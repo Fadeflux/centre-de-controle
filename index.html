@@ -15,9 +15,9 @@
   :root{
     --bg:#0a0a0a; --surface:#111214; --surface-2:#17181b; --line:#1f2024; --line-2:#2b2c31;
     --text:#f5f5f6; --muted:#8a8a92; --faint:#57575f;
-    --acc:#a855f7; --acc-hover:#9333ea; --acc-bg:#1b1230; --acc-line:#3a2a63;
-    --ok:#4ade80; --down:#f87171; --idle:#33343a;
-    --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --acc:#a855f7; --acc-hover:#9333ea; --acc-bg:#1b1230; --acc-line:#3a2a63; --acc-ink:#c9a9ff;
+    --ok:#4ade80; --down:#f87171; --idle:#33343a; --gold:#e6c84a;
+    --radius:12px;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -29,9 +29,10 @@
   }
   .wrap{max-width:980px;margin:0 auto}
 
-  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 22px}
-  .brand{display:flex;align-items:center;gap:13px;flex:1;min-width:200px}
-  .logo{width:42px;height:42px;border-radius:12px;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px;box-shadow:0 4px 16px -4px var(--acc)}
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 18px}
+  .brand{display:flex;align-items:center;gap:13px;flex:1;min-width:190px}
+  .logo{width:42px;height:42px;border-radius:12px;background:var(--acc);display:grid;place-items:center;box-shadow:0 4px 16px -4px var(--acc)}
+  .logo svg{width:23px;height:23px}
   h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.3px}
   .sub{font-size:12px;color:var(--muted);margin-top:2px}
   .top-actions{display:flex;align-items:center;gap:8px}
@@ -42,17 +43,23 @@
   }
   button.btn:hover{background:var(--surface-2);border-color:var(--line-2)}
   button.btn:active{transform:scale(.98)}
-  #unlock{border-color:var(--acc-line);color:#c9a9ff}
+  #unlock{border-color:var(--acc-line);color:var(--acc-ink)}
   #unlock:hover{background:var(--acc-bg)}
   .spin{display:inline-block;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  .banner{display:none;align-items:center;gap:10px;background:var(--acc-bg);border:1px solid var(--acc-line);
-    border-radius:11px;padding:11px 14px;font-size:13px;color:#e6d8ff;margin-bottom:20px}
-  .banner.show{display:flex}
+  .banner,.alert{display:none;align-items:center;gap:10px;border-radius:11px;padding:11px 14px;font-size:13px;margin-bottom:16px}
+  .banner{background:var(--acc-bg);border:1px solid var(--acc-line);color:#e6d8ff}
   .banner b{font-weight:600;color:#fff}
+  .banner.show,.alert.show{display:flex}
+  .alert{background:#2a1414;border:1px solid #5c2626;color:#ffd7d7}
+  .alert b{color:#fff;font-weight:600}
 
-  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:28px}
+  .daily{font-size:13.5px;color:var(--muted);margin:0 2px 18px}
+  .daily b{color:var(--text);font-weight:600}
+  .daily .empty{color:var(--faint)}
+
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
   .tile{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:14px 16px;transition:.15s}
   .tile:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.7)}
   .tile.hero{border-top-color:var(--acc)}
@@ -64,20 +71,26 @@
   .section{margin:0 0 24px}
   .sec-head{display:flex;align-items:center;gap:12px;margin:0 2px 13px}
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .sec-head.pin .t{color:var(--gold)}
   .sec-head .rule{flex:1;height:1px;background:var(--line)}
 
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
-  .card{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;display:flex;flex-direction:column;gap:12px;transition:transform .15s,border-color .15s,box-shadow .15s}
+  .card{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;display:flex;flex-direction:column;gap:11px;transition:transform .15s,border-color .15s,box-shadow .15s}
   .card:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(0,0,0,.75)}
   .card.featured{border-top-color:var(--acc)}
   .card-top{display:flex;align-items:center;gap:10px}
-  .ico{width:34px;height:34px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font-weight:700;font-size:15px;color:#b98bff;flex-shrink:0;border:1px solid var(--line)}
+  .ico{width:34px;height:34px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--acc-ink);flex-shrink:0;border:1px solid var(--line)}
   .card-name{font-size:14.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex-shrink:0;position:relative}
+  .star{background:none;border:0;color:var(--faint);font-size:15px;cursor:pointer;padding:0 1px;line-height:1;transition:.15s}
+  .star:hover{color:var(--gold)} .star.on{color:var(--gold)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex-shrink:0}
   .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(74,222,128,.15)} .dot.off{background:var(--down);box-shadow:0 0 0 3px rgba(248,113,113,.15)}
   .metrics{display:flex;gap:20px;flex-wrap:wrap;min-height:40px}
   .metric .m-lbl{font-size:11px;color:var(--faint)}
-  .metric .m-val{font-size:20px;font-weight:600;letter-spacing:-.3px;margin-top:2px}
+  .metric .m-val{font-size:20px;font-weight:600;letter-spacing:-.3px;margin-top:2px;display:flex;align-items:baseline;gap:5px}
+  .delta{font-size:11.5px;font-weight:600;color:var(--muted)}
+  .delta.up{color:var(--ok)} .delta.down{color:var(--down)}
+  .spark{display:block;margin-top:7px}
   .note{font-size:12.5px;color:var(--muted)}
   .card-foot{display:flex;align-items:center;gap:8px;margin-top:auto}
   a.open{flex:1;text-align:center;text-decoration:none;font-size:13px;font-weight:500;color:var(--text);
@@ -111,7 +124,7 @@
 
 <div class="gate" id="gate">
   <div class="box">
-    <div class="logo">CC</div>
+    <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
     <h2>Centre de contrôle</h2>
     <p>Entre ton mot de passe pour afficher tes chiffres.</p>
     <input id="pw" type="password" inputmode="text" autocomplete="current-password" placeholder="Mot de passe" />
@@ -123,7 +136,7 @@
 <div class="wrap" id="app">
   <header class="top">
     <div class="brand">
-      <div class="logo">CC</div>
+      <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
       <div>
         <h1>Centre de contrôle</h1>
         <div class="sub" id="sub">Chargement…</div>
@@ -131,11 +144,14 @@
     </div>
     <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
+      <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
   </header>
 
   <div class="banner" id="banner"></div>
+  <div class="alert" id="alert"></div>
+  <div class="daily" id="daily"></div>
 
   <div class="summary" id="summary"></div>
   <div id="sections"></div>
@@ -152,15 +168,13 @@
 <script>
 /* ============================================================
    CONFIG — pour ajouter/modifier un outil, tout se passe ici.
-   openUrl : mettre l'adresse réelle (Railway / site) quand tu l'as.
-   metrics : les clés doivent matcher ce que renvoie /api/hub.
    ============================================================ */
 const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
-const REFRESH_MS = 60000;     // rafraîchit toutes les 60 s
+const REFRESH_MS = 60000;
 
 const fmtMoney = v => (Math.round(v)).toLocaleString("fr-FR") + " $";
 const fmtInt   = v => Math.round(v).toLocaleString("fr-FR");
-const fmtBig   = v => {                       // 2 400 000 -> "2,4 M"
+const fmtBig   = v => {
   v = Number(v)||0;
   if (v >= 1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(".",",") + " M";
   if (v >= 1e3) return (v/1e3).toFixed(0) + " k";
@@ -188,27 +202,46 @@ const TOOLS = [
   { id:"monloader",   cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
 
-/* Données de démonstration (utilisées tant que le cerveau n'est pas activé). */
+/* Démo (tant que le cerveau n'est pas activé) — avec tendances + courbes. */
 const DEMO = {
   "lola":{status:"online"},
-  "clipfusion-shinra":{status:"online",metrics:{drives7d:96,views7d:1800000}},
+  "clipfusion-shinra":{status:"online",metrics:{drives7d:96,views7d:1800000},series:{views7d:[210000,240000,260000,230000,280000,300000,280000]}},
   "shinra-finance":{status:"online",metrics:{profitMonth:3080,subs:412}},
-  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137}},
-  "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000}},
+  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]}},
+  "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "sms-perso":{status:"online"},
 };
 
-/* ---------- rendu ---------- */
+/* ---------- état ---------- */
 const $ = s => document.querySelector(s);
 let TOKEN = localStorage.getItem("cc_token") || "";
+let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
+let LAST  = DEMO;
 
 function statusClass(s){ return s==="online"?"on":s==="offline"?"off":""; }
+function toolById(id){ return TOOLS.find(t=>t.id===id); }
+
+function sparkSVG(arr){
+  if(!arr || arr.length<2) return "";
+  const w=68,h=22, max=Math.max(...arr), min=Math.min(...arr), rng=(max-min)||1;
+  const pts=arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${(h-((v-min)/rng)*(h-3)-1.5).toFixed(1)}`).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function deltaHTML(cur, prev){
+  if(prev==null || isNaN(prev)) return "";
+  const diff = cur - prev;
+  if(diff===0) return `<span class="delta" title="identique à la période précédente">=</span>`;
+  const up = diff>0;
+  return `<span class="delta ${up?'up':'down'}" title="vs période précédente">${up?'▲':'▼'} ${fmtInt(Math.abs(diff))}</span>`;
+}
 
 function cardHTML(t, data){
   const d = data[t.id] || {};
   const st = t.build ? "idle" : (d.status||"unknown");
-  const dotCls = t.build ? "" : statusClass(st);
+  const pinned = PINS.indexOf(t.id) !== -1;
+  const star = t.build ? "" : `<button class="star ${pinned?'on':''}" data-pin="${t.id}" title="${pinned?'Désépingler':'Épingler'}" aria-label="Épingler">${pinned?'★':'☆'}</button>`;
+  const dot  = t.build ? "" : `<span class="dot ${statusClass(st)}"></span>`;
   let body;
   if (t.build){
     body = `<div class="note">Pas encore en ligne</div>`;
@@ -217,8 +250,10 @@ function cardHTML(t, data){
   } else {
     const m = t.metrics.map(mt=>{
       const raw = d.metrics ? d.metrics[mt.k] : undefined;
-      const val = (raw===undefined||raw===null) ? "—" : mt.f(raw);
-      return `<div class="metric"><div class="m-lbl">${mt.l}</div><div class="m-val">${val}</div></div>`;
+      const val = (raw==null) ? "—" : mt.f(raw);
+      const delta = (raw!=null && d.prev) ? deltaHTML(raw, d.prev[mt.k]) : "";
+      const spark = (raw!=null && d.series && d.series[mt.k]) ? sparkSVG(d.series[mt.k]) : "";
+      return `<div class="metric"><div class="m-lbl">${mt.l}</div><div class="m-val">${val}${delta}</div>${spark}</div>`;
     }).join("");
     body = `<div class="metrics">${m}</div>`;
   }
@@ -226,31 +261,58 @@ function cardHTML(t, data){
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
     : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a></div>`;
   return `<div class="card ${t.featured?"featured":""}">
-    <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${t.build?"":`<span class="dot ${dotCls}"></span>`}</div>
+    <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${star}${dot}</div>
     ${body}${foot}</div>`;
 }
 
-function render(data){
-  const cats = [...new Set(TOOLS.map(t=>t.cat))];
-  $("#sections").innerHTML = cats.map(cat=>{
+function groups(){
+  const out = [];
+  const pinnedTools = PINS.map(toolById).filter(t=>t && !t.build);
+  if (pinnedTools.length) out.push({ cat:"★ Épinglés", pin:true, build:false, tools:pinnedTools });
+  [...new Set(TOOLS.map(t=>t.cat))].forEach(cat=>{
     const isBuild = cat==="En construction";
-    const cards = TOOLS.filter(t=>t.cat===cat).map(t=>cardHTML(t,data)).join("");
-    return `<div class="section ${isBuild?"build":""}">
-      <div class="sec-head"><span class="t">${cat}</span><span class="rule"></span></div>
+    const tools = TOOLS.filter(t=>t.cat===cat && (isBuild || PINS.indexOf(t.id)===-1));
+    if (tools.length) out.push({ cat, pin:false, build:isBuild, tools });
+  });
+  return out;
+}
+
+function render(data){
+  LAST = data;
+  $("#sections").innerHTML = groups().map(g=>{
+    const cards = g.tools.map(t=>cardHTML(t,data)).join("");
+    return `<div class="section ${g.build?"build":""}">
+      <div class="sec-head ${g.pin?"pin":""}"><span class="t">${g.cat}</span><span class="rule"></span></div>
       <div class="grid">${cards}</div></div>`;
   }).join("");
 
   const live = TOOLS.filter(t=>!t.build);
   const onCount = live.filter(t=>(data[t.id]||{}).status==="online").length;
-  const g = (id,k)=>{ const d=data[id]; return d&&d.metrics?Number(d.metrics[k])||0:0; };
-  const aPayer = g("stats-tracker","aPayer");
-  const subsTeam = g("stats-tracker","subsQuinzaine");
-  const profit = g("shinra-finance","profitMonth") + g("noctra-finance","profitMonth");
+  const gg = (id,k)=>{ const d=data[id]; return d&&d.metrics?Number(d.metrics[k])||0:0; };
+  const aPayer = gg("stats-tracker","aPayer");
+  const subsTeam = gg("stats-tracker","subsQuinzaine");
+  const profit = gg("shinra-finance","profitMonth") + gg("noctra-finance","profitMonth");
   $("#summary").innerHTML = `
     <div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>
     <div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${fmtMoney(aPayer)}</div></div>
     <div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(subsTeam)}</div></div>
     <div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`;
+
+  // alerte hors-ligne
+  const off = live.filter(t=>(data[t.id]||{}).status==="offline");
+  if (off.length){
+    $("#alert").innerHTML = `<b>⚠️ ${off.length} outil${off.length>1?"s":""} hors ligne</b> — ${off.map(t=>t.name).join(", ")}`;
+    $("#alert").classList.add("show");
+  } else $("#alert").classList.remove("show");
+
+  // résumé du jour
+  const st = data["stats-tracker"] || {};
+  const todaySubs = (st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
+  let parts = [];
+  if (todaySubs!=null) parts.push(`<b>${fmtInt(todaySubs)}</b> subs aujourd'hui`);
+  if (st.metrics && st.metrics.aPayer!=null) parts.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
+  parts.push(`<b>${onCount}/${live.length}</b> outils en ligne`);
+  $("#daily").innerHTML = "Aujourd'hui : " + parts.join(" · ");
 }
 
 /* ---------- données ---------- */
@@ -280,6 +342,18 @@ async function load(){
   }
 }
 
+/* ---------- épinglage ---------- */
+function togglePin(id){
+  const i = PINS.indexOf(id);
+  if (i>=0) PINS.splice(i,1); else PINS.push(id);
+  localStorage.setItem("cc_pins", JSON.stringify(PINS));
+  render(LAST);
+}
+$("#sections").addEventListener("click", e=>{
+  const b = e.target.closest("[data-pin]");
+  if (b){ togglePin(b.getAttribute("data-pin")); }
+});
+
 /* ---------- mot de passe ---------- */
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
@@ -287,6 +361,14 @@ $("#unlock").onclick = ()=>openGate();
 $("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
+
+/* ---------- mode plein écran ---------- */
+$("#tv").onclick = ()=>{
+  try{
+    if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||function(){})(); }
+    else { (document.exitFullscreen||function(){})(); }
+  }catch(e){}
+};
 
 /* ---------- démarrage ---------- */
 load();
