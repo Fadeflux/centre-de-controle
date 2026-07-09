@@ -144,6 +144,7 @@
     </div>
     <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
+      <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
@@ -170,6 +171,7 @@
    CONFIG — pour ajouter/modifier un outil, tout se passe ici.
    ============================================================ */
 const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
+const HUB_BASE = HUB_URL.replace(/\/api\/hub$/, "");
 const REFRESH_MS = 60000;
 
 const fmtMoney = v => (Math.round(v)).toLocaleString("fr-FR") + " $";
@@ -194,6 +196,8 @@ const TOOLS = [
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
   { id:"noctra-finance",   cat:"Perso — Bénin", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+  { id:"onlymonster",      cat:"Perso — Bénin", name:"OnlyMonster", icon:"◎", openUrl:"",
+    metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   { id:"sms-perso",        cat:"Perso — Bénin", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
 
   { id:"growthx",     cat:"En construction", name:"GrowthX",      icon:"G", build:true },
@@ -210,6 +214,7 @@ const DEMO = {
   "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]}},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
+  "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
   "sms-perso":{status:"online"},
 };
 
@@ -369,6 +374,35 @@ $("#tv").onclick = ()=>{
     else { (document.exitFullscreen||function(){})(); }
   }catch(e){}
 };
+
+/* ---------- notifications push ---------- */
+function b64ToU8(base64){
+  const pad="=".repeat((4-base64.length%4)%4);
+  const b=(base64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(b), out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+if(("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window)){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  $("#push").style.display="inline-flex";
+}
+async function enablePush(){
+  const btn=$("#push");
+  if(!TOKEN){ openGate("Connecte-toi d'abord pour activer les alertes."); return; }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){ btn.textContent="🔔 Refusé"; return; }
+    const vr=await fetch(HUB_BASE+"/api/hub/vapid").then(r=>r.json()).catch(()=>({}));
+    if(!vr.publicKey){ btn.textContent="🔔 Bientôt"; btn.title="Alertes pas encore activées côté serveur (clés VAPID à poser)"; return; }
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64ToU8(vr.publicKey)});
+    const r=await fetch(HUB_BASE+"/api/hub/subscribe",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(sub)});
+    if(r.ok){ btn.textContent="🔔 Activées ✓"; btn.title="Tu recevras une notif si un outil tombe."; }
+    else { btn.textContent="🔔 Erreur"; }
+  }catch(e){ btn.textContent="🔔 Erreur"; }
+}
+$("#push").onclick=enablePush;
 
 /* ---------- démarrage ---------- */
 load();
