@@ -55,9 +55,26 @@
   .alert{background:#2a1414;border:1px solid #5c2626;color:#ffd7d7}
   .alert b{color:#fff;font-weight:600}
 
-  .daily{font-size:13.5px;color:var(--muted);margin:0 2px 18px}
-  .daily b{color:var(--text);font-weight:600}
-  .daily .empty{color:var(--faint)}
+  .daily{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px;margin:0 0 22px}
+  .meteo{font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .meteo.ok{color:var(--ok)} .meteo.warn{color:#eab308} .meteo.bad{color:var(--down)}
+  .brief-txt{font-size:13.5px;color:var(--muted);margin-top:5px}
+  .brief-txt b{color:var(--text);font-weight:600}
+
+  .costs{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .costs-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .costs-head .tot{margin-left:auto;font-size:13px;color:var(--acc);font-weight:700}
+  .costs-add{display:flex;gap:8px;margin-bottom:6px}
+  .costs-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .costs-add input:focus{border-color:var(--acc)}
+  #costName{flex:1;min-width:0} #costAmount{width:96px}
+  .co-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .co-row:last-child{border-bottom:0}
+  .co-name{flex:1;word-break:break-word}
+  .co-amt{color:var(--text);font-weight:500}
+  .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
+  .co-del:hover{color:var(--down);opacity:1}
+  .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
 
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -188,6 +205,15 @@
 
   <div class="summary" id="summary"></div>
   <div id="sections"></div>
+
+  <div class="costs" id="costs">
+    <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
+    <div class="costs-add">
+      <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
+      <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
+    </div>
+    <div id="costsList"></div>
+  </div>
 
   <div class="foot">
     <span class="legend"><i style="background:var(--ok)"></i> En ligne</span>
@@ -359,13 +385,28 @@ function render(data){
   } else $("#alert").classList.remove("show");
 
   // résumé du jour
+  renderBrief(data, live, onCount, stInW);
+}
+
+/* ---------- résumé du jour + météo business ---------- */
+function renderBrief(data, live, onCount, stInW){
+  const off = live.length - onCount;
+  const meteo = off===0 ? "ok" : (off>=2 ? "bad" : "warn");
   const st = data["stats-tracker"] || {};
-  const todaySubs = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
-  let parts = [];
-  if (todaySubs!=null) parts.push(`<b>${fmtInt(todaySubs)}</b> subs aujourd'hui`);
-  if (stInW && st.metrics && st.metrics.aPayer!=null) parts.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
-  parts.push(`<b>${onCount}/${live.length}</b> outils en ligne`);
-  $("#daily").innerHTML = "Aujourd'hui : " + parts.join(" · ");
+  const subsDelta = (stInW && st.prev && st.metrics && st.metrics.subsQuinzaine!=null) ? st.metrics.subsQuinzaine - (st.prev.subsQuinzaine||0) : null;
+  const today = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
+  let s = [];
+  if (today!=null) s.push(`<b>${fmtInt(today)}</b> sub${today>1?"s":""} aujourd'hui`);
+  if (subsDelta!=null && subsDelta!==0) s.push(subsDelta>0 ? `quinzaine <b>en hausse</b> (+${fmtInt(subsDelta)})` : `quinzaine <b>en baisse</b> (${fmtInt(subsDelta)})`);
+  if (stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
+  s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
+  const nTodo = TODOS.filter(t=>!t.d).length;
+  if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
+  const h = new Date().getHours();
+  const greet = h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+  const mIcon = meteo==="ok"?"🟢":meteo==="warn"?"🟡":"🔴";
+  const mLbl = meteo==="ok"?"Tout roule":meteo==="warn"?"À surveiller":"Attention";
+  $("#daily").innerHTML = `<span class="meteo ${meteo}">${mIcon} ${mLbl}</span><div class="brief-txt">${greet} 👋 · ${s.join(" · ")}</div>`;
 }
 
 /* ---------- données ---------- */
@@ -460,6 +501,26 @@ async function loadTodosFromBrain(){
   }catch(e){}
 }
 renderTodos();
+
+/* ---------- dépenses d'outils ---------- */
+let COSTS = JSON.parse(localStorage.getItem("cc_costs") || "[]");
+function saveCosts(){ localStorage.setItem("cc_costs", JSON.stringify(COSTS)); }
+function renderCosts(){
+  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
+  $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
+  if(!COSTS.length){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
+  $("#costsList").innerHTML = COSTS.map((c,i)=>`<div class="co-row"><span class="co-name">${escapeHtml(c.n)}</span><span class="co-amt">${fmtMoney(Number(c.m)||0)}</span><button class="co-del" data-cdel="${i}" aria-label="Supprimer">✕</button></div>`).join("");
+}
+function addCost(){
+  const n=$("#costName").value.trim(), m=parseFloat(String($("#costAmount").value).replace(",","."));
+  if(!n || isNaN(m)) return;
+  COSTS.push({n:n,m:m}); saveCosts(); renderCosts();
+  $("#costName").value=""; $("#costAmount").value=""; $("#costName").focus();
+}
+$("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
+$("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
+$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); } });
+renderCosts();
 
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
