@@ -74,6 +74,11 @@
   .ti-del:hover{color:var(--down);opacity:1}
   .todo-empty{font-size:13px;color:var(--faint);padding:8px 0 2px}
 
+  .worlds{display:inline-flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:3px;margin:0 0 18px}
+  .worlds button{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:none;border:0;border-radius:8px;padding:7px 17px;cursor:pointer;transition:.15s}
+  .worlds button:hover{color:var(--text)}
+  .worlds button.won{color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc)}
+
   .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
   .tile{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:14px 16px;transition:.15s}
   .tile:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.7)}
@@ -165,6 +170,12 @@
     </div>
   </header>
 
+  <div class="worlds" id="worlds">
+    <button data-world="all" class="won">Tout</button>
+    <button data-world="shinra">Shinra</button>
+    <button data-world="noctra">Noctra</button>
+  </div>
+
   <div class="banner" id="banner"></div>
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
@@ -205,26 +216,26 @@ const fmtBig   = v => {
 };
 
 const TOOLS = [
-  { id:"lola",             cat:"Agence — Shinra", name:"Bot Lola",          icon:"L", openUrl:"", voyantOnly:true },
-  { id:"clipfusion-shinra",cat:"Agence — Shinra", name:"ClipFusion Shinra", icon:"C", openUrl:"",
+  { id:"lola",             world:"shinra", cat:"Shinra", name:"Bot Lola",          icon:"L", openUrl:"", voyantOnly:true },
+  { id:"clipfusion-shinra",world:"shinra", cat:"Shinra", name:"ClipFusion Shinra", icon:"C", openUrl:"",
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
-  { id:"shinra-finance",   cat:"Agence — Shinra", name:"Shinra Finance",    icon:"$", openUrl:"https://fadeflux.github.io/shinra-finance/",
+  { id:"shinra-finance",   world:"shinra", cat:"Shinra", name:"Shinra Finance",    icon:"$", openUrl:"https://fadeflux.github.io/shinra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
 
-  { id:"stats-tracker",    cat:"Perso — Bénin", name:"Subs & Paie", icon:"S", openUrl:"https://stats-tracker-prive-production.up.railway.app", featured:true,
+  { id:"stats-tracker",    world:"noctra", cat:"Noctra", name:"Subs & Paie", icon:"S", openUrl:"https://stats-tracker-prive-production.up.railway.app", featured:true,
     metrics:[{k:"subsQuinzaine",l:"Subs quinzaine",f:fmtInt},{k:"aPayer",l:"À payer",f:fmtMoney}] },
-  { id:"clipfusion-perso", cat:"Perso — Bénin", name:"ClipFusion Perso", icon:"C", openUrl:"",
+  { id:"clipfusion-perso", world:"noctra", cat:"Noctra", name:"ClipFusion Perso", icon:"C", openUrl:"",
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
-  { id:"noctra-finance",   cat:"Perso — Bénin", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
+  { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
-  { id:"onlymonster",      cat:"Perso — Bénin", name:"OnlyMonster", icon:"◎", openUrl:"",
+  { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
-  { id:"sms-perso",        cat:"Perso — Bénin", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
+  { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
 
-  { id:"growthx",     cat:"En construction", name:"GrowthX",      icon:"G", build:true },
-  { id:"coachos",     cat:"En construction", name:"CoachOS",      icon:"C", build:true },
-  { id:"iphone-panel",cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
-  { id:"monloader",   cat:"En construction", name:"MonLoader",    icon:"M", build:true },
+  { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
+  { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
+  { id:"iphone-panel",world:"noctra", cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
+  { id:"monloader",   world:"noctra", cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
 
 /* Démo (tant que le cerveau n'est pas activé) — avec tendances + courbes. */
@@ -244,6 +255,18 @@ const $ = s => document.querySelector(s);
 let TOKEN = localStorage.getItem("cc_token") || "";
 let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
 let LAST  = DEMO;
+let WORLD = localStorage.getItem("cc_world") || "all";
+const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
+function applyAccent(){
+  const a = ACCENTS[WORLD] || ACCENTS.all;
+  document.documentElement.style.setProperty("--acc", a[0]);
+  document.documentElement.style.setProperty("--acc-hover", a[1]);
+}
+function setWorld(w){
+  WORLD = w; localStorage.setItem("cc_world", w);
+  [...document.querySelectorAll("#worlds button")].forEach(b=>b.classList.toggle("won", b.getAttribute("data-world")===w));
+  applyAccent(); render(LAST);
+}
 
 function statusClass(s){ return s==="online"?"on":s==="offline"?"off":""; }
 function toolById(id){ return TOOLS.find(t=>t.id===id); }
@@ -291,13 +314,14 @@ function cardHTML(t, data){
     ${body}${foot}</div>`;
 }
 
+function inWorld(t){ return WORLD==="all" || t.world===WORLD; }
 function groups(){
   const out = [];
-  const pinnedTools = PINS.map(toolById).filter(t=>t && !t.build);
+  const pinnedTools = PINS.map(toolById).filter(t=>t && !t.build && inWorld(t));
   if (pinnedTools.length) out.push({ cat:"★ Épinglés", pin:true, build:false, tools:pinnedTools });
   [...new Set(TOOLS.map(t=>t.cat))].forEach(cat=>{
     const isBuild = cat==="En construction";
-    const tools = TOOLS.filter(t=>t.cat===cat && (isBuild || PINS.indexOf(t.id)===-1));
+    const tools = TOOLS.filter(t=>t.cat===cat && inWorld(t) && (isBuild || PINS.indexOf(t.id)===-1));
     if (tools.length) out.push({ cat, pin:false, build:isBuild, tools });
   });
   return out;
@@ -312,17 +336,20 @@ function render(data){
       <div class="grid">${cards}</div></div>`;
   }).join("");
 
-  const live = TOOLS.filter(t=>!t.build);
+  const live = TOOLS.filter(t=>!t.build && inWorld(t));
   const onCount = live.filter(t=>(data[t.id]||{}).status==="online").length;
   const gg = (id,k)=>{ const d=data[id]; return d&&d.metrics?Number(d.metrics[k])||0:0; };
-  const aPayer = gg("stats-tracker","aPayer");
-  const subsTeam = gg("stats-tracker","subsQuinzaine");
-  const profit = gg("shinra-finance","profitMonth") + gg("noctra-finance","profitMonth");
-  $("#summary").innerHTML = `
-    <div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>
-    <div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${fmtMoney(aPayer)}</div></div>
-    <div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(subsTeam)}</div></div>
-    <div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`;
+  const stInW = inWorld(toolById("stats-tracker"));
+  const tiles = [`<div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>`];
+  if(stInW){
+    tiles.push(`<div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${fmtMoney(gg("stats-tracker","aPayer"))}</div></div>`);
+    tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(gg("stats-tracker","subsQuinzaine"))}</div></div>`);
+  }
+  let profit = 0;
+  if(inWorld(toolById("shinra-finance"))) profit += gg("shinra-finance","profitMonth");
+  if(inWorld(toolById("noctra-finance"))) profit += gg("noctra-finance","profitMonth");
+  tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`);
+  $("#summary").innerHTML = tiles.join("");
 
   // alerte hors-ligne
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
@@ -333,10 +360,10 @@ function render(data){
 
   // résumé du jour
   const st = data["stats-tracker"] || {};
-  const todaySubs = (st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
+  const todaySubs = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
   let parts = [];
   if (todaySubs!=null) parts.push(`<b>${fmtInt(todaySubs)}</b> subs aujourd'hui`);
-  if (st.metrics && st.metrics.aPayer!=null) parts.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
+  if (stInW && st.metrics && st.metrics.aPayer!=null) parts.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
   parts.push(`<b>${onCount}/${live.length}</b> outils en ligne`);
   $("#daily").innerHTML = "Aujourd'hui : " + parts.join(" · ");
 }
@@ -464,6 +491,9 @@ async function enablePush(){
 $("#push").onclick=enablePush;
 
 /* ---------- démarrage ---------- */
+$("#worlds").addEventListener("click", e=>{ const b=e.target.closest("[data-world]"); if(b) setWorld(b.getAttribute("data-world")); });
+[...document.querySelectorAll("#worlds button")].forEach(b=>b.classList.toggle("won", b.getAttribute("data-world")===WORLD));
+applyAccent();
 load();
 loadTodosFromBrain();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")) load(); }, REFRESH_MS);
