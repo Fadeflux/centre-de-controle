@@ -59,6 +59,21 @@
   .daily b{color:var(--text);font-weight:600}
   .daily .empty{color:var(--faint)}
 
+  .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
+  .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
+  #todoInput{width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
+  #todoInput:focus{border-color:var(--acc)}
+  .ti-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:.5px solid var(--line)}
+  .ti-row:last-child{border-bottom:0}
+  .ti-check{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);flex-shrink:0;cursor:pointer;display:grid;place-items:center;color:transparent;font-size:12px;transition:.15s}
+  .ti-check.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .ti-text{flex:1;font-size:14px;cursor:pointer;word-break:break-word}
+  .ti-row.on .ti-text{color:var(--faint);text-decoration:line-through}
+  .ti-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
+  .ti-del:hover{color:var(--down);opacity:1}
+  .todo-empty{font-size:13px;color:var(--faint);padding:8px 0 2px}
+
   .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
   .tile{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:14px 16px;transition:.15s}
   .tile:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.7)}
@@ -153,6 +168,12 @@
   <div class="banner" id="banner"></div>
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
+
+  <div class="todo" id="todo">
+    <div class="todo-head">📝 Ma journée <span class="c" id="todoCount"></span></div>
+    <input id="todoInput" placeholder="Ajouter une tâche… (Entrée)" autocomplete="off" />
+    <div id="todoList"></div>
+  </div>
 
   <div class="summary" id="summary"></div>
   <div id="sections"></div>
@@ -363,7 +384,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -374,6 +395,44 @@ $("#tv").onclick = ()=>{
     else { (document.exitFullscreen||function(){})(); }
   }catch(e){}
 };
+
+/* ---------- ma journée (à faire) ---------- */
+let TODOS = JSON.parse(localStorage.getItem("cc_todos") || "[]");
+let todoSyncT = null;
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function saveTodos(){
+  localStorage.setItem("cc_todos", JSON.stringify(TODOS));
+  if(TOKEN && HUB_URL){
+    clearTimeout(todoSyncT);
+    todoSyncT = setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:TODOS})}).catch(()=>{}); }, 600);
+  }
+}
+function renderTodos(){
+  const done = TODOS.filter(t=>t.d).length;
+  $("#todoCount").textContent = TODOS.length ? `${TODOS.length-done} à faire${done?` · ${done} fait${done>1?"s":""}`:""}` : "";
+  if(!TODOS.length){ $("#todoList").innerHTML = `<div class="todo-empty">Rien pour l'instant — ajoute ta première tâche 👆</div>`; return; }
+  $("#todoList").innerHTML = TODOS.map((t,i)=>`<div class="ti-row ${t.d?"on":""}">
+    <div class="ti-check ${t.d?"on":""}" data-toggle="${i}">✓</div>
+    <div class="ti-text" data-toggle="${i}">${escapeHtml(t.t)}</div>
+    <button class="ti-del" data-del="${i}" aria-label="Supprimer">✕</button></div>`).join("");
+}
+function addTodo(text){ text=(text||"").trim(); if(!text) return; TODOS.unshift({t:text,d:false}); saveTodos(); renderTodos(); }
+$("#todoInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ addTodo(e.target.value); e.target.value=""; } });
+$("#todoList").addEventListener("click",e=>{
+  const tg=e.target.closest("[data-toggle]"), dl=e.target.closest("[data-del]");
+  if(tg){ const i=+tg.getAttribute("data-toggle"); if(TODOS[i]){ TODOS[i].d=!TODOS[i].d; saveTodos(); renderTodos(); } }
+  else if(dl){ const i=+dl.getAttribute("data-del"); TODOS.splice(i,1); saveTodos(); renderTodos(); }
+});
+async function loadTodosFromBrain(){
+  if(!TOKEN || !HUB_URL) return;
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/notes",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return;
+    const j = await r.json();
+    if(Array.isArray(j.notes)){ TODOS = j.notes; localStorage.setItem("cc_todos",JSON.stringify(TODOS)); renderTodos(); }
+  }catch(e){}
+}
+renderTodos();
 
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
@@ -406,6 +465,7 @@ $("#push").onclick=enablePush;
 
 /* ---------- démarrage ---------- */
 load();
+loadTodosFromBrain();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")) load(); }, REFRESH_MS);
 </script>
 </body>
