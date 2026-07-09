@@ -1,0 +1,12 @@
+{
+  "name": "Centre de contrôle",
+  "short_name": "Contrôle",
+  "description": "Poste de pilotage de tous les outils du business.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

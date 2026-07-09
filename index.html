@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1115" />
+<title>Centre de contrôle</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<style>
+  :root{
+    --bg:#f4f5f7; --surface:#ffffff; --surface-2:#f0f1f4; --line:#e3e5ea;
+    --text:#1a1d24; --muted:#6b7280; --faint:#9aa1ac;
+    --accent:#5b6ef5; --accent-bg:#eceeffe6;
+    --ok:#1ea672; --ok-bg:#e6f6ef; --down:#e0574f; --down-bg:#fbeceb; --idle:#b6bcc6;
+    --radius:14px; --shadow:0 1px 2px rgba(20,24,40,.04),0 4px 16px rgba(20,24,40,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1115; --surface:#181b22; --surface-2:#20242d; --line:#2a2f3a;
+      --text:#eef0f4; --muted:#9aa1ac; --faint:#6b7280;
+      --accent:#7c8bff; --accent-bg:#232741;
+      --ok:#35c48d; --ok-bg:#12281f; --down:#f0776f; --down-bg:#301a19; --idle:#3a4150;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+    padding:max(14px,env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:960px;margin:0 auto}
+
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0 20px}
+  .brand{display:flex;align-items:center;gap:12px;flex:1;min-width:200px}
+  .logo{width:40px;height:40px;border-radius:12px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:19px}
+  h1{font-size:20px;font-weight:650;margin:0;letter-spacing:-.2px}
+  .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .top-actions{display:flex;align-items:center;gap:8px}
+  button.btn{
+    font:inherit;font-size:13px;font-weight:550;color:var(--text);
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s
+  }
+  button.btn:hover{background:var(--surface-2)}
+  button.btn:active{transform:scale(.98)}
+  .spin{animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .banner{display:none;align-items:center;gap:10px;background:var(--accent-bg);border:1px solid var(--line);
+    border-radius:12px;padding:11px 14px;font-size:13px;color:var(--text);margin-bottom:18px}
+  .banner.show{display:flex}
+  .banner b{font-weight:600}
+
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .tile .lbl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .tile .val{font-size:26px;font-weight:680;letter-spacing:-.5px;margin-top:5px}
+  .tile .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
+
+  .section{margin:0 0 22px}
+  .sec-head{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+  .sec-head .t{font-size:13px;font-weight:600;color:var(--muted)}
+  .sec-head .rule{flex:1;height:1px;background:var(--line)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+  .card.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+  .card-top{display:flex;align-items:center;gap:10px}
+  .ico{width:34px;height:34px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--muted);flex-shrink:0}
+  .card-name{font-size:14.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex-shrink:0;position:relative}
+  .dot.on{background:var(--ok)} .dot.off{background:var(--down)}
+  .dot.on::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--ok);opacity:.4}
+  .metrics{display:flex;gap:18px;flex-wrap:wrap;min-height:38px}
+  .metric .m-lbl{font-size:11.5px;color:var(--faint)}
+  .metric .m-val{font-size:20px;font-weight:640;letter-spacing:-.3px;margin-top:1px}
+  .note{font-size:12.5px;color:var(--muted)}
+  .card-foot{display:flex;align-items:center;gap:8px;margin-top:auto}
+  a.open{flex:1;text-align:center;text-decoration:none;font-size:13px;font-weight:550;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;transition:.15s}
+  a.open:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  a.open.disabled{opacity:.45;pointer-events:none}
+  .pill{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:3px 9px}
+
+  .build .card{opacity:.72;padding-bottom:15px}
+  .build .metrics{min-height:0}
+
+  .foot{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--faint)}
+  .legend{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+  .gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .gate.show{display:flex}
+  .gate .box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px 24px;width:100%;max-width:340px;box-shadow:var(--shadow);text-align:center}
+  .gate .logo{margin:0 auto 14px}
+  .gate h2{font-size:17px;margin:0 0 4px}
+  .gate p{font-size:13px;color:var(--muted);margin:0 0 16px}
+  .gate input{width:100%;font:inherit;font-size:15px;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);margin-bottom:10px;text-align:center}
+  .gate button{width:100%;font:inherit;font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px;cursor:pointer}
+  .gate .err{color:var(--down);font-size:12.5px;min-height:16px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="box">
+    <div class="logo">CC</div>
+    <h2>Centre de contrôle</h2>
+    <p>Entre ton mot de passe pour accéder à tes chiffres.</p>
+    <input id="pw" type="password" inputmode="text" autocomplete="current-password" placeholder="Mot de passe" />
+    <button id="pwGo">Entrer</button>
+    <div class="err" id="pwErr"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">CC</div>
+      <div>
+        <h1>Centre de contrôle</h1>
+        <div class="sub" id="sub">Chargement…</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
+      <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="summary" id="summary"></div>
+  <div id="sections"></div>
+
+  <div class="foot">
+    <span class="legend"><i style="background:var(--ok)"></i> En ligne</span>
+    <span class="legend"><i style="background:var(--down)"></i> Hors ligne</span>
+    <span class="legend"><i style="background:var(--idle)"></i> Local / à venir</span>
+    <span style="flex:1"></span>
+    <span id="footnote"></span>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — pour ajouter/modifier un outil, tout se passe ici.
+   openUrl : mettre l'adresse réelle (Railway / site) quand tu l'as.
+   metrics : les clés doivent matcher ce que renvoie /api/hub.
+   ============================================================ */
+const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub"; // cerveau (à confirmer)
+const REFRESH_MS = 60000;     // rafraîchit toutes les 60 s
+
+const fmtMoney = v => (Math.round(v)).toLocaleString("fr-FR") + " $";
+const fmtInt   = v => Math.round(v).toLocaleString("fr-FR");
+const fmtBig   = v => {                       // 2 400 000 -> "2,4 M"
+  v = Number(v)||0;
+  if (v >= 1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(".",",") + " M";
+  if (v >= 1e3) return (v/1e3).toFixed(0) + " k";
+  return String(Math.round(v));
+};
+
+const TOOLS = [
+  { id:"lola",             cat:"Agence — Shinra", name:"Bot Lola",          icon:"L", openUrl:"", voyantOnly:true },
+  { id:"clipfusion-shinra",cat:"Agence — Shinra", name:"ClipFusion Shinra", icon:"C", openUrl:"",
+    metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
+  { id:"shinra-finance",   cat:"Agence — Shinra", name:"Shinra Finance",    icon:"$", openUrl:"https://fadeflux.github.io/shinra-finance/",
+    metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+
+  { id:"stats-tracker",    cat:"Perso — Bénin", name:"Subs & Paie", icon:"S", openUrl:"", featured:true,
+    metrics:[{k:"subsQuinzaine",l:"Subs quinzaine",f:fmtInt},{k:"aPayer",l:"À payer",f:fmtMoney}] },
+  { id:"clipfusion-perso", cat:"Perso — Bénin", name:"ClipFusion Perso", icon:"C", openUrl:"",
+    metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
+  { id:"noctra-finance",   cat:"Perso — Bénin", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
+    metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+  { id:"sms-perso",        cat:"Perso — Bénin", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
+
+  { id:"growthx",     cat:"En construction", name:"GrowthX",      icon:"G", build:true },
+  { id:"coachos",     cat:"En construction", name:"CoachOS",      icon:"C", build:true },
+  { id:"iphone-panel",cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
+  { id:"monloader",   cat:"En construction", name:"MonLoader",    icon:"M", build:true },
+];
+
+/* Données de démonstration (utilisées tant que HUB_URL est vide). */
+const DEMO = {
+  "lola":{status:"online"},
+  "clipfusion-shinra":{status:"online",metrics:{drives7d:96,views7d:1800000}},
+  "shinra-finance":{status:"online",metrics:{profitMonth:3080,subs:412}},
+  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137}},
+  "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000}},
+  "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
+  "sms-perso":{status:"online"},
+};
+
+/* ---------- rendu ---------- */
+const $ = s => document.querySelector(s);
+let TOKEN = localStorage.getItem("cc_token") || "";
+
+function statusClass(s){ return s==="online"?"on":s==="offline"?"off":""; }
+
+function cardHTML(t, data){
+  const d = data[t.id] || {};
+  const st = t.build ? "idle" : (d.status||"unknown");
+  const dotCls = t.build ? "" : statusClass(st);
+  let body;
+  if (t.build){
+    body = `<div class="note">Pas encore en ligne</div>`;
+  } else if (t.voyantOnly){
+    body = `<div class="note">${st==="online"?"En ligne":st==="offline"?"Hors ligne":"—"} · voyant seul</div>`;
+  } else {
+    const m = t.metrics.map(mt=>{
+      const raw = d.metrics ? d.metrics[mt.k] : undefined;
+      const val = (raw===undefined||raw===null) ? "—" : mt.f(raw);
+      return `<div class="metric"><div class="m-lbl">${mt.l}</div><div class="m-val">${val}</div></div>`;
+    }).join("");
+    body = `<div class="metrics">${m}</div>`;
+  }
+  const foot = t.build
+    ? `<div class="card-foot"><span class="pill">à venir</span></div>`
+    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a></div>`;
+  return `<div class="card ${t.featured?"featured":""}">
+    <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${t.build?"":`<span class="dot ${dotCls}"></span>`}</div>
+    ${body}${foot}</div>`;
+}
+
+function render(data){
+  const cats = [...new Set(TOOLS.map(t=>t.cat))];
+  $("#sections").innerHTML = cats.map(cat=>{
+    const isBuild = cat==="En construction";
+    const cards = TOOLS.filter(t=>t.cat===cat).map(t=>cardHTML(t,data)).join("");
+    return `<div class="section ${isBuild?"build":""}">
+      <div class="sec-head"><span class="t">${cat}</span><span class="rule"></span></div>
+      <div class="grid">${cards}</div></div>`;
+  }).join("");
+
+  // vue d'ensemble
+  const live = TOOLS.filter(t=>!t.build);
+  const onCount = live.filter(t=>(data[t.id]||{}).status==="online").length;
+  const g = (id,k)=>{ const d=data[id]; return d&&d.metrics?Number(d.metrics[k])||0:0; };
+  const aPayer = g("stats-tracker","aPayer");
+  const subsTeam = g("stats-tracker","subsQuinzaine");
+  const profit = g("shinra-finance","profitMonth") + g("noctra-finance","profitMonth");
+  $("#summary").innerHTML = `
+    <div class="tile"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>
+    <div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${fmtMoney(aPayer)}</div></div>
+    <div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(subsTeam)}</div></div>
+    <div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`;
+}
+
+/* ---------- données ---------- */
+function setBanner(html){ const b=$("#banner"); if(html){ b.innerHTML=html; b.classList.add("show"); } else { b.classList.remove("show"); } }
+function demoFallback(msg){
+  render(DEMO);
+  $("#sub").textContent = "Mode démo";
+  setBanner(msg);
+  if(HUB_URL) $("#unlock").style.display = "inline-flex";
+}
+async function load(){
+  const rico = $("#rico"); rico.classList.add("spin");
+  try{
+    if(!HUB_URL){ demoFallback(`<b>Mode démo</b> — chiffres d'exemple. Le « cerveau » n'est pas encore branché.`); return; }
+    const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j = await r.json();
+    render(j.tools||{});
+    $("#sub").textContent = "Mis à jour à l'instant";
+    $("#footnote").textContent = new Date().toLocaleString("fr-FR");
+    setBanner("");
+    $("#unlock").style.display = "none";
+  }catch(e){
+    demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`);
+  }finally{
+    rico.classList.remove("spin");
+  }
+}
+
+/* ---------- mot de passe ---------- */
+function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
+function closeGate(){ $("#gate").classList.remove("show"); }
+$("#unlock").onclick = ()=>openGate();
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); };
+$("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
+$("#refresh").onclick = load;
+
+/* ---------- démarrage ---------- */
+load();
+setInterval(()=>{ if(!$("#gate").classList.contains("show")) load(); }, REFRESH_MS);
+</script>
+</body>
+</html>
