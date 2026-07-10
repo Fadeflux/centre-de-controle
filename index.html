@@ -136,6 +136,17 @@
   .goal-fill{height:100%;background:var(--acc);border-radius:20px;transition:width .6s}
   .goal-info{font-size:13px;color:var(--muted)}
   .goal-win{color:var(--acc);font-weight:600}
+  .ask-row{display:flex;gap:8px}
+  #askInput{flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #askInput:focus{border-color:var(--acc)}
+  #askGo{font:inherit;font-size:13px;font-weight:600;color:#0a0a0a;background:var(--acc);border:0;border-radius:9px;padding:0 16px;cursor:pointer;white-space:nowrap}
+  #askGo:disabled{opacity:.6;cursor:default}
+  .ask-ex{font-size:12px;color:var(--faint);margin-top:9px}
+  .ask-ex a{color:var(--acc-ink);cursor:pointer}
+  .ask-ex a:hover{text-decoration:underline}
+  .ask-ans{font-size:14px;color:var(--text);margin-top:12px;line-height:1.6;white-space:pre-wrap}
+  .ask-ans:empty{display:none}
+  .ask-ans.muted{color:var(--muted)}
 
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -267,6 +278,13 @@
   <div class="panel-box" id="goal">
     <div class="pb-head">🎯 Objectif de la quinzaine</div>
     <div id="goalBody"></div>
+  </div>
+
+  <div class="panel-box" id="ask">
+    <div class="pb-head">🗣️ Assistant — pose ta question</div>
+    <div class="ask-row"><input id="askInput" placeholder="Ex : combien à payer cette quinzaine ?" autocomplete="off" /><button id="askGo">Demander</button></div>
+    <div class="ask-ex">Essaie : <a data-q="Combien de subs cette quinzaine et combien à payer ?">subs &amp; paie</a> · <a data-q="Quel VA est le meilleur cette quinzaine ?">meilleur VA</a> · <a data-q="Quels sont mes revenus OnlyMonster ce mois ?">revenus du mois</a></div>
+    <div class="ask-ans" id="askAns"></div>
   </div>
 
   <div id="sections"></div>
@@ -736,6 +754,24 @@ function renderGoal(data){
   const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("cc_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
   if(win && !GOAL_CELEBRATED){ GOAL_CELEBRATED=true; confetti(); }
 }
+
+/* ---------- assistant IA ---------- */
+async function doAsk(q){
+  q = (q || $("#askInput").value || "").trim(); if(!q) return;
+  if(!TOKEN){ openGate("Connecte-toi d'abord pour utiliser l'assistant."); return; }
+  $("#askInput").value = q;
+  const go=$("#askGo"); go.disabled=true; go.textContent="…";
+  $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/ask",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({question:q})});
+    const j = await r.json();
+    $("#askAns").className="ask-ans"; $("#askAns").textContent = j.answer || j.error || "Pas de réponse.";
+  }catch(e){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Erreur — réessaie."; }
+  finally{ go.disabled=false; go.textContent="Demander"; }
+}
+$("#askGo").onclick=()=>doAsk();
+$("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter") doAsk(); });
+$("#ask").addEventListener("click",e=>{ const a=e.target.closest("[data-q]"); if(a) doAsk(a.getAttribute("data-q")); });
 
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
