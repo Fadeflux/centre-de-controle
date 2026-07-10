@@ -119,6 +119,24 @@
   .jr-time{font-size:11px;color:var(--faint);white-space:nowrap}
   .jr-empty{font-size:13px;color:var(--faint)}
 
+  .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
+  .pb-head .act:hover{background:var(--acc-bg)}
+  .pv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .pv-row:last-child{border-bottom:0}
+  .pv-va{flex:1;font-weight:500}
+  .pv-subs{color:var(--muted);font-size:13px;min-width:64px;text-align:right}
+  .pv-pay{min-width:78px;text-align:right;font-weight:600}
+  .pv-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700}
+  .pv-total .pv-pay{color:var(--acc)}
+  .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+  .goal-row input{width:130px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .goal-gauge{height:12px;background:var(--surface-2);border-radius:20px;overflow:hidden;margin:9px 0 8px}
+  .goal-fill{height:100%;background:var(--acc);border-radius:20px;transition:width .6s}
+  .goal-info{font-size:13px;color:var(--muted)}
+  .goal-win{color:var(--acc);font-weight:600}
+
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
@@ -245,7 +263,18 @@
   </div>
 
   <div class="summary" id="summary"></div>
+
+  <div class="panel-box" id="goal">
+    <div class="pb-head">🎯 Objectif de la quinzaine</div>
+    <div id="goalBody"></div>
+  </div>
+
   <div id="sections"></div>
+
+  <div class="panel-box" id="paie" style="display:none">
+    <div class="pb-head">🧾 Fiche de paie <button class="act" id="paieCopy">📋 Copier</button></div>
+    <div id="paieBody"></div>
+  </div>
 
   <div class="journal" id="journal" style="display:none">
     <div class="jr-head">📩 Journal <span class="c" id="jrCount"></span></div>
@@ -315,7 +344,7 @@ const TOOLS = [
 
 /* Démo (tant que le cerveau n'est pas activé) — avec tendances + courbes. */
 const DEMO = {
-  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]}},
+  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]},vas:[{va:"Welzy",subs:120,pay:60},{va:"Prince",subs:88,pay:44},{va:"Yohan",subs:66,pay:33}]},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
@@ -434,6 +463,8 @@ function render(data){
 
   // résumé du jour
   renderBrief(data, live, onCount, stInW);
+  renderPaie(data);
+  renderGoal(data);
 }
 
 /* ---------- résumé du jour + météo business ---------- */
@@ -662,6 +693,48 @@ async function loadJournal(){
       <div class="jr-main"><div class="jr-title">${escapeHtml(it.title||"")}</div>${it.body?`<div class="jr-body">${escapeHtml(it.body)}</div>`:""}</div>
       <span class="jr-time">${relTime(it.ts)}</span></div>`).join("");
   }catch(e){}
+}
+
+/* ---------- fiche de paie + objectif ---------- */
+function fmtCur(v){ return HIDE ? "••• $" : fmtMoney(v); }
+function renderPaie(data){
+  const vas = ((data["stats-tracker"]||{}).vas)||[];
+  if(!vas.length){ $("#paie").style.display="none"; return; }
+  $("#paie").style.display="block";
+  const total = vas.reduce((a,v)=>a+(Number(v.pay)||0),0), totalSubs = vas.reduce((a,v)=>a+(Number(v.subs)||0),0);
+  $("#paieBody").innerHTML = vas.map(v=>`<div class="pv-row"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span></div>`).join("")
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span></div>`;
+}
+$("#paieCopy").onclick = ()=>{
+  const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
+  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${fmtMoney(v.pay)}`).join("\n") + `\nTOTAL : ${fmtMoney(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
+};
+
+let GOAL = JSON.parse(localStorage.getItem("cc_goal")||"null");
+let GOAL_CELEBRATED = false;
+function confetti(){
+  const em=["🎉","✨","🎊","⭐","💜"];
+  for(let i=0;i<26;i++){ const s=document.createElement("span"); s.textContent=em[Math.floor(Math.random()*em.length)];
+    s.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-30px;font-size:${14+Math.random()*16}px;z-index:99;pointer-events:none;transition:transform 2.5s linear,opacity 2.5s ease-in`;
+    document.body.appendChild(s);
+    requestAnimationFrame(()=>{ s.style.transform=`translateY(${105+Math.random()*15}vh) rotate(${(Math.random()*2-1)*360}deg)`; s.style.opacity="0"; });
+    setTimeout(()=>s.remove(),2700);
+  }
+}
+function renderGoal(data){
+  const current = Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
+  if(!GOAL){
+    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif subs" /><button class="act" id="goalSet" style="margin:0">Fixer</button></div><div class="goal-info">Fixe un objectif de subs pour la quinzaine et suis ta progression.</div>`;
+    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={value:v}; localStorage.setItem("cc_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    return;
+  }
+  const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
+  $("#goalBody").innerHTML = `<div class="goal-info"><b style="color:var(--text)">${fmtInt(current)}</b> / ${fmtInt(GOAL.value)} subs · <b style="color:var(--text)">${pct}%</b> <a href="#" id="goalReset" style="color:var(--faint);margin-left:6px">changer</a></div>
+    <div class="goal-gauge"><div class="goal-fill" style="width:${pct}%"></div></div>
+    <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Encore <b style="color:var(--text)">${fmtInt(GOAL.value-current)}</b> subs`}</div>`;
+  const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("cc_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
+  if(win && !GOAL_CELEBRATED){ GOAL_CELEBRATED=true; confetti(); }
 }
 
 /* ---------- notifications push ---------- */
