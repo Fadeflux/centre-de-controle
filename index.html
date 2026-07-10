@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0a0a0a" />
-<title>Centre de contrôle</title>
+<title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
 <link rel="apple-touch-icon" href="icon.svg" />
@@ -218,7 +218,7 @@
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
       <div>
-        <h1>Centre de contrôle</h1>
+        <h1>Noctra</h1>
         <div class="sub" id="sub">Chargement…</div>
       </div>
     </div>
@@ -231,11 +231,6 @@
     </div>
   </header>
 
-  <div class="worlds" id="worlds">
-    <button data-world="all" class="won">Tout</button>
-    <button data-world="shinra">Shinra</button>
-    <button data-world="noctra">Noctra</button>
-  </div>
 
   <div class="banner" id="banner"></div>
   <div class="alert" id="alert"></div>
@@ -302,12 +297,6 @@ const fmtBig   = v => {
 };
 
 const TOOLS = [
-  { id:"lola",             world:"shinra", cat:"Shinra", name:"Bot Lola",          icon:"L", openUrl:"", voyantOnly:true },
-  { id:"clipfusion-shinra",world:"shinra", cat:"Shinra", name:"ClipFusion Shinra", icon:"C", openUrl:"https://repurposebot-production-8823.up.railway.app",
-    metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
-  { id:"shinra-finance",   world:"shinra", cat:"Shinra", name:"Shinra Finance",    icon:"$", openUrl:"https://fadeflux.github.io/shinra-finance/",
-    metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
-
   { id:"stats-tracker",    world:"noctra", cat:"Noctra", name:"Subs & Paie", icon:"S", openUrl:"https://stats-tracker-prive-production.up.railway.app", featured:true,
     metrics:[{k:"subsQuinzaine",l:"Subs quinzaine",f:fmtInt},{k:"aPayer",l:"À payer",f:fmtMoney}] },
   { id:"clipfusion-perso", world:"noctra", cat:"Noctra", name:"ClipFusion Perso", icon:"C", openUrl:"https://clipfusionperso-production.up.railway.app",
@@ -326,9 +315,6 @@ const TOOLS = [
 
 /* Démo (tant que le cerveau n'est pas activé) — avec tendances + courbes. */
 const DEMO = {
-  "lola":{status:"online"},
-  "clipfusion-shinra":{status:"online",metrics:{drives7d:96,views7d:1800000},series:{views7d:[210000,240000,260000,230000,280000,300000,280000]}},
-  "shinra-finance":{status:"online",metrics:{profitMonth:3080,subs:412}},
   "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]}},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
@@ -341,7 +327,7 @@ const $ = s => document.querySelector(s);
 let TOKEN = localStorage.getItem("cc_token") || "";
 let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
 let LAST  = DEMO;
-let WORLD = localStorage.getItem("cc_world") || "all";
+let WORLD = "all";
 let HIDE  = localStorage.getItem("cc_hide") === "1";
 let IS_LIVE = false;
 const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
@@ -708,8 +694,6 @@ async function enablePush(){
 $("#push").onclick=enablePush;
 
 /* ---------- démarrage ---------- */
-$("#worlds").addEventListener("click", e=>{ const b=e.target.closest("[data-world]"); if(b) setWorld(b.getAttribute("data-world")); });
-[...document.querySelectorAll("#worlds button")].forEach(b=>b.classList.toggle("won", b.getAttribute("data-world")===WORLD));
 applyAccent();
 load();
 loadTodosFromBrain();
