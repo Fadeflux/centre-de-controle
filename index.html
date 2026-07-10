@@ -76,6 +76,14 @@
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
 
+  .rappels{background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:var(--radius);padding:13px 16px;margin:0 0 22px}
+  .rap-head{font-size:11px;font-weight:600;color:var(--acc-ink);margin-bottom:9px;text-transform:uppercase;letter-spacing:.06em}
+  .rap-row{display:flex;align-items:center;gap:10px;font-size:14px;padding:5px 0}
+  .rap-row span{flex:1}
+  .rap-add{font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .rap-add:hover{background:var(--surface-2)}
+  .rap-add:disabled{opacity:.55;cursor:default}
+
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
@@ -196,6 +204,8 @@
   <div class="banner" id="banner"></div>
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
+
+  <div class="rappels" id="rappels" style="display:none"></div>
 
   <div class="todo" id="todo">
     <div class="todo-head">📝 Ma journée <span class="c" id="todoCount"></span></div>
@@ -501,6 +511,26 @@ async function loadTodosFromBrain(){
   }catch(e){}
 }
 renderTodos();
+
+/* ---------- rappels récurrents ---------- */
+function lastDayOfMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
+function activeRappels(){
+  const d=new Date(), day=d.getDate(), wd=d.getDay(), last=lastDayOfMonth(d.getFullYear(),d.getMonth());
+  const r=[];
+  if(day===15 || day===last) r.push("💰 Jour de paie — payer les VA (quinzaine)");
+  if(day===1) r.push("🗓️ Nouveau mois — vérifier objectifs et dépenses");
+  if(wd===1) r.push("📅 Nouveau lundi — faire le bilan de la semaine");
+  return r;
+}
+function renderRappels(){
+  const r=activeRappels();
+  if(!r.length){ $("#rappels").style.display="none"; return; }
+  $("#rappels").style.display="block";
+  $("#rappels").innerHTML = `<div class="rap-head">⏰ Rappels du jour</div>` +
+    r.map(x=>`<div class="rap-row"><span>${x}</span><button class="rap-add" data-rap="${escapeHtml(x)}">＋ Ma journée</button></div>`).join("");
+}
+$("#rappels").addEventListener("click",e=>{ const b=e.target.closest("[data-rap]"); if(b){ addTodo(b.getAttribute("data-rap")); b.textContent="✓ Ajouté"; b.disabled=true; } });
+renderRappels();
 
 /* ---------- dépenses d'outils ---------- */
 let COSTS = JSON.parse(localStorage.getItem("cc_costs") || "[]");
