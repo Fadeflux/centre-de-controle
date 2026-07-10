@@ -84,6 +84,27 @@
   .rap-add:hover{background:var(--surface-2)}
   .rap-add:disabled{opacity:.55;cursor:default}
 
+  .shortcuts{margin:26px 0 0}
+  .sc-head{display:flex;align-items:center;gap:12px;margin:0 2px 13px;flex-wrap:wrap}
+  .sc-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .sc-head .rule{flex:1;height:1px;background:var(--line);min-width:20px}
+  .sc-head .routine{font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .sc-head .routine:hover{background:var(--acc-bg)}
+  .sc-add{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .sc-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .sc-add input:focus{border-color:var(--acc)}
+  #scName{width:150px} #scUrl{flex:1;min-width:140px}
+  .sc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .sc-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:9px}
+  .sc-star{background:none;border:0;color:var(--faint);font-size:14px;cursor:pointer;padding:0;line-height:1}
+  .sc-star.on{color:var(--gold)}
+  .sc-name{flex:1;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc-open{text-decoration:none;color:var(--acc-ink);font-size:13px;font-weight:500;white-space:nowrap}
+  .sc-open:hover{text-decoration:underline}
+  .sc-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;opacity:.5}
+  .sc-del:hover{color:var(--down);opacity:1}
+  .sc-empty{font-size:13px;color:var(--faint)}
+
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
@@ -190,6 +211,7 @@
     <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
+      <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
@@ -215,6 +237,15 @@
 
   <div class="summary" id="summary"></div>
   <div id="sections"></div>
+
+  <div class="shortcuts" id="shortcuts">
+    <div class="sc-head"><span class="t">⭐ Mes raccourcis</span><span class="rule"></span><button class="routine" id="scRoutine">🚀 Ouvrir ma routine</button></div>
+    <div class="sc-add">
+      <input id="scName" placeholder="Nom (ex : Railway)" autocomplete="off" />
+      <input id="scUrl" placeholder="https://…" autocomplete="off" />
+    </div>
+    <div class="sc-grid" id="scGrid"></div>
+  </div>
 
   <div class="costs" id="costs">
     <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
@@ -242,7 +273,7 @@ const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
 const HUB_BASE = HUB_URL.replace(/\/api\/hub$/, "");
 const REFRESH_MS = 60000;
 
-const fmtMoney = v => (Math.round(v)).toLocaleString("fr-FR") + " $";
+const fmtMoney = v => HIDE ? "••• $" : (Math.round(v)).toLocaleString("fr-FR") + " $";
 const fmtInt   = v => Math.round(v).toLocaleString("fr-FR");
 const fmtBig   = v => {
   v = Number(v)||0;
@@ -292,6 +323,7 @@ let TOKEN = localStorage.getItem("cc_token") || "";
 let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
 let LAST  = DEMO;
 let WORLD = localStorage.getItem("cc_world") || "all";
+let HIDE  = localStorage.getItem("cc_hide") === "1";
 const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
 function applyAccent(){
   const a = ACCENTS[WORLD] || ACCENTS.all;
@@ -474,6 +506,14 @@ $("#tv").onclick = ()=>{
   }catch(e){}
 };
 
+/* ---------- mode discret (masquer les montants) ---------- */
+$("#hide").textContent = HIDE ? "🙈" : "👁️";
+$("#hide").onclick = ()=>{
+  HIDE = !HIDE; localStorage.setItem("cc_hide", HIDE?"1":"0");
+  $("#hide").textContent = HIDE ? "🙈" : "👁️";
+  render(LAST); renderCosts();
+};
+
 /* ---------- ma journée (à faire) ---------- */
 let TODOS = JSON.parse(localStorage.getItem("cc_todos") || "[]");
 let todoSyncT = null;
@@ -551,6 +591,33 @@ $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); 
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
 $("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); } });
 renderCosts();
+
+/* ---------- mes raccourcis + ouvrir ma routine ---------- */
+let SHORTCUTS = JSON.parse(localStorage.getItem("cc_shortcuts") || "[]");
+function saveShortcuts(){ localStorage.setItem("cc_shortcuts", JSON.stringify(SHORTCUTS)); }
+function normUrl(u){ u=(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return u; }
+function renderShortcuts(){
+  if(!SHORTCUTS.length){ $("#scGrid").innerHTML = `<div class="sc-empty">Ajoute tes liens (Railway, Drive, salons Discord…). L'étoile ★ = dans ta routine du matin.</div>`; return; }
+  $("#scGrid").innerHTML = SHORTCUTS.map((s,i)=>`<div class="sc-card">
+    <button class="sc-star ${s.r?"on":""}" data-scstar="${i}" title="Dans ma routine" aria-label="Routine">${s.r?"★":"☆"}</button>
+    <span class="sc-name">${escapeHtml(s.n)}</span>
+    <a class="sc-open" href="${escapeHtml(s.u)}" target="_blank" rel="noopener">Ouvrir</a>
+    <button class="sc-del" data-scdel="${i}" aria-label="Supprimer">✕</button></div>`).join("");
+}
+function addShortcut(){ const n=$("#scName").value.trim(), u=normUrl($("#scUrl").value); if(!n||!u) return; SHORTCUTS.push({n:n,u:u,r:false}); saveShortcuts(); renderShortcuts(); $("#scName").value=""; $("#scUrl").value=""; $("#scName").focus(); }
+$("#scUrl").addEventListener("keydown",e=>{ if(e.key==="Enter") addShortcut(); });
+$("#scName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#scUrl").focus(); });
+$("#scGrid").addEventListener("click",e=>{
+  const st=e.target.closest("[data-scstar]"), dl=e.target.closest("[data-scdel]");
+  if(st){ const i=+st.getAttribute("data-scstar"); SHORTCUTS[i].r=!SHORTCUTS[i].r; saveShortcuts(); renderShortcuts(); }
+  else if(dl){ const i=+dl.getAttribute("data-scdel"); SHORTCUTS.splice(i,1); saveShortcuts(); renderShortcuts(); }
+});
+$("#scRoutine").onclick = ()=>{
+  const routine = SHORTCUTS.filter(s=>s.r);
+  if(!routine.length){ setBanner(`<b>Astuce</b> — marque des raccourcis avec l'étoile ★ pour les mettre dans ta routine du matin.`); return; }
+  routine.forEach(s=>window.open(s.u,"_blank","noopener"));
+};
+renderShortcuts();
 
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
