@@ -148,6 +148,32 @@
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
+  .om .pb-head{flex-wrap:wrap;gap:10px}
+  .om-models{display:inline-flex;gap:2px;background:var(--surface-2);border-radius:9px;padding:2px}
+  .om-models button{font:inherit;font-size:12px;font-weight:500;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 12px;cursor:pointer}
+  .om-models button.on{background:var(--acc);color:#0a0a0a}
+  .om-launch{margin-left:auto;text-decoration:none}
+  .om-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px;margin-bottom:14px}
+  .om-tiles .tile{background:var(--surface-2)}
+  .om-tiles .lbl{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .om-tiles .val{font-size:20px;font-weight:700;letter-spacing:-.4px;margin-top:5px}
+  .om-models-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+  .om-model{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;transition:.15s}
+  .om-model:hover{border-color:var(--acc-line)}
+  .om-model-name{font-size:13px;font-weight:600}
+  .om-model-net{font-size:20px;font-weight:700;color:var(--acc);margin-top:4px}
+  .om-model-subs{font-size:12px;color:var(--muted);margin-top:1px}
+  .om-va-head{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 8px}
+  .om-va-head button{margin-left:auto;font:inherit;font-size:11px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:7px;padding:4px 10px;cursor:pointer;text-transform:none;letter-spacing:0}
+  .omv-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
+  .omv-row:last-child{border-bottom:0}
+  .omv-rank{width:18px;color:var(--faint);font-size:12px;text-align:center;flex-shrink:0}
+  .omv-va{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .omv-s{color:var(--muted);white-space:nowrap}
+  .omv-r{font-weight:600;white-space:nowrap;min-width:60px;text-align:right}
+  .omv-l{color:var(--faint);font-size:12px;white-space:nowrap;min-width:66px;text-align:right}
+  .om-prep{font-size:13px;color:var(--muted);padding:8px 0}
+
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
@@ -288,6 +314,14 @@
   </div>
 
   <div id="sections"></div>
+
+  <div class="panel-box om" id="om" style="display:none">
+    <div class="pb-head">◎ OnlyMonster
+      <div class="om-models" id="omModels"></div>
+      <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
+    </div>
+    <div id="omBody"></div>
+  </div>
 
   <div class="panel-box" id="paie" style="display:none">
     <div class="pb-head">🧾 Fiche de paie <button class="act" id="paieCopy">📋 Copier</button></div>
@@ -562,7 +596,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -773,6 +807,48 @@ $("#askGo").onclick=()=>doAsk();
 $("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter") doAsk(); });
 $("#ask").addEventListener("click",e=>{ const a=e.target.closest("[data-q]"); if(a) doAsk(a.getAttribute("data-q")); });
 
+/* ---------- mini-dashboard OnlyMonster ---------- */
+let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
+const DEMO_OM = { currency:"$", totals:{netMonth:720,netLastMonth:130,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01},{va:"Prince",subs:79,rev:124,ltv:1.57},{va:"Welzy",subs:48,rev:572,ltv:11.92}] };
+function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
+function renderOM(){
+  if(!OM_DATA) return;
+  const d=OM_DATA, cur=d.currency||"$", models=Object.keys(d.models||{});
+  $("#om").style.display="block";
+  $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
+  let net,subsMonth;
+  if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
+  else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
+  const delta=(OM_MODEL==="all")?deltaHTML(d.totals.netMonth,d.totals.netLastMonth):"";
+  const tiles=`<div class="om-tiles">
+    <div class="tile"><div class="lbl">Net du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${omMoney(net,cur)} ${delta}</div></div>
+    <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
+    <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
+    <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
+    <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div></div>`;
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs ce mois</div></div>`).join("")}</div>`:"";
+  let vas=(d.vas||[]).slice(); vas.sort((a,b)=>OM_SORT==="rev"?(b.rev-a.rev):(b.subs-a.subs));
+  const vaRows=vas.slice(0,20).map((v,i)=>`<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l">LTV ${omMoney(v.ltv,cur)}</span></div>`).join("")||`<div class="om-prep">Aucun VA.</div>`;
+  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 argent":"par 👥 subs"}</button></div>`;
+  $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
+}
+async function loadOM(){
+  if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
+    const j=await r.json();
+    if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
+    OM_DATA=j.data; renderOM();
+  }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
+}
+function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
+$("#om").addEventListener("click",e=>{
+  if(e.target.id==="omSort"){ OM_SORT=(OM_SORT==="rev")?"subs":"rev"; renderOM(); return; }
+  if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
+  const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
+});
+
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
   const pad="=".repeat((4-base64.length%4)%4);
@@ -807,6 +883,7 @@ applyAccent();
 load();
 loadTodosFromBrain();
 loadJournal();
+loadOM();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
