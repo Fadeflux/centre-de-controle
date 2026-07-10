@@ -105,6 +105,18 @@
   .sc-del:hover{color:var(--down);opacity:1}
   .sc-empty{font-size:13px;color:var(--faint)}
 
+  .journal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .jr-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .jr-head .c{font-size:11px;color:var(--faint);font-weight:500;margin-left:auto}
+  .jr-row{display:flex;gap:11px;padding:9px 0;border-bottom:.5px solid var(--line)}
+  .jr-row:last-child{border-bottom:0}
+  .jr-src{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:6px;padding:3px 7px;height:fit-content;white-space:nowrap}
+  .jr-main{flex:1;min-width:0}
+  .jr-title{font-size:14px;font-weight:500}
+  .jr-body{font-size:13px;color:var(--muted);margin-top:2px;word-break:break-word}
+  .jr-time{font-size:11px;color:var(--faint);white-space:nowrap}
+  .jr-empty{font-size:13px;color:var(--faint)}
+
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
@@ -237,6 +249,11 @@
 
   <div class="summary" id="summary"></div>
   <div id="sections"></div>
+
+  <div class="journal" id="journal" style="display:none">
+    <div class="jr-head">📩 Journal <span class="c" id="jrCount"></span></div>
+    <div id="jrList"></div>
+  </div>
 
   <div class="shortcuts" id="shortcuts">
     <div class="sc-head"><span class="t">⭐ Mes raccourcis</span><span class="rule"></span><button class="routine" id="scRoutine">🚀 Ouvrir ma routine</button></div>
@@ -494,7 +511,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -619,6 +636,32 @@ $("#scRoutine").onclick = ()=>{
 };
 renderShortcuts();
 
+/* ---------- journal (flux Discord + timeline) ---------- */
+function relTime(ts){
+  try{
+    const d=new Date(ts), s=Math.round((Date.now()-d.getTime())/1000);
+    if(s<60) return "à l'instant";
+    if(s<3600) return "il y a "+Math.floor(s/60)+" min";
+    if(s<86400) return "il y a "+Math.floor(s/3600)+" h";
+    return d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+  }catch(e){ return ""; }
+}
+async function loadJournal(){
+  if(!TOKEN || !HUB_URL){ $("#journal").style.display="none"; return; }
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/feed",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return;
+    const items = (await r.json()).items || [];
+    $("#journal").style.display="block";
+    $("#jrCount").textContent = items.length ? items.length+" évènement"+(items.length>1?"s":"") : "";
+    if(!items.length){ $("#jrList").innerHTML = `<div class="jr-empty">Rien pour l'instant. Les alertes de tes bots et les changements d'état apparaîtront ici.</div>`; return; }
+    $("#jrList").innerHTML = items.map(it=>`<div class="jr-row">
+      <span class="jr-src">${escapeHtml(it.source||"info")}</span>
+      <div class="jr-main"><div class="jr-title">${escapeHtml(it.title||"")}</div>${it.body?`<div class="jr-body">${escapeHtml(it.body)}</div>`:""}</div>
+      <span class="jr-time">${relTime(it.ts)}</span></div>`).join("");
+  }catch(e){}
+}
+
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
   const pad="=".repeat((4-base64.length%4)%4);
@@ -654,7 +697,8 @@ $("#worlds").addEventListener("click", e=>{ const b=e.target.closest("[data-worl
 applyAccent();
 load();
 loadTodosFromBrain();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")) load(); }, REFRESH_MS);
+loadJournal();
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
 </html>
