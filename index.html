@@ -58,6 +58,8 @@
   .daily{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px;margin:0 0 22px}
   .meteo{font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
   .meteo.ok{color:var(--ok)} .meteo.warn{color:#eab308} .meteo.bad{color:var(--down)}
+  .next{color:var(--text);font-size:15px;font-weight:600;margin-bottom:9px;line-height:1.4}
+  .next.u{color:var(--acc)}
   .brief-txt{font-size:13.5px;color:var(--muted);margin-top:5px}
   .brief-txt b{color:var(--text);font-weight:600}
 
@@ -341,6 +343,7 @@ let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
 let LAST  = DEMO;
 let WORLD = localStorage.getItem("cc_world") || "all";
 let HIDE  = localStorage.getItem("cc_hide") === "1";
+let IS_LIVE = false;
 const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
 function applyAccent(){
   const a = ACCENTS[WORLD] || ACCENTS.all;
@@ -448,6 +451,16 @@ function render(data){
 }
 
 /* ---------- résumé du jour + météo business ---------- */
+function nextAction(data, live){
+  if(!IS_LIVE) return {icon:"🔑", text:"Connecte-toi (« Mes chiffres ») pour activer tes vrais chiffres", urgent:true};
+  const off = live.filter(t=>(data[t.id]||{}).status==="offline");
+  if(off.length) return {icon:"🔧", text:`Répare ${off[0].name} — hors ligne`, urgent:true};
+  const d=new Date(), day=d.getDate();
+  if(day===15 || day===lastDayOfMonth(d.getFullYear(),d.getMonth())) return {icon:"💰", text:"C'est jour de paie — paye tes VA", urgent:true};
+  const t = TODOS.find(x=>!x.d);
+  if(t) return {icon:"📝", text:t.t, urgent:false};
+  return {icon:"✅", text:"Tout est à jour — rien d'urgent", urgent:false};
+}
 function renderBrief(data, live, onCount, stInW){
   const off = live.length - onCount;
   const meteo = off===0 ? "ok" : (off>=2 ? "bad" : "warn");
@@ -465,12 +478,14 @@ function renderBrief(data, live, onCount, stInW){
   const greet = h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
   const mIcon = meteo==="ok"?"🟢":meteo==="warn"?"🟡":"🔴";
   const mLbl = meteo==="ok"?"Tout roule":meteo==="warn"?"À surveiller":"Attention";
-  $("#daily").innerHTML = `<span class="meteo ${meteo}">${mIcon} ${mLbl}</span><div class="brief-txt">${greet} 👋 · ${s.join(" · ")}</div>`;
+  const na = nextAction(data, live);
+  $("#daily").innerHTML = `<div class="next ${na.urgent?'u':''}">👉 ${na.icon} ${escapeHtml(na.text)}</div><span class="meteo ${meteo}">${mIcon} ${mLbl}</span><div class="brief-txt">${greet} 👋 · ${s.join(" · ")}</div>`;
 }
 
 /* ---------- données ---------- */
 function setBanner(html){ const b=$("#banner"); if(html){ b.innerHTML=html; b.classList.add("show"); } else { b.classList.remove("show"); } }
 function demoFallback(msg){
+  IS_LIVE = false;
   render(DEMO);
   $("#sub").textContent = "Mode démo";
   setBanner(msg);
@@ -483,6 +498,7 @@ async function load(){
     const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
     if(!r.ok) throw new Error("HTTP "+r.status);
     const j = await r.json();
+    IS_LIVE = true;
     render(j.tools||{});
     $("#sub").textContent = "Mis à jour à l'instant";
     $("#footnote").textContent = new Date().toLocaleString("fr-FR");
