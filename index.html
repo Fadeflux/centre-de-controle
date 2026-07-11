@@ -192,6 +192,12 @@
   .omv-l.lo{color:var(--down)}
   .om-model-marge{font-size:12px;font-weight:600;margin-top:3px}
   .om-model-marge.pos{color:var(--ok)} .om-model-marge.neg{color:var(--down)}
+  .rn-line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .rn-line:last-of-type{border-bottom:0}
+  .rn-v{font-weight:600;white-space:nowrap} .rn-v.pos{color:var(--ok)} .rn-v.neg{color:var(--down)}
+  .rn-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700;font-size:15px}
+  .rn-proj{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.6}
+  .rn-proj b{color:var(--text);font-weight:600}
 
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -344,6 +350,11 @@
     <div id="omBody"></div>
   </div>
 
+  <div class="panel-box" id="renta" style="display:none">
+    <div class="pb-head">💰 Rentabilité du mois</div>
+    <div id="rentaBody"></div>
+  </div>
+
   <div class="panel-box" id="paie" style="display:none">
     <div class="pb-head">🧾 Fiche de paie <button class="act" id="paieCopy">📋 Copier</button></div>
     <div id="paieBody"></div>
@@ -410,6 +421,8 @@ const TOOLS = [
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
+  { id:"diddysms",         world:"noctra", cat:"Noctra", name:"DiddySMS", icon:"D", openUrl:"https://diddysms.com", metrics:[] },
+  { id:"getatext",         world:"noctra", cat:"Noctra", name:"Getatext (secours)", icon:"G", openUrl:"https://getatext.com", metrics:[] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
@@ -424,6 +437,8 @@ const DEMO = {
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
   "sms-perso":{status:"online"},
+  "diddysms":{status:"online"},
+  "getatext":{status:"online"},
 };
 
 /* ---------- état ---------- */
@@ -709,12 +724,12 @@ function renderCosts(){
 function addCost(){
   const n=$("#costName").value.trim(), m=parseFloat(String($("#costAmount").value).replace(",","."));
   if(!n || isNaN(m)) return;
-  COSTS.push({n:n,m:m}); saveCosts(); renderCosts();
+  COSTS.push({n:n,m:m}); saveCosts(); renderCosts(); renderRenta();
   $("#costName").value=""; $("#costAmount").value=""; $("#costName").focus();
 }
 $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
-$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); } });
+$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); } });
 renderCosts();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
@@ -868,6 +883,25 @@ function renderOM(){
   const vaRows=vas.slice(0,20).map((v,i)=>{const bad=v.ltv<0.5,mp=(v.marge||0)>=0;return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span></div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
+  renderRenta();
+}
+function renderRenta(){
+  if(!OM_DATA){ $("#renta").style.display="none"; return; }
+  const d=OM_DATA, cur=d.currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
+  const coutVA=netMonth-margeMonth;
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const profitNet=margeMonth-coutOutils;
+  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const projNet=day>0?Math.round(netMonth/day*dim):netMonth, projProfit=day>0?Math.round(profitNet/day*dim):profitNet;
+  $("#renta").style.display="block";
+  $("#rentaBody").innerHTML=`
+    <div class="rn-line"><span>Revenus du mois</span><span class="rn-v">${money(netMonth)}</span></div>
+    <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
+    <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
+    <div class="rn-line rn-total"><span>= Profit net</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
+    <div class="rn-proj">🔮 Au rythme actuel, fin de mois : ~<b>${money(projNet)}</b> de revenus · ~<b>${money(projProfit)}</b> de profit net.</div>`;
 }
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
