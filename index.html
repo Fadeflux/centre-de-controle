@@ -143,6 +143,16 @@
   .pv-pay{min-width:78px;text-align:right;font-weight:600}
   .pv-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700}
   .pv-total .pv-pay{color:var(--acc)}
+  .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#fff;cursor:pointer}
+  .pv-paid{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer}
+  .pv-row.pv-done .pv-va{color:var(--muted)}
+  .pv-note{font-size:11px;color:var(--muted);font-weight:600}
+  .pay-hist{margin-top:12px}
+  .pay-hist summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
+  .pay-h-row{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--line);font-size:13px}
+  .pay-h-row:last-child{border-bottom:0}
+  .pay-h-d{color:var(--muted);margin-left:auto;font-size:12px}
+  .pay-h-a{font-weight:600;min-width:60px;text-align:right}
   .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px}
   .goal-row input{width:130px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .goal-gauge{height:12px;background:var(--surface-2);border-radius:20px;overflow:hidden;margin:9px 0 8px}
@@ -353,6 +363,7 @@
     <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
+      <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
@@ -399,9 +410,9 @@
   </div>
 
   <div class="panel-box" id="ask">
-    <div class="pb-head">🗣️ Assistant — pose ta question</div>
-    <div class="ask-row"><input id="askInput" placeholder="Ex : combien à payer cette quinzaine ?" autocomplete="off" /><button id="askGo">Demander</button></div>
-    <div class="ask-ex">Essaie : <a data-q="Combien de subs cette quinzaine et combien à payer ?">subs &amp; paie</a> · <a data-q="Quel VA est le meilleur cette quinzaine ?">meilleur VA</a> · <a data-q="Quels sont mes revenus OnlyMonster ce mois ?">revenus du mois</a> · <a data-bilan="1">📅 bilan de la semaine</a></div>
+    <div class="pb-head">🤖 Assistant — demande ou donne un ordre</div>
+    <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askGo">Envoyer</button></div>
+    <div class="ask-ex">Essaie : <a data-q="Ajoute une tâche pour Manon : relancer Prince">＋ tâche à Manon</a> · <a data-q="Qui je dois relancer ?">qui relancer</a> · <a data-q="Combien à payer cette quinzaine ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
     <div class="ask-ans" id="askAns"></div>
   </div>
 
@@ -705,7 +716,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -858,14 +869,34 @@ async function loadJournal(){
 
 /* ---------- fiche de paie + objectif ---------- */
 function fmtCur(v){ return HIDE ? "••• $" : fmtMoney(v); }
+/* ---------- cahier de paie ---------- */
+let PAYMENTS = JSON.parse(localStorage.getItem("ccn_payments")||"[]"); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
+function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
+function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
+function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})}).catch(()=>{}); } }
+async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
+function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST); }
+function unpayVa(va){ const p=curPeriod(); PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments(); renderPaie(LAST); }
 function renderPaie(data){
   const vas = ((data["stats-tracker"]||{}).vas)||[];
   if(!vas.length){ $("#paie").style.display="none"; return; }
   $("#paie").style.display="block";
   const total = vas.reduce((a,v)=>a+(Number(v.pay)||0),0), totalSubs = vas.reduce((a,v)=>a+(Number(v.subs)||0),0);
-  $("#paieBody").innerHTML = vas.map(v=>`<div class="pv-row"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span></div>`).join("")
-    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span></div>`;
+  const rows = vas.map(v=>{
+    const paid=isPaid(v.va);
+    const btn = paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>` : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`;
+    return `<div class="pv-row ${paid?"pv-done":""}"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span>${btn}</div>`;
+  }).join("");
+  const paidCount = vas.filter(v=>isPaid(v.va)).length;
+  const hist = PAYMENTS.slice(0,15).map(p=>`<div class="pay-h-row"><span>${escapeHtml(p.va)}</span><span class="pay-h-d">${new Date(p.ts).toLocaleDateString("fr-FR")}</span><span class="pay-h-a">${fmtCur(p.amount)}</span></div>`).join("") || `<div class="tk-empty">Aucun paiement encore.</div>`;
+  $("#paieBody").innerHTML = rows
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note">${paidCount}/${vas.length} payés</span></div>`
+    + `<details class="pay-hist"><summary>📜 Historique de paie</summary><div class="pay-h-list">${hist}</div></details>`;
 }
+$("#paieBody").addEventListener("click",e=>{
+  const pb=e.target.closest("[data-pay]"); if(pb){ payVa(pb.getAttribute("data-pay"), pb.getAttribute("data-amt")); return; }
+  const ub=e.target.closest("[data-unpay]"); if(ub){ if(confirm("Annuler ce paiement ?")) unpayVa(ub.getAttribute("data-unpay")); return; }
+});
 $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
   const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${fmtMoney(v.pay)}`).join("\n") + `\nTOTAL : ${fmtMoney(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
@@ -909,12 +940,13 @@ async function doAsk(q){
   const go=$("#askGo"); go.disabled=true; go.textContent="…";
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
-    const r = await fetch(HUB_BASE+"/api/hub/ask",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({question:q})});
-    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Token incorrect — reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Ton token du site est incorrect. Recolle le bon token (celui du site, PAS le token Railway)."); go.disabled=false; go.textContent="Demander"; return; }
+    const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES})});
+    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Token incorrect — reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Ton token du site est incorrect. Recolle le bon token (celui du site, PAS le token Railway)."); go.disabled=false; go.textContent="Envoyer"; return; }
     const j = await r.json();
     $("#askAns").className="ask-ans"; $("#askAns").textContent = j.answer || j.error || "Pas de réponse.";
+    if(j.reloadTasks) loadTasks();
   }catch(e){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Erreur — réessaie."; }
-  finally{ go.disabled=false; go.textContent="Demander"; }
+  finally{ go.disabled=false; go.textContent="Envoyer"; }
 }
 $("#askGo").onclick=()=>doAsk();
 $("#askInput").addEventListener("keydown",e=>{ if(e.key==="Enter") doAsk(); });
@@ -1186,6 +1218,42 @@ async function enablePush(){
 }
 $("#push").onclick=enablePush;
 
+/* ---------- carte du jour à partager (image) ---------- */
+function roundRect(ctx,X,Y,W,H,R){ ctx.beginPath(); ctx.moveTo(X+R,Y); ctx.arcTo(X+W,Y,X+W,Y+H,R); ctx.arcTo(X+W,Y+H,X,Y+H,R); ctx.arcTo(X,Y+H,X,Y,R); ctx.arcTo(X,Y,X+W,Y,R); ctx.closePath(); }
+function makeDayCard(){
+  const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  const brand=(document.querySelector("h1")||{}).textContent||"Noctra";
+  x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
+  const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.35; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
+  x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(brand,80,148);
+  x.fillStyle=acc; x.font="600 33px Inter,Arial,sans-serif"; const dt=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}); x.fillText("Résumé du "+dt,80,205);
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{}, cur=om.currency||"$";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["Net du mois",money(tot.netMonth)],["À payer",money(st.aPayer)]];
+  const sy=290;
+  for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*225; x.fillStyle="#141416"; roundRect(x,bx,by,440,195,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 29px Inter,Arial,sans-serif"; x.fillText(stats[i][0],bx+34,by+56); x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(stats[i][1],bx+34,by+146); }
+  let vy=sy+2*225+70; x.fillStyle=acc; x.font="bold 40px Inter,Arial,sans-serif"; x.fillText("🏆 Top VA",80,vy);
+  ((om.vas||[]).slice(0,3)).forEach((v,i)=>{ vy+=72; x.fillStyle="#fff"; x.font="600 37px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText((i+1)+". "+v.va,90,vy); x.fillStyle="#8a8a92"; x.font="500 33px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(v.subs+" subs",1000,vy); });
+  x.textAlign="left";
+  const undone=(typeof TASKS!=="undefined")?(["moi","other","general"].reduce((a,k)=>a+((TASKS[k]||[]).filter(t=>!t.done).length),0)):0;
+  x.fillStyle="#57575f"; x.font="500 29px Inter,Arial,sans-serif"; x.fillText("✅ "+undone+" tâche(s) en cours · Centre de contrôle",80,1295);
+  return c;
+}
+async function shareDayCard(){
+  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord (« Mes chiffres ») pour générer la carte."); return; }
+  const c=makeDayCard();
+  c.toBlob(async(blob)=>{
+    if(!blob){ return; }
+    try{
+      const file=new File([blob],"carte-du-jour.png",{type:"image/png"});
+      if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Résumé du jour"}); return; }
+    }catch(e){}
+    const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="carte-du-jour.png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  },"image/png");
+}
+{ const cb=$("#card"); if(cb) cb.onclick=shareDayCard; }
+
 /* ---------- démarrage ---------- */
 applyAccent();
 load();
@@ -1194,6 +1262,7 @@ loadJournal();
 loadOM();
 loadTip();
 loadTasks();
+loadPayments();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
