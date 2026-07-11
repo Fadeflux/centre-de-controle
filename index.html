@@ -186,6 +186,12 @@
   .omv-r{font-weight:600;white-space:nowrap;min-width:60px;text-align:right}
   .omv-l{color:var(--faint);font-size:12px;white-space:nowrap;min-width:66px;text-align:right}
   .om-prep{font-size:13px;color:var(--muted);padding:8px 0}
+  .omv-row{flex-wrap:wrap}
+  .omv-m{font-weight:600;white-space:nowrap;min-width:60px;text-align:right;font-size:13px}
+  .omv-m.pos{color:var(--ok)} .omv-m.neg{color:var(--down)}
+  .omv-l.lo{color:var(--down)}
+  .om-model-marge{font-size:12px;font-weight:600;margin-top:3px}
+  .om-model-marge.pos{color:var(--ok)} .om-model-marge.neg{color:var(--down)}
 
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -792,16 +798,19 @@ function confetti(){
   }
 }
 function renderGoal(data){
-  const current = Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
   if(!GOAL){
-    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif subs" /><button class="act" id="goalSet" style="margin:0">Fixer</button></div><div class="goal-info">Fixe un objectif de subs pour la quinzaine et suis ta progression.</div>`;
-    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={value:v}; localStorage.setItem("cc_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div><div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`;
+    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("cc_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
     return;
   }
+  const isRev = GOAL.type==="rev";
+  const current = isRev ? (OM_DATA?Number(OM_DATA.totals.netMonth)||0:0) : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
+  const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
+  const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
-  $("#goalBody").innerHTML = `<div class="goal-info"><b style="color:var(--text)">${fmtInt(current)}</b> / ${fmtInt(GOAL.value)} subs · <b style="color:var(--text)">${pct}%</b> <a href="#" id="goalReset" style="color:var(--faint);margin-left:6px">changer</a></div>
+  $("#goalBody").innerHTML = `<div class="goal-info"><b style="color:var(--text)">${fmt(current)}</b> / ${fmt(GOAL.value)} ${unit} · <b style="color:var(--text)">${pct}%</b> <a href="#" id="goalReset" style="color:var(--faint);margin-left:6px">changer</a></div>
     <div class="goal-gauge"><div class="goal-fill" style="width:${pct}%"></div></div>
-    <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Encore <b style="color:var(--text)">${fmtInt(GOAL.value-current)}</b> subs`}</div>`;
+    <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Encore <b style="color:var(--text)">${fmt(GOAL.value-current)}</b> ${unit}`}</div>`;
   const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("cc_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
   if(win && !GOAL_CELEBRATED){ GOAL_CELEBRATED=true; confetti(); }
 }
@@ -835,7 +844,7 @@ $("#ask").addEventListener("click",e=>{ const b=e.target.closest("[data-bilan]")
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
-const DEMO_OM = { currency:"$", totals:{netMonth:720,netLastMonth:130,netTotal:3200,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51},Zoe:{net:142,subs:65,ltv:2.18}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01},{va:"Prince",subs:79,rev:124,ltv:1.57},{va:"Welzy",subs:48,rev:572,ltv:11.92}] };
+const DEMO_OM = { currency:"$", totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548}] };
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -854,10 +863,10 @@ function renderOM(){
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
     <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div>
     <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${fmtLtv((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv,cur)}</div></div></div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs ce mois · LTV ${fmtLtv(d.models[m].ltv,cur)}</div></div>`).join("")}</div>`:"";
-  let vas=(d.vas||[]).slice(); vas.sort((a,b)=>OM_SORT==="rev"?(b.rev-a.rev):(b.subs-a.subs));
-  const vaRows=vas.slice(0,20).map((v,i)=>`<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l">LTV ${fmtLtv(v.ltv,cur)}</span></div>`).join("")||`<div class="om-prep">Aucun VA.</div>`;
-  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 argent":"par 👥 subs"}</button></div>`;
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${fmtLtv(d.models[m].ltv,cur)}</div><div class="om-model-marge ${(d.models[m].marge||0)>=0?'pos':'neg'}">Marge ${(d.models[m].marge||0)>=0?'+':''}${omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  let vas=(d.vas||[]).slice(); vas.sort((a,b)=> OM_SORT==="rev"?(b.rev-a.rev): OM_SORT==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
+  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=v.ltv<0.5,mp=(v.marge||0)>=0;return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span></div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
 }
 async function loadOM(){
@@ -867,12 +876,12 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM();
+    OM_DATA=j.data; renderOM(); renderGoal(LAST);
   }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
-  if(e.target.id==="omSort"){ OM_SORT=(OM_SORT==="rev")?"subs":"rev"; renderOM(); return; }
+  if(e.target.id==="omSort"){ OM_SORT=OM_SORT==="subs"?"rev":OM_SORT==="rev"?"marge":"subs"; renderOM(); return; }
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
 });
