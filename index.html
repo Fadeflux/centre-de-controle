@@ -236,6 +236,9 @@
   .tk-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .tk-fchip{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
   .tk-fchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .tk-routines{display:flex;gap:8px;margin-bottom:12px}
+  .tk-rsel{flex:1;font:inherit;font-size:13px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .tk-rbtn{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap}
   .clk-now{margin-left:auto;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
   .clk-add{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
   .clk-add input#rmText{flex:1;min-width:140px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
@@ -250,6 +253,8 @@
   .rm-row.dt-today{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
   .rm-row.dt-today .rm-who{color:var(--acc)}
   .rm-row.dt-past{opacity:.5}
+  .np-area{width:100%;min-height:120px;resize:vertical;font:inherit;font-size:14px;line-height:1.6;padding:12px;border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-top:8px}
+  .np-saved{margin-left:auto;font-size:12px;color:var(--ok);font-weight:600}
   .clk-timer{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2);font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .clk-tm{width:60px;font:inherit;font-size:14px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);text-align:center}
   .clk-timer .act{margin:0;padding:7px 13px}
@@ -487,6 +492,7 @@
       <button id="taskAdd" class="act">＋</button>
     </div>
     <div class="tk-filter" id="taskFilter"></div>
+    <div class="tk-routines"><select id="rtSel" class="tk-rsel"></select><button id="rtSave" class="tk-rbtn" title="Enregistrer la liste actuelle comme routine">💾 Routine</button></div>
     <div id="taskList"></div>
   </div>
 
@@ -510,6 +516,11 @@
       <button id="dtAdd" class="act">＋</button>
     </div>
     <div id="dtList"></div>
+  </div>
+
+  <div class="panel-box" id="notepad">
+    <div class="pb-head">📝 Bloc-notes <span class="np-saved" id="npSaved"></span></div>
+    <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ça se sauvegarde tout seul."></textarea>
   </div>
 
   <div class="rappels" id="rappels" style="display:none"></div>
@@ -1214,6 +1225,14 @@ function renderTasks(){
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
+let ROUTINES = JSON.parse(localStorage.getItem("ccn_routines")||"[]"); if(!Array.isArray(ROUTINES)) ROUTINES=[];
+function saveRoutines(){ localStorage.setItem("ccn_routines",JSON.stringify(ROUTINES)); }
+function renderRoutines(){ const sel=$("#rtSel"); if(!sel) return; sel.innerHTML=`<option value="">📁 Charger une routine…</option>`+ROUTINES.map((r,i)=>`<option value="${i}">${escapeHtml(r.name)} (${r.tasks.length})</option>`).join(""); }
+function saveRoutine(){ const items=(TASKS[TK_VIEW]||[]).filter(x=>!x.done).map(x=>({text:x.text,tags:x.tags||[],prio:x.prio||"n"})); if(!items.length){ alert("La liste est vide, rien à enregistrer."); return; } const name=prompt("Nom de la routine (ex : Routine du matin) :"); if(!name) return; ROUTINES.push({name:name.slice(0,40),tasks:items}); saveRoutines(); renderRoutines(); if(typeof toast==="function") toast("📁 Routine enregistrée",name); }
+function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.forEach(t=>TASKS[TK_VIEW].unshift({id:tkId(),text:t.text,tags:t.tags||[],prio:t.prio||"n",done:false,ts:Date.now(),repeat:""})); saveTasks(); renderTasks(); if(typeof toast==="function") toast("✅ Routine chargée",r.name+" · "+r.tasks.length+" tâches"); }
+{ const b=$("#rtSave"); if(b) b.onclick=saveRoutine; }
+{ const s=$("#rtSel"); if(s) s.onchange=()=>{ const v=s.value; s.value=""; if(v!=="") loadRoutine(parseInt(v,10)); }; }
+renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
     const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; saveTasks(); renderTasks(); } return; }
@@ -1684,6 +1703,9 @@ function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"
 { const t=$("#dtText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDate(); }); }
 { const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
 renderDates();
+
+/* ---------- bloc-notes ---------- */
+{ const np=$("#npText"); if(np){ np.value=localStorage.getItem("ccn_notepad")||""; let nt=null; np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ localStorage.setItem("ccn_notepad",np.value); const s=$("#npSaved"); if(s){ s.textContent="✓ enregistré"; setTimeout(()=>{ s.textContent=""; },1500); } },400); }); } }
 
 /* ---------- soldes SMS ---------- */
 let SMS_DATA=null;
