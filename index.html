@@ -29,6 +29,19 @@
   }
   .wrap{max-width:980px;margin:0 auto}
 
+  .tabbar{position:sticky;top:0;z-index:8;display:flex;gap:5px;padding:8px 0 10px;background:var(--bg);overflow-x:auto}
+  .tabbar::-webkit-scrollbar{height:0}
+  .tab{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 13px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.15s}
+  .tab:hover{color:var(--text);border-color:var(--line-2)}
+  .tab.on{color:var(--text);border-color:var(--acc);background:var(--acc-bg)}
+  .tab .x{font-size:14px;color:var(--faint);line-height:1}
+  .tab .x:hover{color:var(--down)}
+  .frames{display:none;height:calc(100vh - 86px);margin:2px -16px 0}
+  .frames.show{display:block}
+  .frames iframe{width:100%;height:100%;border:0;display:none;background:#fff}
+  .frames iframe.on{display:block}
+  body.framing #home{display:none}
+
   header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 18px}
   .brand{display:flex;align-items:center;gap:13px;flex:1;min-width:190px}
   .logo{width:42px;height:42px;border-radius:12px;background:var(--acc);display:grid;place-items:center;box-shadow:0 4px 16px -4px var(--acc)}
@@ -269,6 +282,8 @@
 </div>
 
 <div class="wrap" id="app">
+  <div class="tabbar" id="tabbar"></div>
+  <div id="home">
   <header class="top">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
@@ -358,6 +373,8 @@
     <span style="flex:1"></span>
     <span id="footnote"></span>
   </div>
+  </div>
+  <div class="frames" id="frames"></div>
 </div>
 
 <script>
@@ -463,7 +480,7 @@ function cardHTML(t, data){
   }
   const foot = t.build
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
-    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a></div>`;
+    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${t.openUrl?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a></div>`;
   return `<div class="card ${t.featured?"featured":""}">
     <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${star}${dot}</div>
     ${body}${foot}</div>`;
@@ -848,6 +865,42 @@ $("#om").addEventListener("click",e=>{
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
 });
+
+/* ---------- barre d'onglets (les outils s'ouvrent DANS le site) ---------- */
+let TABS = [], ACTIVE = "home";
+function renderTabStrip(){
+  const home = `<div class="tab ${ACTIVE==='home'?'on':''}" data-tab="home">🏠 Accueil</div>`;
+  $("#tabbar").innerHTML = home + TABS.map(t=>`<div class="tab ${ACTIVE===t.id?'on':''}" data-tab="${t.id}">${escapeHtml(t.name)} <span class="x" data-close="${t.id}">✕</span></div>`).join("");
+}
+function updateView(){
+  renderTabStrip();
+  document.querySelectorAll('#frames iframe').forEach(f=>f.classList.toggle('on', f.getAttribute('data-fr')===ACTIVE));
+  const framing = ACTIVE!=='home';
+  document.body.classList.toggle('framing', framing);
+  $("#frames").classList.toggle('show', framing);
+}
+function openTab(id,name,url){
+  if(!url) return;
+  if(!TABS.find(t=>t.id===id)){
+    TABS.push({id:id,name:name,url:url});
+    const f=document.createElement('iframe'); f.setAttribute('data-fr',id); f.src=url; $("#frames").appendChild(f);
+  }
+  ACTIVE=id; updateView();
+}
+function closeTab(id){
+  TABS=TABS.filter(t=>t.id!==id);
+  const f=document.querySelector('#frames iframe[data-fr="'+id+'"]'); if(f) f.remove();
+  if(ACTIVE===id) ACTIVE="home";
+  updateView();
+}
+$("#tabbar").addEventListener("click",e=>{
+  const c=e.target.closest("[data-close]"); if(c){ e.stopPropagation(); closeTab(c.getAttribute("data-close")); return; }
+  const t=e.target.closest("[data-tab]"); if(t){ ACTIVE=t.getAttribute("data-tab"); updateView(); }
+});
+$("#sections").addEventListener("click",e=>{
+  const a=e.target.closest("[data-openurl]"); if(a){ e.preventDefault(); openTab(a.getAttribute("data-openid"), a.getAttribute("data-openname"), a.getAttribute("data-openurl")); }
+});
+renderTabStrip();
 
 /* ---------- notifications push ---------- */
 function b64ToU8(base64){
