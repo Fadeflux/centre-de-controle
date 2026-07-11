@@ -1637,6 +1637,7 @@ loadTodosFromBrain();
 loadJournal();
 /* ---------- chrono, horloge & rappels ---------- */
 let REMINDERS = JSON.parse(localStorage.getItem("ccn_reminders")||"[]"); if(!Array.isArray(REMINDERS)) REMINDERS=[];
+let DATES = JSON.parse(localStorage.getItem("ccn_dates")||"[]"); if(!Array.isArray(DATES)) DATES=[];
 let RM_SAVE_T=null, AUDIO_CTX=null, TM_INT=null, TM_END=0;
 function audioCtx(){ if(!AUDIO_CTX){ try{ AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AUDIO_CTX; }
 document.addEventListener("click",()=>{ const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); },{once:true});
@@ -1671,7 +1672,6 @@ function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_
 renderReminders(); tickClock(); setInterval(tickClock, 5000);
 
 /* ---------- dates importantes ---------- */
-let DATES = JSON.parse(localStorage.getItem("ccn_dates")||"[]"); if(!Array.isArray(DATES)) DATES=[];
 function saveDates(){ localStorage.setItem("ccn_dates",JSON.stringify(DATES)); }
 function renderDates(){
   const list=DATES.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
