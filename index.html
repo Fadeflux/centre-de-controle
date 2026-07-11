@@ -394,6 +394,7 @@
   .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
   .mn-next{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px}
   .mn-next b{color:var(--acc)}
+  .mn-quote{font-style:italic;color:var(--muted);font-size:14px;text-align:center;margin:6px 0 18px;line-height:1.5}
   .mn-tasks{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:20px}
   .mn-tasks h4{margin:0 0 10px;font-size:14px}
   .mn-task{display:flex;gap:9px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -1480,6 +1481,8 @@ function renderMorning(){
   const verdict=paceVerdict();
   const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
   const na=LAST_NA;
+  const QUOTES=["Chaque sub compte. Reste constant.","Le succès = la somme de petits efforts répétés.","Concentre-toi sur ce qui rapporte.","Un VA motivé vaut dix VA à surveiller.","Discipline > motivation.","Ce que tu mesures, tu l'améliores.","Aujourd'hui, fais mieux qu'hier.","Les détails font la différence.","Avance, même d'un petit pas.","Ton business grandit pendant que tu bosses."];
+  const quote=QUOTES[new Date().getDate()%QUOTES.length];
   $("#morningBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
@@ -1487,6 +1490,7 @@ function renderMorning(){
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
     <div class="mn-tasks"><h4>📋 Ta journée ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
+    <div class="mn-quote">💬 ${escapeHtml(quote)}</div>
     <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
