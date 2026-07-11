@@ -192,6 +192,16 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
+  .hb-chart{display:flex;align-items:flex-end;gap:8px;height:132px;padding:6px 2px 0}
+  .hb{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+  .hb-bar-wrap{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
+  .hb-bar{width:64%;max-width:34px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 55%,transparent));transition:height .35s}
+  .hb-bar.rec{background:linear-gradient(180deg,#facc15,#f59e0b)}
+  .hb-val{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
+  .hb-lbl{font-size:10px;color:var(--muted);white-space:nowrap}
+  .hb-trend{margin-top:12px;font-size:13px;color:var(--muted);line-height:1.6}
+  .hb-trend b{color:var(--text);font-weight:600}
+  .hb-trend .up{color:var(--ok);font-weight:700} .hb-trend .dn{color:var(--down);font-weight:700}
   .om-model-marge{font-size:12px;font-weight:600;margin-top:3px}
   .om-model-marge.pos{color:var(--ok)} .om-model-marge.neg{color:var(--down)}
   .rn-line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -350,6 +360,11 @@
       <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
     </div>
     <div id="omBody"></div>
+  </div>
+
+  <div class="panel-box" id="history" style="display:none">
+    <div class="pb-head">📈 Historique & tendance</div>
+    <div id="historyBody"></div>
   </div>
 
   <div class="panel-box" id="renta" style="display:none">
@@ -861,7 +876,7 @@ $("#ask").addEventListener("click",e=>{ const b=e.target.closest("[data-bilan]")
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
-const DEMO_OM = { currency:"$", totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+const DEMO_OM = { currency:"$", history:[{month:"02/26",net:410,subs:88},{month:"03/26",net:520,subs:110},{month:"04/26",net:480,subs:102},{month:"05/26",net:610,subs:128},{month:"06/26",net:130,subs:40},{month:"07/26",net:720,subs:142}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -886,6 +901,32 @@ function renderOM(){
   const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
   renderRenta();
+  renderHistory();
+}
+function renderHistory(){
+  const h = OM_DATA && OM_DATA.history;
+  if(!h || !h.length){ $("#history").style.display="none"; return; }
+  const cur = OM_DATA.currency||"$";
+  const useSubs = h.every(m=>!Number(m.net));      // pas de net attribué → on montre les subs
+  const val = m => useSubs ? (Number(m.subs)||0) : (Number(m.net)||0);
+  const max = Math.max(1, ...h.map(val));
+  const fmtK = v => { v=Number(v)||0; return v>=1000 ? (v/1000).toFixed(1).replace(".",",")+"k" : String(Math.round(v)); };
+  const bars = h.map(m=>{
+    const v=val(m), pct=Math.round(v/max*100), rec=(v===max && max>1);
+    const lab = HIDE ? "•••" : (useSubs ? fmtInt(v) : fmtK(v));
+    return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${rec?'rec':''}" style="height:${Math.max(3,pct)}%" title="${m.month} · ${fmtInt(m.subs)} subs${useSubs?'':' · '+omMoney(m.net,cur)}"></div></div><div class="hb-val">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
+  }).join("");
+  let trend="";
+  if(h.length>=2){
+    const a=val(h[h.length-2]), b=val(h[h.length-1]), what=useSubs?"subs":"revenus";
+    if(a>0){ const pc=Math.round((b-a)/a*100), cls=pc>=0?"up":"dn", arrow=pc>=0?"▲":"▼";
+      trend=`Ce mois-ci, tes ${what} sont <span class="${cls}">${arrow} ${Math.abs(pc)}%</span> vs le mois dernier.`; }
+    else if(b>0){ trend=`Ce mois-ci tu démarres avec ${useSubs?fmtInt(b)+" subs":omMoney(b,cur)}.`; }
+  }
+  const best = h.reduce((mx,m)=>val(m)>val(mx)?m:mx, h[0]);
+  if(best && val(best)>1){ trend += `${trend?" ":""}🏆 Meilleur mois : <b>${best.month}</b> (${useSubs?fmtInt(best.subs)+" subs":omMoney(best.net,cur)}).`; }
+  $("#history").style.display="block";
+  $("#historyBody").innerHTML=`<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
 }
 function renderRenta(){
   if(!OM_DATA){ $("#renta").style.display="none"; return; }
