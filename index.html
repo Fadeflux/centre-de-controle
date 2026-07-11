@@ -232,6 +232,10 @@
   .tk-lt{background:var(--down);color:#fff;border-radius:999px;padding:0 5px;font-size:10px;margin-left:4px;font-weight:700}
   .tk-latesum{color:var(--down);font-weight:700;font-size:13px;padding:2px 0 10px}
   .tk-rep{font-size:11px;font-weight:600;color:var(--acc);margin-left:8px;white-space:nowrap}
+  .tk-prio{margin-right:5px;font-size:11px}
+  .tk-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .tk-fchip{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+  .tk-fchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .clk-now{margin-left:auto;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
   .clk-add{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
   .clk-add input#rmText{flex:1;min-width:140px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
@@ -243,6 +247,9 @@
   .rm-tx{flex:1;font-size:14px}
   .rm-who{font-size:11px;color:var(--muted);background:var(--surface-2,#17181b);border-radius:6px;padding:2px 7px}
   .rm-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px}
+  .rm-row.dt-today{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
+  .rm-row.dt-today .rm-who{color:var(--acc)}
+  .rm-row.dt-past{opacity:.5}
   .clk-timer{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2);font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .clk-tm{width:60px;font:inherit;font-size:14px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);text-align:center}
   .clk-timer .act{margin:0;padding:7px 13px}
@@ -250,6 +257,8 @@
   .cc-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,80px);background:var(--acc);color:#0a0a0a;padding:14px 20px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:9999;font-size:15px;max-width:90vw;opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),opacity .35s;cursor:pointer}
   .cc-toast.show{transform:translate(-50%,0);opacity:1}
   .cc-toast b{font-weight:800} .cc-toast div{font-size:13px;opacity:.85;margin-top:2px}
+  .cc-toast-actions{display:flex;gap:8px;margin-top:10px}
+  .cc-toast-actions button{font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:9px;border:0;background:rgba(0,0,0,.22);color:#0a0a0a;cursor:pointer}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -284,6 +293,13 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
+  .pie-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .pie-svg{flex:0 0 auto}
+  .pie-legend{flex:1;min-width:160px}
+  .pie-lg{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px}
+  .pie-dot{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+  .pie-nm{font-weight:600}
+  .pie-v{margin-left:auto;color:var(--muted);font-size:13px}
   .hb-cumul{display:flex;gap:12px;margin-bottom:14px}
   .hb-c{flex:1;background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:13px;padding:14px}
   .hb-c-v{font-size:24px;font-weight:800;color:var(--acc)}
@@ -465,10 +481,12 @@
     <div class="tk-add">
       <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
       <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
+      <select id="taskPrio" class="tk-dest" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select>
       <select id="taskRepeat" class="tk-dest" title="Répétition"><option value="">une fois</option><option value="day">🔁 chaque jour</option><option value="week">🔁 chaque semaine</option><option value="quinzaine">🔁 chaque quinzaine</option></select>
       <select id="taskDest" class="tk-dest"></select>
       <button id="taskAdd" class="act">＋</button>
     </div>
+    <div class="tk-filter" id="taskFilter"></div>
     <div id="taskList"></div>
   </div>
 
@@ -482,6 +500,16 @@
     </div>
     <div id="rmList"></div>
     <div class="clk-timer">⏱️ Minuteur : <input id="tmMin" type="number" min="1" value="10" class="clk-tm" /> min <button id="tmStart" class="act">Lancer</button> <span id="tmDisp" class="clk-disp"></span></div>
+  </div>
+
+  <div class="panel-box" id="dates">
+    <div class="pb-head">🎁 Dates importantes</div>
+    <div class="clk-add">
+      <input id="dtText" placeholder="Ex : Anniv de Manon, fin d'abo…" autocomplete="off" />
+      <input id="dtDate" type="date" class="clk-time" />
+      <button id="dtAdd" class="act">＋</button>
+    </div>
+    <div id="dtList"></div>
   </div>
 
   <div class="rappels" id="rappels" style="display:none"></div>
@@ -524,6 +552,11 @@
   <div class="panel-box" id="history" style="display:none">
     <div class="pb-head">📅 Mon année</div>
     <div id="historyBody"></div>
+  </div>
+
+  <div class="panel-box" id="pie" style="display:none">
+    <div class="pb-head">🥧 D'où vient l'argent</div>
+    <div id="pieBody"></div>
   </div>
 
   <div class="panel-box" id="renta" style="display:none">
@@ -1123,7 +1156,9 @@ const TK_KEYS = ["moi","other","general"];
 let WHO = localStorage.getItem("ccn_who") || "moi";
 let TASKS = JSON.parse(localStorage.getItem("ccn_tasks")||"null") || {moi:[],other:[],general:[]};
 let TK_VIEW = localStorage.getItem("ccn_tkview") || WHO;
+let TK_TAG = "";
 let TK_SAVE_T = null;
+const TK_PRIO_RANK = {h:0,n:1,b:2};
 function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
 function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
 const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaque jour",week:"chaque semaine",quinzaine:"chaque quinzaine"};
@@ -1142,8 +1177,8 @@ function addTask(){
   const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest"), rp=$("#taskRepeat");
   const text=(t.value||"").trim(); if(!text) return;
   const tags=(g.value||"").split(",").map(s=>s.trim()).filter(Boolean).slice(0,8);
-  const dest=(d&&d.value)||"moi", repeat=(rp&&rp.value)||"";
-  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now(),repeat});
+  const dest=(d&&d.value)||"moi", repeat=(rp&&rp.value)||"", prio=(($("#taskPrio")||{}).value)||"n";
+  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now(),repeat,prio});
   t.value=""; g.value=""; if(rp) rp.value=""; saveTasks(); renderTasks();
 }
 function renderTasks(){
@@ -1155,18 +1190,29 @@ function renderTasks(){
   const OVD=3*24*3600*1000, now=Date.now(), isLate=x=>!x.done && x.ts && (now-x.ts>OVD);
   $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done).length, lt=TASKS[k].filter(isLate).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}${lt?`<span class="tk-lt">⏰${lt}</span>`:""}</button>`; }).join("");
   const items=TASKS[TK_VIEW];
+  // Barre de filtre par tag
+  const allTags=[...new Set(items.filter(x=>!x.done).flatMap(x=>x.tags||[]))];
+  if(TK_TAG && !allTags.includes(TK_TAG)) TK_TAG="";
+  const fEl=$("#taskFilter");
+  if(fEl){ fEl.innerHTML = allTags.length ? (`<button class="tk-fchip ${TK_TAG===""?"on":""}" data-tag="">Tous</button>`+allTags.map(t=>`<button class="tk-fchip ${TK_TAG===t?"on":""}" data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</button>`).join("")) : ""; }
+  // Filtre + tri par priorité (haute → normale → basse), non-faites d'abord
+  let list=items.slice();
+  if(TK_TAG) list=list.filter(x=>(x.tags||[]).includes(TK_TAG));
+  list.sort((a,b)=>((a.done?1:0)-(b.done?1:0)) || ((TK_PRIO_RANK[a.prio||"n"])-(TK_PRIO_RANK[b.prio||"n"])));
   const lateCount=items.filter(isLate).length;
   const lateSum=lateCount?`<div class="tk-latesum">⏰ ${lateCount} tâche${lateCount>1?"s":""} en retard (plus de 3 jours)</div>`:"";
-  $("#taskList").innerHTML = items.length ? (lateSum+items.map(x=>{
+  $("#taskList").innerHTML = list.length ? (lateSum+list.map(x=>{
     const tags=(x.tags||[]).map(g=>`<span class="tk-tag">#${escapeHtml(g)}</span>`).join("");
     const opts=TK_KEYS.map(k=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(tkName(k))}</option>`).join("");
     const late=isLate(x), days=late?Math.max(1,Math.floor((now-x.ts)/(24*3600*1000))):0;
-    return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${x.repeat?`<span class="tk-rep">🔁 ${REPEAT_LBL[x.repeat]||""}</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
-  }).join("")) : `<div class="tk-empty">Rien ici — ajoute une tâche 👆</div>`;
+    const pdot=x.prio==="h"?`<span class="tk-prio">🔴</span>`:x.prio==="b"?`<span class="tk-prio">🔵</span>`:"";
+    return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${pdot}${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${x.repeat?`<span class="tk-rep">🔁 ${REPEAT_LBL[x.repeat]||""}</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
+  }).join("")) : `<div class="tk-empty">${TK_TAG?"Aucune tâche avec #"+escapeHtml(TK_TAG):"Rien ici — ajoute une tâche 👆"}</div>`;
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
-{ const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
+{ const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
+{ const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
     const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; saveTasks(); renderTasks(); } return; }
@@ -1207,6 +1253,7 @@ function renderOM(){
   renderHistory();
   renderBadges();
   renderSim();
+  renderPie();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
 function renderHistory(){
@@ -1568,6 +1615,20 @@ function renderSim(){
   function renderAdd(){ const n=Math.max(0,parseInt(simN.value,10)||0), cnt=vas.length, ltv=Number((om.totals||{}).ltv)||0, rev=n*cnt*ltv, pay=n*cnt*0.5, marge=rev-pay; $("#simAddRes").innerHTML=`Avec <b>${n}</b> subs de plus par VA (${cnt} VA), à ta LTV moyenne ${money(ltv)} :<br><span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>.`; }
   cutSel.onchange=renderCut; simN.oninput=renderAdd; renderCut(); renderAdd();
 }
+function renderPie(){
+  const panel=$("#pie"); if(!panel) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, models=om.models||{}, cur=om.currency||"$";
+  const entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  const total=entries.reduce((a,e)=>a+e[1],0);
+  if(!entries.length||total<=0){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const colors=["#a855f7","#22d3ee","#f59e0b","#4ade80","#f472b6","#818cf8"];
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(v).toLocaleString("fr-FR")+" "+cur;
+  const R=52, C=2*Math.PI*R; let off=0;
+  const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");
+  const legend=entries.map((e,i)=>`<div class="pie-lg"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-nm">${escapeHtml(e[0])}</span><span class="pie-v">${money(e[1])} · ${Math.round(e[1]/total*100)}%</span></div>`).join("");
+  $("#pieBody").innerHTML=`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`;
+}
 
 /* ---------- démarrage ---------- */
 applyAccent();
@@ -1595,9 +1656,12 @@ function tickClock(){
   const now=new Date(), hh=String(now.getHours()).padStart(2,"0"), mm=String(now.getMinutes()).padStart(2,"0"), cur=hh+":"+mm, today=todayStr();
   const c=$("#clkNow"); if(c) c.textContent=cur;
   let changed=false;
-  REMINDERS.forEach(r=>{ if(r.at===cur && r.firedDate!==today){ r.firedDate=today; changed=true; playChime(); const who=r.who==="other"?NAMES.other:NAMES.moi; toast(`⏰ ${r.text}`, `Rappel pour ${who} · ${r.at}`); } });
+  REMINDERS.forEach(r=>{ if(r.at===cur && r.firedDate!==today){ r.firedDate=today; changed=true; playChime(); toastReminder(r); } });
   if(changed) saveReminders();
+  if(typeof DATES!=="undefined"){ DATES.forEach(d=>{ if(d.date===today && localStorage.getItem("ccn_dt_"+d.id)!==today){ localStorage.setItem("ccn_dt_"+d.id,today); playChime(); toast("🎁 "+d.text,"C'est aujourd'hui !"); } }); }
 }
+function snoozeReminder(id){ const r=REMINDERS.find(x=>x.id===id); if(!r) return; const t=new Date(Date.now()+10*60000); r.at=String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); r.firedDate=""; saveReminders(); renderReminders(); toast("😴 Reporté","Je te rappelle à "+r.at+"."); }
+function toastReminder(r){ const who=r.who==="other"?NAMES.other:NAMES.moi; const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>⏰ ${escapeHtml(r.text)}</b><div>Pour ${escapeHtml(who)} · ${escapeHtml(r.at)}</div><div class="cc-toast-actions"><button data-snz="${r.id}">😴 +10 min</button><button data-ok="1">OK</button></div>`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; t.addEventListener("click",e=>{ const s=e.target.closest("[data-snz]"); if(s){ snoozeReminder(s.getAttribute("data-snz")); kill(); return; } kill(); }); setTimeout(kill, 30000); }
 function tmTick(){ const left=TM_END-Date.now(), d=$("#tmDisp"); if(left<=0){ clearInterval(TM_INT); TM_INT=null; if(d) d.textContent="⏰ Fini !"; playChime(); toast("⏱️ Minuteur terminé","Le temps est écoulé."); return; } const m=Math.floor(left/60000), s=Math.floor((left%60000)/1000); if(d) d.textContent=`${m}:${String(s).padStart(2,"0")}`; }
 function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_END=Date.now()+min*60000; if(TM_INT) clearInterval(TM_INT); const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); TM_INT=setInterval(tmTick,250); tmTick(); }
 { const a=$("#rmAdd"); if(a) a.onclick=addReminder; }
@@ -1605,6 +1669,20 @@ function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_
 { const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){ REMINDERS=REMINDERS.filter(x=>x.id!==d.getAttribute("data-rmdel")); saveReminders(); renderReminders(); } }); }
 { const b=$("#tmStart"); if(b) b.onclick=tmStart; }
 renderReminders(); tickClock(); setInterval(tickClock, 5000);
+
+/* ---------- dates importantes ---------- */
+let DATES = JSON.parse(localStorage.getItem("ccn_dates")||"[]"); if(!Array.isArray(DATES)) DATES=[];
+function saveDates(){ localStorage.setItem("ccn_dates",JSON.stringify(DATES)); }
+function renderDates(){
+  const list=DATES.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const today=todayStr();
+  $("#dtList").innerHTML = list.length ? list.map(d=>{ const days=Math.round((new Date(d.date+"T00:00:00")-new Date(today+"T00:00:00"))/864e5); const when=isNaN(days)?"":days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`; const cls=days===0?"dt-today":days<0?"dt-past":""; return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}</span><span class="rm-who">${new Date(d.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`; }).join("") : `<div class="tk-empty">Aucune date — ajoute anniversaires, échéances… 👆</div>`;
+}
+function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date}); t.value=""; d.value=""; saveDates(); renderDates(); }
+{ const a=$("#dtAdd"); if(a) a.onclick=addDate; }
+{ const t=$("#dtText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDate(); }); }
+{ const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
+renderDates();
 
 loadOM();
 loadTip();
