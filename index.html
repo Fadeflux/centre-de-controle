@@ -7,7 +7,11 @@
 <title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
-<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Noctra" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -253,7 +257,11 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
-  .hb-chart{display:flex;align-items:flex-end;gap:8px;height:132px;padding:6px 2px 0}
+  .hb-cumul{display:flex;gap:12px;margin-bottom:14px}
+  .hb-c{flex:1;background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:13px;padding:14px}
+  .hb-c-v{font-size:24px;font-weight:800;color:var(--acc)}
+  .hb-c-l{font-size:12px;color:var(--muted);margin-top:3px}
+  .hb-chart{display:flex;align-items:flex-end;gap:6px;height:132px;padding:6px 2px 0}
   .hb{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
   .hb-bar-wrap{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
   .hb-bar{width:64%;max-width:34px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 55%,transparent));transition:height .35s}
@@ -407,6 +415,7 @@
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
+      <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
@@ -473,7 +482,7 @@
   </div>
 
   <div class="panel-box" id="history" style="display:none">
-    <div class="pb-head">📈 Historique & tendance</div>
+    <div class="pb-head">📅 Mon année</div>
     <div id="historyBody"></div>
   </div>
 
@@ -1187,8 +1196,10 @@ function renderHistory(){
       if(localStorage.getItem("ccn_record")!==rk){ localStorage.setItem("ccn_record",rk); setTimeout(confetti,300); }
     }
   }
+  const tot=OM_DATA.totals||{};
+  const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":omMoney(tot.netTotal||0,cur)}</div><div class="hb-c-l">généré depuis le début</div></div></div>`;
   $("#history").style.display="block";
-  $("#historyBody").innerHTML=`${recordBanner}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
+  $("#historyBody").innerHTML=`${recordBanner}${cumul}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
 }
 function renderRenta(){
   if(!OM_DATA){ $("#renta").style.display="none"; return; }
@@ -1283,10 +1294,22 @@ function b64ToU8(base64){
   for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
   return out;
 }
-if(("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window)){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
-  $("#push").style.display="inline-flex";
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+if(("PushManager" in window) && ("Notification" in window)){ $("#push").style.display="inline-flex"; }
+
+/* ---------- installation sur l'écran d'accueil ---------- */
+let DEFERRED_PROMPT=null;
+function isStandalone(){ return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true; }
+window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); DEFERRED_PROMPT=e; const b=$("#install"); if(b && !isStandalone()) b.style.display="inline-flex"; });
+window.addEventListener("appinstalled", ()=>{ const b=$("#install"); if(b) b.style.display="none"; });
+async function doInstall(){
+  if(DEFERRED_PROMPT){ DEFERRED_PROMPT.prompt(); try{ await DEFERRED_PROMPT.userChoice; }catch(e){} DEFERRED_PROMPT=null; const b=$("#install"); if(b) b.style.display="none"; return; }
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  alert(isIOS
+    ? "📲 Installer sur iPhone :\n\n1. Appuie sur le bouton Partager (le carré avec une flèche ↑) en bas de Safari\n2. Choisis « Sur l'écran d'accueil »\n3. Appuie sur « Ajouter »\n\nL'app Noctra apparaîtra sur ton écran d'accueil."
+    : "📲 Installer :\n\n1. Ouvre le menu ⋮ du navigateur\n2. Choisis « Installer l'application » ou « Ajouter à l'écran d'accueil »");
 }
+{ const b=$("#install"); if(b){ b.onclick=doInstall; const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent); if(!isStandalone() && isIOS) b.style.display="inline-flex"; } }
 async function enablePush(){
   const btn=$("#push");
   if(!TOKEN){ openGate("Connecte-toi d'abord pour activer les alertes."); return; }
