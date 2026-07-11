@@ -157,6 +157,21 @@
   .goal-row input{width:130px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .goal-gauge{height:12px;background:var(--surface-2);border-radius:20px;overflow:hidden;margin:9px 0 8px}
   .goal-fill{height:100%;background:var(--acc);border-radius:20px;transition:width .6s}
+  .goal-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .goal-ring{flex:0 0 auto}
+  .goal-ring circle:last-of-type{transition:stroke-dasharray .8s ease}
+  .goal-side{flex:1;min-width:150px}
+  .goal-cur{font-size:20px;margin-bottom:4px}
+  .goal-cur b{color:var(--acc)}
+  .goal-proj{font-size:13px;color:var(--muted);margin-top:8px}
+  .goal-proj b{color:var(--text)}
+  .goal-change{display:inline-block;margin-top:10px;color:var(--faint);font-size:13px}
+  .bdg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:12px}
+  .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
+  .bdg.on{opacity:1;filter:none;border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 30%,transparent)}
+  .bdg-ico{font-size:30px;line-height:1}
+  .bdg-lbl{font-size:11px;color:var(--muted);font-weight:600;line-height:1.2}
+  .bdg.on .bdg-lbl{color:var(--text)}
   .goal-info{font-size:13px;color:var(--muted)}
   .goal-win{color:var(--acc);font-weight:600}
   .ask-row{display:flex;gap:8px}
@@ -465,6 +480,11 @@
   <div class="panel-box" id="renta" style="display:none">
     <div class="pb-head">💰 Rentabilité du mois</div>
     <div id="rentaBody"></div>
+  </div>
+
+  <div class="panel-box" id="badges" style="display:none">
+    <div class="pb-head">🏅 Tes badges</div>
+    <div id="badgesBody" class="bdg-grid"></div>
   </div>
 
   <div class="panel-box" id="paie" style="display:none">
@@ -958,9 +978,23 @@ function renderGoal(data){
   const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
   const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
-  $("#goalBody").innerHTML = `<div class="goal-info"><b style="color:var(--text)">${fmt(current)}</b> / ${fmt(GOAL.value)} ${unit} · <b style="color:var(--text)">${pct}%</b> <a href="#" id="goalReset" style="color:var(--faint);margin-left:6px">changer</a></div>
-    <div class="goal-gauge"><div class="goal-fill" style="width:${pct}%"></div></div>
-    <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Encore <b style="color:var(--text)">${fmt(GOAL.value-current)}</b> ${unit}`}</div>`;
+  const R=52, CIRC=2*Math.PI*R, dash=Math.round(CIRC*pct/100);
+  let proj="";
+  if(isRev){ const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(); if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; } }
+  $("#goalBody").innerHTML = `<div class="goal-wrap">
+    <svg class="goal-ring" viewBox="0 0 120 120" width="118" height="118" aria-hidden="true">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="var(--line-2)" stroke-width="12"/>
+      <circle cx="60" cy="60" r="52" fill="none" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${dash} ${Math.round(CIRC)}" transform="rotate(-90 60 60)"/>
+      <text x="60" y="57" text-anchor="middle" font-size="27" font-weight="800" fill="var(--text)">${pct}%</text>
+      <text x="60" y="79" text-anchor="middle" font-size="11" fill="var(--muted)">${win?"atteint 🎉":(isRev?"du mois":"quinzaine")}</text>
+    </svg>
+    <div class="goal-side">
+      <div class="goal-cur"><b>${fmt(current)}</b> / ${fmt(GOAL.value)} ${unit}</div>
+      <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Il te manque <b style="color:var(--text)">${fmt(GOAL.value-current)}</b> ${unit}`}</div>
+      ${proj}
+      <a href="#" id="goalReset" class="goal-change">changer d'objectif</a>
+    </div>
+  </div>`;
   const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("ccn_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
   if(win && !GOAL_CELEBRATED){ GOAL_CELEBRATED=true; confetti(); }
 }
@@ -1117,6 +1151,7 @@ function renderOM(){
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
   renderRenta();
   renderHistory();
+  renderBadges();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
 function renderHistory(){
@@ -1378,7 +1413,7 @@ function renderMorning(){
   const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
   const na=LAST_NA;
   $("#morningBody").innerHTML=`
-    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">aujourd'hui : <b>${tot.subsDay!=null?tot.subsDay:"—"}</b> subs · <b>${money(st.aPayer)}</b> à payer</div></div>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
@@ -1387,11 +1422,58 @@ function renderMorning(){
     <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
+  const sp=$("#mnSpeak"); if(sp) sp.onclick=speakBriefing;
+}
+function speakBriefing(){
+  try{
+    if(!window.speechSynthesis) return;
+    const name=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"toi";
+    const h=new Date().getHours(), hi=h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+    const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
+    const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{});
+    const today=(st.series&&st.series.subsQuinzaine&&st.series.subsQuinzaine.length)?st.series.subsQuinzaine[st.series.subsQuinzaine.length-1]:null;
+    const topVA=(om.vas&&om.vas.length)?om.vas[0].va:null;
+    const hidden=(typeof HIDE!=="undefined"&&HIDE);
+    const undone=(typeof TASKS!=="undefined")?["moi","other","general"].reduce((a,k)=>a+((TASKS[k]||[]).filter(t=>!t.done).length),0):0;
+    let p=[hi+" "+name+"."];
+    if(today!=null) p.push(today+" sub"+(today>1?"s":"")+" aujourd'hui.");
+    if(tot.netMonth!=null && !hidden) p.push("Net du mois : "+Math.round(tot.netMonth)+" dollars.");
+    if(topVA) p.push(topVA+" est en tête.");
+    p.push(undone?(undone+" tâche"+(undone>1?"s":"")+" à faire."):"Aucune tâche en attente.");
+    const u=new SpeechSynthesisUtterance(p.join(" ")); u.lang="fr-FR"; u.rate=1;
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  }catch(e){}
 }
 function showMorning(){ renderMorning(); $("#morning").classList.add("show"); }
 function closeMorning(){ $("#morning").classList.remove("show"); localStorage.setItem("ccn_morning",todayStr()); }
 function showMorningIfNew(){ if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
+
+/* ---------- badges & paliers ---------- */
+const BADGES=[
+  {id:"streak7", icon:"🔥", label:"7 jours de série", cond:c=>c.streak>=7},
+  {id:"streak30", icon:"🌟", label:"30 jours de série", cond:c=>c.streak>=30},
+  {id:"subs100", icon:"💯", label:"100 subs", cond:c=>c.subsTotal>=100},
+  {id:"subs1000", icon:"🚀", label:"1 000 subs", cond:c=>c.subsTotal>=1000},
+  {id:"net1000", icon:"💰", label:"Premier 1 000 $", cond:c=>c.netTotal>=1000},
+  {id:"net5000", icon:"💎", label:"5 000 $ générés", cond:c=>c.netTotal>=5000},
+  {id:"record", icon:"🏆", label:"Meilleur mois", cond:c=>c.isRecord},
+  {id:"goal", icon:"🎯", label:"Objectif atteint", cond:c=>c.goalMet},
+];
+let BADGES_OWNED=JSON.parse(localStorage.getItem("ccn_badges")||"[]"); if(!Array.isArray(BADGES_OWNED)) BADGES_OWNED=[];
+function renderBadges(){
+  const panel=$("#badges"); if(!panel) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
+  let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>Number(m.net)||0)); isRecord=(Number(c.net)||0)>prevMax && prevMax>0; }
+  const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?(Number(tot.netMonth)||0):(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
+  const ctx={ streak:(typeof STREAK!=="undefined"?STREAK:0), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, isRecord, goalMet };
+  const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
+  const owned=new Set(unlocked.map(b=>b.id));
+  const newly=unlocked.filter(b=>BADGES_OWNED.indexOf(b.id)<0);
+  if(newly.length){ newly.forEach(b=>BADGES_OWNED.push(b.id)); localStorage.setItem("ccn_badges",JSON.stringify(BADGES_OWNED)); if(typeof confetti==="function") setTimeout(confetti,300); }
+  panel.style.display="block";
+  $("#badgesBody").innerHTML=BADGES.map(b=>{ const on=owned.has(b.id); return `<div class="bdg ${on?"on":""}"><div class="bdg-ico">${b.icon}</div><div class="bdg-lbl">${escapeHtml(b.label)}</div></div>`; }).join("");
+}
 
 /* ---------- démarrage ---------- */
 applyAccent();
