@@ -327,6 +327,28 @@
   .legend{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
 
+  .morning{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:26px 20px 40px;z-index:20;overflow-y:auto}
+  .morning.show{display:flex}
+  .mn-inner{max-width:520px;margin:0 auto;width:100%}
+  .mn-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+  .mn-hi{font-size:26px;font-weight:800;line-height:1.2}
+  .mn-streak{background:color-mix(in srgb,#f59e0b 18%,transparent);color:#f59e0b;border:1px solid color-mix(in srgb,#f59e0b 45%,transparent);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:700;white-space:nowrap}
+  .mn-close{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+  .mn-date{color:var(--muted);font-size:14px;margin-bottom:22px;text-transform:capitalize}
+  .mn-money{background:linear-gradient(160deg,color-mix(in srgb,var(--acc) 22%,var(--surface)),var(--surface));border:1px solid var(--line-2);border-radius:18px;padding:22px;margin-bottom:14px}
+  .mn-money .lbl{font-size:13px;color:var(--muted);font-weight:600}
+  .mn-money .big{font-size:52px;font-weight:800;line-height:1.1;margin-top:4px}
+  .mn-money .sub{font-size:14px;color:var(--muted);margin-top:8px}
+  .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
+  .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+  .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
+  .mn-next{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px}
+  .mn-next b{color:var(--acc)}
+  .mn-tasks{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:20px}
+  .mn-tasks h4{margin:0 0 10px;font-size:14px}
+  .mn-task{display:flex;gap:9px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .mn-task:last-child{border-bottom:0}
+  .mn-go{width:100%;font:inherit;font-size:16px;font-weight:700;color:#0a0a0a;background:var(--acc);border:0;border-radius:12px;padding:15px;cursor:pointer}
   .gate{position:fixed;inset:0;background:rgba(6,6,8,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
   .gate.show{display:flex}
   .gate .box{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:28px 24px;width:100%;max-width:350px;box-shadow:0 24px 60px -20px rgba(0,0,0,.8);text-align:center}
@@ -353,6 +375,8 @@
   </div>
 </div>
 
+<div class="morning" id="morning"><div class="mn-inner" id="morningBody"></div></div>
+
 <div class="wrap" id="app">
   <div class="tabbar" id="tabbar"></div>
   <div id="home">
@@ -367,6 +391,7 @@
     <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
+      <button class="btn" id="morn" title="Écran du matin">☀️</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
@@ -669,11 +694,12 @@ function renderBrief(data, live, onCount, stInW){
   s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
   const nTodo = TODOS.filter(t=>!t.d).length;
   if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
+  if (STREAK>1) s.push(`🔥 <b>${STREAK}</b> j`);
   const h = new Date().getHours();
   const greet = h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
   const mIcon = meteo==="ok"?"🟢":meteo==="warn"?"🟡":"🔴";
   const mLbl = meteo==="ok"?"Tout roule":meteo==="warn"?"À surveiller":"Attention";
-  const na = nextAction(data, live);
+  const na = nextAction(data, live); LAST_NA = na;
   $("#daily").innerHTML = `<div class="next ${na.urgent?'u':''}">👉 ${na.icon} ${escapeHtml(na.text)}</div><span class="meteo ${meteo}">${mIcon} ${mLbl}</span><div class="brief-txt">${greet} 👋 · ${s.join(" · ")}</div>`;
 }
 
@@ -1090,6 +1116,7 @@ function renderOM(){
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
   renderRenta();
   renderHistory();
+  if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
@@ -1305,7 +1332,54 @@ async function shareRankCard(){
 }
 { const rb=$("#rank"); if(rb) rb.onclick=shareRankCard; }
 
+/* ---------- écran du matin « Bonjour » : série + compteur + verdict ---------- */
+let LAST_NA=null, STREAK=0, MORNING_SHOWN=false;
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function computeStreak(){
+  const t=todayStr(); let s=null; try{ s=JSON.parse(localStorage.getItem("ccn_streak")||"null"); }catch(e){} s=s||{count:0,last:""};
+  if(s.last!==t){ const y=new Date(Date.now()-864e5).toISOString().slice(0,10); s.count=(s.last===y)?(s.count+1):1; s.last=t; localStorage.setItem("ccn_streak",JSON.stringify(s)); }
+  return s.count;
+}
+function animateCount(el,to,fmt,dur){ to=Number(to)||0; dur=dur||900; const start=performance.now(); (function step(now){ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3); el.textContent=fmt(Math.round(to*e)); if(p<1) requestAnimationFrame(step); })(performance.now()); }
+function paceVerdict(){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
+  const cur=om.currency||"$", nm=Number(om.totals.netMonth)||0, lm=Number(om.totals.netLastMonth)||0;
+  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const proj=day>0?nm/day*dim:nm, fmt=v=>Math.round(v).toLocaleString("fr-FR")+" "+cur;
+  if(lm<=0) return {up:true,text:`🚀 Bon rythme — projection ~${fmt(proj)} ce mois.`};
+  const pct=Math.round((proj-lm)/lm*100);
+  if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
+  const need=Math.max(0,Math.round((lm-nm)/Math.max(1,dim-day)));
+  return {up:false,text:`🔴 En retard : ${pct}% vs le mois dernier. Il te faut ~${fmt(need)}/jour pour rattraper.`};
+}
+function renderMorning(){
+  const name=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"toi";
+  const streak=computeStreak();
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
+  const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
+  const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const verdict=paceVerdict();
+  const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
+  const na=LAST_NA;
+  $("#morningBody").innerHTML=`
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>1?`<span class="mn-streak">🔥 ${streak} j</span>`:""}<button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
+    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">aujourd'hui : <b>${tot.subsDay!=null?tot.subsDay:"—"}</b> subs · <b>${money(st.aPayer)}</b> à payer</div></div>
+    ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
+    ${na?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
+    <div class="mn-tasks"><h4>📋 Ta journée ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
+    <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
+  const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
+  const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
+}
+function showMorning(){ renderMorning(); $("#morning").classList.add("show"); }
+function closeMorning(){ $("#morning").classList.remove("show"); localStorage.setItem("ccn_morning",todayStr()); }
+function showMorningIfNew(){ if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
+{ const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
+
 /* ---------- démarrage ---------- */
+STREAK=computeStreak();
 applyAccent();
 load();
 loadTodosFromBrain();
