@@ -904,7 +904,7 @@ function renderRenta(){
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     <div class="rn-line rn-total"><span>= Profit (avant part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
     <div class="rn-proj">🔮 Au rythme actuel, fin de mois : ~<b>${money(projNet)}</b> de revenus · ~<b>${money(projProfit)}</b> de profit.</div>
-    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Basé sur le <b>net OnlyMonster</b> (déjà après commissions OF + Skrill). Ne déduit <b>pas</b> encore la part reversée à la modèle — ça se gère sur ton site finance.</div>`;
+    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>net OnlyMonster</b> (déjà après la commission OnlyFans 20 %). Les <b>2 % Skrill</b> et la <b>part reversée à la modèle</b> se gèrent sur ton site finance.</div>`;
 }
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
