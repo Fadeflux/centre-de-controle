@@ -232,6 +232,24 @@
   .tk-lt{background:var(--down);color:#fff;border-radius:999px;padding:0 5px;font-size:10px;margin-left:4px;font-weight:700}
   .tk-latesum{color:var(--down);font-weight:700;font-size:13px;padding:2px 0 10px}
   .tk-rep{font-size:11px;font-weight:600;color:var(--acc);margin-left:8px;white-space:nowrap}
+  .clk-now{margin-left:auto;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
+  .clk-add{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
+  .clk-add input#rmText{flex:1;min-width:140px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .clk-time,.clk-who{font:inherit;font-size:13px;padding:8px 9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .clk-add .act{margin:0;padding:9px 15px}
+  .rm-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line)}
+  .rm-row:last-of-type{border-bottom:0}
+  .rm-at{font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc);min-width:48px}
+  .rm-tx{flex:1;font-size:14px}
+  .rm-who{font-size:11px;color:var(--muted);background:var(--surface-2,#17181b);border-radius:6px;padding:2px 7px}
+  .rm-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px}
+  .clk-timer{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2);font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .clk-tm{width:60px;font:inherit;font-size:14px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);text-align:center}
+  .clk-timer .act{margin:0;padding:7px 13px}
+  .clk-disp{font-weight:800;font-variant-numeric:tabular-nums;color:var(--text);font-size:16px}
+  .cc-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,80px);background:var(--acc);color:#0a0a0a;padding:14px 20px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:9999;font-size:15px;max-width:90vw;opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),opacity .35s;cursor:pointer}
+  .cc-toast.show{transform:translate(-50%,0);opacity:1}
+  .cc-toast b{font-weight:800} .cc-toast div{font-size:13px;opacity:.85;margin-top:2px}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -451,6 +469,18 @@
       <button id="taskAdd" class="act">＋</button>
     </div>
     <div id="taskList"></div>
+  </div>
+
+  <div class="panel-box" id="clock">
+    <div class="pb-head">⏰ Rappels &amp; minuteur <span class="clk-now" id="clkNow">--:--</span></div>
+    <div class="clk-add">
+      <input id="rmText" placeholder="Ex : Appeler le client" autocomplete="off" />
+      <input id="rmTime" type="time" class="clk-time" />
+      <select id="rmWho" class="clk-who"></select>
+      <button id="rmAdd" class="act">＋</button>
+    </div>
+    <div id="rmList"></div>
+    <div class="clk-timer">⏱️ Minuteur : <input id="tmMin" type="number" min="1" value="10" class="clk-tm" /> min <button id="tmStart" class="act">Lancer</button> <span id="tmDisp" class="clk-disp"></span></div>
   </div>
 
   <div class="rappels" id="rappels" style="display:none"></div>
@@ -792,7 +822,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -1540,10 +1570,43 @@ applyAccent();
 load();
 loadTodosFromBrain();
 loadJournal();
+/* ---------- chrono, horloge & rappels ---------- */
+let REMINDERS = JSON.parse(localStorage.getItem("ccn_reminders")||"[]"); if(!Array.isArray(REMINDERS)) REMINDERS=[];
+let RM_SAVE_T=null, AUDIO_CTX=null, TM_INT=null, TM_END=0;
+function audioCtx(){ if(!AUDIO_CTX){ try{ AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AUDIO_CTX; }
+document.addEventListener("click",()=>{ const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); },{once:true});
+function playChime(){ const ac=audioCtx(); if(!ac) return; if(ac.state==="suspended") ac.resume();
+  [[659.25,0],[783.99,0.15],[1046.5,0.3]].forEach(([f,t])=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const s=ac.currentTime+t; g.gain.setValueAtTime(0,s); g.gain.linearRampToValueAtTime(0.5,s+0.02); g.gain.exponentialRampToValueAtTime(0.001,s+0.45); o.start(s); o.stop(s+0.5); });
+}
+function toast(title, body){ const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>${escapeHtml(title)}</b>${body?`<div>${escapeHtml(body)}</div>`:""}`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; setTimeout(kill,8000); t.onclick=kill; }
+function saveReminders(){ localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS)); if(TOKEN){ clearTimeout(RM_SAVE_T); RM_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/reminders",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({reminders:REMINDERS})}).catch(()=>{}); },500); } }
+async function loadReminders(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/reminders",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.reminders)){ REMINDERS=j.reminders; localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS)); } } }catch(e){} } renderReminders(); }
+function renderReminders(){
+  const who=$("#rmWho"); if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">pour ${escapeHtml(NAMES.moi)}</option><option value="other">pour ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; }
+  const list=REMINDERS.slice().sort((a,b)=>(a.at||"").localeCompare(b.at||""));
+  $("#rmList").innerHTML = list.length ? list.map(r=>`<div class="rm-row"><span class="rm-at">${escapeHtml(r.at)}</span><span class="rm-tx">${escapeHtml(r.text)}</span><span class="rm-who">${r.who==="other"?escapeHtml(NAMES.other):escapeHtml(NAMES.moi)}</span><button class="rm-del" data-rmdel="${r.id}">✕</button></div>`).join("") : `<div class="tk-empty">Aucun rappel — ajoute-en un 👆</div>`;
+}
+function addReminder(){ const t=$("#rmText"), tm=$("#rmTime"), w=$("#rmWho"); const text=(t.value||"").trim(), at=(tm.value||""); if(!text) { t.focus(); return; } if(!/^\d{2}:\d{2}$/.test(at)){ tm.focus(); return; } REMINDERS.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,at,who:(w&&w.value)||"moi",firedDate:"",ts:Date.now()}); t.value=""; saveReminders(); renderReminders(); }
+function tickClock(){
+  const now=new Date(), hh=String(now.getHours()).padStart(2,"0"), mm=String(now.getMinutes()).padStart(2,"0"), cur=hh+":"+mm, today=todayStr();
+  const c=$("#clkNow"); if(c) c.textContent=cur;
+  let changed=false;
+  REMINDERS.forEach(r=>{ if(r.at===cur && r.firedDate!==today){ r.firedDate=today; changed=true; playChime(); const who=r.who==="other"?NAMES.other:NAMES.moi; toast(`⏰ ${r.text}`, `Rappel pour ${who} · ${r.at}`); } });
+  if(changed) saveReminders();
+}
+function tmTick(){ const left=TM_END-Date.now(), d=$("#tmDisp"); if(left<=0){ clearInterval(TM_INT); TM_INT=null; if(d) d.textContent="⏰ Fini !"; playChime(); toast("⏱️ Minuteur terminé","Le temps est écoulé."); return; } const m=Math.floor(left/60000), s=Math.floor((left%60000)/1000); if(d) d.textContent=`${m}:${String(s).padStart(2,"0")}`; }
+function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_END=Date.now()+min*60000; if(TM_INT) clearInterval(TM_INT); const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); TM_INT=setInterval(tmTick,250); tmTick(); }
+{ const a=$("#rmAdd"); if(a) a.onclick=addReminder; }
+{ const t=$("#rmText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addReminder(); }); }
+{ const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){ REMINDERS=REMINDERS.filter(x=>x.id!==d.getAttribute("data-rmdel")); saveReminders(); renderReminders(); } }); }
+{ const b=$("#tmStart"); if(b) b.onclick=tmStart; }
+renderReminders(); tickClock(); setInterval(tickClock, 5000);
+
 loadOM();
 loadTip();
 loadTasks();
 loadPayments();
+loadReminders();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
