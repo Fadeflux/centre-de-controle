@@ -1340,7 +1340,7 @@ function computeStreak(){
   if(s.last!==t){ const y=new Date(Date.now()-864e5).toISOString().slice(0,10); s.count=(s.last===y)?(s.count+1):1; s.last=t; localStorage.setItem("ccn_streak",JSON.stringify(s)); }
   return s.count;
 }
-function animateCount(el,to,fmt,dur){ to=Number(to)||0; dur=dur||900; const start=performance.now(); (function step(now){ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3); el.textContent=fmt(Math.round(to*e)); if(p<1) requestAnimationFrame(step); })(performance.now()); }
+function animateCount(el,to,fmt,dur){ to=Number(to)||0; dur=dur||900; const start=performance.now(); (function step(now){ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3); el.textContent=fmt(Math.round(to*e)); if(p<1) requestAnimationFrame(step); })(performance.now()); setTimeout(()=>{ el.textContent=fmt(to); }, dur+150); }
 function paceVerdict(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
   const cur=om.currency||"$", nm=Number(om.totals.netMonth)||0, lm=Number(om.totals.netLastMonth)||0;
