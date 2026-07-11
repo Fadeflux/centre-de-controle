@@ -176,6 +176,15 @@
   .bdg-ico{font-size:30px;line-height:1}
   .bdg-lbl{font-size:11px;color:var(--muted);font-weight:600;line-height:1.2}
   .bdg.on .bdg-lbl{color:var(--text)}
+  .sim-block{padding:12px 0;border-bottom:.5px solid var(--line)}
+  .sim-block:last-child{border-bottom:0}
+  .sim-q{font-size:14px;font-weight:600}
+  .sim-sel{width:100%;margin:9px 0;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .sim-n{width:62px;font:inherit;font-size:14px;padding:4px 8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;text-align:center}
+  .sim-res{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.7}
+  .sim-res b{color:var(--text)}
+  .sim-verdict{font-weight:600}
+  .sim-verdict.pos{color:var(--ok)} .sim-verdict.neg{color:var(--down)}
   .goal-info{font-size:13px;color:var(--muted)}
   .goal-win{color:var(--acc);font-weight:600}
   .ask-row{display:flex;gap:8px}
@@ -494,6 +503,11 @@
   <div class="panel-box" id="badges" style="display:none">
     <div class="pb-head">🏅 Tes badges</div>
     <div id="badgesBody" class="bdg-grid"></div>
+  </div>
+
+  <div class="panel-box" id="sim" style="display:none">
+    <div class="pb-head">🔮 Simulateur « et si »</div>
+    <div id="simBody"></div>
   </div>
 
   <div class="panel-box" id="paie" style="display:none">
@@ -1161,6 +1175,7 @@ function renderOM(){
   renderRenta();
   renderHistory();
   renderBadges();
+  renderSim();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
 function renderHistory(){
@@ -1496,6 +1511,28 @@ function renderBadges(){
   if(newly.length){ newly.forEach(b=>BADGES_OWNED.push(b.id)); localStorage.setItem("ccn_badges",JSON.stringify(BADGES_OWNED)); if(typeof confetti==="function") setTimeout(confetti,300); }
   panel.style.display="block";
   $("#badgesBody").innerHTML=BADGES.map(b=>{ const on=owned.has(b.id); return `<div class="bdg ${on?"on":""}"><div class="bdg-ico">${b.icon}</div><div class="bdg-lbl">${escapeHtml(b.label)}</div></div>`; }).join("");
+}
+function renderSim(){
+  const panel=$("#sim"); if(!panel) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, vas=(om.vas||[]), cur=om.currency||"$";
+  if(!vas.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const opts=vas.map(v=>`<option value="${escapeHtml(v.va)}">${escapeHtml(v.va)}</option>`).join("");
+  $("#simBody").innerHTML=`
+    <div class="sim-block">
+      <div class="sim-q">✂️ Et si je coupe un VA ?</div>
+      <select id="simVa" class="sim-sel">${opts}</select>
+      <div id="simCutRes" class="sim-res"></div>
+    </div>
+    <div class="sim-block">
+      <div class="sim-q">📈 Et si chaque VA faisait <input id="simN" class="sim-n" type="number" inputmode="numeric" value="5" min="1"> subs de plus ce mois ?</div>
+      <div id="simAddRes" class="sim-res"></div>
+    </div>`;
+  const cutSel=$("#simVa"), simN=$("#simN");
+  function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round((Number(v.rev)||0)-marge), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
+  function renderAdd(){ const n=Math.max(0,parseInt(simN.value,10)||0), cnt=vas.length, ltv=Number((om.totals||{}).ltv)||0, rev=n*cnt*ltv, pay=n*cnt*0.5, marge=rev-pay; $("#simAddRes").innerHTML=`Avec <b>${n}</b> subs de plus par VA (${cnt} VA), à ta LTV moyenne ${money(ltv)} :<br><span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>.`; }
+  cutSel.onchange=renderCut; simN.oninput=renderAdd; renderCut(); renderAdd();
 }
 
 /* ---------- démarrage ---------- */
