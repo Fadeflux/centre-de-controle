@@ -186,6 +186,10 @@
   .restart-btn{margin-left:8px;font:inherit;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);color:var(--text);cursor:pointer}
   .restart-btn:hover{border-color:var(--acc);color:var(--acc)}
   .restart-btn:disabled{opacity:.7;cursor:default}
+  .tk-row.late{background:color-mix(in srgb,var(--down) 9%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
+  .tk-late{font-size:11px;font-weight:700;color:var(--down);margin-left:8px;white-space:nowrap}
+  .tk-lt{background:var(--down);color:#fff;border-radius:999px;padding:0 5px;font-size:10px;margin-left:4px;font-weight:700}
+  .tk-latesum{color:var(--down);font-weight:700;font-size:13px;padding:2px 0 10px}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -509,11 +513,11 @@ const DEMO = {
 
 /* ---------- état ---------- */
 const $ = s => document.querySelector(s);
-let TOKEN = localStorage.getItem("cc_token") || "";
-let PINS  = JSON.parse(localStorage.getItem("cc_pins") || "[]");
+let TOKEN = localStorage.getItem("ccn_token") || "";
+let PINS  = JSON.parse(localStorage.getItem("ccn_pins") || "[]");
 let LAST  = DEMO;
 let WORLD = "all";
-let HIDE  = localStorage.getItem("cc_hide") === "1";
+let HIDE  = localStorage.getItem("ccn_hide") === "1";
 let IS_LIVE = false;
 const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
 function applyAccent(){
@@ -522,7 +526,7 @@ function applyAccent(){
   document.documentElement.style.setProperty("--acc-hover", a[1]);
 }
 function setWorld(w){
-  WORLD = w; localStorage.setItem("cc_world", w);
+  WORLD = w; localStorage.setItem("ccn_world", w);
   [...document.querySelectorAll("#worlds button")].forEach(b=>b.classList.toggle("won", b.getAttribute("data-world")===w));
   applyAccent(); render(LAST);
 }
@@ -689,7 +693,7 @@ async function load(){
 function togglePin(id){
   const i = PINS.indexOf(id);
   if (i>=0) PINS.splice(i,1); else PINS.push(id);
-  localStorage.setItem("cc_pins", JSON.stringify(PINS));
+  localStorage.setItem("ccn_pins", JSON.stringify(PINS));
   render(LAST);
 }
 $("#sections").addEventListener("click", e=>{
@@ -701,7 +705,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("cc_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -716,17 +720,17 @@ $("#tv").onclick = ()=>{
 /* ---------- mode discret (masquer les montants) ---------- */
 $("#hide").textContent = HIDE ? "🙈" : "👁️";
 $("#hide").onclick = ()=>{
-  HIDE = !HIDE; localStorage.setItem("cc_hide", HIDE?"1":"0");
+  HIDE = !HIDE; localStorage.setItem("ccn_hide", HIDE?"1":"0");
   $("#hide").textContent = HIDE ? "🙈" : "👁️";
   render(LAST); renderCosts();
 };
 
 /* ---------- ma journée (à faire) ---------- */
-let TODOS = JSON.parse(localStorage.getItem("cc_todos") || "[]");
+let TODOS = JSON.parse(localStorage.getItem("ccn_todos") || "[]");
 let todoSyncT = null;
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function saveTodos(){
-  localStorage.setItem("cc_todos", JSON.stringify(TODOS));
+  localStorage.setItem("ccn_todos", JSON.stringify(TODOS));
   if(TOKEN && HUB_URL){
     clearTimeout(todoSyncT);
     todoSyncT = setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:TODOS})}).catch(()=>{}); }, 600);
@@ -754,7 +758,7 @@ async function loadTodosFromBrain(){
     const r = await fetch(HUB_BASE+"/api/hub/notes",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
     if(!r.ok) return;
     const j = await r.json();
-    if(Array.isArray(j.notes)){ TODOS = j.notes; localStorage.setItem("cc_todos",JSON.stringify(TODOS)); renderTodos(); }
+    if(Array.isArray(j.notes)){ TODOS = j.notes; localStorage.setItem("ccn_todos",JSON.stringify(TODOS)); renderTodos(); }
   }catch(e){}
 }
 renderTodos();
@@ -780,8 +784,8 @@ $("#rappels").addEventListener("click",e=>{ const b=e.target.closest("[data-rap]
 renderRappels();
 
 /* ---------- dépenses d'outils ---------- */
-let COSTS = JSON.parse(localStorage.getItem("cc_costs") || "[]");
-function saveCosts(){ localStorage.setItem("cc_costs", JSON.stringify(COSTS)); }
+let COSTS = JSON.parse(localStorage.getItem("ccn_costs") || "[]");
+function saveCosts(){ localStorage.setItem("ccn_costs", JSON.stringify(COSTS)); }
 function renderCosts(){
   const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
   $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
@@ -800,8 +804,8 @@ $("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cd
 renderCosts();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
-let SHORTCUTS = JSON.parse(localStorage.getItem("cc_shortcuts") || "[]");
-function saveShortcuts(){ localStorage.setItem("cc_shortcuts", JSON.stringify(SHORTCUTS)); }
+let SHORTCUTS = JSON.parse(localStorage.getItem("ccn_shortcuts") || "[]");
+function saveShortcuts(){ localStorage.setItem("ccn_shortcuts", JSON.stringify(SHORTCUTS)); }
 function normUrl(u){ u=(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return u; }
 function renderShortcuts(){
   if(!SHORTCUTS.length){ $("#scGrid").innerHTML = `<div class="sc-empty">Ajoute tes liens (Railway, Drive, salons Discord…). L'étoile ★ = dans ta routine du matin.</div>`; return; }
@@ -868,7 +872,7 @@ $("#paieCopy").onclick = ()=>{
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
-let GOAL = JSON.parse(localStorage.getItem("cc_goal")||"null");
+let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
 let GOAL_CELEBRATED = false;
 function confetti(){
   const em=["🎉","✨","🎊","⭐","💜"];
@@ -882,7 +886,7 @@ function confetti(){
 function renderGoal(data){
   if(!GOAL){
     $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div><div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`;
-    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("cc_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
     return;
   }
   const isRev = GOAL.type==="rev";
@@ -893,7 +897,7 @@ function renderGoal(data){
   $("#goalBody").innerHTML = `<div class="goal-info"><b style="color:var(--text)">${fmt(current)}</b> / ${fmt(GOAL.value)} ${unit} · <b style="color:var(--text)">${pct}%</b> <a href="#" id="goalReset" style="color:var(--faint);margin-left:6px">changer</a></div>
     <div class="goal-gauge"><div class="goal-fill" style="width:${pct}%"></div></div>
     <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Encore <b style="color:var(--text)">${fmt(GOAL.value-current)}</b> ${unit}`}</div>`;
-  const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("cc_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
+  const gr=$("#goalReset"); if(gr) gr.onclick=(e)=>{ e.preventDefault(); GOAL=null; localStorage.removeItem("ccn_goal"); GOAL_CELEBRATED=false; renderGoal(LAST); };
   if(win && !GOAL_CELEBRATED){ GOAL_CELEBRATED=true; confetti(); }
 }
 
@@ -932,7 +936,7 @@ async function loadTip(force){
   panel.style.display="block";
   const box=$("#tipBody");
   const key=new Date().toISOString().slice(0,10);
-  const cached=JSON.parse(localStorage.getItem("cc_tip")||"null");
+  const cached=JSON.parse(localStorage.getItem("ccn_tip")||"null");
   if(!force && cached && cached.d===key && cached.t){ box.className="tip-body"; box.textContent=cached.t; return; }
   box.className="tip-body muted"; box.textContent="L'assistant analyse tes chiffres…";
   try{
@@ -940,7 +944,7 @@ async function loadTip(force){
     const j=await r.json();
     const t=j.answer||j.error||"Pas de conseil aujourd'hui.";
     box.className="tip-body"; box.textContent=t;
-    localStorage.setItem("cc_tip",JSON.stringify({d:key,t:t}));
+    localStorage.setItem("ccn_tip",JSON.stringify({d:key,t:t}));
   }catch(e){ box.className="tip-body muted"; box.textContent="Conseil indisponible — réessaie."; }
 }
 { const _t=$("#tipRefresh"); if(_t) _t.onclick=()=>loadTip(true); }
@@ -948,20 +952,20 @@ async function loadTip(force){
 /* ---------- tâches d'équipe (3 listes + tags, sync serveur) ---------- */
 const NAMES = { moi:"Andre", other:"Manon" };   // Noctra ; côté Shinra = { moi:"Andre", other:"Ghoulz" }
 const TK_KEYS = ["moi","other","general"];
-let WHO = localStorage.getItem("cc_who") || "moi";
-let TASKS = JSON.parse(localStorage.getItem("cc_tasks")||"null") || {moi:[],other:[],general:[]};
-let TK_VIEW = localStorage.getItem("cc_tkview") || WHO;
+let WHO = localStorage.getItem("ccn_who") || "moi";
+let TASKS = JSON.parse(localStorage.getItem("ccn_tasks")||"null") || {moi:[],other:[],general:[]};
+let TK_VIEW = localStorage.getItem("ccn_tkview") || WHO;
 let TK_SAVE_T = null;
 function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
 function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function saveTasks(){
-  tkNorm(); localStorage.setItem("cc_tasks",JSON.stringify(TASKS));
+  tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
   if(TOKEN){ clearTimeout(TK_SAVE_T); TK_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); },500); }
 }
 async function loadTasks(){
-  if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ TASKS=j.tasks; tkNorm(); localStorage.setItem("cc_tasks",JSON.stringify(TASKS)); } } }catch(e){} }
+  if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ TASKS=j.tasks; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); } } }catch(e){} }
   renderTasks();
 }
 function addTask(){
@@ -975,20 +979,24 @@ function addTask(){
 function renderTasks(){
   tkNorm();
   const who=$("#taskWho");
-  if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("cc_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
+  if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
   const dest=$("#taskDest");
   if(dest){ dest.innerHTML=TK_KEYS.map(k=>`<option value="${k}">${escapeHtml(tkName(k))}</option>`).join(""); dest.value=TK_VIEW; }
-  $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}</button>`; }).join("");
+  const OVD=3*24*3600*1000, now=Date.now(), isLate=x=>!x.done && x.ts && (now-x.ts>OVD);
+  $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done).length, lt=TASKS[k].filter(isLate).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}${lt?`<span class="tk-lt">⏰${lt}</span>`:""}</button>`; }).join("");
   const items=TASKS[TK_VIEW];
-  $("#taskList").innerHTML = items.length ? items.map(x=>{
+  const lateCount=items.filter(isLate).length;
+  const lateSum=lateCount?`<div class="tk-latesum">⏰ ${lateCount} tâche${lateCount>1?"s":""} en retard (plus de 3 jours)</div>`:"";
+  $("#taskList").innerHTML = items.length ? (lateSum+items.map(x=>{
     const tags=(x.tags||[]).map(g=>`<span class="tk-tag">#${escapeHtml(g)}</span>`).join("");
     const opts=TK_KEYS.map(k=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(tkName(k))}</option>`).join("");
-    return `<div class="tk-row ${x.done?"done":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
-  }).join("") : `<div class="tk-empty">Rien ici — ajoute une tâche 👆</div>`;
+    const late=isLate(x), days=late?Math.max(1,Math.floor((now-x.ts)/(24*3600*1000))):0;
+    return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
+  }).join("")) : `<div class="tk-empty">Rien ici — ajoute une tâche 👆</div>`;
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
-{ const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("cc_tkview",TK_VIEW); const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
+{ const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
     const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; saveTasks(); renderTasks(); } return; }
@@ -1058,7 +1066,7 @@ function renderHistory(){
       const lab=useSubs?fmtInt(curM.subs)+" subs":omMoney(curM.net,cur);
       recordBanner=`<div class="hb-record">🏆 Nouveau record ! <b>${curM.month}</b> est ton meilleur mois : <b>${lab}</b> 🎉</div>`;
       const rk=`${curM.month}:${val(curM)}`;
-      if(localStorage.getItem("cc_record")!==rk){ localStorage.setItem("cc_record",rk); setTimeout(confetti,300); }
+      if(localStorage.getItem("ccn_record")!==rk){ localStorage.setItem("ccn_record",rk); setTimeout(confetti,300); }
     }
   }
   $("#history").style.display="block";
