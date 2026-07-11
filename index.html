@@ -368,6 +368,7 @@
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
+      <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
@@ -1275,6 +1276,34 @@ async function shareDayCard(){
   },"image/png");
 }
 { const cb=$("#card"); if(cb) cb.onclick=shareDayCard; }
+function makeRankCard(){
+  const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
+  const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.3; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
+  x.fillStyle="#fff"; x.font="bold 62px Inter,Arial,sans-serif"; x.fillText("🏆 Classement VA",70,140);
+  x.fillStyle=acc; x.font="600 32px Inter,Arial,sans-serif"; x.fillText(new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}),70,196);
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; const vas=(om.vas||[]).slice(0,8);
+  const cur=om.currency||"$"; const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const medals=["🥇","🥈","🥉"]; let y=270;
+  vas.forEach((v,i)=>{
+    const rowH=124; x.fillStyle=i<3?"#17171b":"#121214"; roundRect(x,70,y,940,rowH-16,20); x.fill();
+    if(i<3){ x.textAlign="center"; x.font="54px Inter,Arial,sans-serif"; x.fillText(medals[i],120,y+70); } else { x.fillStyle="#8a8a92"; x.font="bold 40px Inter,Arial,sans-serif"; x.textAlign="center"; x.fillText(String(i+1),120,y+68); }
+    x.textAlign="left"; x.fillStyle="#fff"; x.font="600 40px Inter,Arial,sans-serif"; x.fillText(String(v.va),195,y+56);
+    x.fillStyle="#8a8a92"; x.font="500 28px Inter,Arial,sans-serif"; x.fillText(v.subs+" subs",195,y+92);
+    x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(money(v.rev),980,y+72); x.textAlign="left";
+    y+=rowH;
+  });
+  if(!vas.length){ x.fillStyle="#8a8a92"; x.font="500 34px Inter,Arial,sans-serif"; x.fillText("Pas encore de données VA.",70,320); }
+  x.fillStyle="#57575f"; x.font="500 28px Inter,Arial,sans-serif"; x.fillText("Centre de contrôle",70,1300);
+  return c;
+}
+async function shareRankCard(){
+  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord (« Mes chiffres »)."); return; }
+  const c=makeRankCard();
+  c.toBlob(async(blob)=>{ if(!blob) return; try{ const file=new File([blob],"classement-va.png",{type:"image/png"}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Classement VA"}); return; } }catch(e){} const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="classement-va.png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); },"image/png");
+}
+{ const rb=$("#rank"); if(rb) rb.onclick=shareRankCard; }
 
 /* ---------- démarrage ---------- */
 applyAccent();
