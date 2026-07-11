@@ -640,8 +640,8 @@ const TOOLS = [
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true, restart:"private-discord-bot" },
-  { id:"diddysms",         world:"noctra", cat:"Noctra", name:"DiddySMS", icon:"D", openUrl:"https://diddysms.com", metrics:[] },
-  { id:"getatext",         world:"noctra", cat:"Noctra", name:"Getatext (secours)", icon:"G", openUrl:"https://getatext.com", metrics:[] },
+  { id:"diddysms",         world:"noctra", cat:"Noctra", name:"DiddySMS", icon:"D", openUrl:"https://diddysms.com", metrics:[{k:"balance",l:"Solde",f:fmtMoney}] },
+  { id:"getatext",         world:"noctra", cat:"Noctra", name:"Getatext (secours)", icon:"G", openUrl:"https://getatext.com", metrics:[{k:"balance",l:"Solde",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
@@ -742,6 +742,7 @@ function groups(){
 
 function render(data){
   LAST = data;
+  if(typeof SMS_DATA!=="undefined" && SMS_DATA){ ["diddysms","getatext"].forEach(id=>{ const s=SMS_DATA[id]; if(s && s.balance!=null){ data[id]=data[id]||{}; data[id].status="online"; data[id].metrics=Object.assign({},data[id].metrics,{balance:s.balance}); } }); }
   $("#sections").innerHTML = groups().map(g=>{
     const cards = g.tools.map(t=>cardHTML(t,data)).join("");
     return `<div class="section ${g.build?"build":""}">
@@ -856,7 +857,7 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); };
+$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -1684,11 +1685,16 @@ function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"
 { const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
 renderDates();
 
+/* ---------- soldes SMS ---------- */
+let SMS_DATA=null;
+async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
+
 loadOM();
 loadTip();
 loadTasks();
 loadPayments();
 loadReminders();
+loadSms();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
