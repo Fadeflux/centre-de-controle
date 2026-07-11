@@ -164,6 +164,9 @@
   #askInput:focus{border-color:var(--acc)}
   #askGo{font:inherit;font-size:13px;font-weight:600;color:#0a0a0a;background:var(--acc);border:0;border-radius:9px;padding:0 16px;cursor:pointer;white-space:nowrap}
   #askGo:disabled{opacity:.6;cursor:default}
+  .ask-mic{font-size:16px;background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:9px;padding:0 12px;cursor:pointer;line-height:1}
+  .ask-mic.on{background:var(--down);border-color:var(--down);animation:micpulse 1s infinite}
+  @keyframes micpulse{0%,100%{opacity:1}50%{opacity:.55}}
   .ask-ex{font-size:12px;color:var(--faint);margin-top:9px}
   .ask-ex a{color:var(--acc-ink);cursor:pointer}
   .ask-ex a:hover{text-decoration:underline}
@@ -200,6 +203,7 @@
   .tk-late{font-size:11px;font-weight:700;color:var(--down);margin-left:8px;white-space:nowrap}
   .tk-lt{background:var(--down);color:#fff;border-radius:999px;padding:0 5px;font-size:10px;margin-left:4px;font-weight:700}
   .tk-latesum{color:var(--down);font-weight:700;font-size:13px;padding:2px 0 10px}
+  .tk-rep{font-size:11px;font-weight:600;color:var(--acc);margin-left:8px;white-space:nowrap}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -383,6 +387,7 @@
     <div class="tk-add">
       <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
       <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
+      <select id="taskRepeat" class="tk-dest" title="Répétition"><option value="">une fois</option><option value="day">🔁 chaque jour</option><option value="week">🔁 chaque semaine</option><option value="quinzaine">🔁 chaque quinzaine</option></select>
       <select id="taskDest" class="tk-dest"></select>
       <button id="taskAdd" class="act">＋</button>
     </div>
@@ -411,7 +416,7 @@
 
   <div class="panel-box" id="ask">
     <div class="pb-head">🤖 Assistant — demande ou donne un ordre</div>
-    <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askGo">Envoyer</button></div>
+    <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
     <div class="ask-ex">Essaie : <a data-q="Ajoute une tâche pour Manon : relancer Prince">＋ tâche à Manon</a> · <a data-q="Qui je dois relancer ?">qui relancer</a> · <a data-q="Combien à payer cette quinzaine ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
     <div class="ask-ans" id="askAns"></div>
   </div>
@@ -960,6 +965,21 @@ async function doBilan(){
   }catch(e){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Erreur — réessaie."; }
 }
 $("#ask").addEventListener("click",e=>{ const b=e.target.closest("[data-bilan]"); if(b){ e.preventDefault(); doBilan(); return; } const a=e.target.closest("[data-q]"); if(a) doAsk(a.getAttribute("data-q")); });
+/* ---------- dictée vocale (Web Speech) ---------- */
+(function(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const mic = $("#askMic"); if(!mic) return;
+  if(!SR){ mic.style.display="none"; return; }
+  let rec=null, listening=false;
+  mic.onclick=()=>{
+    if(listening){ try{ rec.stop(); }catch(e){} return; }
+    rec = new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
+    rec.onstart=()=>{ listening=true; mic.classList.add("on"); mic.textContent="🔴"; $("#askInput").placeholder="Parle…"; };
+    rec.onend=()=>{ listening=false; mic.classList.remove("on"); mic.textContent="🎤"; $("#askInput").placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS"; };
+    rec.onresult=(e)=>{ const txt=e.results[0][0].transcript; $("#askInput").value=txt; doAsk(txt); };
+    try{ rec.start(); }catch(e){ listening=false; }
+  };
+})();
 
 /* ---------- conseil du jour (IA, 1x/jour) ---------- */
 async function loadTip(force){
@@ -990,6 +1010,8 @@ let TK_VIEW = localStorage.getItem("ccn_tkview") || WHO;
 let TK_SAVE_T = null;
 function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
 function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
+const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaque jour",week:"chaque semaine",quinzaine:"chaque quinzaine"};
+function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function saveTasks(){
@@ -1001,15 +1023,15 @@ async function loadTasks(){
   renderTasks();
 }
 function addTask(){
-  const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest");
+  const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest"), rp=$("#taskRepeat");
   const text=(t.value||"").trim(); if(!text) return;
   const tags=(g.value||"").split(",").map(s=>s.trim()).filter(Boolean).slice(0,8);
-  const dest=(d&&d.value)||"moi";
-  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now()});
-  t.value=""; g.value=""; saveTasks(); renderTasks();
+  const dest=(d&&d.value)||"moi", repeat=(rp&&rp.value)||"";
+  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now(),repeat});
+  t.value=""; g.value=""; if(rp) rp.value=""; saveTasks(); renderTasks();
 }
 function renderTasks(){
-  tkNorm();
+  tkNorm(); if(tkReconcile()) saveTasks();
   const who=$("#taskWho");
   if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
   const dest=$("#taskDest");
@@ -1023,7 +1045,7 @@ function renderTasks(){
     const tags=(x.tags||[]).map(g=>`<span class="tk-tag">#${escapeHtml(g)}</span>`).join("");
     const opts=TK_KEYS.map(k=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(tkName(k))}</option>`).join("");
     const late=isLate(x), days=late?Math.max(1,Math.floor((now-x.ts)/(24*3600*1000))):0;
-    return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
+    return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${x.repeat?`<span class="tk-rep">🔁 ${REPEAT_LBL[x.repeat]||""}</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
   }).join("")) : `<div class="tk-empty">Rien ici — ajoute une tâche 👆</div>`;
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
@@ -1031,7 +1053,7 @@ function renderTasks(){
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
-    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; saveTasks(); renderTasks(); } return; }
+    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; saveTasks(); renderTasks(); } return; }
     const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); TASKS[TK_VIEW]=TASKS[TK_VIEW].filter(x=>x.id!==id); saveTasks(); renderTasks(); return; }
   });
   list.addEventListener("change",e=>{
