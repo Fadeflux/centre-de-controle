@@ -682,6 +682,7 @@ function nextAction(data, live){
   return {icon:"✅", text:"Tout est à jour — rien d'urgent", urgent:false};
 }
 function renderBrief(data, live, onCount, stInW){
+  STREAK = computeStreak();
   const off = live.length - onCount;
   const meteo = off===0 ? "ok" : (off>=2 ? "bad" : "warn");
   const st = data["stats-tracker"] || {};
@@ -694,7 +695,7 @@ function renderBrief(data, live, onCount, stInW){
   s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
   const nTodo = TODOS.filter(t=>!t.d).length;
   if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
-  if (STREAK>1) s.push(`🔥 <b>${STREAK}</b> j`);
+  if (STREAK>0) s.push(`🔥 <b>${STREAK}</b> j${STREAK_GOAL?" 🎯":""}`);
   const h = new Date().getHours();
   const greet = h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
   const mIcon = meteo==="ok"?"🟢":meteo==="warn"?"🟡":"🔴";
@@ -1333,11 +1334,25 @@ async function shareRankCard(){
 { const rb=$("#rank"); if(rb) rb.onclick=shareRankCard; }
 
 /* ---------- écran du matin « Bonjour » : série + compteur + verdict ---------- */
-let LAST_NA=null, STREAK=0, MORNING_SHOWN=false;
+let LAST_NA=null, STREAK=0, STREAK_GOAL=false, MORNING_SHOWN=false;
 function todayStr(){ return new Date().toISOString().slice(0,10); }
+function yStr(){ return new Date(Date.now()-864e5).toISOString().slice(0,10); }
 function computeStreak(){
-  const t=todayStr(); let s=null; try{ s=JSON.parse(localStorage.getItem("ccn_streak")||"null"); }catch(e){} s=s||{count:0,last:""};
-  if(s.last!==t){ const y=new Date(Date.now()-864e5).toISOString().slice(0,10); s.count=(s.last===y)?(s.count+1):1; s.last=t; localStorage.setItem("ccn_streak",JSON.stringify(s)); }
+  const t=todayStr();
+  // Objectif de subs quotidien = objectif de la quinzaine ÷ 15 (si fixé).
+  let target=0;
+  if((typeof IS_LIVE==="undefined"||IS_LIVE) && typeof GOAL!=="undefined" && GOAL && GOAL.type==="subs" && GOAL.value>0) target=Math.max(1,Math.round(GOAL.value/15));
+  const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{});
+  const todaySubs=(st.series&&st.series.subsQuinzaine&&st.series.subsQuinzaine.length)?st.series.subsQuinzaine[st.series.subsQuinzaine.length-1]:null;
+  if(target>0 && todaySubs!=null){
+    STREAK_GOAL=true;
+    let g=null; try{ g=JSON.parse(localStorage.getItem("ccn_gstreak")||"null"); }catch(e){} g=g||{count:0,last:""};
+    if(todaySubs>=target && g.last!==t){ g.count=(g.last===yStr())?(g.count+1):1; g.last=t; localStorage.setItem("ccn_gstreak",JSON.stringify(g)); }
+    return g.count;
+  }
+  STREAK_GOAL=false;
+  let s=null; try{ s=JSON.parse(localStorage.getItem("ccn_streak")||"null"); }catch(e){} s=s||{count:0,last:""};
+  if(s.last!==t){ s.count=(s.last===yStr())?(s.count+1):1; s.last=t; localStorage.setItem("ccn_streak",JSON.stringify(s)); }
   return s.count;
 }
 function animateCount(el,to,fmt,dur){ to=Number(to)||0; dur=dur||900; const start=performance.now(); (function step(now){ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3); el.textContent=fmt(Math.round(to*e)); if(p<1) requestAnimationFrame(step); })(performance.now()); setTimeout(()=>{ el.textContent=fmt(to); }, dur+150); }
@@ -1363,7 +1378,7 @@ function renderMorning(){
   const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
   const na=LAST_NA;
   $("#morningBody").innerHTML=`
-    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>1?`<span class="mn-streak">🔥 ${streak} j</span>`:""}<button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">aujourd'hui : <b>${tot.subsDay!=null?tot.subsDay:"—"}</b> subs · <b>${money(st.aPayer)}</b> à payer</div></div>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
@@ -1379,7 +1394,6 @@ function showMorningIfNew(){ if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(lo
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
 
 /* ---------- démarrage ---------- */
-STREAK=computeStreak();
 applyAccent();
 load();
 loadTodosFromBrain();
