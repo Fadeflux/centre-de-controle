@@ -181,6 +181,11 @@
   .tk-move{font:inherit;font-size:11px;padding:3px 4px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--muted);outline:none;max-width:104px}
   .tk-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px;padding:2px 4px}
   .tk-empty{color:var(--muted);font-size:13px;padding:6px 0}
+  .tasks-hero{border-top:3px solid var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 28%,transparent),0 10px 34px -14px color-mix(in srgb,var(--acc) 55%,transparent)}
+  .tasks-hero .pb-head{font-size:16px}
+  .restart-btn{margin-left:8px;font:inherit;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg);color:var(--text);cursor:pointer}
+  .restart-btn:hover{border-color:var(--acc);color:var(--acc)}
+  .restart-btn:disabled{opacity:.7;cursor:default}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -355,6 +360,20 @@
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
 
+  <div class="panel-box tasks-hero" id="tasks">
+    <div class="pb-head">✅ Tâches d'équipe
+      <select id="taskWho" class="tk-who" title="Qui es-tu ?"></select>
+    </div>
+    <div class="tk-tabs" id="taskTabs"></div>
+    <div class="tk-add">
+      <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
+      <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
+      <select id="taskDest" class="tk-dest"></select>
+      <button id="taskAdd" class="act">＋</button>
+    </div>
+    <div id="taskList"></div>
+  </div>
+
   <div class="rappels" id="rappels" style="display:none"></div>
 
   <div class="todo" id="todo">
@@ -380,20 +399,6 @@
     <div class="ask-row"><input id="askInput" placeholder="Ex : combien à payer cette quinzaine ?" autocomplete="off" /><button id="askGo">Demander</button></div>
     <div class="ask-ex">Essaie : <a data-q="Combien de subs cette quinzaine et combien à payer ?">subs &amp; paie</a> · <a data-q="Quel VA est le meilleur cette quinzaine ?">meilleur VA</a> · <a data-q="Quels sont mes revenus OnlyMonster ce mois ?">revenus du mois</a> · <a data-bilan="1">📅 bilan de la semaine</a></div>
     <div class="ask-ans" id="askAns"></div>
-  </div>
-
-  <div class="panel-box" id="tasks">
-    <div class="pb-head">✅ Tâches d'équipe
-      <select id="taskWho" class="tk-who" title="Qui es-tu ?"></select>
-    </div>
-    <div class="tk-tabs" id="taskTabs"></div>
-    <div class="tk-add">
-      <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
-      <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
-      <select id="taskDest" class="tk-dest"></select>
-      <button id="taskAdd" class="act">＋</button>
-    </div>
-    <div id="taskList"></div>
   </div>
 
   <div id="sections"></div>
@@ -481,7 +486,7 @@ const TOOLS = [
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
-  { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true },
+  { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true, restart:"private-discord-bot" },
   { id:"diddysms",         world:"noctra", cat:"Noctra", name:"DiddySMS", icon:"D", openUrl:"https://diddysms.com", metrics:[] },
   { id:"getatext",         world:"noctra", cat:"Noctra", name:"Getatext (secours)", icon:"G", openUrl:"https://getatext.com", metrics:[] },
 
@@ -560,9 +565,10 @@ function cardHTML(t, data){
     }).join("");
     body = `<div class="metrics">${m}</div>`;
   }
+  const restartBtn = (t.restart && TOKEN) ? `<button class="restart-btn" data-restart="${escapeHtml(t.restart)}" data-restartname="${escapeHtml(t.name)}" title="Redémarrer ce bot">🔄 Redémarrer</button>` : "";
   const foot = t.build
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
-    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${t.openUrl?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a></div>`;
+    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${t.openUrl?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a>${restartBtn}</div>`;
   return `<div class="card ${t.featured?"featured":""}">
     <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${star}${dot}</div>
     ${body}${foot}</div>`;
@@ -900,6 +906,7 @@ async function doAsk(q){
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
     const r = await fetch(HUB_BASE+"/api/hub/ask",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({question:q})});
+    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Token incorrect — reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Ton token du site est incorrect. Recolle le bon token (celui du site, PAS le token Railway)."); go.disabled=false; go.textContent="Demander"; return; }
     const j = await r.json();
     $("#askAns").className="ask-ans"; $("#askAns").textContent = j.answer || j.error || "Pas de réponse.";
   }catch(e){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Erreur — réessaie."; }
@@ -939,11 +946,14 @@ async function loadTip(force){
 { const _t=$("#tipRefresh"); if(_t) _t.onclick=()=>loadTip(true); }
 
 /* ---------- tâches d'équipe (3 listes + tags, sync serveur) ---------- */
-const LABEL2 = "Ma modèle";   // Noctra ; côté Shinra = "Associé"
-const TK_LISTS = [["moi","📋 Moi"],["other","👤 "+LABEL2],["general","🌐 Générale"]];
+const NAMES = { moi:"Andre", other:"Manon" };   // Noctra ; côté Shinra = { moi:"Andre", other:"Ghoulz" }
+const TK_KEYS = ["moi","other","general"];
+let WHO = localStorage.getItem("cc_who") || "moi";
 let TASKS = JSON.parse(localStorage.getItem("cc_tasks")||"null") || {moi:[],other:[],general:[]};
-let TK_VIEW = localStorage.getItem("cc_tkview") || "moi";
+let TK_VIEW = localStorage.getItem("cc_tkview") || WHO;
 let TK_SAVE_T = null;
+function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
+function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function saveTasks(){
@@ -965,14 +975,14 @@ function addTask(){
 function renderTasks(){
   tkNorm();
   const who=$("#taskWho");
-  if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : Moi</option><option value="other">Je suis : ${escapeHtml(LABEL2)}</option>`; who.dataset.filled="1"; who.value=localStorage.getItem("cc_who")||"moi"; who.onchange=()=>localStorage.setItem("cc_who",who.value); }
+  if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("cc_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
   const dest=$("#taskDest");
-  if(dest && !dest.dataset.filled){ dest.innerHTML=TK_LISTS.map(([k,l])=>`<option value="${k}">${escapeHtml(l)}</option>`).join(""); dest.dataset.filled="1"; dest.value=TK_VIEW; }
-  $("#taskTabs").innerHTML=TK_LISTS.map(([k,l])=>{ const n=TASKS[k].filter(x=>!x.done).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(l)}${n?`<span class="tk-n">${n}</span>`:""}</button>`; }).join("");
+  if(dest){ dest.innerHTML=TK_KEYS.map(k=>`<option value="${k}">${escapeHtml(tkName(k))}</option>`).join(""); dest.value=TK_VIEW; }
+  $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}</button>`; }).join("");
   const items=TASKS[TK_VIEW];
   $("#taskList").innerHTML = items.length ? items.map(x=>{
     const tags=(x.tags||[]).map(g=>`<span class="tk-tag">#${escapeHtml(g)}</span>`).join("");
-    const opts=TK_LISTS.map(([k,l])=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(l.replace(/^\S+\s/,""))}</option>`).join("");
+    const opts=TK_KEYS.map(k=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(tkName(k))}</option>`).join("");
     return `<div class="tk-row ${x.done?"done":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${escapeHtml(x.text)}</span>${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
   }).join("") : `<div class="tk-empty">Rien ici — ajoute une tâche 👆</div>`;
 }
@@ -1121,7 +1131,20 @@ $("#tabbar").addEventListener("click",e=>{
   const c=e.target.closest("[data-close]"); if(c){ e.stopPropagation(); closeTab(c.getAttribute("data-close")); return; }
   const t=e.target.closest("[data-tab]"); if(t){ ACTIVE=t.getAttribute("data-tab"); updateView(); }
 });
+async function doRestart(bot, name, btn){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  if(!confirm(`Redémarrer ${name} ?\nLe bot sera indisponible ~30 s le temps de redémarrer.`)) return;
+  const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Redémarrage…";
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/restart",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({bot})});
+    if(r.status===401){ btn.disabled=false; btn.textContent=old; openGate("Token incorrect — recolle le bon token du site."); return; }
+    const j=await r.json();
+    if(j.ok){ btn.textContent="✅ Relancé"; setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },4000); }
+    else { btn.textContent="⚠️ Échec"; alert("Échec du redémarrage : "+(j.error||"inconnu")); setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },3000); }
+  }catch(e){ btn.textContent="⚠️ Erreur"; setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },3000); }
+}
 $("#sections").addEventListener("click",e=>{
+  const rb=e.target.closest("[data-restart]"); if(rb){ e.preventDefault(); doRestart(rb.getAttribute("data-restart"), rb.getAttribute("data-restartname"), rb); return; }
   const a=e.target.closest("[data-openurl]"); if(a){ e.preventDefault(); openTab(a.getAttribute("data-openid"), a.getAttribute("data-openname"), a.getAttribute("data-openurl")); }
 });
 renderTabStrip();
