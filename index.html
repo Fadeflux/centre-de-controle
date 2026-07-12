@@ -479,7 +479,8 @@
   <div class="box">
     <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
     <h2>Centre de contrôle</h2>
-    <p>Entre ton mot de passe pour afficher tes chiffres.</p>
+    <p>Connecte-toi pour voir tes chiffres.</p>
+    <input id="pwUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Identifiant (andre / manon)" />
     <input id="pw" type="password" inputmode="text" autocomplete="current-password" placeholder="Mot de passe" />
     <button id="pwGo">Entrer</button>
     <div class="err" id="pwErr"></div>
@@ -705,8 +706,7 @@ const TOOLS = [
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true, restart:"private-discord-bot" },
-  { id:"diddysms",         world:"noctra", cat:"Noctra", name:"DiddySMS", icon:"D", openUrl:"https://diddysms.com", metrics:[{k:"balance",l:"Solde",f:fmtMoney}] },
-  { id:"getatext",         world:"noctra", cat:"Noctra", name:"Getatext (secours)", icon:"G", openUrl:"https://getatext.com", metrics:[{k:"balance",l:"Solde",f:fmtMoney}] },
+  { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
@@ -721,13 +721,13 @@ const DEMO = {
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
   "sms-perso":{status:"online"},
-  "diddysms":{status:"online"},
-  "getatext":{status:"online"},
+  "sms":{status:"online",metrics:{diddysms:38,getatext:8}},
 };
 
 /* ---------- état ---------- */
 const $ = s => document.querySelector(s);
 let TOKEN = localStorage.getItem("ccn_token") || "";
+let CURRENT_USER = localStorage.getItem("ccn_name") || "";
 let PINS  = JSON.parse(localStorage.getItem("ccn_pins") || "[]");
 let LAST  = DEMO;
 let WORLD = "all";
@@ -807,7 +807,7 @@ function groups(){
 
 function render(data){
   LAST = data;
-  if(typeof SMS_DATA!=="undefined" && SMS_DATA){ ["diddysms","getatext"].forEach(id=>{ const s=SMS_DATA[id]; if(s && s.balance!=null){ data[id]=data[id]||{}; data[id].status="online"; data[id].metrics=Object.assign({},data[id].metrics,{balance:s.balance}); } }); }
+  if(typeof SMS_DATA!=="undefined" && SMS_DATA){ const dd=SMS_DATA.diddysms, gt=SMS_DATA.getatext; if((dd&&dd.balance!=null)||(gt&&gt.balance!=null)){ data["sms"]=data["sms"]||{}; data["sms"].status="online"; data["sms"].metrics=Object.assign({},(data["sms"]||{}).metrics,{ diddysms:(dd&&dd.balance!=null)?dd.balance:null, getatext:(gt&&gt.balance!=null)?gt.balance:null }); } }
   $("#sections").innerHTML = groups().map(g=>{
     const cards = g.tools.map(t=>cardHTML(t,data)).join("");
     return `<div class="section ${g.build?"build":""}">
@@ -923,19 +923,28 @@ $("#sections").addEventListener("click", e=>{
 });
 
 /* ---------- mot de passe ---------- */
-function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
+function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>{ const u=$("#pwUser"); ((u&&!u.value)?u:$("#pw")).focus(); },50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
 async function doLogin(){
-  const input=$("#pw").value.trim(); if(!input) return;
-  const go=$("#pwGo"); go.disabled=true; go.textContent="…";
-  let tok=input;
-  try{ const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:input})}); if(r.ok){ const j=await r.json(); if(j.token) tok=j.token; } }catch(e){}
+  const user=($("#pwUser")?$("#pwUser").value.trim().toLowerCase():""), input=$("#pw").value.trim();
+  if(!input){ $("#pwErr").textContent="Entre ton mot de passe."; return; }
+  const go=$("#pwGo"); go.disabled=true; go.textContent="…"; $("#pwErr").textContent="";
+  let tok="", who=null, name="";
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:user, password:input})});
+    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; } }
+  }catch(e){}
   go.disabled=false; go.textContent="Entrer";
-  TOKEN=tok; localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms();
+  if(!tok){ if(input.length>=20 && !user){ tok=input; } else { $("#pwErr").textContent="Identifiant ou mot de passe incorrect."; return; } }
+  TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
+  if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
+  if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms();
 }
 $("#pwGo").onclick = doLogin;
-$("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
+$("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+{ const u=$("#pwUser"); if(u) u.addEventListener("keydown",e=>{ if(e.key==="Enter"){ if($("#pw").value) doLogin(); else $("#pw").focus(); } }); }
 $("#refresh").onclick = load;
 
 /* ---------- mode plein écran ---------- */
@@ -1247,14 +1256,22 @@ const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaqu
 function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+let TK_LAST_EDIT = 0;
 function saveTasks(){
-  tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
+  tkNorm(); TK_LAST_EDIT=Date.now(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
   if(TOKEN){ clearTimeout(TK_SAVE_T); TK_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); },500); }
 }
 async function loadTasks(){
   if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ TASKS=j.tasks; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); } } }catch(e){} }
   renderTasks();
 }
+// Synchro auto entre appareils : récupère la todo du serveur toutes les 10 s
+// (sauf juste après une modif locale) et ne redessine que si ça a changé.
+async function syncTasks(){
+  if(!TOKEN || Date.now()-TK_LAST_EDIT<5000) return;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ const s=JSON.stringify({moi:j.tasks.moi||[],other:j.tasks.other||[],general:j.tasks.general||[]}); if(s!==JSON.stringify({moi:TASKS.moi||[],other:TASKS.other||[],general:TASKS.general||[]})){ TASKS=j.tasks; tkNorm(); localStorage.setItem("ccn_tasks",s); renderTasks(); } } } }catch(e){}
+}
+setInterval(syncTasks, 10000);
 function addTask(){
   const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest"), rp=$("#taskRepeat");
   const text=(t.value||"").trim(); if(!text) return;
