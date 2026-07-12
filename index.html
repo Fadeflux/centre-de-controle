@@ -825,7 +825,6 @@ function render(data){
     tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(gg("stats-tracker","subsQuinzaine"))}</div></div>`);
   }
   let profit = 0;
-  if(inWorld(toolById("shinra-finance"))) profit += gg("shinra-finance","profitMonth");
   if(inWorld(toolById("noctra-finance"))) profit += gg("noctra-finance","profitMonth");
   tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`);
   $("#summary").innerHTML = tiles.join("");
@@ -936,7 +935,7 @@ async function doLogin(){
     if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; } }
   }catch(e){}
   go.disabled=false; go.textContent="Entrer";
-  if(!tok){ if(input.length>=20 && !user){ tok=input; } else { $("#pwErr").textContent="Identifiant ou mot de passe incorrect."; return; } }
+  if(!tok){ $("#pwErr").textContent="Identifiant ou mot de passe incorrect."; return; }
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
@@ -1183,7 +1182,7 @@ async function doAsk(q){
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
     const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES, history:ASK_HISTORY.slice(-4)})});
-    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Entre ton mot de passe du site (Noctra : noctra12)."); go.disabled=false; go.textContent="Envoyer"; return; }
+    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Reconnecte-toi (identifiant + mot de passe)."); go.disabled=false; go.textContent="Envoyer"; return; }
     const j = await r.json();
     const ans = j.answer || j.error || "Pas de réponse.";
     $("#askAns").className="ask-ans"; $("#askAns").textContent = ans;
@@ -1253,7 +1252,7 @@ const TK_PRIO_RANK = {h:0,n:1,b:2};
 function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
 function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
 const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaque jour",week:"chaque semaine",quinzaine:"chaque quinzaine"};
-function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; ch=true; } }); }); return ch; }
+function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && !x.del && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; x.upd=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 let TK_LAST_EDIT = 0;
@@ -1261,23 +1260,41 @@ function saveTasks(){
   tkNorm(); TK_LAST_EDIT=Date.now(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
   if(TOKEN){ clearTimeout(TK_SAVE_T); TK_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); },500); }
 }
+function tkSig(x){ return [x.id,x.text,(x.tags||[]).join(","),x.done?1:0,x.prio||"n",x.repeat||"",x.doneTs||0,x.del?1:0,x.upd||0].join("|"); }
+function tkBoardSig(b){ return TK_KEYS.map(k=>(b[k]||[]).map(tkSig).join(";")).join("§"); }
+// Fusion locale+serveur par id : la version au `upd` le plus récent gagne (tombstones inclus).
+function tkMerge(local, server){
+  const out={}; let localWins=false;
+  TK_KEYS.forEach(k=>{
+    const byId={};
+    (server[k]||[]).forEach(x=>{ if(x&&x.id) byId[x.id]=x; });
+    (local[k]||[]).forEach(x=>{ if(!x||!x.id) return; const sv=byId[x.id]; if(!sv || (Number(x.upd)||0)>(Number(sv.upd)||0)){ byId[x.id]=x; localWins=true; } });
+    out[k]=Object.keys(byId).map(id=>byId[id]);
+  });
+  return {board:out, localWins};
+}
 async function loadTasks(){
-  if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ TASKS=j.tasks; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); } } }catch(e){} }
+  if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ const m=tkMerge(TASKS,j.tasks); TASKS=m.board; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); if(m.localWins) saveTasks(); } } }catch(e){} }
   renderTasks();
 }
-// Synchro auto entre appareils : récupère la todo du serveur toutes les 10 s
-// (sauf juste après une modif locale) et ne redessine que si ça a changé.
+// Synchro auto entre appareils (toutes les 8 s) : fusion sûre par id, ne perd jamais un edit local plus récent, re-POST si besoin.
 async function syncTasks(){
-  if(!TOKEN || Date.now()-TK_LAST_EDIT<5000) return;
-  try{ const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.tasks){ const s=JSON.stringify({moi:j.tasks.moi||[],other:j.tasks.other||[],general:j.tasks.general||[]}); if(s!==JSON.stringify({moi:TASKS.moi||[],other:TASKS.other||[],general:TASKS.general||[]})){ TASKS=j.tasks; tkNorm(); localStorage.setItem("ccn_tasks",s); renderTasks(); } } } }catch(e){}
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return;
+    const j=await r.json(); if(!j.tasks) return;
+    const m=tkMerge(TASKS,j.tasks);
+    if(tkBoardSig(m.board)!==tkBoardSig(TASKS)){ TASKS=m.board; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); renderTasks(); }
+    if(m.localWins && Date.now()-TK_LAST_EDIT>1500){ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); }
+  }catch(e){}
 }
-setInterval(syncTasks, 10000);
+setInterval(syncTasks, 8000);
 function addTask(){
   const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest"), rp=$("#taskRepeat");
   const text=(t.value||"").trim(); if(!text) return;
   const tags=(g.value||"").split(",").map(s=>s.trim()).filter(Boolean).slice(0,8);
   const dest=(d&&d.value)||"moi", repeat=(rp&&rp.value)||"", prio=(($("#taskPrio")||{}).value)||"n";
-  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now(),repeat,prio});
+  tkNorm(); TASKS[dest].unshift({id:tkId(),text,tags,done:false,ts:Date.now(),repeat,prio,upd:Date.now()});
   t.value=""; g.value=""; if(rp) rp.value=""; saveTasks(); renderTasks();
 }
 function renderTasks(){
@@ -1286,9 +1303,9 @@ function renderTasks(){
   if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
   const dest=$("#taskDest");
   if(dest){ dest.innerHTML=TK_KEYS.map(k=>`<option value="${k}">${escapeHtml(tkName(k))}</option>`).join(""); dest.value=TK_VIEW; }
-  const OVD=3*24*3600*1000, now=Date.now(), isLate=x=>!x.done && x.ts && (now-x.ts>OVD);
-  $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done).length, lt=TASKS[k].filter(isLate).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}${lt?`<span class="tk-lt">⏰${lt}</span>`:""}</button>`; }).join("");
-  const items=TASKS[TK_VIEW];
+  const OVD=3*24*3600*1000, now=Date.now(), isLate=x=>!x.done && !x.del && x.ts && (now-x.ts>OVD);
+  $("#taskTabs").innerHTML=TK_KEYS.map(k=>{ const n=TASKS[k].filter(x=>!x.done && !x.del).length, lt=TASKS[k].filter(isLate).length; return `<button class="tk-tab ${k===TK_VIEW?'on':''}" data-tkview="${k}">${escapeHtml(tkTabLabel(k))}${n?`<span class="tk-n">${n}</span>`:""}${lt?`<span class="tk-lt">⏰${lt}</span>`:""}</button>`; }).join("");
+  const items=(TASKS[TK_VIEW]||[]).filter(x=>!x.del);
   // Barre de filtre par tag
   const allTags=[...new Set(items.filter(x=>!x.done).flatMap(x=>x.tags||[]))];
   if(TK_TAG && !allTags.includes(TK_TAG)) TK_TAG="";
@@ -1316,17 +1333,17 @@ let ROUTINES = JSON.parse(localStorage.getItem("ccn_routines")||"[]"); if(!Array
 function saveRoutines(){ localStorage.setItem("ccn_routines",JSON.stringify(ROUTINES)); }
 function renderRoutines(){ const sel=$("#rtSel"); if(!sel) return; sel.innerHTML=`<option value="">📁 Charger une routine…</option>`+ROUTINES.map((r,i)=>`<option value="${i}">${escapeHtml(r.name)} (${r.tasks.length})</option>`).join(""); }
 function saveRoutine(){ const items=(TASKS[TK_VIEW]||[]).filter(x=>!x.done).map(x=>({text:x.text,tags:x.tags||[],prio:x.prio||"n"})); if(!items.length){ alert("La liste est vide, rien à enregistrer."); return; } const name=prompt("Nom de la routine (ex : Routine du matin) :"); if(!name) return; ROUTINES.push({name:name.slice(0,40),tasks:items}); saveRoutines(); renderRoutines(); if(typeof toast==="function") toast("📁 Routine enregistrée",name); }
-function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.forEach(t=>TASKS[TK_VIEW].unshift({id:tkId(),text:t.text,tags:t.tags||[],prio:t.prio||"n",done:false,ts:Date.now(),repeat:""})); saveTasks(); renderTasks(); if(typeof toast==="function") toast("✅ Routine chargée",r.name+" · "+r.tasks.length+" tâches"); }
+function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.forEach(t=>TASKS[TK_VIEW].unshift({id:tkId(),text:t.text,tags:t.tags||[],prio:t.prio||"n",done:false,ts:Date.now(),repeat:"",upd:Date.now()})); saveTasks(); renderTasks(); if(typeof toast==="function") toast("✅ Routine chargée",r.name+" · "+r.tasks.length+" tâches"); }
 { const b=$("#rtSave"); if(b) b.onclick=saveRoutine; }
 { const s=$("#rtSel"); if(s) s.onchange=()=>{ const v=s.value; s.value=""; if(v!=="") loadRoutine(parseInt(v,10)); }; }
 renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
-    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; saveTasks(); renderTasks(); } return; }
-    const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); TASKS[TK_VIEW]=TASKS[TK_VIEW].filter(x=>x.id!==id); saveTasks(); renderTasks(); return; }
+    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
+    const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
   });
   list.addEventListener("change",e=>{
-    const mv=e.target.closest("[data-tkmove]"); if(mv){ const id=mv.getAttribute("data-tkmove"), to=mv.value; if(to!==TK_VIEW){ const i=TASKS[TK_VIEW].findIndex(x=>x.id===id); if(i>=0){ const it=TASKS[TK_VIEW].splice(i,1)[0]; TASKS[to].unshift(it); saveTasks(); renderTasks(); } } }
+    const mv=e.target.closest("[data-tkmove]"); if(mv){ const id=mv.getAttribute("data-tkmove"), to=mv.value; if(to!==TK_VIEW){ const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ TASKS[to].unshift({id:tkId(),text:it.text,tags:it.tags||[],prio:it.prio||"n",repeat:it.repeat||"",done:!!it.done,doneTs:it.doneTs||0,ts:it.ts||Date.now(),upd:Date.now()}); it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } } }
   });
 } }
 
@@ -1474,7 +1491,7 @@ async function doRestart(bot, name, btn){
   const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Redémarrage…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/restart",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({bot})});
-    if(r.status===401){ btn.disabled=false; btn.textContent=old; openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
+    if(r.status===401){ btn.disabled=false; btn.textContent=old; openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
     const j=await r.json();
     if(j.ok){ btn.textContent="✅ Relancé"; setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },4000); }
     else { btn.textContent="⚠️ Échec"; alert("Échec du redémarrage : "+(j.error||"inconnu")); setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },3000); }
@@ -1841,7 +1858,7 @@ function speakText(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=
 function voiceAsk(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
-  if(!TOKEN){ openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
+  if(!TOKEN){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
   const fab=$("#voiceFab"); if(fab && fab.classList.contains("listening")) return;
   const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
   rec.onstart=()=>{ if(fab) fab.classList.add("listening"); };
@@ -1851,7 +1868,7 @@ function voiceAsk(){
     toast("🗣️ « "+q+" »","L'assistant réfléchit…");
     try{
       const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q,names:NAMES,history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
-      if(r.status===401){ openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
+      if(r.status===401){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
       const j=await r.json(); const ans=j.answer||j.error||"Pas de réponse.";
       if(typeof ASK_HISTORY!=="undefined") ASK_HISTORY.push({q,a:ans});
       const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent=ans; }
