@@ -32,6 +32,15 @@
     padding:max(16px,env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
   }
   .wrap{max-width:980px;margin:0 auto}
+  #sidebar:empty{display:none}
+  #sidebar > .panel-box, #sidebar > .tkbox{margin:0!important}
+  @media (min-width:1180px){
+    .wrap{max-width:1340px}
+    #home{display:grid;grid-template-columns:minmax(0,1fr) 360px;column-gap:24px;align-items:start}
+    #home > .top{grid-column:1 / -1}
+    #home > #sidebar{grid-column:2;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
+    #home > *:not(.top):not(#sidebar){grid-column:1}
+  }
 
   .tabbar{position:sticky;top:0;z-index:8;display:flex;gap:5px;padding:8px 0 10px;background:var(--bg);overflow-x:auto}
   .tabbar::-webkit-scrollbar{height:0}
@@ -496,6 +505,8 @@
   <div class="banner" id="banner"></div>
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
+
+  <aside id="sidebar"></aside>
 
   <div class="panel-box tasks-hero" id="tasks">
     <div class="pb-head">✅ Tâches d'équipe
@@ -1776,7 +1787,7 @@ async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
   const saved=JSON.parse(localStorage.getItem("ccn_order")||"[]"); if(!saved.length) return;
-  const panels=[...document.querySelectorAll(".panel-box[id]")]; if(!panels.length) return;
+  const panels=[...document.querySelectorAll("#home > .panel-box[id]")]; if(!panels.length) return;
   const slots=panels.map(p=>{ const ph=document.createComment("o"); p.parentNode.insertBefore(ph,p); return ph; });
   const byId={}; panels.forEach(p=>byId[p.id]=p);
   const ordered=saved.map(id=>byId[id]).filter(Boolean);
@@ -1784,12 +1795,14 @@ function applyOrder(){
   ordered.forEach((p,i)=>{ if(slots[i]) slots[i].parentNode.insertBefore(p,slots[i]); });
   slots.forEach(s=>s.remove());
 }
-function reorderCtrls(on){ document.querySelectorAll(".panel-box[id]").forEach(p=>{ let c=p.querySelector(":scope > .reord-ctrl"); if(on){ if(!c){ c=document.createElement("div"); c.className="reord-ctrl"; c.innerHTML=`<button data-reord="-1">▲</button><button data-reord="1">▼</button>`; p.appendChild(c); } } else if(c){ c.remove(); } }); }
+function reorderCtrls(on){ document.querySelectorAll("#home > .panel-box[id]").forEach(p=>{ let c=p.querySelector(":scope > .reord-ctrl"); if(on){ if(!c){ c=document.createElement("div"); c.className="reord-ctrl"; c.innerHTML=`<button data-reord="-1">▲</button><button data-reord="1">▼</button>`; p.appendChild(c); } } else if(c){ c.remove(); } }); }
 let REORDERING=false;
 function toggleReorder(){ REORDERING=!REORDERING; document.body.classList.toggle("reordering",REORDERING); reorderCtrls(REORDERING); const b=$("#reorder"); if(b){ b.textContent=REORDERING?"✓":"⇅"; } }
-function movePanel(panel,dir){ const ids=[...document.querySelectorAll(".panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
+function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > .panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
+/* colonne latérale collante (desktop) : horloge/minuteur + tâches */
+{ const sb=$("#sidebar"); if(sb){ ["tasks","clock"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
 applyOrder();
 
 loadOM();
