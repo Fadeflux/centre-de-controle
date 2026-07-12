@@ -291,6 +291,15 @@
   .cc-toast b{font-weight:800} .cc-toast div{font-size:13px;opacity:.85;margin-top:2px}
   .cc-toast-actions{display:flex;gap:8px;margin-top:10px}
   .cc-toast-actions button{font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:9px;border:0;background:rgba(0,0,0,.22);color:#0a0a0a;cursor:pointer}
+  .voice-fab{position:fixed;bottom:22px;right:22px;width:60px;height:60px;border-radius:50%;background:var(--acc);border:0;font-size:26px;color:#fff;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.45);z-index:45;display:flex;align-items:center;justify-content:center}
+  .voice-fab.listening{background:var(--down);animation:micpulse 1s infinite}
+  .settings-wrap{position:relative}
+  .settings-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface-2,#17181b);border:1px solid var(--line-2);border-radius:14px;padding:6px;min-width:236px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:50;display:none;flex-direction:column;gap:2px}
+  .settings-menu.show{display:flex}
+  .settings-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;cursor:pointer}
+  .settings-row:hover{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+  .settings-row .btn{margin:0;pointer-events:none}
+  .settings-lbl{font-size:14px;color:var(--text)}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -476,6 +485,8 @@
 
 <div class="morning" id="morning"><div class="mn-inner" id="morningBody"></div></div>
 
+<button id="voiceFab" class="voice-fab" title="Parler à l'assistant" aria-label="Parler à l'assistant">🎤</button>
+
 <div class="wrap" id="app">
   <div class="tabbar" id="tabbar"></div>
   <div id="home">
@@ -497,6 +508,10 @@
       <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
+      <div class="settings-wrap">
+        <button class="btn" id="settingsBtn" title="Paramètres">⚙️</button>
+        <div class="settings-menu" id="settingsMenu"></div>
+      </div>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
   </header>
@@ -539,9 +554,9 @@
   </div>
 
   <div class="panel-box" id="dates">
-    <div class="pb-head">🎁 Dates importantes</div>
+    <div class="pb-head">📌 Événements & dates</div>
     <div class="clk-add">
-      <input id="dtText" placeholder="Ex : Anniv de Manon, fin d'abo…" autocomplete="off" />
+      <input id="dtText" placeholder="Ex : Appel client, RDV, anniv, échéance…" autocomplete="off" />
       <input id="dtDate" type="date" class="clk-time" />
       <button id="dtAdd" class="act">＋</button>
     </div>
@@ -907,7 +922,15 @@ $("#sections").addEventListener("click", e=>{
 function openGate(msg){ $("#gate").classList.add("show"); $("#pwErr").textContent=msg||""; setTimeout(()=>$("#pw").focus(),50); }
 function closeGate(){ $("#gate").classList.remove("show"); }
 $("#unlock").onclick = ()=>openGate();
-$("#pwGo").onclick = ()=>{ TOKEN=$("#pw").value.trim(); localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); };
+async function doLogin(){
+  const input=$("#pw").value.trim(); if(!input) return;
+  const go=$("#pwGo"); go.disabled=true; go.textContent="…";
+  let tok=input;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:input})}); if(r.ok){ const j=await r.json(); if(j.token) tok=j.token; } }catch(e){}
+  go.disabled=false; go.textContent="Entrer";
+  TOKEN=tok; localStorage.setItem("ccn_token",TOKEN); closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms();
+}
+$("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#pwGo").click(); });
 $("#refresh").onclick = load;
 
@@ -1147,7 +1170,7 @@ async function doAsk(q){
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
     const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES, history:ASK_HISTORY.slice(-4)})});
-    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Token incorrect — reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Ton token du site est incorrect. Recolle le bon token (celui du site, PAS le token Railway)."); go.disabled=false; go.textContent="Envoyer"; return; }
+    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Entre ton mot de passe du site (Noctra : noctra12)."); go.disabled=false; go.textContent="Envoyer"; return; }
     const j = await r.json();
     const ans = j.answer || j.error || "Pas de réponse.";
     $("#askAns").className="ask-ans"; $("#askAns").textContent = ans;
@@ -1429,7 +1452,7 @@ async function doRestart(bot, name, btn){
   const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Redémarrage…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/restart",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({bot})});
-    if(r.status===401){ btn.disabled=false; btn.textContent=old; openGate("Token incorrect — recolle le bon token du site."); return; }
+    if(r.status===401){ btn.disabled=false; btn.textContent=old; openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
     const j=await r.json();
     if(j.ok){ btn.textContent="✅ Relancé"; setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },4000); }
     else { btn.textContent="⚠️ Échec"; alert("Échec du redémarrage : "+(j.error||"inconnu")); setTimeout(()=>{ btn.disabled=false; btn.textContent=old; },3000); }
@@ -1734,7 +1757,7 @@ function tickClock(){
   let changed=false;
   REMINDERS.forEach(r=>{ if(r.at===cur && r.firedDate!==today){ r.firedDate=today; changed=true; playChime(); toastReminder(r); } });
   if(changed) saveReminders();
-  if(typeof DATES!=="undefined"){ DATES.forEach(d=>{ if(d.date===today && localStorage.getItem("ccn_dt_"+d.id)!==today){ localStorage.setItem("ccn_dt_"+d.id,today); playChime(); toast("🎁 "+d.text,"C'est aujourd'hui !"); } }); }
+  if(typeof DATES!=="undefined"){ DATES.forEach(d=>{ if(d.date===today && localStorage.getItem("ccn_dt_"+d.id)!==today){ localStorage.setItem("ccn_dt_"+d.id,today); playChime(); toast("📌 "+d.text,"C'est aujourd'hui !"); } }); }
 }
 function snoozeReminder(id){ const r=REMINDERS.find(x=>x.id===id); if(!r) return; const t=new Date(Date.now()+10*60000); r.at=String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); r.firedDate=""; saveReminders(); renderReminders(); toast("😴 Reporté","Je te rappelle à "+r.at+"."); }
 function toastReminder(r){ const who=r.who==="other"?NAMES.other:NAMES.moi; const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>⏰ ${escapeHtml(r.text)}</b><div>Pour ${escapeHtml(who)} · ${escapeHtml(r.at)}</div><div class="cc-toast-actions"><button data-snz="${r.id}">😴 +10 min</button><button data-ok="1">OK</button></div>`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; t.addEventListener("click",e=>{ const s=e.target.closest("[data-snz]"); if(s){ snoozeReminder(s.getAttribute("data-snz")); kill(); return; } kill(); }); setTimeout(kill, 30000); }
@@ -1751,7 +1774,7 @@ function saveDates(){ localStorage.setItem("ccn_dates",JSON.stringify(DATES)); }
 function renderDates(){
   const list=DATES.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   const today=todayStr();
-  $("#dtList").innerHTML = list.length ? list.map(d=>{ const days=Math.round((new Date(d.date+"T00:00:00")-new Date(today+"T00:00:00"))/864e5); const when=isNaN(days)?"":days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`; const cls=days===0?"dt-today":days<0?"dt-past":""; return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}</span><span class="rm-who">${new Date(d.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`; }).join("") : `<div class="tk-empty">Aucune date — ajoute anniversaires, échéances… 👆</div>`;
+  $("#dtList").innerHTML = list.length ? list.map(d=>{ const days=Math.round((new Date(d.date+"T00:00:00")-new Date(today+"T00:00:00"))/864e5); const when=isNaN(days)?"":days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`; const cls=days===0?"dt-today":days<0?"dt-past":""; return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}</span><span class="rm-who">${new Date(d.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`; }).join("") : `<div class="tk-empty">Rien de prévu — RDV, appel, anniv, échéance… 👆</div>`;
 }
 function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date}); t.value=""; d.value=""; saveDates(); renderDates(); if(typeof renderCal==="function") renderCal(); }
 { const a=$("#dtAdd"); if(a) a.onclick=addDate; }
@@ -1773,7 +1796,7 @@ function renderCal(){
   for(let d=1;d<=daysInMonth;d++){ const k=`${ym}-${String(d).padStart(2,"0")}`, has=byDay[d]; cells+=`<div class="cal-cell ${k===today?"today":""} ${has?"has":""}" ${has?`data-caltip="${escapeHtml(has.join(' · '))}"`:""}>${d}${has?`<span class="cal-dot"></span>`:""}</div>`; }
   $("#calBody").innerHTML=`<div class="cal-head"><button class="cal-nav" data-calnav="-1">‹</button><span class="cal-title">${CAL_MONTH.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</span><button class="cal-nav" data-calnav="1">›</button></div><div class="cal-grid">${cells}</div>`;
 }
-{ const cb=$("#calBody"); if(cb) cb.addEventListener("click",e=>{ const nav=e.target.closest("[data-calnav]"); if(nav){ CAL_MONTH=new Date(CAL_MONTH.getFullYear(),CAL_MONTH.getMonth()+parseInt(nav.getAttribute("data-calnav"),10),1); renderCal(); return; } const c=e.target.closest("[data-caltip]"); if(c && typeof toast==="function") toast("🎁 "+c.getAttribute("data-caltip"),""); }); }
+{ const cb=$("#calBody"); if(cb) cb.addEventListener("click",e=>{ const nav=e.target.closest("[data-calnav]"); if(nav){ CAL_MONTH=new Date(CAL_MONTH.getFullYear(),CAL_MONTH.getMonth()+parseInt(nav.getAttribute("data-calnav"),10),1); renderCal(); return; } const c=e.target.closest("[data-caltip]"); if(c && typeof toast==="function") toast("📌 "+c.getAttribute("data-caltip"),""); }); }
 { const ch=$("#calHead"); if(ch) ch.onclick=()=>{ $("#cal").classList.toggle("collapsed"); }; }
 renderCal();
 
@@ -1783,6 +1806,52 @@ renderCal();
 /* ---------- soldes SMS ---------- */
 let SMS_DATA=null;
 async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
+
+/* ---------- parler à l'assistant (micro flottant) ---------- */
+function speakText(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=0.98; u.pitch=1.08; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
+function voiceAsk(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
+  if(!TOKEN){ openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
+  const fab=$("#voiceFab"); if(fab && fab.classList.contains("listening")) return;
+  const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
+  rec.onstart=()=>{ if(fab) fab.classList.add("listening"); };
+  rec.onend=()=>{ if(fab) fab.classList.remove("listening"); };
+  rec.onresult=async(e)=>{
+    const q=(e.results[0][0].transcript||"").trim(); if(!q) return;
+    toast("🗣️ « "+q+" »","L'assistant réfléchit…");
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q,names:NAMES,history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
+      if(r.status===401){ openGate("Entre ton mot de passe du site (Noctra : noctra12)."); return; }
+      const j=await r.json(); const ans=j.answer||j.error||"Pas de réponse.";
+      if(typeof ASK_HISTORY!=="undefined") ASK_HISTORY.push({q,a:ans});
+      const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent=ans; }
+      toast("🤖 Assistant", ans);
+      speakText(ans);
+      if(j.reloadTasks && typeof loadTasks==="function") loadTasks();
+    }catch(err){ toast("⚠️ Erreur","Réessaie."); }
+  };
+  try{ rec.start(); }catch(err){ if(fab) fab.classList.remove("listening"); }
+}
+{ const f=$("#voiceFab"); if(f) f.onclick=voiceAsk; }
+
+/* ---------- menu paramètres (désencombre l'entête) ---------- */
+{
+  const menu=$("#settingsMenu"), btn=$("#settingsBtn");
+  if(menu && btn){
+    ["morn","install","card","rank","reorder","hide","tv"].forEach(id=>{
+      const b=document.getElementById(id); if(!b) return;
+      b.style.display="inline-flex";
+      const row=document.createElement("div"); row.className="settings-row";
+      const lbl=document.createElement("span"); lbl.className="settings-lbl"; lbl.textContent=(b.getAttribute("title")||b.textContent||"").trim();
+      row.appendChild(b); row.appendChild(lbl);
+      row.onclick=()=>{ b.click(); menu.classList.remove("show"); };
+      menu.appendChild(row);
+    });
+    btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle("show"); };
+    document.addEventListener("click",(e)=>{ if(!menu.contains(e.target) && e.target!==btn) menu.classList.remove("show"); });
+  }
+}
 
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
