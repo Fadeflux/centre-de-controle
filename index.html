@@ -104,6 +104,38 @@
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
+  .al-intro{font-size:12px;color:var(--muted);margin:8px 0 12px;line-height:1.45}
+  .al-add{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .al-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #alName{width:150px} #alAlias{flex:1;min-width:180px}
+  .al-add input:focus{border-color:var(--acc)}
+  .al-btn{margin:0;white-space:nowrap}
+  .al-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .al-row:last-child{border-bottom:0}
+  .al-m{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .al-m-name{font-weight:600}
+  .al-m-alias{font-size:11px;color:var(--muted);word-break:break-word}
+  .al-tog{background:none;border:1px solid var(--line);border-radius:20px;color:var(--muted);cursor:pointer;font-size:11px;padding:3px 9px;white-space:nowrap}
+  .al-tog.on{color:var(--ok);border-color:var(--ok)}
+  .al-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
+  .al-del:hover{color:var(--down);opacity:1}
+  .al-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  .al-leaks-head{font-size:13px;font-weight:600;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+  .al-lc{font-size:12px;color:var(--muted);font-weight:600}
+  .al-leak{display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--bg)}
+  .al-leak-body{flex:1;min-width:0}
+  .al-leak-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;font-weight:600}
+  .al-leak-url{font-size:12px;color:var(--acc);word-break:break-all;text-decoration:none}
+  .al-leak-meta{font-size:11px;color:var(--muted);margin-top:3px}
+  .al-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+  .al-badge.new{background:rgba(237,66,69,.15);color:#f87171}
+  .al-badge.sent{background:rgba(250,204,21,.15);color:#facc15}
+  .al-badge.removed{background:rgba(74,222,128,.15);color:#4ade80}
+  .al-badge.ignored{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
 
   .rappels{background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:var(--radius);padding:13px 16px;margin:0 0 22px}
   .rap-head{font-size:11px;font-weight:600;color:var(--acc-ink);margin-bottom:9px;text-transform:uppercase;letter-spacing:.06em}
@@ -689,6 +721,19 @@
     <div id="costsList"></div>
   </div>
 
+  <div class="antileak" id="antileak">
+    <div class="al-head">🛡️ Anti-Leak <span class="al-tag">protège le contenu de tes modèles</span></div>
+    <div class="al-intro">Ajoute chaque modèle avec <b>tous ses pseudos</b> (lien OnlyFans, @Instagram, nom de scène…). Le radar cherche en boucle si son contenu fuite sur le web, te prévient ici avec les détails, et envoie le retrait DMCA automatiquement.</div>
+    <div class="al-add">
+      <input id="alName" placeholder="Modèle (ex : Layla)" autocomplete="off" />
+      <input id="alAlias" placeholder="Pseudos séparés par virgules (onlyfans.com/layla, @layla_ig, Layla Rose)" autocomplete="off" />
+      <button class="act al-btn" id="alAdd">＋ Surveiller</button>
+    </div>
+    <div id="alList"></div>
+    <div class="al-leaks-head">🚨 Fuites détectées <span class="al-lc" id="alLeakCount"></span></div>
+    <div id="alLeaks"></div>
+  </div>
+
   <div class="foot">
     <span class="legend"><i style="background:var(--ok)"></i> En ligne</span>
     <span class="legend"><i style="background:var(--down)"></i> Hors ligne</span>
@@ -960,7 +1005,7 @@ async function doLogin(){
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1060,6 +1105,51 @@ $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); 
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
 $("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); } });
 renderCosts();
+
+/* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
+let LEAKWATCH = JSON.parse(localStorage.getItem("ccn_leakwatch")||"[]"); if(!Array.isArray(LEAKWATCH)) LEAKWATCH=[];
+let LEAKS = [];
+function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(LEAKWATCH)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})}).catch(()=>{}); } }
+async function loadLeakwatch(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-watch",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.watch)){ LEAKWATCH=j.watch; localStorage.setItem("ccn_leakwatch",JSON.stringify(LEAKWATCH)); } } }catch(e){} } renderWatch(); }
+async function loadLeaks(){ if(!TOKEN){ LEAKS=[]; renderLeaks(); return; } try{ const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; } }catch(e){} renderLeaks(); }
+function renderWatch(){
+  const list=$("#alList"); if(!list) return;
+  if(!LEAKWATCH.length){ list.innerHTML=`<div class="al-empty">Aucun modèle surveillé. Ajoute-en un ci-dessus 👆</div>`; return; }
+  list.innerHTML=LEAKWATCH.map((m,i)=>`<div class="al-row"><div class="al-m"><span class="al-m-name">${escapeHtml(m.name||"—")}</span><span class="al-m-alias">${(m.aliases||[]).map(escapeHtml).join(" · ")||"aucun pseudo — ajoute-en pour un meilleur radar"}</span></div><button class="al-tog ${m.active!==false?"on":""}" data-altog="${i}">${m.active!==false?"🟢 actif":"⏸ en pause"}</button><button class="al-del" data-aldel="${i}" aria-label="Retirer">✕</button></div>`).join("");
+}
+function renderLeaks(){
+  const box=$("#alLeaks"), cnt=$("#alLeakCount"); if(!box) return;
+  const active=LEAKS.filter(l=>l.status!=="ignored"&&l.status!=="removed");
+  if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
+  if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi (« Mes chiffres ») pour activer la surveillance.</div>`; return; }
+  if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Aucune fuite détectée pour l'instant. Le radar tourne en fond.</div>`; return; }
+  const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée"};
+  box.innerHTML=LEAKS.slice(0,50).map(l=>{
+    const st=l.status||"new";
+    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${st}">${stLabel[st]||st}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div>${st==="ignored"?`<button class="al-leak-act" data-alreopen="${escapeHtml(l.id)}">Rouvrir</button>`:`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`}</div>`;
+  }).join("");
+}
+function addWatch(){
+  const n=$("#alName").value.trim(), aliasRaw=$("#alAlias").value.trim();
+  const aliases=aliasRaw.split(",").map(s=>s.trim()).filter(Boolean).slice(0,20);
+  if(!n && !aliases.length) return;
+  LEAKWATCH.push({id:tkId(),name:n,aliases:aliases,active:true,ts:Date.now()}); saveLeakwatch(); renderWatch();
+  $("#alName").value=""; $("#alAlias").value=""; $("#alName").focus();
+  if(typeof toast==="function") toast("🛡️ Surveillance activée", n||aliases[0]);
+}
+function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.status=status; renderLeaks(); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leaks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id,status:status})}).catch(()=>{}); } }
+{ const b=$("#alAdd"); if(b) b.onclick=addWatch; }
+{ const a=$("#alAlias"); if(a) a.addEventListener("keydown",e=>{ if(e.key==="Enter") addWatch(); }); }
+{ const a=$("#alName"); if(a) a.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#alAlias").focus(); }); }
+{ const list=$("#alList"); if(list) list.addEventListener("click",e=>{
+  const t=e.target.closest("[data-altog]"); if(t){ const i=+t.getAttribute("data-altog"); LEAKWATCH[i].active=(LEAKWATCH[i].active===false); saveLeakwatch(); renderWatch(); return; }
+  const d=e.target.closest("[data-aldel]"); if(d){ const i=+d.getAttribute("data-aldel"); if(confirm("Arrêter de surveiller "+(LEAKWATCH[i].name||"ce modèle")+" ?")){ LEAKWATCH.splice(i,1); saveLeakwatch(); renderWatch(); } return; }
+}); }
+{ const box=$("#alLeaks"); if(box) box.addEventListener("click",e=>{
+  const ig=e.target.closest("[data-alignore]"); if(ig){ setLeakStatus(ig.getAttribute("data-alignore"),"ignored"); return; }
+  const ro=e.target.closest("[data-alreopen]"); if(ro){ setLeakStatus(ro.getAttribute("data-alreopen"),"new"); return; }
+}); }
+renderWatch(); renderLeaks();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
 let SHORTCUTS = JSON.parse(localStorage.getItem("ccn_shortcuts") || "[]");
@@ -1983,6 +2073,8 @@ loadTasks();
 loadPayments();
 loadReminders();
 loadSms();
+loadLeakwatch();
+loadLeaks();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
