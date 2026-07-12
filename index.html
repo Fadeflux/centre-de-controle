@@ -135,7 +135,17 @@
   .al-badge.sent{background:rgba(250,204,21,.15);color:#facc15}
   .al-badge.removed{background:rgba(74,222,128,.15);color:#4ade80}
   .al-badge.ignored{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  .al-leak-actions{display:flex;flex-direction:column;gap:6px}
   .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
+  .al-leak-act.prim{border-color:var(--acc);color:var(--acc);font-weight:600}
+  .al-leak-act:hover{border-color:var(--acc)}
+  .al-idbox{margin-top:14px;border-top:.5px solid var(--line);padding-top:12px}
+  .al-idbox summary{cursor:pointer;font-size:13px;font-weight:600;list-style:none}
+  .al-idbox summary::-webkit-details-marker{display:none}
+  .al-idstate{font-size:11px;font-weight:500;color:var(--muted);margin-left:6px}
+  .al-idform{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .al-idform input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .al-idform input:focus{border-color:var(--acc)}
 
   .rappels{background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:var(--radius);padding:13px 16px;margin:0 0 22px}
   .rap-head{font-size:11px;font-weight:600;color:var(--acc-ink);margin-bottom:9px;text-transform:uppercase;letter-spacing:.06em}
@@ -732,6 +742,19 @@
     <div id="alList"></div>
     <div class="al-leaks-head">🚨 Fuites détectées <span class="al-lc" id="alLeakCount"></span></div>
     <div id="alLeaks"></div>
+    <details class="al-idbox">
+      <summary>⚖️ Mes infos DMCA <span class="al-idstate" id="dmState"></span></summary>
+      <div class="al-idnote">Obligatoire pour l'envoi automatique des retraits (une demande DMCA ne peut pas être anonyme). Ces infos restent privées sur ton dashboard.</div>
+      <div class="al-idform">
+        <input id="dmName" placeholder="Ton nom (ou nom d'agence)" autocomplete="off" />
+        <input id="dmCompany" placeholder="Société / agence (optionnel)" autocomplete="off" />
+        <input id="dmAddress" placeholder="Adresse postale complète" autocomplete="off" />
+        <input id="dmPhone" placeholder="Téléphone" autocomplete="off" />
+        <input id="dmEmail" placeholder="Email de contact" autocomplete="off" />
+        <input id="dmSign" placeholder="Signature (ton nom tapé)" autocomplete="off" />
+        <button class="act" id="dmSave" style="margin:0">💾 Enregistrer mes infos</button>
+      </div>
+    </details>
   </div>
 
   <div class="foot">
@@ -1005,7 +1028,7 @@ async function doLogin(){
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks(); loadIdentity();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1126,7 +1149,11 @@ function renderLeaks(){
   const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée"};
   box.innerHTML=LEAKS.slice(0,50).map(l=>{
     const st=l.status||"new";
-    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${st}">${stLabel[st]||st}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div>${st==="ignored"?`<button class="al-leak-act" data-alreopen="${escapeHtml(l.id)}">Rouvrir</button>`:`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`}</div>`;
+    let actions;
+    if(st==="ignored") actions=`<button class="al-leak-act" data-alreopen="${escapeHtml(l.id)}">Rouvrir</button>`;
+    else if(st==="sent"||st==="removed") actions=`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
+    else actions=`<button class="al-leak-act prim" data-aldmca="${escapeHtml(l.id)}">📤 DMCA</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
+    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${st}">${stLabel[st]||st}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
   }).join("");
 }
 function addWatch(){
@@ -1146,10 +1173,51 @@ function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.sta
   const d=e.target.closest("[data-aldel]"); if(d){ const i=+d.getAttribute("data-aldel"); if(confirm("Arrêter de surveiller "+(LEAKWATCH[i].name||"ce modèle")+" ?")){ LEAKWATCH.splice(i,1); saveLeakwatch(); renderWatch(); } return; }
 }); }
 { const box=$("#alLeaks"); if(box) box.addEventListener("click",e=>{
+  const dm=e.target.closest("[data-aldmca]"); if(dm){ sendLeakDmca(dm.getAttribute("data-aldmca")); return; }
   const ig=e.target.closest("[data-alignore]"); if(ig){ setLeakStatus(ig.getAttribute("data-alignore"),"ignored"); return; }
   const ro=e.target.closest("[data-alreopen]"); if(ro){ setLeakStatus(ro.getAttribute("data-alreopen"),"new"); return; }
 }); }
-renderWatch(); renderLeaks();
+/* ---- infos titulaire DMCA + envoi ---- */
+let IDENTITY = JSON.parse(localStorage.getItem("ccn_dmca_id")||"{}"); if(!IDENTITY||typeof IDENTITY!=="object") IDENTITY={};
+function idComplete(i){ return !!(i&&i.name&&i.address&&i.email); }
+function renderIdentity(){
+  const f={name:"dmName",company:"dmCompany",address:"dmAddress",phone:"dmPhone",email:"dmEmail",signature:"dmSign"};
+  Object.keys(f).forEach(k=>{ const el=$("#"+f[k]); if(el) el.value=IDENTITY[k]||""; });
+  const st=$("#dmState"); if(st) st.textContent = idComplete(IDENTITY) ? "✅ complètes" : "⚠️ à remplir";
+}
+function saveIdentity(){
+  IDENTITY={ name:$("#dmName").value.trim(), company:$("#dmCompany").value.trim(), address:$("#dmAddress").value.trim(), phone:$("#dmPhone").value.trim(), email:$("#dmEmail").value.trim(), signature:$("#dmSign").value.trim() };
+  localStorage.setItem("ccn_dmca_id",JSON.stringify(IDENTITY));
+  if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-identity",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({identity:IDENTITY})}).catch(()=>{}); }
+  renderIdentity(); if(typeof toast==="function") toast("⚖️ Infos DMCA enregistrées", idComplete(IDENTITY)?"prêt pour l'envoi auto":"complète nom+adresse+email");
+}
+async function loadIdentity(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-identity",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.identity&&typeof j.identity==="object"){ IDENTITY=j.identity; localStorage.setItem("ccn_dmca_id",JSON.stringify(IDENTITY)); } } }catch(e){} } renderIdentity(); }
+{ const b=$("#dmSave"); if(b) b.onclick=saveIdentity; }
+function ofUrlFor(model){ const m=LEAKWATCH.find(x=>x.name===model); if(m){ const a=(m.aliases||[]).find(x=>/onlyfans\.com/i.test(x)); if(a) return a.indexOf("http")===0?a:("https://"+a.replace(/^\/+/,"")); } return "[lien OnlyFans officiel]"; }
+function clientNotice(l){
+  const i=IDENTITY||{};
+  return `To whom it may concern,\n\nI report copyright infringement under the DMCA (17 U.S.C. §512).\n\n1. Copyrighted work owned by ${i.name||"[ton nom]"} — original published at: ${ofUrlFor(l.model)}\n2. Infringing URL (unauthorized): ${l.url}\n(host: ${l.host||""})\n3. Contact — Name: ${i.name||""}${i.company?(" / "+i.company):""}; Address: ${i.address||""}; Phone: ${i.phone||""}; Email: ${i.email||""}\n4. I have a good faith belief that this use is not authorized by the owner, its agent, or the law.\n5. Under penalty of perjury, this notice is accurate and I am the owner or authorized to act on the owner's behalf.\n\nSignature: /s/ ${i.signature||i.name||""}\n`;
+}
+function openDmcaMailto(l){
+  const to=l.dmcaTo||("abuse@"+(l.host||"")); const subj="DMCA Takedown Notice — "+(l.url||"");
+  window.location.href="mailto:"+encodeURIComponent(to)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(clientNotice(l));
+}
+async function sendLeakDmca(id){
+  const l=LEAKS.find(x=>x.id===id); if(!l) return;
+  if(!idComplete(IDENTITY)){ if(typeof toast==="function") toast("⚖️ Remplis tes infos DMCA","nom + adresse + email obligatoires"); const box=$("#antileak"); if(box) box.scrollIntoView({block:"center"}); return; }
+  if(TOKEN){
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/leak-dmca",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id})});
+      if(r.ok){ const j=await r.json(); if(j.to) l.dmcaTo=j.to;
+        if(j.sent){ l.status="sent"; l.dmcaTs=Date.now(); renderLeaks(); if(typeof toast==="function") toast("📤 DMCA envoyé",l.model+" → "+(j.to||"")); return; }
+      }
+    }catch(e){}
+  }
+  // Envoi auto indisponible (pas de clé Resend) → ouvre l'email pré-rempli
+  openDmcaMailto(l);
+  if(typeof toast==="function") toast("📤 Email DMCA prêt","vérifie et envoie · ou active l'envoi auto (Resend)");
+}
+renderWatch(); renderLeaks(); renderIdentity();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
 let SHORTCUTS = JSON.parse(localStorage.getItem("ccn_shortcuts") || "[]");
@@ -2075,6 +2143,7 @@ loadReminders();
 loadSms();
 loadLeakwatch();
 loadLeaks();
+loadIdentity();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
