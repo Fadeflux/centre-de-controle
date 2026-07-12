@@ -334,6 +334,7 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
+  .omv-perso{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
   .pair-row{display:grid;grid-template-columns:1fr;gap:16px}
   .pair-row > .panel-box{margin:0}
   @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} }
@@ -1349,7 +1350,7 @@ renderRoutines();
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
-const DEMO_OM = { currency:"$", history:[{month:"02/26",net:410,subs:88},{month:"03/26",net:520,subs:110},{month:"04/26",net:480,subs:102},{month:"05/26",net:610,subs:128},{month:"06/26",net:130,subs:40},{month:"07/26",net:720,subs:142}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+const DEMO_OM = { currency:"$", history:[{month:"02/26",net:410,subs:88},{month:"03/26",net:520,subs:110},{month:"04/26",net:480,subs:102},{month:"05/26",net:610,subs:128},{month:"06/26",net:130,subs:40},{month:"07/26",net:720,subs:142}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -1370,7 +1371,7 @@ function renderOM(){
     <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${fmtLtv((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv,cur)}</div></div></div>`;
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${fmtLtv(d.models[m].ltv,cur)}</div><div class="om-model-marge ${(d.models[m].marge||0)>=0?'pos':'neg'}">Marge ${(d.models[m].marge||0)>=0?'+':''}${omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   let vas=(d.vas||[]).slice(); vas.sort((a,b)=> OM_SORT==="rev"?(b.rev-a.rev): OM_SORT==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
-  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`;return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span></div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=!v.unpaid && v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`);return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span></div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
   renderRenta();
