@@ -119,6 +119,10 @@
   .sc-head .rule{flex:1;height:1px;background:var(--line);min-width:20px}
   .sc-head .routine{font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
   .sc-head .routine:hover{background:var(--acc-bg)}
+  .rt-openwrap{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .rt-open{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;background:var(--acc-bg);border:1px solid var(--acc-line);color:var(--acc-ink);text-decoration:none;font-weight:600;font-size:15px}
+  .rt-open:active{transform:scale(.98)}
+  .rt-open span{opacity:.6}
   .sc-add{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .sc-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .sc-add input:focus{border-color:var(--acc)}
@@ -223,7 +227,8 @@
   .tk-add .act{margin:0;padding:9px 15px}
   .tk-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .tk-row:last-child{border-bottom:0}
-  .tk-ck{background:none;border:0;cursor:pointer;font-size:16px;line-height:1.3;padding:0}
+  .tk-ck{background:none;border:0;cursor:pointer;font-size:16px;line-height:1.3;padding:0;transition:transform .12s ease}
+  .tk-ck:active{transform:scale(1.35)}
   .tk-body{flex:1;min-width:0}
   .tk-txt{font-size:14px;color:var(--text)}
   .tk-row.done .tk-txt{text-decoration:line-through;color:var(--muted)}
@@ -338,7 +343,7 @@
   .omv-perso{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
   .pair-row{display:grid;grid-template-columns:1fr;gap:16px}
   .pair-row > .panel-box{margin:0}
-  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} }
+  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
   .pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   .pie-svg{flex:0 0 auto}
   .pie-legend{flex:1;min-width:160px}
@@ -346,6 +351,14 @@
   .pie-dot{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
   .pie-nm{font-weight:600}
   .pie-v{margin-left:auto;color:var(--muted);font-size:13px}
+  .sp-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0 2px;font-size:15px;font-weight:600}
+  .sp-pct{font-size:12px;color:var(--muted);font-weight:600}
+  .sp-v{font-weight:800;color:var(--acc);font-size:18px}
+  .sp-sub{font-size:12px;color:var(--muted);padding-bottom:8px;border-bottom:.5px solid var(--line)}
+  .sp-w{width:64px;font:inherit;font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;text-align:right}
+  .sp-ctrl{margin-top:12px;font-size:13px;color:var(--muted)}
+  .sp-ctrl input{width:56px;font:inherit;font-size:13px;padding:3px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;text-align:center}
+  .sp-note{display:block;margin-top:4px;font-size:11px}
   .hb-cumul{display:flex;gap:12px;margin-bottom:14px}
   .hb-c{flex:1;background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:13px;padding:14px}
   .hb-c-v{font-size:24px;font-weight:800;color:var(--acc)}
@@ -632,14 +645,20 @@
     </div>
   </div>
 
-  <div class="panel-box" id="badges" style="display:none">
-    <div class="pb-head">🏅 Tes badges</div>
-    <div id="badgesBody" class="bdg-grid"></div>
+  <div class="panel-box" id="split" style="display:none">
+    <div class="pb-head">🤝 Ma part / Part de l'associé</div>
+    <div id="splitBody"></div>
   </div>
 
-  <div class="panel-box" id="sim" style="display:none">
-    <div class="pb-head">🔮 Simulateur « et si »</div>
-    <div id="simBody"></div>
+  <div class="pair-row">
+    <div class="panel-box" id="badges" style="display:none">
+      <div class="pb-head">🏅 Tes badges</div>
+      <div id="badgesBody" class="bdg-grid"></div>
+    </div>
+    <div class="panel-box" id="sim" style="display:none">
+      <div class="pb-head">🔮 Simulateur « et si »</div>
+      <div id="simBody"></div>
+    </div>
   </div>
 
   <div class="panel-box" id="paie" style="display:none">
@@ -1065,7 +1084,11 @@ $("#scGrid").addEventListener("click",e=>{
 $("#scRoutine").onclick = ()=>{
   const routine = SHORTCUTS.filter(s=>s.r);
   if(!routine.length){ setBanner(`<b>Astuce</b> — marque des raccourcis avec l'étoile ★ pour les mettre dans ta routine du matin.`); return; }
-  routine.forEach(s=>window.open(s.u,"_blank","noopener"));
+  const isMobile = matchMedia("(max-width:600px)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(!isMobile){ routine.forEach(s=>window.open(s.u,"_blank","noopener")); return; }
+  // iPhone bloque les window.open en boucle → on affiche une liste, chaque tap ouvre un onglet
+  const links = routine.map(s=>`<a class="rt-open" href="${escapeHtml(s.u)}" target="_blank" rel="noopener">${escapeHtml(s.n)} <span>↗</span></a>`).join("");
+  setBanner(`<b>🚀 Ta routine du matin</b> — appuie sur chaque lien pour l'ouvrir :<div class="rt-openwrap">${links}</div>`);
 };
 renderShortcuts();
 
@@ -1257,6 +1280,8 @@ const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaqu
 function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && !x.del && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; x.upd=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length===1) vis[0].classList.add("solo"); }); }
+function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 function saveTasks(){
   tkNorm(); TK_LAST_EDIT=Date.now(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
@@ -1341,7 +1366,7 @@ function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.f
 renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
-    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done && it.repeat) it.doneTs=Date.now(); else if(!it.done) it.doneTs=0; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
+    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ if(it.repeat) it.doneTs=Date.now(); tkPop(); } else it.doneTs=0; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
     const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
   });
   list.addEventListener("change",e=>{
@@ -1380,6 +1405,8 @@ function renderOM(){
   renderBadges();
   renderSim();
   renderPie();
+  renderSplit();
+  fixPairs();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
 function renderHistory(){
@@ -1438,6 +1465,31 @@ function renderRenta(){
     <div class="rn-line rn-total"><span>= Profit (avant part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
     <div class="rn-proj">🔮 Au rythme actuel, fin de mois : ~<b>${money(projNet)}</b> de revenus · ~<b>${money(projProfit)}</b> de profit.</div>
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>net OnlyMonster</b> (déjà après la commission OnlyFans 20 %). Les <b>2 % Skrill</b> et la <b>part reversée à la modèle</b> se gèrent sur ton site finance.</div>`;
+}
+function renderSplit(){
+  const panel=$("#split"); if(!panel) return;
+  if(!OM_DATA){ panel.style.display="none"; return; }
+  const d=OM_DATA, cur=d.currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const margeMonth=Number(d.totals.margeMonth)||0;
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const profit=margeMonth-coutOutils;
+  const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
+  const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
+  const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
+  const wKey="ccn_split_w_"+new Date().toISOString().slice(0,7);
+  let w={}; try{ w=JSON.parse(localStorage.getItem(wKey)||"{}"); }catch(e){}
+  const wMe=Number(w.me)||0, wOther=Number(w.other)||0;
+  panel.style.display="block";
+  $("#splitBody").innerHTML=`
+    <div class="sp-row"><div class="sp-name">${escapeHtml(nameMe)} <span class="sp-pct">${pct}%</span></div><div class="sp-v">${money(partMe)}</div></div>
+    <div class="sp-sub">déjà pris <input class="sp-w" id="spWme" type="number" inputmode="numeric" value="${wMe}"> ${cur} · reste <b>${money(partMe-wMe)}</b></div>
+    <div class="sp-row"><div class="sp-name">${escapeHtml(nameOther)} <span class="sp-pct">${100-pct}%</span></div><div class="sp-v">${money(partOther)}</div></div>
+    <div class="sp-sub">déjà pris <input class="sp-w" id="spWother" type="number" inputmode="numeric" value="${wOther}"> ${cur} · reste <b>${money(partOther-wOther)}</b></div>
+    <div class="sp-ctrl">Part ${escapeHtml(nameMe)} : <input id="spPct" type="number" min="0" max="100" value="${pct}">% <span class="sp-note">du profit du mois (${money(profit)}, avant part modèle)</span></div>`;
+  const setW=()=>{ localStorage.setItem(wKey,JSON.stringify({me:Number($("#spWme").value)||0,other:Number($("#spWother").value)||0})); renderSplit(); };
+  { const a=$("#spWme"); if(a) a.onchange=setW; } { const b=$("#spWother"); if(b) b.onchange=setW; }
+  { const p=$("#spPct"); if(p) p.onchange=()=>{ localStorage.setItem("ccn_split",String(Math.min(100,Math.max(0,parseInt(p.value,10)||50)))); renderSplit(); }; }
 }
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
