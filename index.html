@@ -41,6 +41,7 @@
     #home > #sidebar{grid-column:2;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
     #home > *:not(.top):not(#sidebar){grid-column:1}
   }
+  @media (max-width:600px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px } }
 
   .tabbar{position:sticky;top:0;z-index:8;display:flex;gap:5px;padding:8px 0 10px;background:var(--bg);overflow-x:auto}
   .tabbar::-webkit-scrollbar{height:0}
@@ -1918,7 +1919,7 @@ function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > 
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
-{ const sb=$("#sidebar"); if(sb){ ["tasks","clock"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
+{ const sb=$("#sidebar"); if(sb){ ["tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
 applyOrder();
 
 loadOM();
