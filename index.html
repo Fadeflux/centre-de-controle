@@ -334,7 +334,10 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
-  .pie-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .pair-row{display:grid;grid-template-columns:1fr;gap:16px}
+  .pair-row > .panel-box{margin:0}
+  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} }
+  .pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   .pie-svg{flex:0 0 auto}
   .pie-legend{flex:1;min-width:160px}
   .pie-lg{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px}
@@ -615,14 +618,15 @@
     <div id="historyBody"></div>
   </div>
 
-  <div class="panel-box" id="pie" style="display:none">
-    <div class="pb-head">🥧 D'où vient l'argent</div>
-    <div id="pieBody"></div>
-  </div>
-
-  <div class="panel-box" id="renta" style="display:none">
-    <div class="pb-head">💰 Rentabilité du mois</div>
-    <div id="rentaBody"></div>
+  <div class="pair-row">
+    <div class="panel-box" id="renta" style="display:none">
+      <div class="pb-head">💰 Rentabilité du mois</div>
+      <div id="rentaBody"></div>
+    </div>
+    <div class="panel-box" id="pie" style="display:none">
+      <div class="pb-head">🥧 D'où vient l'argent</div>
+      <div id="pieBody"></div>
+    </div>
   </div>
 
   <div class="panel-box" id="badges" style="display:none">
@@ -1219,8 +1223,9 @@ async function loadTip(force){
   box.className="tip-body muted"; box.textContent="L'assistant analyse tes chiffres…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/tip",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN}});
+    if(r.status===401){ panel.style.display="none"; return; }
     const j=await r.json();
-    const t=j.answer||j.error||"Pas de conseil aujourd'hui.";
+    const t=j.answer||"Pas de conseil aujourd'hui.";
     box.className="tip-body"; box.textContent=t;
     localStorage.setItem("ccn_tip",JSON.stringify({d:key,t:t}));
   }catch(e){ box.className="tip-body muted"; box.textContent="Conseil indisponible — réessaie."; }
@@ -1670,10 +1675,17 @@ function showMorningIfNew(){ if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(lo
 const BADGES=[
   {id:"streak7", icon:"🔥", label:"7 jours de série", cond:c=>c.streak>=7},
   {id:"streak30", icon:"🌟", label:"30 jours de série", cond:c=>c.streak>=30},
+  {id:"streak100", icon:"☄️", label:"100 jours de série", cond:c=>c.streak>=100},
   {id:"subs100", icon:"💯", label:"100 subs", cond:c=>c.subsTotal>=100},
+  {id:"subs500", icon:"⭐", label:"500 subs", cond:c=>c.subsTotal>=500},
   {id:"subs1000", icon:"🚀", label:"1 000 subs", cond:c=>c.subsTotal>=1000},
-  {id:"net1000", icon:"💰", label:"Premier 1 000 $", cond:c=>c.netTotal>=1000},
-  {id:"net5000", icon:"💎", label:"5 000 $ générés", cond:c=>c.netTotal>=5000},
+  {id:"subs5000", icon:"🛸", label:"5 000 subs", cond:c=>c.subsTotal>=5000},
+  {id:"subs10000", icon:"👑", label:"10 000 subs", cond:c=>c.subsTotal>=10000},
+  {id:"net1000", icon:"💵", label:"1 000 $ générés", cond:c=>c.netTotal>=1000},
+  {id:"net5000", icon:"💰", label:"5 000 $ générés", cond:c=>c.netTotal>=5000},
+  {id:"net10000", icon:"💎", label:"10 000 $ générés", cond:c=>c.netTotal>=10000},
+  {id:"net50000", icon:"🏦", label:"50 000 $ générés", cond:c=>c.netTotal>=50000},
+  {id:"net100000", icon:"🐋", label:"100 000 $ générés", cond:c=>c.netTotal>=100000},
   {id:"record", icon:"🏆", label:"Meilleur mois", cond:c=>c.isRecord},
   {id:"goal", icon:"🎯", label:"Objectif atteint", cond:c=>c.goalMet},
 ];
