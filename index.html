@@ -1126,7 +1126,10 @@ function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.ge
 function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
 function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})}).catch(()=>{}); } }
 async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
-function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST); }
+function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST);
+  // Prévient le bot : il postera "ta paie a été envoyée" dans le ticket du VA (montant > 0 uniquement → exclut le perso à 0)
+  if(TOKEN && (Number(amount)||0)>0){ fetch(HUB_BASE+"/api/hub/pay-notify",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, amount:Number(amount)||0, period:curPeriod()})}).then(()=>{ if(typeof toast==="function") toast("💸 Paie marquée",va+" — le bot prévient le VA dans son ticket"); }).catch(()=>{}); }
+}
 function unpayVa(va){ const p=curPeriod(); PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments(); renderPaie(LAST); }
 function renderPaie(data){
   const vas = ((data["stats-tracker"]||{}).vas)||[];
