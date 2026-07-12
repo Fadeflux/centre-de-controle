@@ -255,6 +255,20 @@
   .rm-row.dt-past{opacity:.5}
   .np-area{width:100%;min-height:120px;resize:vertical;font:inherit;font-size:14px;line-height:1.6;padding:12px;border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-top:8px}
   .np-saved{margin-left:auto;font-size:12px;color:var(--ok);font-weight:600}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .cal-title{font-weight:700;text-transform:capitalize}
+  .cal-nav{background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--text);font-size:18px;width:34px;height:34px;cursor:pointer}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal-dow{text-align:center;font-size:11px;color:var(--muted);font-weight:600;padding-bottom:4px}
+  .cal-cell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;color:var(--text)}
+  .cal-cell.empty{background:transparent}
+  .cal-cell.has{background:color-mix(in srgb,var(--acc) 14%,transparent);cursor:pointer;font-weight:700}
+  .cal-cell.today{outline:2px solid var(--acc);font-weight:800}
+  .cal-dot{position:absolute;bottom:4px;width:5px;height:5px;border-radius:50%;background:var(--acc)}
+  .reord-ctrl{display:none}
+  body.reordering .panel-box{outline:2px dashed var(--acc);outline-offset:-2px;position:relative}
+  body.reordering .reord-ctrl{display:flex;gap:6px;position:absolute;top:12px;right:14px;z-index:6}
+  .reord-ctrl button{width:34px;height:34px;border-radius:9px;border:1px solid var(--acc);background:var(--surface,#111);color:var(--acc);font-size:14px;cursor:pointer}
   .clk-timer{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2);font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .clk-tm{width:60px;font:inherit;font-size:14px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);text-align:center}
   .clk-timer .act{margin:0;padding:7px 13px}
@@ -467,6 +481,7 @@
       <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
+      <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
@@ -521,6 +536,11 @@
   <div class="panel-box" id="notepad">
     <div class="pb-head">📝 Bloc-notes <span class="np-saved" id="npSaved"></span></div>
     <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ça se sauvegarde tout seul."></textarea>
+  </div>
+
+  <div class="panel-box" id="cal">
+    <div class="pb-head">📅 Calendrier</div>
+    <div id="calBody"></div>
   </div>
 
   <div class="rappels" id="rappels" style="display:none"></div>
@@ -775,6 +795,7 @@ function render(data){
   if(inWorld(toolById("noctra-finance"))) profit += gg("noctra-finance","profitMonth");
   tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`);
   $("#summary").innerHTML = tiles.join("");
+  { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile .val").forEach(el=>{ const raw=el.textContent; const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const isMoney=/\$/.test(raw); animateCount(el,num,v=> isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR")); } }); } }
 
   // alerte hors-ligne
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
@@ -841,12 +862,15 @@ async function load(){
     const j = await r.json();
     IS_LIVE = true;
     render(j.tools||{});
+    try{ localStorage.setItem("ccn_lastdata", JSON.stringify(j.tools||{})); }catch(_){}
     $("#sub").textContent = "Mis à jour à l'instant";
     $("#footnote").textContent = new Date().toLocaleString("fr-FR");
     setBanner("");
     $("#unlock").style.display = "none";
   }catch(e){
-    demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`);
+    let cached=null; try{ cached = TOKEN ? JSON.parse(localStorage.getItem("ccn_lastdata")||"null") : null; }catch(_){}
+    if(cached){ IS_LIVE=true; render(cached); $("#sub").textContent="Hors-ligne — derniers chiffres connus"; setBanner("📴 Hors-ligne — voici tes chiffres de la dernière connexion."); }
+    else { demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`); }
   }finally{
     rico.classList.remove("spin");
   }
@@ -1099,6 +1123,7 @@ function renderGoal(data){
 }
 
 /* ---------- assistant IA ---------- */
+let ASK_HISTORY=[];
 async function doAsk(q){
   q = (q || $("#askInput").value || "").trim(); if(!q) return;
   if(!TOKEN){ openGate("Connecte-toi d'abord pour utiliser l'assistant."); return; }
@@ -1106,10 +1131,12 @@ async function doAsk(q){
   const go=$("#askGo"); go.disabled=true; go.textContent="…";
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
-    const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES})});
+    const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES, history:ASK_HISTORY.slice(-4)})});
     if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Token incorrect — reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Ton token du site est incorrect. Recolle le bon token (celui du site, PAS le token Railway)."); go.disabled=false; go.textContent="Envoyer"; return; }
     const j = await r.json();
-    $("#askAns").className="ask-ans"; $("#askAns").textContent = j.answer || j.error || "Pas de réponse.";
+    const ans = j.answer || j.error || "Pas de réponse.";
+    $("#askAns").className="ask-ans"; $("#askAns").textContent = ans;
+    ASK_HISTORY.push({q, a:ans}); if(ASK_HISTORY.length>8) ASK_HISTORY=ASK_HISTORY.slice(-8);
     if(j.reloadTasks) loadTasks();
   }catch(e){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Erreur — réessaie."; }
   finally{ go.disabled=false; go.textContent="Envoyer"; }
@@ -1698,11 +1725,28 @@ function renderDates(){
   const today=todayStr();
   $("#dtList").innerHTML = list.length ? list.map(d=>{ const days=Math.round((new Date(d.date+"T00:00:00")-new Date(today+"T00:00:00"))/864e5); const when=isNaN(days)?"":days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`; const cls=days===0?"dt-today":days<0?"dt-past":""; return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}</span><span class="rm-who">${new Date(d.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`; }).join("") : `<div class="tk-empty">Aucune date — ajoute anniversaires, échéances… 👆</div>`;
 }
-function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date}); t.value=""; d.value=""; saveDates(); renderDates(); }
+function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date}); t.value=""; d.value=""; saveDates(); renderDates(); if(typeof renderCal==="function") renderCal(); }
 { const a=$("#dtAdd"); if(a) a.onclick=addDate; }
 { const t=$("#dtText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDate(); }); }
 { const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
 renderDates();
+
+/* ---------- calendrier ---------- */
+let CAL_MONTH=null;
+function renderCal(){
+  const panel=$("#cal"); if(!panel) return;
+  if(!CAL_MONTH){ const n=new Date(); CAL_MONTH=new Date(n.getFullYear(),n.getMonth(),1); }
+  const y=CAL_MONTH.getFullYear(), m=CAL_MONTH.getMonth();
+  const startDow=(new Date(y,m,1).getDay()+6)%7, daysInMonth=new Date(y,m+1,0).getDate(), today=todayStr();
+  const ym=`${y}-${String(m+1).padStart(2,"0")}`, byDay={};
+  (typeof DATES!=="undefined"?DATES:[]).forEach(d=>{ if(d.date&&d.date.slice(0,7)===ym){ const dd=parseInt(d.date.slice(8,10),10); (byDay[dd]=byDay[dd]||[]).push(d.text); } });
+  let cells=["L","M","M","J","V","S","D"].map(x=>`<div class="cal-dow">${x}</div>`).join("");
+  for(let i=0;i<startDow;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){ const k=`${ym}-${String(d).padStart(2,"0")}`, has=byDay[d]; cells+=`<div class="cal-cell ${k===today?"today":""} ${has?"has":""}" ${has?`data-caltip="${escapeHtml(has.join(' · '))}"`:""}>${d}${has?`<span class="cal-dot"></span>`:""}</div>`; }
+  $("#calBody").innerHTML=`<div class="cal-head"><button class="cal-nav" data-calnav="-1">‹</button><span class="cal-title">${CAL_MONTH.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</span><button class="cal-nav" data-calnav="1">›</button></div><div class="cal-grid">${cells}</div>`;
+}
+{ const cb=$("#calBody"); if(cb) cb.addEventListener("click",e=>{ const nav=e.target.closest("[data-calnav]"); if(nav){ CAL_MONTH=new Date(CAL_MONTH.getFullYear(),CAL_MONTH.getMonth()+parseInt(nav.getAttribute("data-calnav"),10),1); renderCal(); return; } const c=e.target.closest("[data-caltip]"); if(c && typeof toast==="function") toast("🎁 "+c.getAttribute("data-caltip"),""); }); }
+renderCal();
 
 /* ---------- bloc-notes ---------- */
 { const np=$("#npText"); if(np){ np.value=localStorage.getItem("ccn_notepad")||""; let nt=null; np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ localStorage.setItem("ccn_notepad",np.value); const s=$("#npSaved"); if(s){ s.textContent="✓ enregistré"; setTimeout(()=>{ s.textContent=""; },1500); } },400); }); } }
@@ -1710,6 +1754,25 @@ renderDates();
 /* ---------- soldes SMS ---------- */
 let SMS_DATA=null;
 async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
+
+/* ---------- réorganiser les panneaux ---------- */
+function applyOrder(){
+  const saved=JSON.parse(localStorage.getItem("ccn_order")||"[]"); if(!saved.length) return;
+  const panels=[...document.querySelectorAll(".panel-box[id]")]; if(!panels.length) return;
+  const slots=panels.map(p=>{ const ph=document.createComment("o"); p.parentNode.insertBefore(ph,p); return ph; });
+  const byId={}; panels.forEach(p=>byId[p.id]=p);
+  const ordered=saved.map(id=>byId[id]).filter(Boolean);
+  panels.forEach(p=>{ if(saved.indexOf(p.id)<0) ordered.push(p); });
+  ordered.forEach((p,i)=>{ if(slots[i]) slots[i].parentNode.insertBefore(p,slots[i]); });
+  slots.forEach(s=>s.remove());
+}
+function reorderCtrls(on){ document.querySelectorAll(".panel-box[id]").forEach(p=>{ let c=p.querySelector(":scope > .reord-ctrl"); if(on){ if(!c){ c=document.createElement("div"); c.className="reord-ctrl"; c.innerHTML=`<button data-reord="-1">▲</button><button data-reord="1">▼</button>`; p.appendChild(c); } } else if(c){ c.remove(); } }); }
+let REORDERING=false;
+function toggleReorder(){ REORDERING=!REORDERING; document.body.classList.toggle("reordering",REORDERING); reorderCtrls(REORDERING); const b=$("#reorder"); if(b){ b.textContent=REORDERING?"✓":"⇅"; } }
+function movePanel(panel,dir){ const ids=[...document.querySelectorAll(".panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
+{ const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
+document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
+applyOrder();
 
 loadOM();
 loadTip();
