@@ -1122,7 +1122,7 @@ function renderLeaks(){
   const active=LEAKS.filter(l=>l.status!=="ignored"&&l.status!=="removed");
   if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
   if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi (« Mes chiffres ») pour activer la surveillance.</div>`; return; }
-  if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Aucune fuite détectée pour l'instant. Le radar tourne en fond.</div>`; return; }
+  if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Rien pour l'instant — les fuites détectées apparaîtront ici avec tous les détails.</div>`; return; }
   const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée"};
   box.innerHTML=LEAKS.slice(0,50).map(l=>{
     const st=l.status||"new";
