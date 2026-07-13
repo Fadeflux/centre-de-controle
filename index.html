@@ -963,7 +963,7 @@ function render(data){
 
 /* ---------- résumé du jour + météo business ---------- */
 function nextAction(data, live){
-  if(!IS_LIVE) return {icon:"🔑", text:"Connecte-toi (« Mes chiffres ») pour activer tes vrais chiffres", urgent:true};
+  if(!IS_LIVE) return {icon:"🔑", text:"Connecte-toi pour activer tes vrais chiffres", urgent:true};
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
   if(off.length) return {icon:"🔧", text:`Répare ${off[0].name} — hors ligne`, urgent:true};
   const d=new Date(), day=d.getDate();
@@ -1050,7 +1050,7 @@ async function load(){
       // Retente vite tant que c'est coupé (sans empiler les timers).
       if(!OFFLINE_TIMER) OFFLINE_TIMER=setTimeout(()=>{ OFFLINE_TIMER=null; load(); }, 7000);
     } else {
-      demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`);
+      demoFallback(`<b>Chiffres d'exemple</b> — reconnecte-toi pour afficher tes vrais chiffres.`);
     }
   }finally{
     LOADING=false;
@@ -1457,7 +1457,7 @@ async function doAsk(q){
   $("#askAns").className="ask-ans muted"; $("#askAns").textContent="L'assistant réfléchit…";
   try{
     const r = await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q, names:NAMES, history:ASK_HISTORY.slice(-4)})});
-    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Reconnecte-toi via « 🔒 Mes chiffres »."; openGate("Reconnecte-toi (identifiant + mot de passe)."); go.disabled=false; go.textContent="Envoyer"; return; }
+    if(r.status===401){ $("#askAns").className="ask-ans muted"; $("#askAns").textContent="Reconnecte-toi."; openGate("🔑 Reconnecte-toi (identifiant + mot de passe)."); go.disabled=false; go.textContent="Envoyer"; return; }
     const j = await r.json();
     const ans = j.answer || j.error || "Pas de réponse.";
     $("#askAns").className="ask-ans"; $("#askAns").textContent = ans;
@@ -1871,7 +1871,7 @@ function makeDayCard(){
   return c;
 }
 async function shareDayCard(){
-  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord (« Mes chiffres ») pour générer la carte."); return; }
+  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord pour générer la carte."); return; }
   const c=makeDayCard();
   c.toBlob(async(blob)=>{
     if(!blob){ return; }
@@ -1906,7 +1906,7 @@ function makeRankCard(){
   return c;
 }
 async function shareRankCard(){
-  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord (« Mes chiffres »)."); return; }
+  if(typeof LAST==="undefined"||!LAST){ alert("Connecte-toi d'abord."); return; }
   const c=makeRankCard();
   c.toBlob(async(blob)=>{ if(!blob) return; try{ const file=new File([blob],"classement-va.png",{type:"image/png"}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Classement VA"}); return; } }catch(e){} const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="classement-va.png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); },"image/png");
 }
