@@ -534,6 +534,10 @@
   .mn-money .lbl{font-size:13px;color:var(--muted);font-weight:600}
   .mn-money .big{font-size:52px;font-weight:800;line-height:1.1;margin-top:4px}
   .mn-money .sub{font-size:14px;color:var(--muted);margin-top:8px}
+  .mn-coach{background:var(--surface);border:1px solid var(--acc-line);border-left:3px solid var(--acc);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+  .mn-coach-hd{font-size:13px;font-weight:700;color:var(--acc-ink);display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .mn-coach-play{margin-left:auto;font:inherit;font-size:12px;font-weight:600;background:var(--acc);color:#0a0a0a;border:0;border-radius:9px;padding:6px 12px;cursor:pointer}
+  .mn-coach-txt{font-size:15px;line-height:1.5;color:var(--text)}
   .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
   .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
   .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
@@ -1993,6 +1997,7 @@ function renderMorning(){
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">aujourd'hui : <b>${tot.subsDay!=null?tot.subsDay:"—"}</b> subs · <b>${money(st.aPayer)}</b> à payer</div></div>
+    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">🎙️ Ton coach du matin <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div></div>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
     <div class="mn-tasks"><h4>📋 Ta journée ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
@@ -2000,7 +2005,31 @@ function renderMorning(){
     <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
-  const sp=$("#mnSpeak"); if(sp) sp.onclick=speakBriefing;
+  const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakText(COACH_TEXT); else speakBriefing(); };
+  const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakText(COACH_TEXT); };
+}
+let COACH_TEXT="";
+function speakText(t){
+  try{
+    if(!window.speechSynthesis || !t) return;
+    let spoken=false;
+    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(t); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=0.98; u.pitch=1.06; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
+    const vs=window.speechSynthesis.getVoices();
+    if(vs&&vs.length) doSpeak(); else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
+  }catch(e){}
+}
+async function loadBrief(){
+  if(!TOKEN) return;
+  const box=$("#mnCoach"), txt=$("#mnCoachTxt"); if(!box||!txt) return;
+  box.style.display="block"; txt.textContent="Ton coach prépare ton briefing…";
+  try{
+    const nm=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"";
+    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm})});
+    if(r.status===401){ box.style.display="none"; return; }
+    const j=await r.json();
+    COACH_TEXT=(j.brief||"").trim();
+    txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
+  }catch(e){ txt.textContent="Coach indisponible — réessaie."; }
 }
 function pickFrenchVoice(){
   const vs=(window.speechSynthesis.getVoices())||[];
@@ -2035,7 +2064,7 @@ function speakBriefing(){
     else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
 }
-function showMorning(){ renderMorning(); $("#morning").classList.add("show"); }
+function showMorning(){ renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
 function closeMorning(){ $("#morning").classList.remove("show"); localStorage.setItem("ccn_morning",todayStr()); }
 function showMorningIfNew(){ if(!TOKEN) return; if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
