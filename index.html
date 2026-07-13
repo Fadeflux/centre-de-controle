@@ -24,7 +24,7 @@
     --radius:12px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
+  html,body{margin:0;overflow-x:clip}
   body{
     background:var(--bg); color:var(--text);
     font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -213,8 +213,9 @@
   .pay-h-row:last-child{border-bottom:0}
   .pay-h-d{color:var(--muted);margin-left:auto;font-size:12px}
   .pay-h-a{font-weight:600;min-width:60px;text-align:right}
-  .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px}
-  .goal-row input{width:130px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
+  .goal-row select{flex:1;min-width:130px}
+  .goal-row input{flex:1;min-width:110px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .goal-gauge{height:12px;background:var(--surface-2);border-radius:20px;overflow:hidden;margin:9px 0 8px}
   .goal-fill{height:100%;background:var(--acc);border-radius:20px;transition:width .6s}
   .goal-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
@@ -494,7 +495,7 @@
   .legend{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
 
-  .morning{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:26px 20px 40px;z-index:20;overflow-y:auto}
+  .morning{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:26px 20px 40px;z-index:20;overflow-x:hidden;overflow-y:auto}
   .morning.show{display:flex}
   .mn-inner{max-width:520px;margin:0 auto;width:100%}
   .mn-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
