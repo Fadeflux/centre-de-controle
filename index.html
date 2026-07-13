@@ -110,7 +110,7 @@
   .tg-sub{font-size:12px;color:var(--muted);margin:6px 0 10px}
   .tg-add{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .tg-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  #tgAmount{width:110px} #tgNote{flex:1;min-width:130px}
+  #tgAmount{width:110px} #tgSubs{width:120px} #tgNote{flex:1;min-width:130px}
   .tg-add input:focus{border-color:var(--acc)}
   .tg-btn{margin:0;white-space:nowrap}
   .tg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -754,6 +754,7 @@
     <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main).</div>
     <div class="tg-add">
       <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
+      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb subs (option)" title="Nb de personnes qui ont payé — pour la LTV" />
       <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
       <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
     </div>
@@ -1196,26 +1197,32 @@ let TGREV = JSON.parse(localStorage.getItem("ccn_tgrev")||"[]"); if(!Array.isArr
 function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})}).catch(()=>{}); } }
 async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function tgMonthTotal(){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0); }
 function renderTgrev(){
   const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
-  const mKey=tgMonthKey(Date.now());
-  const monthTot=TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const monthTot=tgMonthTotal();
   const allTot=TGREV.reduce((a,x)=>a+(Number(x.amount)||0),0);
-  if(tot) tot.textContent = TGREV.length ? `${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total` : "";
+  const allSubs=TGREV.reduce((a,x)=>a+(Number(x.subs)||0),0);
+  const ltv=allSubs>0?allTot/allSubs:0;
+  const ltvTxt=HIDE?"•••":ltv.toFixed(2).replace(".",",")+" $";
+  if(tot) tot.textContent = TGREV.length ? (`${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total`+(allSubs>0?` · LTV ${ltvTxt}`:"")) : "";
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
-  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} subs`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
+function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); }
 function addTgrev(){
   const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
+  const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
   if(!a || a<=0) return;
-  TGREV.unshift({id:tkId(), amount:a, note:note, ts:Date.now()}); saveTgrev(); renderTgrev();
-  $("#tgAmount").value=""; $("#tgNote").value=""; $("#tgAmount").focus();
+  TGREV.unshift({id:tkId(), amount:a, subs:subs, note:note, ts:Date.now()}); saveTgrev(); tgRefresh();
+  $("#tgAmount").value=""; $("#tgSubs").value=""; $("#tgNote").value=""; $("#tgAmount").focus();
   if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", fmtMoney(a));
 }
 { const b=$("#tgAdd"); if(b) b.onclick=addTgrev; }
 { const n=$("#tgNote"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") addTgrev(); }); }
 { const am=$("#tgAmount"); if(am) am.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
-{ const list=$("#tgList"); if(list) list.addEventListener("click",e=>{ const d=e.target.closest("[data-tgdel]"); if(d){ const id=d.getAttribute("data-tgdel"); TGREV=TGREV.filter(x=>x.id!==id); saveTgrev(); renderTgrev(); } }); }
+{ const n=$("#tgSubs"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
+{ const list=$("#tgList"); if(list) list.addEventListener("click",e=>{ const d=e.target.closest("[data-tgdel]"); if(d){ const id=d.getAttribute("data-tgdel"); TGREV=TGREV.filter(x=>x.id!==id); saveTgrev(); tgRefresh(); } }); }
 renderTgrev();
 
 /* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
@@ -1704,7 +1711,8 @@ function renderRenta(){
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
   const coutVA=netMonth-margeMonth;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
-  const profitNet=margeMonth-coutOutils;
+  const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
+  const profitNet=margeMonth-coutOutils+tgMonth;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const projNet=day>0?Math.round(netMonth/day*dim):netMonth, projProfit=day>0?Math.round(profitNet/day*dim):profitNet;
   $("#renta").style.display="block";
@@ -1712,6 +1720,7 @@ function renderRenta(){
     <div class="rn-line"><span>Revenus du mois</span><span class="rn-v">${money(netMonth)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
+    ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     <div class="rn-line rn-total"><span>= Profit (avant part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
     <div class="rn-proj">🔮 Au rythme actuel, fin de mois : ~<b>${money(projNet)}</b> de revenus · ~<b>${money(projProfit)}</b> de profit.</div>
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>net OnlyMonster</b> (déjà après la commission OnlyFans 20 %). Les <b>2 % Skrill</b> et la <b>part reversée à la modèle</b> se gèrent sur ton site finance.</div>`;
@@ -1723,7 +1732,8 @@ function renderSplit(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const margeMonth=Number(d.totals.margeMonth)||0;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
-  const profit=margeMonth-coutOutils;
+  const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
+  const profit=margeMonth-coutOutils+tgMonth;
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
