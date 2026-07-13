@@ -36,10 +36,10 @@
   #sidebar > .panel-box, #sidebar > .tkbox{margin:0!important}
   @media (min-width:1180px){
     .wrap{max-width:1340px}
-    #home{display:grid;grid-template-columns:360px minmax(0,1fr);column-gap:24px;align-items:start}
+    #home{display:grid;grid-template-columns:minmax(0,1fr) 360px;column-gap:24px;align-items:start}
     #home > .top{grid-column:1 / -1}
-    #home > #sidebar{grid-column:1;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
-    #home > *:not(.top):not(#sidebar){grid-column:2}
+    #home > #sidebar{grid-column:2;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
+    #home > *:not(.top):not(#sidebar){grid-column:1}
   }
   @media (max-width:600px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px } }
 
@@ -828,7 +828,6 @@ const TOOLS = [
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
-  { id:"sms-perso",        world:"noctra", cat:"Noctra", name:"Bot SMS Perso", icon:"@", openUrl:"", voyantOnly:true, restart:"private-discord-bot" },
   { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
@@ -843,7 +842,6 @@ const DEMO = {
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
-  "sms-perso":{status:"online"},
   "sms":{status:"online",metrics:{diddysms:38,getatext:8}},
 };
 
