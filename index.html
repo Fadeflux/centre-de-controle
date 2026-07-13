@@ -976,13 +976,24 @@ function demoFallback(msg){
   setBanner(msg);
   if(HUB_URL) $("#unlock").style.display = "inline-flex";
 }
+let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null;
 async function load(){
+  if(LOADING) return;               // évite les appels concurrents (poll 60s + retry)
+  LOADING=true;
   const rico = $("#rico"); rico.classList.add("spin");
   try{
     if(!HUB_URL){ demoFallback(`<b>Mode démo</b> — chiffres d'exemple. Le « cerveau » n'est pas encore branché.`); return; }
-    const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const j = await r.json();
+    // 3 tentatives avec courte pause : absorbe une coupure brève / un redéploiement du cerveau.
+    let j=null, lastErr=null;
+    for(let attempt=0; attempt<3; attempt++){
+      try{
+        const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        j = await r.json(); break;
+      }catch(e){ lastErr=e; if(attempt<2) await new Promise(res=>setTimeout(res,1200*(attempt+1))); }
+    }
+    if(!j) throw (lastErr||new Error("offline"));
+    OFFLINE_FAILS=0; if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
     IS_LIVE = true;
     render(j.tools||{});
     try{ localStorage.setItem("ccn_lastdata", JSON.stringify(j.tools||{})); }catch(_){}
@@ -991,13 +1002,24 @@ async function load(){
     setBanner("");
     $("#unlock").style.display = "none";
   }catch(e){
+    OFFLINE_FAILS++;
     let cached=null; try{ cached = TOKEN ? JSON.parse(localStorage.getItem("ccn_lastdata")||"null") : null; }catch(_){}
-    if(cached){ IS_LIVE=true; render(cached); $("#sub").textContent="Hors-ligne — derniers chiffres connus"; setBanner("📴 Hors-ligne — voici tes chiffres de la dernière connexion."); }
-    else { demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`); }
+    if(cached){
+      IS_LIVE=true; render(cached);
+      // Un blip isolé passe inaperçu ; on n'alerte qu'après 2 échecs d'affilée.
+      if(OFFLINE_FAILS>=2){ $("#sub").textContent="Reconnexion…"; setBanner("📶 Reconnexion en cours… tes chiffres restent affichés."); }
+      // Retente vite tant que c'est coupé (sans empiler les timers).
+      if(!OFFLINE_TIMER) OFFLINE_TIMER=setTimeout(()=>{ OFFLINE_TIMER=null; load(); }, 7000);
+    } else {
+      demoFallback(`<b>Chiffres d'exemple</b> — clique « 🔒 Mes chiffres » pour afficher tes vrais chiffres (une fois le cerveau activé).`);
+    }
   }finally{
+    LOADING=false;
     rico.classList.remove("spin");
   }
 }
+// Reconnexion immédiate quand l'appareil repasse en ligne.
+window.addEventListener("online", function(){ OFFLINE_FAILS=0; if(!$("#gate").classList.contains("show")) load(); });
 
 /* ---------- épinglage ---------- */
 function togglePin(id){
