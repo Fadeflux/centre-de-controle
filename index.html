@@ -758,7 +758,7 @@
     <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main).</div>
     <div class="tg-add">
       <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
-      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb subs (option)" title="Nb de personnes qui ont payé — pour la LTV" />
+      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
       <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
       <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
     </div>
@@ -1209,9 +1209,9 @@ function renderTgrev(){
   const allSubs=TGREV.reduce((a,x)=>a+(Number(x.subs)||0),0);
   const ltv=allSubs>0?allTot/allSubs:0;
   const ltvTxt=HIDE?"•••":ltv.toFixed(2).replace(".",",")+" $";
-  if(tot) tot.textContent = TGREV.length ? (`${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total`+(allSubs>0?` · LTV ${ltvTxt}`:"")) : "";
+  if(tot) tot.textContent = TGREV.length ? (`${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total`+(allSubs>0?` · ${ltvTxt}/pers.`:"")) : "";
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
-  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} subs`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); }
 function addTgrev(){
