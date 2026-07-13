@@ -1240,7 +1240,7 @@ function addTgrev(){
 { const n=$("#tgNote"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") addTgrev(); }); }
 { const am=$("#tgAmount"); if(am) am.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
 { const n=$("#tgSubs"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
-{ const list=$("#tgList"); if(list) list.addEventListener("click",e=>{ const d=e.target.closest("[data-tgdel]"); if(d){ const id=d.getAttribute("data-tgdel"); TGREV=TGREV.filter(x=>x.id!==id); saveTgrev(); tgRefresh(); } }); }
+{ const list=$("#tgList"); if(list) list.addEventListener("click",e=>{ const d=e.target.closest("[data-tgdel]"); if(d){ const id=d.getAttribute("data-tgdel"); const it=TGREV.find(x=>x.id===id); if(it && confirm("Supprimer ce revenu Telegram"+(it.model?" ("+it.model+")":"")+" de "+fmtMoney(Number(it.amount)||0)+" ?")){ TGREV=TGREV.filter(x=>x.id!==id); saveTgrev(); tgRefresh(); if(typeof toast==="function") toast("🗑️ Supprimé", fmtMoney(Number(it.amount)||0)); } } }); }
 renderTgrev();
 
 /* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
