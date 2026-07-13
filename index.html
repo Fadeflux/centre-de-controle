@@ -36,10 +36,10 @@
   #sidebar > .panel-box, #sidebar > .tkbox{margin:0!important}
   @media (min-width:1180px){
     .wrap{max-width:1340px}
-    #home{display:grid;grid-template-columns:minmax(0,1fr) 360px;column-gap:24px;align-items:start}
+    #home{display:grid;grid-template-columns:360px minmax(0,1fr);column-gap:24px;align-items:start}
     #home > .top{grid-column:1 / -1}
-    #home > #sidebar{grid-column:2;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
-    #home > *:not(.top):not(#sidebar){grid-column:1}
+    #home > #sidebar{grid-column:1;grid-row:2 / 9999;position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 28px);overflow-y:auto;padding-right:2px}
+    #home > *:not(.top):not(#sidebar){grid-column:2}
   }
   @media (max-width:600px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px } }
 
@@ -198,8 +198,12 @@
   .sc-empty{font-size:13px;color:var(--faint)}
 
   .journal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
-  .jr-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .jr-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;user-select:none}
   .jr-head .c{font-size:11px;color:var(--faint);font-weight:500;margin-left:auto}
+  .jr-caret{font-size:11px;color:var(--muted);transition:transform .15s}
+  .journal:not(.folded) .jr-caret{transform:rotate(90deg)}
+  .journal.folded .jr-head{margin-bottom:0}
+  .journal.folded #jrList{display:none}
   .jr-row{display:flex;gap:11px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .jr-row:last-child{border-bottom:0}
   .jr-src{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:6px;padding:3px 7px;height:fit-content;white-space:nowrap}
@@ -726,8 +730,8 @@
     <div id="paieBody"></div>
   </div>
 
-  <div class="journal" id="journal" style="display:none">
-    <div class="jr-head">📩 Journal <span class="c" id="jrCount"></span></div>
+  <div class="journal folded" id="journal" style="display:none">
+    <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
     <div id="jrList"></div>
   </div>
 
@@ -2231,7 +2235,8 @@ function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > 
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
-{ const sb=$("#sidebar"); if(sb){ ["tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
+{ const sb=$("#sidebar"); if(sb){ ["journal","tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
+{ const h=$("#jrHead"); if(h) h.onclick=()=>{ const j=$("#journal"); if(j){ j.classList.toggle("folded"); localStorage.setItem("ccn_jrfold", j.classList.contains("folded")?"1":"0"); } }; if(localStorage.getItem("ccn_jrfold")==="0"){ const j=$("#journal"); if(j) j.classList.remove("folded"); } }
 applyOrder();
 
 loadOM();
