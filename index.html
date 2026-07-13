@@ -408,6 +408,9 @@
   .pair-row{display:grid;grid-template-columns:1fr;gap:16px}
   .pair-row > .panel-box{margin:0}
   @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
+  .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
+  .pie-total b{color:var(--text);font-size:18px;font-weight:800}
+  .pie-note{font-size:11px;color:var(--muted);margin-top:10px}
   .pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   .pie-svg{flex:0 0 auto}
   .pie-legend{flex:1;min-width:160px}
@@ -1211,7 +1214,7 @@ function renderTgrev(){
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
   list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
-function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); }
+function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); }
 function addTgrev(){
   const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
   const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
@@ -2078,7 +2081,11 @@ function renderSim(){
 function renderPie(){
   const panel=$("#pie"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, models=om.models||{}, cur=om.currency||"$";
-  const entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  let entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0);
+  // Telegram = source de revenus à part entière, à côté d'OnlyFans
+  const tg=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
+  if(tg>0) entries.push(["📲 Telegram", tg]);
+  entries.sort((a,b)=>b[1]-a[1]);
   const total=entries.reduce((a,e)=>a+e[1],0);
   if(!entries.length||total<=0){ panel.style.display="none"; return; }
   panel.style.display="block";
@@ -2087,7 +2094,8 @@ function renderPie(){
   const R=52, C=2*Math.PI*R; let off=0;
   const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");
   const legend=entries.map((e,i)=>`<div class="pie-lg"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-nm">${escapeHtml(e[0])}</span><span class="pie-v">${money(e[1])} · ${Math.round(e[1]/total*100)}%</span></div>`).join("");
-  $("#pieBody").innerHTML=`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`;
+  const head=`<div class="pie-total"><span>💰 Total généré ce mois</span><b>${money(total)}</b></div>`;
+  $("#pieBody").innerHTML=head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+(tg>0?`<div class="pie-note">OnlyFans (net) + Telegram réunis. Le détail par modèle reste au-dessus.</div>`:"");
 }
 
 /* ---------- démarrage ---------- */
