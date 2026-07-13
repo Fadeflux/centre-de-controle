@@ -984,15 +984,27 @@ async function load(){
   try{
     if(!HUB_URL){ demoFallback(`<b>Mode démo</b> — chiffres d'exemple. Le « cerveau » n'est pas encore branché.`); return; }
     // 3 tentatives avec courte pause : absorbe une coupure brève / un redéploiement du cerveau.
-    let j=null, lastErr=null;
+    let j=null, lastErr=null, authFail=false;
     for(let attempt=0; attempt<3; attempt++){
       try{
         const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+        if(r.status===401){ authFail=true; throw new Error("HTTP 401"); }
         if(!r.ok) throw new Error("HTTP "+r.status);
         j = await r.json(); break;
-      }catch(e){ lastErr=e; if(attempt<2) await new Promise(res=>setTimeout(res,1200*(attempt+1))); }
+      }catch(e){ lastErr=e; if(authFail) break; if(attempt<2) await new Promise(res=>setTimeout(res,1200*(attempt+1))); }
     }
-    if(!j) throw (lastErr||new Error("offline"));
+    if(!j){
+      if(authFail){
+        // Jeton expiré/invalide : ce n'est PAS un souci réseau -> reconnexion.
+        let c=null; try{ c=JSON.parse(localStorage.getItem("ccn_lastdata")||"null"); }catch(_){}
+        if(c) render(c);
+        $("#sub").textContent="🔑 Reconnecte-toi pour tes vrais chiffres";
+        setBanner(`<b>🔑 Ta session a expiré</b> — clique « 🔒 Mes chiffres » (en haut) et reconnecte-toi : identifiant <b>andre</b> + ton mot de passe. Tes vrais chiffres reviennent aussitôt, en direct.`);
+        $("#unlock").style.display="inline-flex";
+        return;
+      }
+      throw (lastErr||new Error("offline"));
+    }
     OFFLINE_FAILS=0; if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
     IS_LIVE = true;
     render(j.tools||{});
