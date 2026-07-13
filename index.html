@@ -104,6 +104,23 @@
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  .tgrev{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .tg-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tg-tot{margin-left:auto;font-size:12px;color:var(--acc);font-weight:700}
+  .tg-sub{font-size:12px;color:var(--muted);margin:6px 0 10px}
+  .tg-add{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+  .tg-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #tgAmount{width:110px} #tgNote{flex:1;min-width:130px}
+  .tg-add input:focus{border-color:var(--acc)}
+  .tg-btn{margin:0;white-space:nowrap}
+  .tg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .tg-row:last-child{border-bottom:0}
+  .tg-d{color:var(--muted);font-size:12px;min-width:74px}
+  .tg-n{flex:1;word-break:break-word;color:var(--muted)}
+  .tg-a{font-weight:600;min-width:64px;text-align:right}
+  .tg-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
+  .tg-del:hover{color:var(--down);opacity:1}
+  .tg-empty{font-size:13px;color:var(--faint);padding:6px 0}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -732,6 +749,17 @@
     <div id="costsList"></div>
   </div>
 
+  <div class="tgrev" id="tgrev">
+    <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
+    <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main).</div>
+    <div class="tg-add">
+      <input id="tgAmount" type="number" inputmode="decimal" placeholder="Montant $" />
+      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
+      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
+    </div>
+    <div id="tgList"></div>
+  </div>
+
   <div class="antileak" id="antileak">
     <div class="al-head">🛡️ Anti-Leak <span class="al-tag">protège le contenu de tes modèles</span></div>
     <div class="al-intro">Ajoute chaque modèle avec <b>tous ses pseudos</b> (lien OnlyFans, @Instagram, nom de scène…). Le radar cherche en boucle si son contenu fuite sur le web, te prévient ici avec les détails, et envoie le retrait DMCA automatiquement.</div>
@@ -976,6 +1004,7 @@ function demoFallback(msg){
   setBanner(msg);
   if(HUB_URL) $("#unlock").style.display = "inline-flex";
 }
+function showReauth(){ $("#sub").textContent="🔑 Reconnecte-toi pour tes vrais chiffres"; setBanner(`<b>🔑 Ta session a expiré</b> — clique « 🔒 Mes chiffres » (en haut) et reconnecte-toi : identifiant <b>andre</b> + ton mot de passe. Tes chiffres et tes tâches se resynchronisent aussitôt.`); const u=$("#unlock"); if(u) u.style.display="inline-flex"; }
 let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null;
 async function load(){
   if(LOADING) return;               // évite les appels concurrents (poll 60s + retry)
@@ -998,9 +1027,7 @@ async function load(){
         // Jeton expiré/invalide : ce n'est PAS un souci réseau -> reconnexion.
         let c=null; try{ c=JSON.parse(localStorage.getItem("ccn_lastdata")||"null"); }catch(_){}
         if(c) render(c);
-        $("#sub").textContent="🔑 Reconnecte-toi pour tes vrais chiffres";
-        setBanner(`<b>🔑 Ta session a expiré</b> — clique « 🔒 Mes chiffres » (en haut) et reconnecte-toi : identifiant <b>andre</b> + ton mot de passe. Tes vrais chiffres reviennent aussitôt, en direct.`);
-        $("#unlock").style.display="inline-flex";
+        showReauth();
         return;
       }
       throw (lastErr||new Error("offline"));
@@ -1063,7 +1090,7 @@ async function doLogin(){
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks(); loadIdentity();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1163,6 +1190,33 @@ $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); 
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
 $("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); } });
 renderCosts();
+
+/* ---------- Revenus Telegram (saisie manuelle) ---------- */
+let TGREV = JSON.parse(localStorage.getItem("ccn_tgrev")||"[]"); if(!Array.isArray(TGREV)) TGREV=[];
+function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})}).catch(()=>{}); } }
+async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
+function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function renderTgrev(){
+  const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
+  const mKey=tgMonthKey(Date.now());
+  const monthTot=TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const allTot=TGREV.reduce((a,x)=>a+(Number(x.amount)||0),0);
+  if(tot) tot.textContent = TGREV.length ? `${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total` : "";
+  if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
+  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+}
+function addTgrev(){
+  const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
+  if(!a || a<=0) return;
+  TGREV.unshift({id:tkId(), amount:a, note:note, ts:Date.now()}); saveTgrev(); renderTgrev();
+  $("#tgAmount").value=""; $("#tgNote").value=""; $("#tgAmount").focus();
+  if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", fmtMoney(a));
+}
+{ const b=$("#tgAdd"); if(b) b.onclick=addTgrev; }
+{ const n=$("#tgNote"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") addTgrev(); }); }
+{ const am=$("#tgAmount"); if(am) am.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
+{ const list=$("#tgList"); if(list) list.addEventListener("click",e=>{ const d=e.target.closest("[data-tgdel]"); if(d){ const id=d.getAttribute("data-tgdel"); TGREV=TGREV.filter(x=>x.id!==id); saveTgrev(); renderTgrev(); } }); }
+renderTgrev();
 
 /* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
 let LEAKWATCH = JSON.parse(localStorage.getItem("ccn_leakwatch")||"[]"); if(!Array.isArray(LEAKWATCH)) LEAKWATCH=[];
@@ -1504,7 +1558,7 @@ async function loadTasks(){
 async function syncTasks(){
   if(!TOKEN) return;
   try{
-    const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return;
+    const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.status===401){ showReauth(); return; } if(!r.ok) return;
     const j=await r.json(); if(!j.tasks) return;
     const m=tkMerge(TASKS,j.tasks);
     if(tkBoardSig(m.board)!==tkBoardSig(TASKS)){ TASKS=m.board; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); renderTasks(); }
@@ -2179,6 +2233,7 @@ loadSms();
 loadLeakwatch();
 loadLeaks();
 loadIdentity();
+loadTgrev();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
 </script>
 </body>
