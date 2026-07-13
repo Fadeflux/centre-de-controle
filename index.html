@@ -535,7 +535,7 @@
   .mn-task{display:flex;gap:9px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .mn-task:last-child{border-bottom:0}
   .mn-go{width:100%;font:inherit;font-size:16px;font-weight:700;color:#0a0a0a;background:var(--acc);border:0;border-radius:12px;padding:15px;cursor:pointer}
-  .gate{position:fixed;inset:0;background:rgba(6,6,8,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .gate{position:fixed;inset:0;background:rgba(6,6,8,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:60}
   .gate.show{display:flex}
   .gate .box{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:28px 24px;width:100%;max-width:350px;box-shadow:0 24px 60px -20px rgba(0,0,0,.8);text-align:center}
   .gate .logo{margin:0 auto 14px}
@@ -1002,9 +1002,8 @@ function demoFallback(msg){
   render(DEMO);
   $("#sub").textContent = "Mode démo";
   setBanner(msg);
-  if(HUB_URL) $("#unlock").style.display = "inline-flex";
 }
-function showReauth(){ $("#sub").textContent="🔑 Reconnecte-toi pour tes vrais chiffres"; setBanner(`<b>🔑 Ta session a expiré</b> — clique « 🔒 Mes chiffres » (en haut) et reconnecte-toi : identifiant <b>andre</b> + ton mot de passe. Tes chiffres et tes tâches se resynchronisent aussitôt.`); const u=$("#unlock"); if(u) u.style.display="inline-flex"; }
+function showReauth(){ openGate("🔑 Ta session a expiré — reconnecte-toi."); }
 let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null;
 async function load(){
   if(LOADING) return;               // évite les appels concurrents (poll 60s + retry)
@@ -1012,6 +1011,7 @@ async function load(){
   const rico = $("#rico"); rico.classList.add("spin");
   try{
     if(!HUB_URL){ demoFallback(`<b>Mode démo</b> — chiffres d'exemple. Le « cerveau » n'est pas encore branché.`); return; }
+    if(!TOKEN){ openGate(); return; }   // pas de session -> écran de connexion direct
     // 3 tentatives avec courte pause : absorbe une coupure brève / un redéploiement du cerveau.
     let j=null, lastErr=null, authFail=false;
     for(let attempt=0; attempt<3; attempt++){
@@ -1233,7 +1233,7 @@ function renderLeaks(){
   const box=$("#alLeaks"), cnt=$("#alLeakCount"); if(!box) return;
   const active=LEAKS.filter(l=>l.status!=="ignored"&&l.status!=="removed");
   if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
-  if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi (« Mes chiffres ») pour activer la surveillance.</div>`; return; }
+  if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi pour activer la surveillance.</div>`; return; }
   if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Rien pour l'instant — les fuites détectées apparaîtront ici avec tous les détails.</div>`; return; }
   const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée"};
   box.innerHTML=LEAKS.slice(0,50).map(l=>{
@@ -2006,7 +2006,7 @@ function speakBriefing(){
 }
 function showMorning(){ renderMorning(); $("#morning").classList.add("show"); }
 function closeMorning(){ $("#morning").classList.remove("show"); localStorage.setItem("ccn_morning",todayStr()); }
-function showMorningIfNew(){ if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
+function showMorningIfNew(){ if(!TOKEN) return; if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
 
 /* ---------- badges & paliers ---------- */
