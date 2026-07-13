@@ -715,6 +715,19 @@
     </div>
   </div>
 
+  <div class="tgrev" id="tgrev">
+    <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
+    <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main). Ça remonte dans le camembert et ton profit.</div>
+    <div class="tg-add">
+      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
+      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
+      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
+      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
+      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
+    </div>
+    <div id="tgList"></div>
+  </div>
+
   <div class="panel-box" id="split" style="display:none">
     <div class="pb-head">🤝 Ma part / Part de l'associé</div>
     <div id="splitBody"></div>
@@ -757,19 +770,6 @@
       <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
     </div>
     <div id="costsList"></div>
-  </div>
-
-  <div class="tgrev" id="tgrev">
-    <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
-    <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main).</div>
-    <div class="tg-add">
-      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
-      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
-      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
-      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
-      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
-    </div>
-    <div id="tgList"></div>
   </div>
 
   <div class="antileak" id="antileak">
@@ -1534,8 +1534,10 @@ async function loadTip(force){
     if(r.status===401){ panel.style.display="none"; return; }
     const j=await r.json();
     const t=j.answer||"Pas de conseil aujourd'hui.";
-    box.className="tip-body"; box.textContent=t;
-    localStorage.setItem("ccn_tip",JSON.stringify({d:key,t:t}));
+    const noData=/aucune donn|impossible d.analyser|pas de conseil/i.test(t);
+    box.className="tip-body"+(noData?" muted":""); box.textContent=noData?"Tes chiffres se préparent — reviens dans un instant (ou clique 🔄).":t;
+    // On ne met PAS en cache une réponse "pas de données" (sinon elle reste figée toute la journée)
+    if(noData) localStorage.removeItem("ccn_tip"); else localStorage.setItem("ccn_tip",JSON.stringify({d:key,t:t}));
   }catch(e){ box.className="tip-body muted"; box.textContent="Conseil indisponible — réessaie."; }
 }
 { const _t=$("#tipRefresh"); if(_t) _t.onclick=()=>loadTip(true); }
