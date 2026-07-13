@@ -1207,7 +1207,7 @@ function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); 
 async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 function tgMonthTotal(){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0); }
-function tgModels(){ const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }
+function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
 function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
 function renderTgrev(){
   const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
