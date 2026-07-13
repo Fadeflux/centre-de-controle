@@ -109,8 +109,11 @@
   .tg-tot{margin-left:auto;font-size:12px;color:var(--acc);font-weight:700}
   .tg-sub{font-size:12px;color:var(--muted);margin:6px 0 10px}
   .tg-add{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
-  .tg-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  #tgAmount{width:110px} #tgSubs{width:120px} #tgNote{flex:1;min-width:130px}
+  .tg-add input,.tg-add select{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #tgModel{min-width:120px} #tgAmount{width:110px} #tgSubs{width:120px} #tgNote{flex:1;min-width:130px}
+  .tg-src{font-size:12px;color:var(--muted);margin:6px 0 4px;display:flex;gap:12px;flex-wrap:wrap}
+  .tg-src b{color:var(--text);font-weight:600}
+  .tg-mtag{font-size:11px;color:var(--acc);font-weight:600}
   .tg-add input:focus{border-color:var(--acc)}
   .tg-btn{margin:0;white-space:nowrap}
   .tg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -760,6 +763,7 @@
     <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
     <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main).</div>
     <div class="tg-add">
+      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
       <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
       <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
       <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
@@ -1203,25 +1207,34 @@ function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); 
 async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 function tgMonthTotal(){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0); }
+function tgModels(){ const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }
+function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
 function renderTgrev(){
   const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
+  tgFillModelSelect();
   const monthTot=tgMonthTotal();
   const allTot=TGREV.reduce((a,x)=>a+(Number(x.amount)||0),0);
   const allSubs=TGREV.reduce((a,x)=>a+(Number(x.subs)||0),0);
   const ltv=allSubs>0?allTot/allSubs:0;
   const ltvTxt=HIDE?"•••":ltv.toFixed(2).replace(".",",")+" $";
   if(tot) tot.textContent = TGREV.length ? (`${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total`+(allSubs>0?` · ${ltvTxt}/pers.`:"")) : "";
+  // Sous-total par modèle (ce mois) — pour tes analyses
+  const mKey=tgMonthKey(Date.now()), perM={};
+  TGREV.filter(x=>tgMonthKey(x.ts)===mKey).forEach(x=>{ const m=(x.model||"").trim()||"Général"; perM[m]=(perM[m]||0)+(Number(x.amount)||0); });
+  const srcKeys=Object.keys(perM).sort((a,b)=>perM[b]-perM[a]);
+  const srcLine = srcKeys.length>1 ? `<div class="tg-src">Ce mois par modèle : ${srcKeys.map(m=>`${escapeHtml(m)} <b>${fmtCur(perM[m])}</b>`).join(" · ")}</div>` : "";
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
-  list.innerHTML=TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+  list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); }
 function addTgrev(){
   const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
   const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
+  const model=($("#tgModel")&&$("#tgModel").value)||"";
   if(!a || a<=0) return;
-  TGREV.unshift({id:tkId(), amount:a, subs:subs, note:note, ts:Date.now()}); saveTgrev(); tgRefresh();
+  TGREV.unshift({id:tkId(), amount:a, subs:subs, model:model, note:note, ts:Date.now()}); saveTgrev(); tgRefresh();
   $("#tgAmount").value=""; $("#tgSubs").value=""; $("#tgNote").value=""; $("#tgAmount").focus();
-  if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", fmtMoney(a));
+  if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", (model?model+" · ":"")+fmtMoney(a));
 }
 { const b=$("#tgAdd"); if(b) b.onclick=addTgrev; }
 { const n=$("#tgNote"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") addTgrev(); }); }
@@ -1668,6 +1681,7 @@ function renderOM(){
   renderSim();
   renderPie();
   renderSplit();
+  if(typeof renderTgrev==="function") renderTgrev();
   fixPairs();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
 }
@@ -2082,9 +2096,13 @@ function renderPie(){
   const panel=$("#pie"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, models=om.models||{}, cur=om.currency||"$";
   let entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0);
-  // Telegram = source de revenus à part entière, à côté d'OnlyFans
-  const tg=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
-  if(tg>0) entries.push(["📲 Telegram", tg]);
+  // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans
+  let tg=0;
+  if(typeof TGREV!=="undefined" && Array.isArray(TGREV)){
+    const mk=tgMonthKey(Date.now()), tgm={};
+    TGREV.filter(x=>tgMonthKey(x.ts)===mk).forEach(x=>{ const m=(x.model||"").trim(); const k=m?("📲 "+m):"📲 Telegram"; tgm[k]=(tgm[k]||0)+(Number(x.amount)||0); tg+=(Number(x.amount)||0); });
+    Object.keys(tgm).forEach(k=>{ if(tgm[k]>0) entries.push([k,tgm[k]]); });
+  }
   entries.sort((a,b)=>b[1]-a[1]);
   const total=entries.reduce((a,e)=>a+e[1],0);
   if(!entries.length||total<=0){ panel.style.display="none"; return; }
