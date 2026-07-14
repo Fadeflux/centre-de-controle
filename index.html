@@ -43,7 +43,7 @@
   }
   @media (max-width:600px){ input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px } }
 
-  .tabbar{position:sticky;top:0;z-index:8;display:flex;gap:5px;padding:8px 0 10px;background:var(--bg);overflow-x:auto}
+  .tabbar{position:sticky;top:env(safe-area-inset-top,0);z-index:8;display:flex;gap:5px;padding:8px 0 10px;background:var(--bg);overflow-x:auto}
   .tabbar::-webkit-scrollbar{height:0}
   .tab{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 13px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.15s}
   .tab:hover{color:var(--text);border-color:var(--line-2)}
@@ -370,6 +370,7 @@
   .cc-toast-actions{display:flex;gap:8px;margin-top:10px}
   .cc-toast-actions button{font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:9px;border:0;background:rgba(0,0,0,.22);color:#0a0a0a;cursor:pointer}
   .voice-fab{position:fixed;bottom:22px;right:22px;width:60px;height:60px;border-radius:50%;background:var(--acc);border:0;font-size:26px;color:#fff;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.45);z-index:45;display:flex;align-items:center;justify-content:center}
+  #morning.show ~ #voiceFab{display:none}
   .voice-fab.listening{background:var(--down);animation:micpulse 1s infinite}
   .settings-wrap{position:relative}
   .settings-menu{position:fixed;background:var(--surface-2,#17181b);border:1px solid var(--line-2);border-radius:14px;padding:6px;min-width:220px;max-width:calc(100vw - 24px);box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:55;display:none;flex-direction:column;gap:2px}
@@ -849,7 +850,7 @@ const TOOLS = [
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
-  { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
+  { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", external:true, metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
@@ -928,7 +929,7 @@ function cardHTML(t, data){
   const restartBtn = (t.restart && TOKEN) ? `<button class="restart-btn" data-restart="${escapeHtml(t.restart)}" data-restartname="${escapeHtml(t.name)}" title="Redémarrer ce bot">🔄 Redémarrer</button>` : "";
   const foot = t.build
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
-    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${t.openUrl?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a>${restartBtn}</div>`;
+    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${(t.openUrl && !t.external)?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a>${restartBtn}</div>`;
   return `<div class="card ${t.featured?"featured":""}">
     <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${star}${dot}</div>
     ${body}${foot}</div>`;
@@ -970,7 +971,7 @@ function render(data){
   if(inWorld(toolById("noctra-finance"))) profit += gg("noctra-finance","profitMonth");
   tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`);
   $("#summary").innerHTML = tiles.join("");
-  { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile .val").forEach(el=>{ const raw=el.textContent; const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const isMoney=/\$/.test(raw); animateCount(el,num,v=> isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR")); } }); } }
+  { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const isMoney=/\$/.test(raw); animateCount(el,num,v=> isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR")); } }); } }
 
   // alerte hors-ligne
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
@@ -2242,7 +2243,7 @@ let SMS_DATA=null;
 async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
 
 /* ---------- parler à l'assistant (micro flottant) ---------- */
-function speakText(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=0.98; u.pitch=1.08; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
+function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=0.98; u.pitch=1.08; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
 function voiceAsk(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
@@ -2261,7 +2262,7 @@ function voiceAsk(){
       if(typeof ASK_HISTORY!=="undefined") ASK_HISTORY.push({q,a:ans});
       const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent=ans; }
       toast("🤖 Assistant", ans);
-      speakText(ans);
+      speakShort(ans);
       if(j.reloadTasks && typeof loadTasks==="function") loadTasks();
     }catch(err){ toast("⚠️ Erreur","Réessaie."); }
   };
