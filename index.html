@@ -287,16 +287,16 @@
   .tk-tab{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
   .tk-tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .tk-n{background:rgba(255,255,255,.25);border-radius:999px;padding:0 5px;font-size:11px;margin-left:3px}
-  .tk-add{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-  .tk-add input{flex:1;min-width:120px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  .tk-add .tk-tags-in{flex:0 1 140px}
-  .tk-opts-btn{font:inherit;font-size:15px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer;color:var(--muted);flex:0 0 auto}
-  .tk-opts-btn.on{border-color:var(--acc);color:var(--acc)}
-  .tk-adv{margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
-  .tk-adv-row{display:flex;gap:6px;flex-wrap:wrap}
-  .tk-adv-row input,.tk-adv-row select{flex:1;min-width:110px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  .tk-dest{font:inherit;font-size:13px;padding:0 9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  .tk-add .act{margin:0;padding:9px 15px}
+  .tk-add{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
+  .tk-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .tk-add input:focus{border-color:var(--acc)}
+  .tk-add .act{margin:0;padding:0 18px;font-size:20px;line-height:1;flex:0 0 auto}
+  .tk-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px 8px;margin-bottom:10px}
+  .tk-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .tk-field>span{font-size:10.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);padding-left:2px}
+  .tk-field select,.tk-field input{width:100%;font:inherit;font-size:13.5px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;cursor:pointer}
+  .tk-field input{cursor:text}
+  .tk-field select:focus,.tk-field input:focus{border-color:var(--acc)}
   .tk-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .tk-row:last-child{border-bottom:0}
   .tk-ck{background:none;border:0;cursor:pointer;font-size:16px;line-height:1.3;padding:0;transition:transform .12s ease}
@@ -629,18 +629,15 @@
     <div class="tk-tabs" id="taskTabs"></div>
     <div class="tk-add">
       <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
-      <select id="taskDest" class="tk-dest" title="Pour qui ?"></select>
-      <button id="taskAddOpts" class="tk-opts-btn" title="Plus d'options (tags, priorité, répétition, routines)">⚙️</button>
-      <button id="taskAdd" class="act">＋</button>
+      <button id="taskAdd" class="act" title="Ajouter">＋</button>
     </div>
-    <div class="tk-adv" id="taskAdv" style="display:none">
-      <div class="tk-adv-row">
-        <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
-        <select id="taskPrio" class="tk-dest" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select>
-        <select id="taskRepeat" class="tk-dest" title="Répétition"><option value="">une fois</option><option value="day">🔁 chaque jour</option><option value="week">🔁 chaque semaine</option><option value="quinzaine">🔁 chaque quinzaine</option></select>
-      </div>
-      <div class="tk-routines"><select id="rtSel" class="tk-rsel"></select><button id="rtSave" class="tk-rbtn" title="Enregistrer la liste actuelle comme routine">💾 Routine</button></div>
+    <div class="tk-opts">
+      <label class="tk-field"><span>👤 Pour qui</span><select id="taskDest" title="Pour qui ?"></select></label>
+      <label class="tk-field"><span>🚩 Priorité</span><select id="taskPrio" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select></label>
+      <label class="tk-field"><span>🔁 Répétition</span><select id="taskRepeat" title="Répétition"><option value="">Une fois</option><option value="day">Chaque jour</option><option value="week">Chaque semaine</option><option value="quinzaine">Chaque quinzaine</option></select></label>
+      <label class="tk-field"><span>🏷️ Tags</span><input id="taskTags" placeholder="ex : urgent" autocomplete="off" /></label>
     </div>
+    <div class="tk-routines"><select id="rtSel" class="tk-rsel"></select><button id="rtSave" class="tk-rbtn" title="Enregistrer la liste actuelle comme routine">💾 Routine</button></div>
     <div class="tk-filter" id="taskFilter"></div>
     <div id="taskList"></div>
   </div>
@@ -1646,11 +1643,6 @@ function renderTasks(){
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
-{ const o=$("#taskAddOpts"), adv=$("#taskAdv");
-  const setAdv=(open)=>{ if(adv) adv.style.display=open?"flex":"none"; if(o) o.classList.toggle("on",open); localStorage.setItem("ccn_tkadv",open?"1":"0"); };
-  if(o) o.onclick=()=>setAdv(adv && adv.style.display==="none");
-  if(localStorage.getItem("ccn_tkadv")==="1") setAdv(true);
-}
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
 let ROUTINES = JSON.parse(localStorage.getItem("ccn_routines")||"[]"); if(!Array.isArray(ROUTINES)) ROUTINES=[];
@@ -2029,7 +2021,7 @@ function speakText(t){
   try{
     if(!window.speechSynthesis || !t) return;
     let spoken=false;
-    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(t); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=0.98; u.pitch=1.06; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
+    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(t); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
     const vs=window.speechSynthesis.getVoices();
     if(vs&&vs.length) doSpeak(); else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
@@ -2047,16 +2039,37 @@ async function loadBrief(){
     txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
   }catch(e){ txt.textContent="Coach indisponible — réessaie."; }
 }
+var _voiceCache=null;
 function pickFrenchVoice(){
-  const vs=(window.speechSynthesis.getVoices())||[];
-  const fr=vs.filter(v=>/fr(-|_|$)/i.test(v.lang||""));
-  if(!fr.length) return null;
-  // Voix féminines françaises connues (iOS / Chrome / Windows / macOS), du plus naturel au moins.
-  const prefer=["aurélie","aurelie","audrey","amélie","amelie","virginie","marie","léa","lea","céline","celine","google français","google french","denise","hortense","julie","chantal"];
-  for(const n of prefer){ const m=fr.find(v=>(v.name||"").toLowerCase().includes(n)); if(m) return m; }
-  const enh=fr.find(v=>/enhanced|premium|natural|neural|siri/i.test(v.name||"")); if(enh) return enh;
-  return fr.find(v=>/female|femme/i.test(v.name||"")) || fr[0];
+  try{
+    const vs=(window.speechSynthesis.getVoices())||[];
+    if(_voiceCache && vs.indexOf(_voiceCache)>=0) return _voiceCache;
+    let fr=vs.filter(v=>/fr(-|_|$)/i.test(v.lang||""));
+    if(!fr.length) fr=vs.filter(v=>/fr/i.test(v.lang||""));
+    if(!fr.length) return null;
+    // Score : + = plus naturel. On privilégie les voix neuronales/en-ligne (bien meilleures que les compactes).
+    const score=(v)=>{
+      const n=(v.name||"").toLowerCase(), u=(v.voiceURI||"").toLowerCase(); let s=0;
+      if(/online.*natural|natural.*online/.test(n)) s+=100;   // Microsoft Edge (neuronale, excellente)
+      if(/neural/.test(n)) s+=90;
+      if(/google/.test(n)) s+=80;                             // "Google français" (Chrome/Android)
+      if(/enhanced|premium/.test(n)) s+=70;                   // voix améliorées iOS/macOS
+      if(/siri/.test(n)) s+=55;
+      if(/aur[eé]lie|am[eé]lie|audrey|virginie|c[eé]line|charlotte|brigitte|julie|marie|l[eé]a|denise/.test(n)) s+=20;
+      if(/female|femme/.test(n)) s+=6;
+      if(/fr-fr/i.test(v.lang||"")||/fr[-_]fr/.test(u)) s+=8; // France plutôt que Canada/Belgique
+      if(!v.localService) s+=4;                              // voix serveur souvent meilleures
+      if(/compact|eloquence|espeak|pico/.test(n)) s-=40;     // robotiques
+      if(/hortense/.test(n)) s-=8;                           // SAPI Windows, un peu robotique
+      return s;
+    };
+    fr.sort((a,b)=>score(b)-score(a));
+    _voiceCache=fr[0]||null;
+    return _voiceCache;
+  }catch(e){ return null; }
 }
+// Précharge la liste des voix ; quand les voix neuronales arrivent (async), on re-choisit la meilleure.
+try{ if(window.speechSynthesis){ window.speechSynthesis.getVoices(); if(typeof window.speechSynthesis.addEventListener==="function") window.speechSynthesis.addEventListener("voiceschanged",function(){ _voiceCache=null; window.speechSynthesis.getVoices(); }); } }catch(e){}
 function speakBriefing(){
   try{
     if(!window.speechSynthesis) return;
@@ -2074,7 +2087,7 @@ function speakBriefing(){
     if(topVA) p.push(topVA+" est en tête.");
     p.push(undone?(undone+" tâche"+(undone>1?"s":"")+" à faire."):"Aucune tâche en attente.");
     let spoken=false;
-    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(p.join(" ")); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=0.98; u.pitch=1.08; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
+    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(p.join(" ")); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
     const vs=window.speechSynthesis.getVoices();
     if(vs&&vs.length) doSpeak();
     else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
@@ -2243,7 +2256,7 @@ let SMS_DATA=null;
 async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
 
 /* ---------- parler à l'assistant (micro flottant) ---------- */
-function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=0.98; u.pitch=1.08; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
+function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
 function voiceAsk(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
