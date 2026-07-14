@@ -290,6 +290,11 @@
   .tk-add{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
   .tk-add input{flex:1;min-width:120px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .tk-add .tk-tags-in{flex:0 1 140px}
+  .tk-opts-btn{font:inherit;font-size:15px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer;color:var(--muted);flex:0 0 auto}
+  .tk-opts-btn.on{border-color:var(--acc);color:var(--acc)}
+  .tk-adv{margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+  .tk-adv-row{display:flex;gap:6px;flex-wrap:wrap}
+  .tk-adv-row input,.tk-adv-row select{flex:1;min-width:110px;font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .tk-dest{font:inherit;font-size:13px;padding:0 9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .tk-add .act{margin:0;padding:9px 15px}
   .tk-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:.5px solid var(--line)}
@@ -623,14 +628,19 @@
     <div class="tk-tabs" id="taskTabs"></div>
     <div class="tk-add">
       <input id="taskText" placeholder="Nouvelle tâche ou idée…" autocomplete="off" />
-      <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
-      <select id="taskPrio" class="tk-dest" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select>
-      <select id="taskRepeat" class="tk-dest" title="Répétition"><option value="">une fois</option><option value="day">🔁 chaque jour</option><option value="week">🔁 chaque semaine</option><option value="quinzaine">🔁 chaque quinzaine</option></select>
-      <select id="taskDest" class="tk-dest"></select>
+      <select id="taskDest" class="tk-dest" title="Pour qui ?"></select>
+      <button id="taskAddOpts" class="tk-opts-btn" title="Plus d'options (tags, priorité, répétition, routines)">⚙️</button>
       <button id="taskAdd" class="act">＋</button>
     </div>
+    <div class="tk-adv" id="taskAdv" style="display:none">
+      <div class="tk-adv-row">
+        <input id="taskTags" class="tk-tags-in" placeholder="tags (ex: urgent)" autocomplete="off" />
+        <select id="taskPrio" class="tk-dest" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select>
+        <select id="taskRepeat" class="tk-dest" title="Répétition"><option value="">une fois</option><option value="day">🔁 chaque jour</option><option value="week">🔁 chaque semaine</option><option value="quinzaine">🔁 chaque quinzaine</option></select>
+      </div>
+      <div class="tk-routines"><select id="rtSel" class="tk-rsel"></select><button id="rtSave" class="tk-rbtn" title="Enregistrer la liste actuelle comme routine">💾 Routine</button></div>
+    </div>
     <div class="tk-filter" id="taskFilter"></div>
-    <div class="tk-routines"><select id="rtSel" class="tk-rsel"></select><button id="rtSave" class="tk-rbtn" title="Enregistrer la liste actuelle comme routine">💾 Routine</button></div>
     <div id="taskList"></div>
   </div>
 
@@ -1635,6 +1645,11 @@ function renderTasks(){
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
+{ const o=$("#taskAddOpts"), adv=$("#taskAdv");
+  const setAdv=(open)=>{ if(adv) adv.style.display=open?"flex":"none"; if(o) o.classList.toggle("on",open); localStorage.setItem("ccn_tkadv",open?"1":"0"); };
+  if(o) o.onclick=()=>setAdv(adv && adv.style.display==="none");
+  if(localStorage.getItem("ccn_tkadv")==="1") setAdv(true);
+}
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
 let ROUTINES = JSON.parse(localStorage.getItem("ccn_routines")||"[]"); if(!Array.isArray(ROUTINES)) ROUTINES=[];
