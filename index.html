@@ -17,11 +17,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --bg:#0a0a0a; --surface:#111214; --surface-2:#17181b; --line:#1f2024; --line-2:#2b2c31;
-    --text:#f5f5f6; --muted:#8a8a92; --faint:#57575f;
-    --acc:#a855f7; --acc-hover:#9333ea; --acc-bg:#1b1230; --acc-line:#3a2a63; --acc-ink:#c9a9ff;
+    --bg:#0a0a0a; --surface:#121217; --surface-2:#191921; --line:#22222b; --line-2:#30303c;
+    --text:#f6f5f8; --muted:#9d9ca8; --faint:#63626e;
+    --acc:#a855f7; --acc-hover:#9333ea; --acc-bg:#1b1230; --acc-line:#3a2a63; --acc-ink:#cbadff;
     --ok:#4ade80; --down:#f87171; --idle:#33343a; --gold:#e6c84a;
-    --radius:12px;
+    --radius:14px;
+    --card-grad:linear-gradient(180deg,#15151c 0%,#101015 100%);
+    --card-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px -18px rgba(0,0,0,.9);
+    --ring:0 0 0 3px color-mix(in srgb,var(--acc) 26%,transparent);
   }
   *{box-sizing:border-box}
   html,body{margin:0;overflow-x:clip}
@@ -30,6 +33,14 @@
     font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     -webkit-font-smoothing:antialiased; line-height:1.5;
     padding:max(16px,env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
+  }
+  /* Halo ambiant violet en haut de page (fixe, très subtil) */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(720px 340px at 18% -60px, color-mix(in srgb,var(--acc) 9%,transparent), transparent 70%),
+      radial-gradient(560px 300px at 88% -80px, color-mix(in srgb,#6366f1 7%,transparent), transparent 70%),
+      var(--bg);
   }
   .wrap{max-width:980px;margin:0 auto}
   #sidebar:empty{display:none}
@@ -578,6 +589,107 @@
   .gate button{width:100%;font:inherit;font-size:14px;font-weight:600;color:#fff;background:var(--acc);border:0;border-radius:10px;padding:12px;cursor:pointer;transition:.15s}
   .gate button:hover{background:var(--acc-hover)}
   .gate .err{color:var(--down);font-size:12.5px;min-height:16px;margin-top:8px}
+
+  /* ============================================================
+     SKIN V2 — refonte visuelle (couches, profondeur, hiérarchie).
+     Couche additive : ne renomme AUCUN sélecteur utilisé par le JS.
+     ============================================================ */
+
+  /* Panneaux : dégradé de surface + liseré haut lumineux + ombre douce */
+  .panel-box,.daily,.costs,.tgrev,.antileak,.journal,.todo,.tile,.card,.sc-card,.gate .box,
+  .mn-coach,.mn-next,.mn-tasks,.hb-c,.om-model{
+    background:var(--card-grad);
+    box-shadow:var(--card-shadow);
+  }
+  .rappels{box-shadow:var(--card-shadow)}
+
+  /* Titres de panneaux : plus affirmés */
+  .pb-head,.jr-head,.costs-head,.tg-head,.al-head,.todo-head{font-size:13.5px;font-weight:700;letter-spacing:.01em}
+
+  /* Chiffres : alignement tabulaire partout (plus de chiffres qui "dansent") */
+  .tile .val,.om-tiles .val,.metric .m-val,.om-model-net,.hb-c-v,.sp-v,.goal-cur,
+  .pv-pay,.rn-v,.tg-a,.omv-r,.omv-m,.omv-l,.omv-roi,.mn-money .big,.pie-total b{
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* Tuiles résumé : gros chiffres en dégradé, survol lumineux */
+  .tile .val{font-size:clamp(23px,6vw,28px);font-weight:800}
+  .tile.hero .val{
+    background:linear-gradient(120deg,var(--acc-ink),var(--acc));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--acc);
+  }
+  .tile:hover{border-color:color-mix(in srgb,var(--acc) 34%,var(--line-2));box-shadow:0 14px 34px -16px color-mix(in srgb,var(--acc) 26%,rgba(0,0,0,.8))}
+  .tile.hero{box-shadow:var(--card-shadow),0 0 26px -14px color-mix(in srgb,var(--acc) 45%,transparent)}
+
+  /* Cartes outils : survol avec halo accent + icône teintée */
+  .card:hover{border-color:color-mix(in srgb,var(--acc) 36%,var(--line-2));box-shadow:0 16px 36px -16px color-mix(in srgb,var(--acc) 24%,rgba(0,0,0,.85))}
+  .card.featured .ico{background:color-mix(in srgb,var(--acc) 16%,var(--surface-2));border-color:var(--acc-line)}
+
+  /* Voyants : pulsation douce quand en ligne, halo rouge si hors ligne */
+  .dot.on{animation:dotpulse 2.6s ease-in-out infinite}
+  @keyframes dotpulse{
+    0%,100%{box-shadow:0 0 0 3px rgba(74,222,128,.14)}
+    50%{box-shadow:0 0 0 6px rgba(74,222,128,.05)}
+  }
+
+  /* Boutons : retour tactile + anneau de focus clavier partout */
+  button,.tab,a.open,.rt-open{cursor:pointer}
+  button.btn:hover{transform:translateY(-1px)}
+  :is(button,a,select,input,textarea,summary):focus-visible{outline:none;box-shadow:var(--ring);border-radius:9px}
+  a.open{font-weight:600}
+  a.open:hover{box-shadow:0 6px 18px -8px color-mix(in srgb,var(--acc) 55%,transparent)}
+  #askGo,.pv-pay-btn,.mn-go,.gate button,.tk-add .act{
+    background:linear-gradient(135deg,var(--acc),#7c3aed);
+    box-shadow:0 6px 20px -8px color-mix(in srgb,var(--acc) 60%,transparent);
+  }
+  #askGo:hover,.pv-pay-btn:hover,.mn-go:hover,.gate button:hover,.tk-add .act:hover{filter:brightness(1.1)}
+  .mn-go:active,.gate button:active,#askGo:active{transform:scale(.985)}
+
+  /* Sélecteur de vue (Tout/…) : pastille pleine au lieu du liseré */
+  .worlds button.won{color:#fff;background:linear-gradient(135deg,var(--acc),#7c3aed);box-shadow:none}
+
+  /* Onglets outils : état actif plus net */
+  .tab.on{box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 35%,transparent)}
+
+  /* Sections : titres avec puce accent */
+  .sec-head .t{display:inline-flex;align-items:center;gap:7px}
+  .sec-head .t::before{content:"";width:5px;height:5px;border-radius:2px;background:var(--acc);opacity:.8}
+  .sec-head.pin .t::before{background:var(--gold)}
+
+  /* Écran du matin : carte argent avec halo, bouton géant */
+  .mn-money{box-shadow:0 0 40px -18px color-mix(in srgb,var(--acc) 50%,transparent),var(--card-shadow)}
+  .mn-money .big{letter-spacing:-1px}
+
+  /* Toast : verre sombre au lieu du violet plein (lisible sur tout) */
+  .cc-toast{background:rgba(24,20,34,.92);color:var(--text);border:1px solid var(--acc-line);backdrop-filter:blur(10px)}
+  .cc-toast b{color:var(--acc-ink)}
+  .cc-toast div{color:var(--muted)}
+  .cc-toast-actions button{background:var(--acc);color:#fff}
+
+  /* Barres de défilement discrètes (desktop) */
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* Sélection de texte violette */
+  ::selection{background:color-mix(in srgb,var(--acc) 40%,transparent);color:#fff}
+
+  /* Micro flottant : halo respirant */
+  .voice-fab{background:linear-gradient(135deg,var(--acc),#7c3aed);box-shadow:0 10px 28px rgba(0,0,0,.45),0 0 24px -6px color-mix(in srgb,var(--acc) 55%,transparent)}
+
+  /* Mobile : marges plus respirantes, tuiles compactes */
+  @media (max-width:600px){
+    .summary{gap:9px}
+    .summary .tile{padding:12px 13px}
+    .grid{gap:10px}
+    .panel-box,.daily,.costs,.tgrev,.antileak,.journal,.todo{padding:14px 14px}
+  }
+
+  /* Respect de « Réduire les animations » (iOS/desktop) */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  }
 </style>
 </head>
 <body>
