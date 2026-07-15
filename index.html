@@ -282,21 +282,33 @@
   .ask-ans{font-size:14px;color:var(--text);margin-top:12px;line-height:1.6;white-space:pre-wrap}
   .tip-body{font-size:15px;color:var(--text);line-height:1.6;white-space:pre-wrap}
   .tip-body.muted{color:var(--muted)}
-  .tk-who{margin-left:auto;font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  /* Badge d'identité (issu du login) — remplace l'ancien select "Je suis" */
+  .tk-me{margin-left:auto;display:inline-flex;align-items:center;gap:9px;padding:5px 12px 5px 6px;border-radius:999px;background:var(--acc-bg);border:1px solid var(--acc-line);cursor:default;user-select:none;white-space:nowrap;max-width:62%}
+  .tk-me-av{width:26px;height:26px;flex:0 0 auto;display:grid;place-items:center;font-size:15px;border-radius:50%;background:color-mix(in srgb, var(--acc) 22%, transparent);border:1px solid var(--acc-line)}
+  .tk-me-txt{display:flex;flex-direction:column;line-height:1.05;min-width:0}
+  .tk-me-lbl{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--acc-ink);opacity:.85}
+  .tk-me-txt b{font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;max-width:120px}
   .tk-tabs{display:flex;gap:6px;margin:10px 0 12px;flex-wrap:wrap}
   .tk-tab{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
   .tk-tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .tk-n{background:rgba(255,255,255,.25);border-radius:999px;padding:0 5px;font-size:11px;margin-left:3px}
   .tk-add{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
   .tk-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  .tk-add input:focus{border-color:var(--acc)}
-  .tk-add .act{margin:0;padding:0 18px;font-size:20px;line-height:1;flex:0 0 auto}
-  .tk-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px 8px;margin-bottom:10px}
+  .tk-add .act{margin:0;padding:0 20px;font-size:22px;line-height:1;flex:0 0 auto;font-weight:700;color:#fff;background:var(--acc);border:1px solid var(--acc);border-radius:10px;cursor:pointer;transition:.15s}
+  .tk-add .act:hover{background:var(--acc-hover);border-color:var(--acc-hover)}
+  .tk-add .act:active{transform:translateY(1px)}
+  /* Encart léger qui regroupe les réglages (mieux structuré, tout visible) */
+  .tk-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;padding:12px;background:color-mix(in srgb, var(--acc) 4%, var(--surface-2));border:1px solid var(--line);border-radius:11px}
+  .tk-opts-lead{grid-column:1/-1;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:-2px 0 2px}
   .tk-field{display:flex;flex-direction:column;gap:4px;min-width:0}
   .tk-field>span{font-size:10.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);padding-left:2px}
   .tk-field select,.tk-field input{width:100%;font:inherit;font-size:13.5px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;cursor:pointer}
   .tk-field input{cursor:text}
-  .tk-field select:focus,.tk-field input:focus{border-color:var(--acc)}
+  .tk-field:has(#taskTags){grid-column:1 / -1}
+  .tk-add input,.tk-add .act,.tk-field select,.tk-field input{min-height:44px}
+  .tk-add input:focus,.tk-field select:focus,.tk-field input:focus,.tk-rsel:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent)}
+  #taskPrio[data-prio="h"]{border-color:var(--down);color:var(--down)}
+  #taskPrio[data-prio="b"]{border-color:#60a5fa;color:#93c5fd}
   .tk-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .tk-row:last-child{border-bottom:0}
   .tk-ck{background:none;border:0;cursor:pointer;font-size:16px;line-height:1.3;padding:0;transition:transform .12s ease}
@@ -607,6 +619,7 @@
       <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
+      <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
       <div class="settings-wrap">
         <button class="btn" id="settingsBtn" title="Paramètres">⚙️</button>
         <div class="settings-menu" id="settingsMenu"></div>
@@ -624,7 +637,10 @@
 
   <div class="panel-box tasks-hero" id="tasks">
     <div class="pb-head">✅ Tâches d'équipe
-      <select id="taskWho" class="tk-who" title="Qui es-tu ?"></select>
+      <div class="tk-me" title="Ton identité (définie par ta connexion)" aria-label="Identité">
+        <span class="tk-me-av" id="taskMeAv">🧑‍💻</span>
+        <span class="tk-me-txt"><span class="tk-me-lbl">Je suis</span><b id="taskMeName">—</b></span>
+      </div>
     </div>
     <div class="tk-tabs" id="taskTabs"></div>
     <div class="tk-add">
@@ -632,6 +648,7 @@
       <button id="taskAdd" class="act" title="Ajouter">＋</button>
     </div>
     <div class="tk-opts">
+      <div class="tk-opts-lead">⚙️ Réglages de la tâche</div>
       <label class="tk-field"><span>👤 Pour qui</span><select id="taskDest" title="Pour qui ?"></select></label>
       <label class="tk-field"><span>🚩 Priorité</span><select id="taskPrio" title="Priorité"><option value="n">⚪ Normal</option><option value="h">🔴 Haute</option><option value="b">🔵 Basse</option></select></label>
       <label class="tk-field"><span>🔁 Répétition</span><select id="taskRepeat" title="Répétition"><option value="">Une fois</option><option value="day">Chaque jour</option><option value="week">Chaque semaine</option><option value="quinzaine">Chaque quinzaine</option></select></label>
@@ -1105,12 +1122,13 @@ async function doLogin(){
   let tok="", who=null, name="";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:user, password:input})});
-    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; } }
+    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; if(!who){ who=whoFromUser(j.username||user); } } }
   }catch(e){}
   go.disabled=false; go.textContent="Entrer";
   if(!tok){ $("#pwErr").textContent="Identifiant ou mot de passe incorrect."; return; }
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
-  if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); }
+  if(!who) who=whoFromUser(user);
+  if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
   closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
@@ -1556,6 +1574,10 @@ async function loadTip(force){
 
 /* ---------- tâches d'équipe (3 listes + tags, sync serveur) ---------- */
 const NAMES = { moi:"Andre", other:"Manon" };   // Noctra ; côté Shinra = { moi:"Andre", other:"Ghoulz" }
+const AVATARS = { moi:"🧑‍💻", other:"🧑‍🚀" };
+// Identité = login : "andre" -> moi, "manon" -> other (dérivé du nom d'utilisateur si le serveur ne le donne pas)
+function whoFromUser(u){ const ul=String(u||"").toLowerCase().trim(); for(const k in NAMES){ if((NAMES[k]||"").toLowerCase()===ul) return k; } return null; }
+function fillMe(){ try{ const w=(typeof WHO!=="undefined")?WHO:"moi"; const el=document.getElementById("taskMeName"); if(el) el.textContent=NAMES[w]||"—"; const av=document.getElementById("taskMeAv"); if(av) av.textContent=AVATARS[w]||"🙂"; }catch(e){} }
 const TK_KEYS = ["moi","other","general"];
 let WHO = localStorage.getItem("ccn_who") || "moi";
 let TASKS = JSON.parse(localStorage.getItem("ccn_tasks")||"null") || {moi:[],other:[],general:[]};
@@ -1615,8 +1637,8 @@ function addTask(){
 }
 function renderTasks(){
   tkNorm(); if(tkReconcile()) saveTasks();
-  const who=$("#taskWho");
-  if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">Je suis : ${escapeHtml(NAMES.moi)}</option><option value="other">Je suis : ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; who.value=WHO; who.onchange=()=>{ WHO=who.value; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; renderTasks(); }; }
+  fillMe();
+  { const pr=$("#taskPrio"); if(pr && !pr.dataset.wired){ pr.dataset.wired="1"; const paint=()=>{ pr.dataset.prio=pr.value; }; pr.addEventListener("change",paint); paint(); } }
   const dest=$("#taskDest");
   if(dest){ dest.innerHTML=TK_KEYS.map(k=>`<option value="${k}">${escapeHtml(tkName(k))}</option>`).join(""); dest.value=TK_VIEW; }
   const OVD=3*24*3600*1000, now=Date.now(), isLate=x=>!x.done && !x.del && x.ts && (now-x.ts>OVD);
@@ -2021,7 +2043,7 @@ function speakText(t){
   try{
     if(!window.speechSynthesis || !t) return;
     let spoken=false;
-    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(t); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
+    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=mkUtter(t); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
     const vs=window.speechSynthesis.getVoices();
     if(vs&&vs.length) doSpeak(); else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
@@ -2048,18 +2070,19 @@ function pickFrenchVoice(){
     if(!fr.length) fr=vs.filter(v=>/fr/i.test(v.lang||""));
     if(!fr.length) return null;
     // Score : + = plus naturel. On privilégie les voix neuronales/en-ligne (bien meilleures que les compactes).
+    // L'indice "améliorée" est souvent dans le voiceURI (iOS/macOS), pas seulement dans le nom -> on teste les deux.
     const score=(v)=>{
       const n=(v.name||"").toLowerCase(), u=(v.voiceURI||"").toLowerCase(); let s=0;
+      const enh=/premium|enhanced|neural|natural/;
       if(/online.*natural|natural.*online/.test(n)) s+=100;   // Microsoft Edge (neuronale, excellente)
-      if(/neural/.test(n)) s+=90;
+      if(enh.test(n)||enh.test(u)) s+=85;                     // "améliorée" repérée aussi via voiceURI
       if(/google/.test(n)) s+=80;                             // "Google français" (Chrome/Android)
-      if(/enhanced|premium/.test(n)) s+=70;                   // voix améliorées iOS/macOS
-      if(/siri/.test(n)) s+=55;
+      if(/siri/.test(n)||/siri/.test(u)) s+=60;              // Siri = très naturel sur iOS récents
       if(/aur[eé]lie|am[eé]lie|audrey|virginie|c[eé]line|charlotte|brigitte|julie|marie|l[eé]a|denise/.test(n)) s+=20;
-      if(/female|femme/.test(n)) s+=6;
+      if(/female|femme/.test(n)) s+=8;
       if(/fr-fr/i.test(v.lang||"")||/fr[-_]fr/.test(u)) s+=8; // France plutôt que Canada/Belgique
       if(!v.localService) s+=4;                              // voix serveur souvent meilleures
-      if(/compact|eloquence|espeak|pico/.test(n)) s-=40;     // robotiques
+      if(/compact|eloquence|espeak|pico/.test(n)||/compact/.test(u)) s-=60;  // robotiques
       if(/hortense/.test(n)) s-=8;                           // SAPI Windows, un peu robotique
       return s;
     };
@@ -2068,8 +2091,14 @@ function pickFrenchVoice(){
     return _voiceCache;
   }catch(e){ return null; }
 }
+// Fabrique une phrase à dire avec la bonne voix + prosodie féminine posée (un seul endroit à régler).
+function mkUtter(text){ const u=new SpeechSynthesisUtterance(text); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=0.97; u.pitch=1.05; return u; }
 // Précharge la liste des voix ; quand les voix neuronales arrivent (async), on re-choisit la meilleure.
 try{ if(window.speechSynthesis){ window.speechSynthesis.getVoices(); if(typeof window.speechSynthesis.addEventListener==="function") window.speechSynthesis.addEventListener("voiceschanged",function(){ _voiceCache=null; window.speechSynthesis.getVoices(); }); } }catch(e){}
+// Réveille le moteur vocal au tout premier geste (iOS n'expose les bonnes voix qu'après) -> voix correcte dès la 1ère phrase.
+let _voicePrimed=false;
+function primeVoices(){ if(_voicePrimed) return; _voicePrimed=true; try{ const ss=window.speechSynthesis; if(!ss) return; ss.getVoices(); const u=new SpeechSynthesisUtterance(" "); u.volume=0; ss.speak(u); ss.cancel(); }catch(e){} }
+["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev, primeVoices, {once:true, passive:true}));
 function speakBriefing(){
   try{
     if(!window.speechSynthesis) return;
@@ -2087,7 +2116,7 @@ function speakBriefing(){
     if(topVA) p.push(topVA+" est en tête.");
     p.push(undone?(undone+" tâche"+(undone>1?"s":"")+" à faire."):"Aucune tâche en attente.");
     let spoken=false;
-    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=new SpeechSynthesisUtterance(p.join(" ")); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
+    const doSpeak=()=>{ if(spoken) return; spoken=true; const u=mkUtter(p.join(" ")); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
     const vs=window.speechSynthesis.getVoices();
     if(vs&&vs.length) doSpeak();
     else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
@@ -2178,6 +2207,7 @@ function renderPie(){
 
 /* ---------- démarrage ---------- */
 applyAccent();
+fillMe();
 load();
 loadTodosFromBrain();
 loadJournal();
@@ -2256,7 +2286,7 @@ let SMS_DATA=null;
 async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
 
 /* ---------- parler à l'assistant (micro flottant) ---------- */
-function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=new SpeechSynthesisUtterance(String(txt).slice(0,320)); u.lang="fr-FR"; const v=(typeof pickFrenchVoice==="function")?pickFrenchVoice():null; if(v) u.voice=v; u.rate=1; u.pitch=1.02; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
+function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=mkUtter(String(txt).slice(0,320)); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
 function voiceAsk(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
@@ -2287,7 +2317,7 @@ function voiceAsk(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","install","card","rank","reorder","hide","tv"].forEach(id=>{
+    ["morn","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -2302,6 +2332,7 @@ function voiceAsk(){
     window.addEventListener("resize",()=>{ if(menu.classList.contains("show")) positionMenu(); });
   }
 }
+{ const vb=$("#voix"); if(vb) vb.onclick=()=>{ try{ primeVoices(); }catch(e){} if(typeof speakText==="function") speakText("Bonjour, c'est ta voix pour le coach du matin."); }; }
 
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
