@@ -2035,8 +2035,8 @@ function renderMorning(){
     <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
-  const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakText(COACH_TEXT); else speakBriefing(); };
-  const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakText(COACH_TEXT); };
+  const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
+  const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
 }
 let COACH_TEXT="";
 function speakText(t){
@@ -2095,10 +2095,38 @@ function pickFrenchVoice(){
 function mkUtter(text){ const u=new SpeechSynthesisUtterance(text); u.lang="fr-FR"; const v=pickFrenchVoice(); if(v) u.voice=v; u.rate=0.97; u.pitch=1.05; return u; }
 // Précharge la liste des voix ; quand les voix neuronales arrivent (async), on re-choisit la meilleure.
 try{ if(window.speechSynthesis){ window.speechSynthesis.getVoices(); if(typeof window.speechSynthesis.addEventListener==="function") window.speechSynthesis.addEventListener("voiceschanged",function(){ _voiceCache=null; window.speechSynthesis.getVoices(); }); } }catch(e){}
-// Réveille le moteur vocal au tout premier geste (iOS n'expose les bonnes voix qu'après) -> voix correcte dès la 1ère phrase.
-let _voicePrimed=false;
-function primeVoices(){ if(_voicePrimed) return; _voicePrimed=true; try{ const ss=window.speechSynthesis; if(!ss) return; ss.getVoices(); const u=new SpeechSynthesisUtterance(" "); u.volume=0; ss.speak(u); ss.cancel(); }catch(e){} }
+// Réveille le moteur vocal + déverrouille l'audio HTML5 au tout premier geste
+// (iOS n'expose les bonnes voix et n'autorise la lecture audio qu'après un geste).
+const _TTS_SILENT="data:audio/wav;base64,UklGRlQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+let _voicePrimed=false, _ttsAudio=null;
+function primeVoices(){ if(_voicePrimed) return; _voicePrimed=true;
+  try{ const ss=window.speechSynthesis; if(ss){ ss.getVoices(); const u=new SpeechSynthesisUtterance(" "); u.volume=0; ss.speak(u); ss.cancel(); } }catch(e){}
+  try{ if(!_ttsAudio) _ttsAudio=new Audio(); _ttsAudio.src=_TTS_SILENT; const p=_ttsAudio.play(); if(p&&p.then) p.then(()=>{ try{ _ttsAudio.pause(); _ttsAudio.currentTime=0; }catch(e){} }).catch(()=>{}); }catch(e){}
+}
 ["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev, primeVoices, {once:true, passive:true}));
+// Voix NEURONALE serveur (Gemini) : belle voix identique sur tous les appareils. Renvoie true si elle a joué.
+async function speakServer(text){
+  try{
+    if(!TOKEN || !text) return false;
+    if(navigator && navigator.onLine===false) return false;
+    try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+    const r=await fetch(HUB_BASE+"/api/hub/tts",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({text:String(text).slice(0,1600)})});
+    if(!r.ok) return false;
+    const j=await r.json(); if(!j.audio) return false;
+    if(!_ttsAudio) _ttsAudio=new Audio();
+    _ttsAudio.src="data:audio/wav;base64,"+j.audio;
+    await _ttsAudio.play();
+    return true;
+  }catch(e){ return false; }
+}
+// Coach : essaie la voix serveur (belle), sinon retombe sur la voix du téléphone. btn = feedback ⏳.
+async function speakCoach(text, btn){
+  if(!text) return;
+  let old; if(btn){ old=btn.textContent; btn.textContent="⏳"; btn.disabled=true; }
+  let ok=false; try{ ok=await speakServer(text); }catch(e){}
+  if(btn){ btn.textContent=old; btn.disabled=false; }
+  if(!ok) speakText(text);
+}
 function speakBriefing(){
   try{
     if(!window.speechSynthesis) return;
@@ -2332,7 +2360,7 @@ function voiceAsk(){
     window.addEventListener("resize",()=>{ if(menu.classList.contains("show")) positionMenu(); });
   }
 }
-{ const vb=$("#voix"); if(vb) vb.onclick=()=>{ try{ primeVoices(); }catch(e){} if(typeof speakText==="function") speakText("Bonjour, c'est ta voix pour le coach du matin."); }; }
+{ const vb=$("#voix"); if(vb) vb.onclick=()=>{ try{ primeVoices(); }catch(e){} speakCoach("Bonjour Andre, c'est ta voix pour le coach du matin. On va faire une belle journée.", vb); }; }
 
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
