@@ -2546,6 +2546,8 @@ async function loadBrief(){
     const j=await r.json();
     COACH_TEXT=(j.brief||"").trim();
     txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
+    // Réchauffe la 1ère phrase en fond -> quand tu tapes « Écouter », ça démarre tout de suite.
+    if(COACH_TEXT && typeof prewarmTts==="function") prewarmTts(COACH_TEXT);
   }catch(e){ txt.textContent="Coach indisponible — réessaie."; }
 }
 var _voiceCache=null;
@@ -2591,27 +2593,66 @@ function primeVoices(){ if(_voicePrimed) return; _voicePrimed=true;
   try{ if(!_ttsAudio) _ttsAudio=new Audio(); _ttsAudio.src=_TTS_SILENT; const p=_ttsAudio.play(); if(p&&p.then) p.then(()=>{ try{ _ttsAudio.pause(); _ttsAudio.currentTime=0; }catch(e){} }).catch(()=>{}); }catch(e){}
 }
 ["pointerdown","touchstart","keydown"].forEach(ev=>window.addEventListener(ev, primeVoices, {once:true, passive:true}));
-// Voix NEURONALE serveur (Gemini) : belle voix identique sur tous les appareils. Renvoie true si elle a joué.
-async function speakServer(text){
-  try{
-    if(!TOKEN || !text) return false;
-    if(navigator && navigator.onLine===false) return false;
-    try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
-    const r=await fetch(HUB_BASE+"/api/hub/tts",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({text:String(text).slice(0,1600)})});
-    if(!r.ok) return false;
-    const j=await r.json(); if(!j.audio) return false;
-    if(!_ttsAudio) _ttsAudio=new Audio();
-    _ttsAudio.src="data:audio/wav;base64,"+j.audio;
-    await _ttsAudio.play();
-    return true;
-  }catch(e){ return false; }
+// --- Voix NEURONALE serveur (Gemini), en STREAMING par phrases ---
+// Le serveur générait tout le briefing d'un coup (~20 s avant le 1er son). On
+// découpe en morceaux : on joue le 1er dès qu'il est prêt (~3-4 s) et on prépare
+// les suivants pendant qu'il parle. Cache client + cache serveur = re-lecture instantanée.
+const _ttsCacheCli={};
+let _speakSeq=0;
+function ttsChunks(text){
+  const parts=String(text||"").replace(/\s+/g," ").trim().match(/[^.!?…]+[.!?…]*/g)||[String(text||"")];
+  const out=[]; let cur="";
+  parts.forEach(p=>{ p=p.trim(); if(!p) return; if((cur+" "+p).trim().length>150 && cur){ out.push(cur.trim()); cur=p; } else cur=(cur?cur+" ":"")+p; });
+  if(cur.trim()) out.push(cur.trim());
+  return out.length?out:[String(text||"")];
 }
-// Coach : essaie la voix serveur (belle), sinon retombe sur la voix du téléphone. btn = feedback ⏳.
+async function ttsFetch(text){
+  text=String(text||"").slice(0,1600); if(!TOKEN || !text) return null;
+  if(_ttsCacheCli[text]) return _ttsCacheCli[text];
+  if(navigator && navigator.onLine===false) return null;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tts",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({text})});
+    if(!r.ok) return null;
+    const j=await r.json(); if(!j.audio) return null;
+    _ttsCacheCli[text]=j.audio; return j.audio;
+  }catch(e){ return null; }
+}
+// Réchauffe le cache (sans jouer) — appelé quand le briefing s'affiche pour un démarrage quasi instantané au tap.
+function prewarmTts(text){ try{ const c=ttsChunks(text); if(c[0]) ttsFetch(c[0]); }catch(e){} }
+// Joue le texte phrase par phrase (pipeline). onStart() = appelé au tout 1er son. Renvoie true si au moins un morceau a joué.
+async function speakServerChunks(text, onStart){
+  if(!TOKEN || !text) return false;
+  if(navigator && navigator.onLine===false) return false;
+  const seq=++_speakSeq;
+  try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+  const chunks=ttsChunks(text);
+  let nextP=ttsFetch(chunks[0]);
+  const first=await nextP;
+  if(seq!==_speakSeq) return true;        // annulé (re-tap) entretemps
+  if(!first) return false;                // rien -> laisse le fallback voix téléphone
+  if(!_ttsAudio) _ttsAudio=new Audio();
+  let played=false;
+  for(let i=0;i<chunks.length;i++){
+    if(seq!==_speakSeq) return true;
+    const audio = i===0 ? first : await nextP;
+    if(i+1<chunks.length) nextP=ttsFetch(chunks[i+1]);  // précharge le suivant AVANT de jouer
+    if(!audio) continue;
+    if(!played && typeof onStart==="function"){ played=true; try{ onStart(); }catch(e){} }
+    await new Promise(res=>{
+      try{ _ttsAudio.onended=res; _ttsAudio.onerror=res; _ttsAudio.src="data:audio/wav;base64,"+audio; const p=_ttsAudio.play(); if(p&&p.catch) p.catch(()=>res()); }
+      catch(e){ res(); }
+    });
+  }
+  return played;
+}
+// Coach : voix serveur (belle) par phrases, sinon voix du téléphone. btn = feedback ⏳ jusqu'au 1er son.
 async function speakCoach(text, btn){
   if(!text) return;
-  let old; if(btn){ old=btn.textContent; btn.textContent="⏳"; btn.disabled=true; }
-  let ok=false; try{ ok=await speakServer(text); }catch(e){}
-  if(btn){ btn.textContent=old; btn.disabled=false; }
+  let old, cleared=false; if(btn){ old=btn.textContent; btn.textContent="⏳"; btn.disabled=true; }
+  const restore=()=>{ if(btn && !cleared){ cleared=true; btn.textContent=old; btn.disabled=false; } };
+  let ok=false;
+  try{ ok=await speakServerChunks(text, restore); }catch(e){}
+  restore();
   if(!ok) speakText(text);
 }
 function speakBriefing(){
