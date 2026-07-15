@@ -377,6 +377,34 @@
   .rm-row.dt-past{opacity:.5}
   .np-area{width:100%;min-height:120px;resize:vertical;font:inherit;font-size:14px;line-height:1.6;padding:12px;border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-top:8px}
   .np-saved{margin-left:auto;font-size:12px;color:var(--ok);font-weight:600}
+  .np-mic{background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:8px;padding:3px 9px;cursor:pointer;font-size:14px;line-height:1}
+  .np-mic.on{background:var(--down);border-color:var(--down);animation:micpulse 1s infinite}
+  /* Panneau VA fantôme */
+  .gh-c{font-size:11px;color:var(--faint);font-weight:600;margin-left:auto}
+  .gh-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45}
+  .gh-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .gh-row:last-child{border-bottom:0}
+  .gh-va{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gh-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+  .gh-days{font-size:11px;font-weight:700;color:var(--down);white-space:nowrap}
+  .gh-relance{font:inherit;font-size:12px;font-weight:600;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  .gh-relance:hover{background:var(--acc-bg)}
+  .gh-relance:disabled{opacity:.6;cursor:default}
+  /* Historique du coach (dans l'écran matin/soir) */
+  .mn-hist{margin-top:4px;margin-bottom:16px}
+  .mn-hist summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
+  .mn-hist summary::-webkit-details-marker{display:none}
+  .mn-hist-item{border-top:.5px solid var(--line);padding:10px 0;font-size:13.5px;line-height:1.5;color:var(--text)}
+  .mn-hist-d{font-size:11px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+  /* Aide widget iPhone */
+  .wh-code{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin:14px 0}
+  .wh-code-hd{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-bottom:8px}
+  .wh-code pre{margin:0;font-family:'Fira Code',ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:var(--acc-ink);white-space:pre-wrap;word-break:break-word;overflow-x:auto}
+  .wh-field{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:10px}
+  .wh-field span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);flex-basis:100%}
+  .wh-field code{flex:1;min-width:0;font-family:'Fira Code',ui-monospace,monospace;font-size:12.5px;color:var(--text);word-break:break-all}
+  .wh-copy{font:inherit;font-size:12px;font-weight:600;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .wh-copy:hover{background:var(--acc-bg)}
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .cal-title{font-weight:700;text-transform:capitalize}
   .cal-nav{background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--text);font-size:18px;width:34px;height:34px;cursor:pointer}
@@ -739,6 +767,7 @@
 </div>
 
 <div class="morning" id="morning"><div class="mn-inner" id="morningBody"></div></div>
+<div class="morning" id="widgetHelp"><div class="mn-inner" id="widgetHelpBody"></div></div>
 
 <button id="voiceFab" class="voice-fab" title="Parler à l'assistant" aria-label="Parler à l'assistant">🎤</button>
 
@@ -758,6 +787,7 @@
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
       <button class="btn" id="eve" title="Coach du soir">🌙</button>
+      <button class="btn" id="widget" title="Widget iPhone">📱</button>
       <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
@@ -827,8 +857,8 @@
   </div>
 
   <div class="panel-box" id="notepad">
-    <div class="pb-head">📝 Bloc-notes <span class="np-saved" id="npSaved"></span></div>
-    <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ça se sauvegarde tout seul."></textarea>
+    <div class="pb-head">📝 Bloc-notes <button class="np-mic" id="npMic" title="Note vocale — parle, ça s'écrit">🎤</button> <span class="np-saved" id="npSaved"></span></div>
+    <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ou clique 🎤 et parle."></textarea>
   </div>
 
   <div class="panel-box collapsed" id="cal">
@@ -874,9 +904,15 @@
     <div id="omBody"></div>
   </div>
 
-  <div class="panel-box" id="fanradar" style="display:none">
-    <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
-    <div id="fanradarBody"></div>
+  <div class="pair-row">
+    <div class="panel-box" id="fanradar" style="display:none">
+      <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
+      <div id="fanradarBody"></div>
+    </div>
+    <div class="panel-box" id="ghosts" style="display:none">
+      <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
+      <div id="ghostsBody"></div>
+    </div>
   </div>
 
   <div class="pair-row">
@@ -1283,7 +1319,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1884,6 +1920,7 @@ function renderOM(){
   renderPie();
   renderSplit();
   renderFanRadar();
+  renderGhosts();
   if(typeof renderTgrev==="function") renderTgrev();
   fixPairs();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
@@ -1918,6 +1955,32 @@ function renderFanRadar(){
   </div>`).join("");
   $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené).</div>${rows}`;
 }
+// ---------- VA fantômes (rien produit depuis longtemps) ----------
+let GHOSTS=null;
+async function loadGhosts(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/ghosts",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); GHOSTS=j.data||null; renderGhosts(); if(!GHOSTS && (retry||0)<2) setTimeout(()=>loadGhosts((retry||0)+1),9000); } }catch(e){} }
+function renderGhosts(){
+  const panel=$("#ghosts"); if(!panel) return;
+  const d=GHOSTS;
+  if(!d || !d.ghosts || !d.ghosts.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block";
+  $("#ghCount").textContent=d.count+" VA";
+  const rows=d.ghosts.map(g=>`<div class="gh-row">
+    <span class="gh-va">${escapeHtml(g.va)}</span>
+    <span class="gh-meta">${fmtInt(g.subsTotal||0)} subs au total${g.daysNoProd!=null?` · ${g.daysNoProd} j sans prod`:""}</span>
+    <button class="gh-relance" data-ghost="${escapeHtml(g.va)}">💬 Relancer</button>
+  </div>`).join("");
+  $("#ghostsBody").innerHTML=`<div class="gh-intro">Aucun sub ni production depuis ≥ ${d.ghostDays} jours. Peut-être partis sans prévenir — vérifie, ou relance-les dans leur ticket.</div>${rows}`;
+}
+async function relanceGhost(va, btn){
+  if(!TOKEN) return;
+  const old=btn.textContent; btn.disabled=true; btn.textContent="⏳";
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({items:[{va:va,title:"👋 On te voit plus, tout va bien ?",body:"Hey, ça fait un moment qu'on n'a pas vu d'activité de ta part 👀. Tout va bien ? Si tu es toujours dispo, remets-toi en route aujourd'hui 💪. Si tu as un souci (compte, contenu, perso…), dis-le nous ici, on t'aide.",reason:"fantome"}]})});
+    const j=await r.json();
+    if(j.ok){ btn.textContent="✅ Envoyé"; } else { btn.textContent="⚠️"; btn.disabled=false; }
+  }catch(e){ btn.textContent="⚠️"; btn.disabled=false; }
+}
+$("#ghosts").addEventListener("click",e=>{ const g=e.target.closest("[data-ghost]"); if(g){ relanceGhost(g.getAttribute("data-ghost"), g); } });
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
   if(!h || !h.length){ $("#history").style.display="none"; return; }
@@ -2237,6 +2300,7 @@ function renderMorning(){
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
     <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div></div>
+    <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
     <div class="mn-tasks"><h4>${ev?"📋 À préparer pour demain":"📋 Ta journée"} ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
@@ -2359,8 +2423,20 @@ function speakBriefing(){
     else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
 }
-function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
-function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
+async function loadBriefHistory(){
+  if(!TOKEN) return;
+  const det=$("#mnHist"), list=$("#mnHistList"); if(!det||!list) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/brief-history",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json(); const h=(j.history||[]).slice(0,15);
+    if(!h.length) return;
+    det.style.display="block";
+    list.innerHTML=h.map(b=>{ const dd=new Date(b.ts||Date.now()).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); return `<div class="mn-hist-item"><div class="mn-hist-d">${b.mode==="evening"?"🌙 soir":"☀️ matin"} · ${dd}</div>${escapeHtml(b.text||"")}</div>`; }).join("");
+  }catch(e){}
+}
+function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
+function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
 function closeMorning(){ $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
 function showMorningIfNew(){ if(!TOKEN) return;
   // Le soir (≥ 20h local), on propose le coach du soir 1×/jour ; sinon le matin.
@@ -2368,6 +2444,36 @@ function showMorningIfNew(){ if(!TOKEN) return;
   if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
 { const eb=$("#eve"); if(eb) eb.onclick=showEvening; }
+// ---------- Widget iPhone : écran d'aide (URL + token + étapes) ----------
+function showWidgetHelp(){
+  const url=HUB_BASE+"/api/hub/widget";
+  const tok=TOKEN||"(connecte-toi d'abord)";
+  const scriptable=`// Widget Scriptable — colle dans un widget Scriptable\nconst r=await new Request("${url}");\nr.headers={"x-hub-token":"${tok}"};\nconst d=await r.loadJSON();\nconst w=new ListWidget();\nw.addText("Noctra");\nlet a=w.addText((d.netMonth??"—")+" $");\na.font=Font.boldSystemFont(26);\nw.addText(d.line||"");\nScript.setWidget(w);\nScript.complete();`;
+  $("#widgetHelpBody").innerHTML=`
+    <div class="mn-top"><div class="mn-hi">📱 Widget iPhone</div><button class="mn-close" id="whClose">✕</button></div>
+    <div class="mn-date">Ton résumé (net du mois + subs) sur l'écran d'accueil, sans ouvrir le site.</div>
+    <div class="mn-next" style="line-height:1.6">La façon la plus simple : l'app gratuite <b>Scriptable</b>.
+      <ol style="margin:10px 0 0;padding-left:20px;font-size:14px;color:var(--muted);line-height:1.7">
+        <li>Installe <b>Scriptable</b> depuis l'App Store.</li>
+        <li>Ouvre-la → <b>＋</b> → colle le script ci-dessous → nomme-le « Noctra ».</li>
+        <li>Sur l'écran d'accueil : appui long → <b>＋</b> → Scriptable → choisis le widget → « Noctra ».</li>
+      </ol>
+    </div>
+    <div class="wh-code"><div class="wh-code-hd">📜 Script à copier <button class="wh-copy" data-copy="script">Copier</button></div><pre id="whScript">${escapeHtml(scriptable)}</pre></div>
+    <div class="wh-field"><span>Adresse (URL)</span><code>${escapeHtml(url)}</code><button class="wh-copy" data-copy="url">Copier</button></div>
+    <div class="wh-field"><span>Ton code (x-hub-token)</span><code>${escapeHtml(tok)}</code><button class="wh-copy" data-copy="tok">Copier</button></div>
+    <div class="mn-quote" style="text-align:left">💡 Tu peux aussi créer un <b>Raccourci</b> iOS « Obtenir le contenu de l'URL » avec l'en-tête <b>x-hub-token</b> = ton code, pour l'ajouter à ton écran ou le lancer avec Siri.</div>
+    <button class="mn-go" id="whClose2">Compris 👍</button>`;
+  $("#widgetHelp").classList.add("show");
+  const close=()=>$("#widgetHelp").classList.remove("show");
+  $("#whClose").onclick=close; $("#whClose2").onclick=close;
+  $("#widgetHelpBody").querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{
+    const map={script:scriptable,url:url,tok:tok};
+    const v=map[b.getAttribute("data-copy")]||"";
+    try{ navigator.clipboard.writeText(v); b.textContent="✓ Copié"; setTimeout(()=>b.textContent="Copier",1500); }catch(e){}
+  });
+}
+{ const wb=$("#widget"); if(wb) wb.onclick=showWidgetHelp; }
 
 /* ---------- badges & paliers ---------- */
 const BADGES=[
@@ -2537,7 +2643,19 @@ function renderCal(){
 renderCal();
 
 /* ---------- bloc-notes ---------- */
-{ const np=$("#npText"); if(np){ np.value=localStorage.getItem("ccn_notepad")||""; let nt=null; np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ localStorage.setItem("ccn_notepad",np.value); const s=$("#npSaved"); if(s){ s.textContent="✓ enregistré"; setTimeout(()=>{ s.textContent=""; },1500); } },400); }); } }
+{ const np=$("#npText"); if(np){ np.value=localStorage.getItem("ccn_notepad")||""; let nt=null; const saveNp=()=>{ localStorage.setItem("ccn_notepad",np.value); const s=$("#npSaved"); if(s){ s.textContent="✓ enregistré"; setTimeout(()=>{ s.textContent=""; },1500); } }; np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(saveNp,400); });
+  // 🎤 Note vocale : dicte et ça s'ajoute au bloc-notes (avec la date).
+  const npm=$("#npMic"); const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(npm){ if(!SR){ npm.style.display="none"; } else { let nrec=null, nlisten=false;
+    npm.onclick=()=>{ try{ primeVoices(); }catch(e){}
+      if(nlisten){ try{ nrec.stop(); }catch(e){} return; }
+      nrec=new SR(); nrec.lang="fr-FR"; nrec.interimResults=false; nrec.continuous=true; nrec.maxAlternatives=1;
+      nrec.onstart=()=>{ nlisten=true; npm.classList.add("on"); npm.textContent="🔴"; };
+      nrec.onend=()=>{ nlisten=false; npm.classList.remove("on"); npm.textContent="🎤"; saveNp(); };
+      nrec.onerror=()=>{ nlisten=false; npm.classList.remove("on"); npm.textContent="🎤"; };
+      nrec.onresult=(e)=>{ let add=""; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) add+=e.results[i][0].transcript+" "; } if(add){ const stamp=new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"short"}); const pre=np.value.trim(); np.value=(pre?pre+"\n":"")+"🎙️ "+stamp+" — "+add.trim(); saveNp(); } };
+      try{ nrec.start(); }catch(e){ nlisten=false; } };
+  } } } }
 
 /* ---------- soldes SMS ---------- */
 let SMS_DATA=null;
@@ -2579,7 +2697,7 @@ function voiceAsk(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -2626,6 +2744,7 @@ loadReminders();
 loadSms();
 loadVaGoals();
 loadFanRadar();
+loadGhosts();
 loadLeakwatch();
 loadLeaks();
 loadIdentity();
