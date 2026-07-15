@@ -390,6 +390,34 @@
   .gh-relance{font:inherit;font-size:12px;font-weight:600;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
   .gh-relance:hover{background:var(--acc-bg)}
   .gh-relance:disabled{opacity:.6;cursor:default}
+  /* Mode duo (qui fait quoi aujourd'hui) */
+  .duo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:520px){ .duo-grid{grid-template-columns:1fr} }
+  .duo-col{background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:13px;padding:13px}
+  .duo-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .duo-av{width:30px;height:30px;flex:0 0 auto;display:grid;place-items:center;font-size:16px;border-radius:50%;background:color-mix(in srgb,var(--acc) 20%,transparent);border:1px solid var(--acc-line)}
+  .duo-nm{font-weight:700;font-size:14.5px}
+  .duo-stat{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:.5px solid var(--line)}
+  .duo-stat:last-of-type{border-bottom:0}
+  .duo-stat b{font-variant-numeric:tabular-nums}
+  .duo-done{color:var(--ok)} .duo-pend{color:var(--muted)}
+  .duo-list{margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .duo-list .di{display:flex;gap:6px}
+  .duo-empty{font-size:12px;color:var(--faint);margin-top:8px}
+  /* Anniversaires VA */
+  .an-add{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .an-add select,.an-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #anVa{flex:1;min-width:120px} #anDate{min-width:150px}
+  .an-add select:focus,.an-add input:focus{border-color:var(--acc)}
+  .an-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .an-row:last-child{border-bottom:0}
+  .an-va{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .an-ten{font-size:12px;color:var(--muted);white-space:nowrap}
+  .an-next{font-size:11px;font-weight:700;white-space:nowrap;color:var(--acc-ink)}
+  .an-next.soon{color:var(--gold)} .an-next.today{color:var(--ok)}
+  .an-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;opacity:.55}
+  .an-del:hover{color:var(--down);opacity:1}
+  .an-empty{font-size:13px;color:var(--faint);padding:6px 0}
   /* Historique du coach (dans l'écran matin/soir) */
   .mn-hist{margin-top:4px;margin-bottom:16px}
   .mn-hist summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
@@ -876,6 +904,11 @@
 
   <div class="summary" id="summary"></div>
 
+  <div class="panel-box" id="duo" style="display:none">
+    <div class="pb-head">🤝 Aujourd'hui, qui fait quoi</div>
+    <div id="duoBody"></div>
+  </div>
+
   <div class="panel-box" id="goal">
     <div class="pb-head">🎯 Objectif de la quinzaine</div>
     <div id="goalBody"></div>
@@ -913,6 +946,11 @@
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
     </div>
+  </div>
+
+  <div class="panel-box" id="anniv" style="display:none">
+    <div class="pb-head">🎂 Anniversaires VA</div>
+    <div id="annivBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1319,7 +1357,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadVaStart(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1857,6 +1895,7 @@ function renderTasks(){
     const pdot=x.prio==="h"?`<span class="tk-prio">🔴</span>`:x.prio==="b"?`<span class="tk-prio">🔵</span>`:"";
     return `<div class="tk-row ${x.done?"done":""} ${late?"late":""}"><button class="tk-ck" data-tkdone="${x.id}">${x.done?"✅":"⬜"}</button><div class="tk-body"><span class="tk-txt">${pdot}${escapeHtml(x.text)}</span>${late?`<span class="tk-late">⏰ ${days}j</span>`:""}${x.repeat?`<span class="tk-rep">🔁 ${REPEAT_LBL[x.repeat]||""}</span>`:""}${tags?`<div class="tk-tags">${tags}</div>`:""}</div><select class="tk-move" data-tkmove="${x.id}" title="Déplacer vers…">${opts}</select><button class="tk-del" data-tkdel="${x.id}">✕</button></div>`;
   }).join("")) : `<div class="tk-empty">${TK_TAG?"Aucune tâche avec #"+escapeHtml(TK_TAG):"Rien ici — ajoute une tâche 👆"}</div>`;
+  if(typeof renderDuo==="function") renderDuo();
 }
 { const a=$("#taskAdd"); if(a) a.onclick=addTask; }
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
@@ -1872,7 +1911,7 @@ function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.f
 renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
-    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ if(it.repeat) it.doneTs=Date.now(); tkPop(); } else it.doneTs=0; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
+    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ if(it.repeat) it.doneTs=Date.now(); it.doneBy=(typeof WHO!=="undefined"?WHO:"moi"); it.doneAt=Date.now(); tkPop(); } else { it.doneTs=0; it.doneBy=""; it.doneAt=0; } it.upd=Date.now(); saveTasks(); renderTasks(); if(typeof renderDuo==="function") renderDuo(); } return; }
     const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
   });
   list.addEventListener("change",e=>{
@@ -1921,6 +1960,7 @@ function renderOM(){
   renderSplit();
   renderFanRadar();
   renderGhosts();
+  renderAnniv();
   if(typeof renderTgrev==="function") renderTgrev();
   fixPairs();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
@@ -1954,6 +1994,7 @@ function renderFanRadar(){
     <span class="fr-days">${f.days} j 💤</span>
   </div>`).join("");
   $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené).</div>${rows}`;
+  if(typeof fixPairs==="function") fixPairs();
 }
 // ---------- VA fantômes (rien produit depuis longtemps) ----------
 let GHOSTS=null;
@@ -1970,6 +2011,7 @@ function renderGhosts(){
     <button class="gh-relance" data-ghost="${escapeHtml(g.va)}">💬 Relancer</button>
   </div>`).join("");
   $("#ghostsBody").innerHTML=`<div class="gh-intro">Aucun sub ni production depuis ≥ ${d.ghostDays} jours. Peut-être partis sans prévenir — vérifie, ou relance-les dans leur ticket.</div>${rows}`;
+  if(typeof fixPairs==="function") fixPairs();
 }
 async function relanceGhost(va, btn){
   if(!TOKEN) return;
@@ -1981,6 +2023,62 @@ async function relanceGhost(va, btn){
   }catch(e){ btn.textContent="⚠️"; btn.disabled=false; }
 }
 $("#ghosts").addEventListener("click",e=>{ const g=e.target.closest("[data-ghost]"); if(g){ relanceGhost(g.getAttribute("data-ghost"), g); } });
+// ---------- Mode duo : qui a fait quoi aujourd'hui (Andre / Manon) ----------
+function renderDuo(){
+  const panel=$("#duo"); if(!panel) return;
+  if(typeof TASKS==="undefined"){ panel.style.display="none"; return; }
+  const t0=new Date(); t0.setHours(0,0,0,0); const dayStart=t0.getTime();
+  const stat={moi:{done:[],pend:0},other:{done:[],pend:0}};
+  ["moi","other","general"].forEach(k=>{ (TASKS[k]||[]).forEach(x=>{
+    if(!x || x.del) return;
+    if(x.done){ const by=(x.doneBy==="moi"||x.doneBy==="other")?x.doneBy:null; if(by && (x.doneAt||0)>=dayStart) stat[by].done.push(x.text); }
+    else { // tâche en attente : compte pour la personne de la liste (general → aux deux)
+      if(k==="moi") stat.moi.pend++; else if(k==="other") stat.other.pend++; else { stat.moi.pend++; stat.other.pend++; }
+    }
+  }); });
+  const col=(who)=>{ const s=stat[who], nm=NAMES[who], av=AVATARS[who];
+    const list=s.done.length?`<div class="duo-list">${s.done.slice(0,6).map(x=>`<div class="di">${escapeHtml(x)}</div>`).join("")}</div>`:`<div class="duo-empty">Rien de coché aujourd'hui</div>`;
+    return `<div class="duo-col"><div class="duo-hd"><span class="duo-av">${av}</span><span class="duo-nm">${escapeHtml(nm)}</span></div>
+      <div class="duo-stat"><span class="duo-done">✅ Fait aujourd'hui</span><b>${s.done.length}</b></div>
+      <div class="duo-stat"><span class="duo-pend">⏳ En attente</span><b>${s.pend}</b></div>${list}</div>`; };
+  panel.style.display="block";
+  $("#duoBody").innerHTML=`<div class="duo-grid">${col("moi")}${col("other")}</div>`;
+}
+// ---------- Anniversaires VA (date d'entrée + ancienneté) ----------
+let VA_STARTS={};
+async function loadVaStart(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-start",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VA_STARTS=j.starts||{}; renderAnniv(); } }catch(e){} }
+async function saveVaStart(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-start",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({starts:VA_STARTS})}); }catch(e){} }
+function annivInfo(sd){
+  // Renvoie {tenure, next} : ancienneté lisible + prochain palier (jours restants).
+  const s=new Date(sd+"T00:00:00"), now=new Date(); now.setHours(0,0,0,0);
+  const totMonths=(now.getFullYear()-s.getFullYear())*12+(now.getMonth()-s.getMonth())-(now.getDate()<s.getDate()?1:0);
+  const years=Math.floor(totMonths/12), months=totMonths%12;
+  let tenure = years>0 ? (years+" an"+(years>1?"s":"")+(months>0?" "+months+" mois":"")) : (totMonths>0?totMonths+" mois":"nouveau");
+  // prochain anniversaire annuel
+  let na=new Date(s); na.setFullYear(now.getFullYear()); if(na<now) na.setFullYear(now.getFullYear()+1);
+  const days=Math.round((na-now)/864e5);
+  const nextYears=na.getFullYear()-s.getFullYear();
+  let cls="", label;
+  if(days===0){ cls="today"; label="🎉 aujourd'hui : "+nextYears+" an"+(nextYears>1?"s":""); }
+  else if(days<=14){ cls="soon"; label="🎂 dans "+days+" j : "+nextYears+" an"+(nextYears>1?"s":""); }
+  else label="dans "+days+" j";
+  return {tenure, label, cls};
+}
+function annivVaOptions(){ const set={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas) OM_DATA.vas.forEach(v=>{ if(!v.unpaid) set[v.va]=1; }); Object.keys(VA_STARTS).forEach(v=>set[v]=1); return Object.keys(set).sort(); }
+function renderAnniv(){
+  const panel=$("#anniv"); if(!panel) return;
+  const vas=annivVaOptions();
+  if(!TOKEN || !vas.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const opts=`<option value="">VA…</option>`+vas.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  const rows=Object.keys(VA_STARTS).sort((a,b)=>{ const da=annivInfo(VA_STARTS[a]), db=annivInfo(VA_STARTS[b]); return 0; }).map(v=>{
+    const info=annivInfo(VA_STARTS[v]);
+    return `<div class="an-row"><span class="an-va">${escapeHtml(v)}</span><span class="an-ten">${info.tenure}</span><span class="an-next ${info.cls}">${info.label}</span><button class="an-del" data-andel="${escapeHtml(v)}">✕</button></div>`;
+  }).join("")||`<div class="an-empty">Ajoute la date d'arrivée de tes VA pour ne jamais rater un anniversaire 🎂</div>`;
+  $("#annivBody").innerHTML=`<div class="an-add"><select id="anVa">${opts}</select><input id="anDate" type="date" /><button class="act" id="anAdd">＋ Ajouter</button></div>${rows}`;
+  const add=$("#anAdd"); if(add) add.onclick=()=>{ const v=$("#anVa").value, d=$("#anDate").value; if(!v||!/^\d{4}-\d{2}-\d{2}$/.test(d)){ return; } VA_STARTS[v]=d; saveVaStart(); renderAnniv(); };
+}
+$("#anniv").addEventListener("click",e=>{ const d=e.target.closest("[data-andel]"); if(d){ const v=d.getAttribute("data-andel"); delete VA_STARTS[v]; saveVaStart(); renderAnniv(); } });
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
   if(!h || !h.length){ $("#history").style.display="none"; return; }
@@ -2743,13 +2841,14 @@ loadPayments();
 loadReminders();
 loadSms();
 loadVaGoals();
+loadVaStart();
 loadFanRadar();
 loadGhosts();
 loadLeakwatch();
 loadLeaks();
 loadIdentity();
 loadTgrev();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
 </html>
