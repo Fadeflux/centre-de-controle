@@ -449,6 +449,25 @@
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
   .omv-perso{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
+  /* Objectif par VA : petite jauge sous le nom */
+  .omv-goal{flex-basis:100%;margin:2px 0 2px 28px;display:flex;align-items:center;gap:8px}
+  .omv-goal-bar{flex:1;max-width:180px;height:6px;background:var(--surface-2);border-radius:20px;overflow:hidden}
+  .omv-goal-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7c3aed)}
+  .omv-goal-bar i.win{background:linear-gradient(90deg,var(--ok),#22c55e)}
+  .omv-goal-txt{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .omv-goal-set{background:none;border:0;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px}
+  .omv-goal-set:hover{color:var(--acc)}
+  /* Radar fans endormis */
+  .fr-c{font-size:11px;color:var(--faint);font-weight:600;margin-left:auto}
+  .fr-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45}
+  .fr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .fr-row:last-child{border-bottom:0}
+  .fr-fan{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fr-meta{font-size:11px;color:var(--muted);font-weight:500}
+  .fr-va{font-size:11px;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:6px;padding:1px 7px;white-space:nowrap}
+  .fr-total{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fr-days{font-size:11px;color:var(--down);font-weight:600;white-space:nowrap;min-width:56px;text-align:right}
+  .fr-empty{font-size:13px;color:var(--muted);padding:6px 0}
   .pair-row{display:grid;grid-template-columns:1fr;gap:16px;margin:16px 0 0}
   .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
   @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
@@ -738,6 +757,7 @@
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
+      <button class="btn" id="eve" title="Coach du soir">🌙</button>
       <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
@@ -852,6 +872,11 @@
       <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
     </div>
     <div id="omBody"></div>
+  </div>
+
+  <div class="panel-box" id="fanradar" style="display:none">
+    <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
+    <div id="fanradarBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1258,7 +1283,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1842,7 +1867,14 @@ function renderOM(){
     <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${fmtLtv((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv,cur)}</div></div></div>`;
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${fmtLtv(d.models[m].ltv,cur)}</div><div class="om-model-marge ${(d.models[m].marge||0)>=0?'pos':'neg'}">Marge ${(d.models[m].marge||0)>=0?'+':''}${omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   let vas=(d.vas||[]).slice(); vas.sort((a,b)=> OM_SORT==="rev"?(b.rev-a.rev): OM_SORT==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
-  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=!v.unpaid && v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`);return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span></div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=!v.unpaid && v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`);
+    // Objectif de subs de la quinzaine (jauge). Progrès = subs du mois vs objectif.
+    const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
+    let goalHtml;
+    if(v.unpaid){ goalHtml=""; }
+    else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal; goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
+    else { goalHtml=`<span class="omv-goal"><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Fixer un objectif de subs">🎯 fixer un objectif</button></span>`; }
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
   $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
   renderRenta();
@@ -1851,9 +1883,40 @@ function renderOM(){
   renderSim();
   renderPie();
   renderSplit();
+  renderFanRadar();
   if(typeof renderTgrev==="function") renderTgrev();
   fixPairs();
   if(typeof showMorningIfNew==="function") showMorningIfNew();
+}
+// ---------- Objectif par VA (jauge dans le classement) ----------
+let VA_GOALS={};
+async function loadVaGoals(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-goals",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VA_GOALS=j.goals||{}; if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM(); } }catch(e){} }
+async function saveVaGoals(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-goals",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goals:VA_GOALS})}); }catch(e){} }
+function setVaGoal(va){
+  const cur=Number(VA_GOALS[va])||0;
+  const v=prompt(`Objectif de subs de la quinzaine pour ${va} :`, cur||"");
+  if(v===null) return;
+  const n=Math.round(Number(String(v).replace(",","."))||0);
+  if(n>0) VA_GOALS[va]=n; else delete VA_GOALS[va];
+  saveVaGoals(); if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM();
+}
+// ---------- Radar fans endormis ----------
+let FAN_RADAR=null;
+async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
+function renderFanRadar(){
+  const panel=$("#fanradar"); if(!panel) return;
+  const d=FAN_RADAR;
+  if(!d || !d.fans || !d.fans.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block";
+  const cur=d.currency||"$";
+  $("#frCount").textContent=d.count+" fan"+(d.count>1?"s":"");
+  const rows=d.fans.map(f=>`<div class="fr-row">
+    <span class="fr-fan">${escapeHtml(f.fan)}${f.model?` <span class="fr-meta">· ${escapeHtml(f.model)}</span>`:""}</span>
+    ${f.va?`<span class="fr-va">👤 ${escapeHtml(f.va)}</span>`:""}
+    <span class="fr-total">${HIDE?"•••":Math.round(f.total).toLocaleString("fr-FR")+" "+cur}</span>
+    <span class="fr-days">${f.days} j 💤</span>
+  </div>`).join("");
+  $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené).</div>${rows}`;
 }
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
@@ -1956,6 +2019,7 @@ async function loadOM(){
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
+  const gv=e.target.closest("[data-goalva]"); if(gv){ e.stopPropagation(); setVaGoal(gv.getAttribute("data-goalva")); return; }
   if(e.target.id==="omSort"){ OM_SORT=OM_SORT==="subs"?"rev":OM_SORT==="rev"?"marge":"subs"; renderOM(); return; }
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
@@ -2119,7 +2183,7 @@ async function shareRankCard(){
 { const rb=$("#rank"); if(rb) rb.onclick=shareRankCard; }
 
 /* ---------- écran du matin « Bonjour » : série + compteur + verdict ---------- */
-let LAST_NA=null, STREAK=0, STREAK_GOAL=false, MORNING_SHOWN=false;
+let LAST_NA=null, STREAK=0, STREAK_GOAL=false, MORNING_SHOWN=false, EVENING_SHOWN=false;
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function yStr(){ return new Date(Date.now()-864e5).toISOString().slice(0,10); }
 function computeStreak(){
@@ -2153,28 +2217,31 @@ function paceVerdict(){
   const need=Math.max(0,Math.round((lm-nm)/Math.max(1,dim-day)));
   return {up:false,text:`🔴 En retard : ${pct}% vs le mois dernier. Il te faut ~${fmt(need)}/jour pour rattraper.`};
 }
+let COACH_MODE="morning";
 function renderMorning(){
+  const ev=COACH_MODE==="evening";
   const name=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"toi";
   const streak=computeStreak();
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
   const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
-  const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+  const h=new Date().getHours(), hi=ev?"Bonne soirée":(h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir");
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const verdict=paceVerdict();
+  // Matin = tâches à faire ; soir = ce qu'il reste + ce qui est déjà noté pour demain.
   const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
   const na=LAST_NA;
   const QUOTES=["Chaque sub compte. Reste constant.","Le succès = la somme de petits efforts répétés.","Concentre-toi sur ce qui rapporte.","Un VA motivé vaut dix VA à surveiller.","Discipline > motivation.","Ce que tu mesures, tu l'améliores.","Aujourd'hui, fais mieux qu'hier.","Les détails font la différence.","Avance, même d'un petit pas.","Ton business grandit pendant que tu bosses."];
   const quote=QUOTES[new Date().getDate()%QUOTES.length];
   $("#morningBody").innerHTML=`
-    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} 👋</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
-    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">aujourd'hui : <b>${tot.subsDay!=null?tot.subsDay:"—"}</b> subs · <b>${money(st.aPayer)}</b> à payer</div></div>
-    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">🎙️ Ton coach du matin <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div></div>
+    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
+    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div></div>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
-    ${na?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
-    <div class="mn-tasks"><h4>📋 Ta journée ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
+    ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
+    <div class="mn-tasks"><h4>${ev?"📋 À préparer pour demain":"📋 Ta journée"} ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
     <div class="mn-quote">💬 ${escapeHtml(quote)}</div>
-    <button class="mn-go" id="mnGo">Commencer ma journée →</button>`;
+    <button class="mn-go" id="mnGo">${ev?"Bonne soirée 🌙":"Commencer ma journée →"}</button>`;
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
@@ -2193,10 +2260,10 @@ function speakText(t){
 async function loadBrief(){
   if(!TOKEN) return;
   const box=$("#mnCoach"), txt=$("#mnCoachTxt"); if(!box||!txt) return;
-  box.style.display="block"; txt.textContent="Ton coach prépare ton briefing…";
+  box.style.display="block"; txt.textContent=COACH_MODE==="evening"?"Ton coach prépare ton débrief du soir…":"Ton coach prépare ton briefing…";
   try{
     const nm=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"";
-    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm})});
+    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE})});
     if(r.status===401){ box.style.display="none"; return; }
     const j=await r.json();
     COACH_TEXT=(j.brief||"").trim();
@@ -2292,10 +2359,15 @@ function speakBriefing(){
     else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
 }
-function showMorning(){ renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
-function closeMorning(){ $("#morning").classList.remove("show"); localStorage.setItem("ccn_morning",todayStr()); }
-function showMorningIfNew(){ if(!TOKEN) return; if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
+function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
+function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); }
+function closeMorning(){ $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
+function showMorningIfNew(){ if(!TOKEN) return;
+  // Le soir (≥ 20h local), on propose le coach du soir 1×/jour ; sinon le matin.
+  if(new Date().getHours()>=20){ if(!EVENING_SHOWN){ EVENING_SHOWN=true; if(localStorage.getItem("ccn_evening")!==todayStr()) showEvening(); } return; }
+  if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
 { const mb=$("#morn"); if(mb) mb.onclick=showMorning; }
+{ const eb=$("#eve"); if(eb) eb.onclick=showEvening; }
 
 /* ---------- badges & paliers ---------- */
 const BADGES=[
@@ -2507,7 +2579,7 @@ function voiceAsk(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
+    ["morn","eve","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -2552,11 +2624,13 @@ loadTasks();
 loadPayments();
 loadReminders();
 loadSms();
+loadVaGoals();
+loadFanRadar();
 loadLeakwatch();
 loadLeaks();
 loadIdentity();
 loadTgrev();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); } }, REFRESH_MS);
 </script>
 </body>
 </html>
