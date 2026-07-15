@@ -372,6 +372,9 @@
   .rm-tx{flex:1;font-size:14px}
   .rm-who{font-size:11px;color:var(--muted);background:var(--surface-2,#17181b);border-radius:6px;padding:2px 7px}
   .rm-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px}
+  .dt-yearly{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:2px 0 12px;cursor:pointer}
+  .dt-yearly input{width:16px;height:16px;accent-color:var(--acc);cursor:pointer}
+  .dt-yr{font-size:11px;font-weight:700;color:var(--acc-ink);white-space:nowrap}
   .rm-row.dt-today{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
   .rm-row.dt-today .rm-who{color:var(--acc)}
   .rm-row.dt-past{opacity:.5}
@@ -625,7 +628,8 @@
   .tile.hero .val{color:var(--acc)}
   .tile .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
 
-  .section{margin:0 0 24px}
+  .section{margin:22px 0 24px}
+  #sections{margin-top:6px}
   .sec-head{display:flex;align-items:center;gap:12px;margin:0 2px 13px}
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .sec-head.pin .t{color:var(--gold)}
@@ -941,10 +945,11 @@
   <div class="panel-box" id="dates">
     <div class="pb-head">📌 Événements & dates</div>
     <div class="clk-add">
-      <input id="dtText" placeholder="Ex : Appel client, RDV, anniv, échéance…" autocomplete="off" />
+      <input id="dtText" placeholder="Ex : Appel client, RDV, anniv d'un VA, échéance…" autocomplete="off" />
       <input id="dtDate" type="date" class="clk-time" />
       <button id="dtAdd" class="act">＋</button>
     </div>
+    <label class="dt-yearly"><input type="checkbox" id="dtYearly" /> 🎂 Chaque année (anniversaire) — te le rappelle tous les ans</label>
     <div id="dtList"></div>
   </div>
 
@@ -1010,11 +1015,6 @@
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
     </div>
-  </div>
-
-  <div class="panel-box" id="anniv" style="display:none">
-    <div class="pb-head">🎂 Anniversaires VA</div>
-    <div id="annivBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1426,7 +1426,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadVaStart(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2029,7 +2029,6 @@ function renderOM(){
   renderSplit();
   renderFanRadar();
   renderGhosts();
-  renderAnniv();
   renderVersus();
   if(typeof renderTgrev==="function") renderTgrev();
   fixPairs();
@@ -2114,41 +2113,7 @@ function renderDuo(){
   panel.style.display="block";
   $("#duoBody").innerHTML=`<div class="duo-grid">${col("moi")}${col("other")}</div>`;
 }
-// ---------- Anniversaires VA (date d'entrée + ancienneté) ----------
-let VA_STARTS={};
-async function loadVaStart(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-start",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VA_STARTS=j.starts||{}; renderAnniv(); } }catch(e){} }
-async function saveVaStart(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-start",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({starts:VA_STARTS})}); }catch(e){} }
-function annivInfo(sd){
-  // Renvoie {tenure, next} : ancienneté lisible + prochain palier (jours restants).
-  const s=new Date(sd+"T00:00:00"), now=new Date(); now.setHours(0,0,0,0);
-  const totMonths=(now.getFullYear()-s.getFullYear())*12+(now.getMonth()-s.getMonth())-(now.getDate()<s.getDate()?1:0);
-  const years=Math.floor(totMonths/12), months=totMonths%12;
-  let tenure = years>0 ? (years+" an"+(years>1?"s":"")+(months>0?" "+months+" mois":"")) : (totMonths>0?totMonths+" mois":"nouveau");
-  // prochain anniversaire annuel
-  let na=new Date(s); na.setFullYear(now.getFullYear()); if(na<now) na.setFullYear(now.getFullYear()+1);
-  const days=Math.round((na-now)/864e5);
-  const nextYears=na.getFullYear()-s.getFullYear();
-  let cls="", label;
-  if(days===0){ cls="today"; label="🎉 aujourd'hui : "+nextYears+" an"+(nextYears>1?"s":""); }
-  else if(days<=14){ cls="soon"; label="🎂 dans "+days+" j : "+nextYears+" an"+(nextYears>1?"s":""); }
-  else label="dans "+days+" j";
-  return {tenure, label, cls};
-}
-function annivVaOptions(){ const set={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas) OM_DATA.vas.forEach(v=>{ if(!v.unpaid) set[v.va]=1; }); Object.keys(VA_STARTS).forEach(v=>set[v]=1); return Object.keys(set).sort(); }
-function renderAnniv(){
-  const panel=$("#anniv"); if(!panel) return;
-  const vas=annivVaOptions();
-  if(!TOKEN || !vas.length){ panel.style.display="none"; return; }
-  panel.style.display="block";
-  const opts=`<option value="">VA…</option>`+vas.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
-  const rows=Object.keys(VA_STARTS).sort((a,b)=>{ const da=annivInfo(VA_STARTS[a]), db=annivInfo(VA_STARTS[b]); return 0; }).map(v=>{
-    const info=annivInfo(VA_STARTS[v]);
-    return `<div class="an-row"><span class="an-va">${escapeHtml(v)}</span><span class="an-ten">${info.tenure}</span><span class="an-next ${info.cls}">${info.label}</span><button class="an-del" data-andel="${escapeHtml(v)}">✕</button></div>`;
-  }).join("")||`<div class="an-empty">Ajoute la date d'arrivée de tes VA pour ne jamais rater un anniversaire 🎂</div>`;
-  $("#annivBody").innerHTML=`<div class="an-add"><select id="anVa">${opts}</select><input id="anDate" type="date" /><button class="act" id="anAdd">＋ Ajouter</button></div>${rows}`;
-  const add=$("#anAdd"); if(add) add.onclick=()=>{ const v=$("#anVa").value, d=$("#anDate").value; if(!v||!/^\d{4}-\d{2}-\d{2}$/.test(d)){ return; } VA_STARTS[v]=d; saveVaStart(); renderAnniv(); };
-}
-$("#anniv").addEventListener("click",e=>{ const d=e.target.closest("[data-andel]"); if(d){ const v=d.getAttribute("data-andel"); delete VA_STARTS[v]; saveVaStart(); renderAnniv(); } });
+// (Anniversaires VA : fusionnés dans « Événements & dates » — option « chaque année ».)
 // ---------- Comparateur de modèles (Layla vs Zoe dans le temps) ----------
 let VS_A=null, VS_B=null;
 function renderVersus(){
@@ -2854,7 +2819,11 @@ function tickClock(){
   let changed=false;
   REMINDERS.forEach(r=>{ if(r.at===cur && r.firedDate!==today){ r.firedDate=today; changed=true; playChime(); toastReminder(r); } });
   if(changed) saveReminders();
-  if(typeof DATES!=="undefined"){ DATES.forEach(d=>{ if(d.date===today && localStorage.getItem("ccn_dt_"+d.id)!==today){ localStorage.setItem("ccn_dt_"+d.id,today); playChime(); toast("📌 "+d.text,"C'est aujourd'hui !"); } }); }
+  if(typeof DATES!=="undefined"){ DATES.forEach(d=>{
+    // Ponctuel : date exacte. Récurrent (🎂) : même jour+mois chaque année.
+    const hit = d.yearly ? (String(d.date||"").slice(5)===today.slice(5)) : (d.date===today);
+    if(hit && localStorage.getItem("ccn_dt_"+d.id)!==today){ localStorage.setItem("ccn_dt_"+d.id,today); playChime(); toast((d.yearly?"🎂 ":"📌 ")+d.text, d.yearly?"Anniversaire aujourd'hui !":"C'est aujourd'hui !"); }
+  }); }
 }
 function snoozeReminder(id){ const r=REMINDERS.find(x=>x.id===id); if(!r) return; const t=new Date(Date.now()+10*60000); r.at=String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); r.firedDate=""; saveReminders(); renderReminders(); toast("😴 Reporté","Je te rappelle à "+r.at+"."); }
 function toastReminder(r){ const who=r.who==="other"?NAMES.other:NAMES.moi; const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>⏰ ${escapeHtml(r.text)}</b><div>Pour ${escapeHtml(who)} · ${escapeHtml(r.at)}</div><div class="cc-toast-actions"><button data-snz="${r.id}">😴 +10 min</button><button data-ok="1">OK</button></div>`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; t.addEventListener("click",e=>{ const s=e.target.closest("[data-snz]"); if(s){ snoozeReminder(s.getAttribute("data-snz")); kill(); return; } kill(); }); setTimeout(kill, 30000); }
@@ -2868,12 +2837,28 @@ renderReminders(); tickClock(); setInterval(tickClock, 5000);
 
 /* ---------- dates importantes ---------- */
 function saveDates(){ localStorage.setItem("ccn_dates",JSON.stringify(DATES)); }
-function renderDates(){
-  const list=DATES.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const today=todayStr();
-  $("#dtList").innerHTML = list.length ? list.map(d=>{ const days=Math.round((new Date(d.date+"T00:00:00")-new Date(today+"T00:00:00"))/864e5); const when=isNaN(days)?"":days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`; const cls=days===0?"dt-today":days<0?"dt-past":""; return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}</span><span class="rm-who">${new Date(d.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`; }).join("") : `<div class="tk-empty">Rien de prévu — RDV, appel, anniv, échéance… 👆</div>`;
+// Pour un évènement « chaque année », renvoie sa prochaine occurrence (cette année ou l'an prochain).
+function dtNextOccurrence(d, today){
+  const base=new Date((d.date||"")+"T00:00:00"); if(isNaN(base)) return null;
+  if(!d.yearly) return base;
+  const now=new Date(today+"T00:00:00");
+  let na=new Date(base); na.setFullYear(now.getFullYear());
+  if(na<now) na.setFullYear(now.getFullYear()+1);
+  return na;
 }
-function addDate(){ const t=$("#dtText"), d=$("#dtDate"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date}); t.value=""; d.value=""; saveDates(); renderDates(); if(typeof renderCal==="function") renderCal(); }
+function renderDates(){
+  const today=todayStr(), now=new Date(today+"T00:00:00");
+  const list=DATES.slice().map(d=>({d, occ:dtNextOccurrence(d,today)})).filter(x=>x.occ).sort((a,b)=>a.occ-b.occ);
+  $("#dtList").innerHTML = list.length ? list.map(({d,occ})=>{
+    const days=Math.round((occ-now)/864e5);
+    const when=days<0?`il y a ${-days} j`:days===0?"aujourd'hui 🎉":days===1?"demain":`dans ${days} j`;
+    const cls=days===0?"dt-today":(days<0&&!d.yearly)?"dt-past":"";
+    let extra="";
+    if(d.yearly){ const yrs=occ.getFullYear()-new Date(d.date+"T00:00:00").getFullYear(); extra=` <span class="dt-yr">🎂 ${yrs>0?yrs+" an"+(yrs>1?"s":""):"1re année"}</span>`; }
+    return `<div class="rm-row ${cls}"><span class="rm-tx">${escapeHtml(d.text)}${extra}</span><span class="rm-who">${occ.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} · ${when}</span><button class="rm-del" data-dtdel="${d.id}">✕</button></div>`;
+  }).join("") : `<div class="tk-empty">Rien de prévu — RDV, appel, anniv d'un VA, échéance… 👆</div>`;
+}
+function addDate(){ const t=$("#dtText"), d=$("#dtDate"), y=$("#dtYearly"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date,yearly:!!(y&&y.checked)}); t.value=""; d.value=""; if(y) y.checked=false; saveDates(); renderDates(); if(typeof renderCal==="function") renderCal(); }
 { const a=$("#dtAdd"); if(a) a.onclick=addDate; }
 { const t=$("#dtText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDate(); }); }
 { const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
@@ -2998,7 +2983,6 @@ loadPayments();
 loadReminders();
 loadSms();
 loadVaGoals();
-loadVaStart();
 loadFanRadar();
 loadGhosts();
 loadLeakwatch();
