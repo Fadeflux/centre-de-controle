@@ -1483,7 +1483,12 @@ function renderGoal(data){
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
   const R=52, CIRC=2*Math.PI*R, dash=Math.round(CIRC*pct/100);
   let proj="";
-  if(isRev){ const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(); if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; } }
+  if(isRev){
+    const FG=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
+    const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(FG.value)}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(FG.low)} – ${fmt(FG.high)})</span>`:""}</div>`; }
+    else if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; }
+  }
   $("#goalBody").innerHTML = `<div class="goal-wrap">
     <svg class="goal-ring" viewBox="0 0 120 120" width="118" height="118" aria-hidden="true">
       <circle cx="60" cy="60" r="52" fill="none" stroke="var(--line-2)" stroke-width="12"/>
@@ -1687,7 +1692,7 @@ renderRoutines();
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
-const DEMO_OM = { currency:"$", history:[{month:"02/26",net:410,subs:88},{month:"03/26",net:520,subs:110},{month:"04/26",net:480,subs:102},{month:"05/26",net:610,subs:128},{month:"06/26",net:130,subs:40},{month:"07/26",net:720,subs:142}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88},{month:"03/26",net:520,subs:110},{month:"04/26",net:480,subs:102},{month:"05/26",net:610,subs:128},{month:"06/26",net:130,subs:40},{month:"07/26",net:720,subs:142}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -1769,7 +1774,10 @@ function renderRenta(){
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const projNet=day>0?Math.round(netMonth/day*dim):netMonth, projProfit=day>0?Math.round(profitNet/day*dim):profitNet;
+  const F=(d.forecast&&d.forecast.net&&d.forecast.net.method==="smart")?d.forecast:null;
+  const projTg=day>0?Math.round(tgMonth/day*dim):tgMonth;
+  const projNet=F?F.net.value:(day>0?Math.round(netMonth/day*dim):netMonth);
+  const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):(day>0?Math.round(profitNet/day*dim):profitNet);
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
     <div class="rn-line"><span>Revenus du mois</span><span class="rn-v">${money(netMonth)}</span></div>
@@ -1777,7 +1785,8 @@ function renderRenta(){
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     <div class="rn-line rn-total"><span>= Profit (avant part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
-    <div class="rn-proj">🔮 Au rythme actuel, fin de mois : ~<b>${money(projNet)}</b> de revenus · ~<b>${money(projProfit)}</b> de profit.</div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet)}</b> de revenus${F&&F.net.low!=null?` <span style="opacity:.75">(entre ${money(F.net.low)} et ${money(F.net.high)})</span>`:""} · ~<b>${money(projProfit)}</b> de profit.</div>
+    ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>net OnlyMonster</b> (déjà après la commission OnlyFans 20 %). Les <b>2 % Skrill</b> et la <b>part reversée à la modèle</b> se gèrent sur ton site finance.</div>`;
 }
 function renderSplit(){
@@ -2004,8 +2013,9 @@ function paceVerdict(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
   const cur=om.currency||"$", nm=Number(om.totals.netMonth)||0, lm=Number(om.totals.netLastMonth)||0;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const proj=day>0?nm/day*dim:nm, fmt=v=>Math.round(v).toLocaleString("fr-FR")+" "+cur;
-  if(lm<=0) return {up:true,text:`🚀 Bon rythme — projection ~${fmt(proj)} ce mois.`};
+  const FV=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net:null;
+  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>Math.round(v).toLocaleString("fr-FR")+" "+cur;
+  if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmt(proj)} ce mois.`};
   const pct=Math.round((proj-lm)/lm*100);
   if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
   const need=Math.max(0,Math.round((lm-nm)/Math.max(1,dim-day)));
