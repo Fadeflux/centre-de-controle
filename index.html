@@ -67,7 +67,7 @@
   .frames iframe.on{display:block}
   body.framing #home{display:none}
 
-  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 18px}
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
   .brand{display:flex;align-items:center;gap:13px;flex:1;min-width:190px}
   .logo{width:42px;height:42px;border-radius:12px;background:var(--acc);display:grid;place-items:center;box-shadow:0 4px 16px -4px var(--acc)}
   .logo svg{width:23px;height:23px}
@@ -263,6 +263,18 @@
   .goal-proj b{color:var(--text)}
   .goal-change{display:inline-block;margin-top:10px;color:var(--faint);font-size:13px}
   .bdg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:12px}
+  /* Badges v2 : pastilles gagnées + barres de progression vers le prochain palier */
+  .bp-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .bp-chip{font-size:12px;font-weight:600;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:999px;padding:4px 11px;white-space:nowrap}
+  .bp-next-title{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .bp-row{display:flex;align-items:center;gap:12px;padding:8px 0}
+  .bp-ico{font-size:22px;width:30px;text-align:center;flex:0 0 auto}
+  .bp-main{flex:1;min-width:0}
+  .bp-lbl{font-size:13.5px;display:flex;justify-content:space-between;gap:10px;margin-bottom:5px}
+  .bp-lbl b{font-weight:600}
+  .bp-n{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bp-bar{height:8px;background:var(--surface-2);border-radius:20px;overflow:hidden}
+  .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7c3aed);transition:width .5s}
   .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
   .bdg.on{opacity:1;filter:none;border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 30%,transparent)}
   .bdg-ico{font-size:30px;line-height:1}
@@ -437,8 +449,8 @@
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
   .omv-perso{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
-  .pair-row{display:grid;grid-template-columns:1fr;gap:16px}
-  .pair-row > .panel-box{margin:0}
+  .pair-row{display:grid;grid-template-columns:1fr;gap:16px;margin:16px 0 0}
+  .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
   @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
   .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
   .pie-total b{color:var(--text);font-size:18px;font-weight:800}
@@ -462,8 +474,9 @@
   .hb-c{flex:1;background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:13px;padding:14px}
   .hb-c-v{font-size:24px;font-weight:800;color:var(--acc)}
   .hb-c-l{font-size:12px;color:var(--muted);margin-top:3px}
-  .hb-chart{display:flex;align-items:flex-end;gap:6px;height:132px;padding:6px 2px 0}
-  .hb{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+  /* Peu de mois d'activité = barres regroupées au centre (plus de grand vide) */
+  .hb-chart{display:flex;align-items:flex-end;justify-content:center;gap:10px;height:132px;padding:6px 2px 0}
+  .hb{flex:1 1 0;max-width:96px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
   .hb-bar-wrap{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
   .hb-bar{width:64%;max-width:34px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 55%,transparent));transition:height .35s}
   .hb-bar.rec{background:linear-gradient(180deg,#facc15,#f59e0b)}
@@ -818,16 +831,17 @@
     <div id="goalBody"></div>
   </div>
 
-  <div class="panel-box" id="tip" style="display:none">
-    <div class="pb-head">💡 Conseil du jour <button class="act" id="tipRefresh" title="Nouveau conseil" style="margin-left:auto">🔄</button></div>
-    <div class="tip-body" id="tipBody"></div>
-  </div>
-
-  <div class="panel-box" id="ask">
-    <div class="pb-head">🤖 Assistant — demande ou donne un ordre</div>
-    <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
-    <div class="ask-ex">Essaie : <a data-q="Ajoute une tâche pour Manon : relancer Prince">＋ tâche à Manon</a> · <a data-q="Qui je dois relancer ?">qui relancer</a> · <a data-q="Combien à payer cette quinzaine ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
-    <div class="ask-ans" id="askAns"></div>
+  <div class="pair-row">
+    <div class="panel-box" id="tip" style="display:none">
+      <div class="pb-head">💡 Conseil du jour <button class="act" id="tipRefresh" title="Nouveau conseil" style="margin-left:auto">🔄</button></div>
+      <div class="tip-body" id="tipBody"></div>
+    </div>
+    <div class="panel-box" id="ask">
+      <div class="pb-head">🤖 Assistant — demande ou donne un ordre</div>
+      <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
+      <div class="ask-ex">Essaie : <a data-q="Ajoute une tâche pour Manon : relancer Prince">＋ tâche à Manon</a> · <a data-q="Qui je dois relancer ?">qui relancer</a> · <a data-q="Combien à payer cette quinzaine ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
+      <div class="ask-ans" id="askAns"></div>
+    </div>
   </div>
 
   <div id="sections"></div>
@@ -838,11 +852,6 @@
       <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
     </div>
     <div id="omBody"></div>
-  </div>
-
-  <div class="panel-box" id="history" style="display:none">
-    <div class="pb-head">📅 Mon année</div>
-    <div id="historyBody"></div>
   </div>
 
   <div class="pair-row">
@@ -856,28 +865,44 @@
     </div>
   </div>
 
-  <div class="tgrev" id="tgrev">
-    <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
-    <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main). Ça remonte dans le camembert et ton profit.</div>
-    <div class="tg-add">
-      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
-      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
-      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
-      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
-      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
+  <div class="pair-row">
+    <div class="panel-box" id="history" style="display:none">
+      <div class="pb-head">📅 Mon année</div>
+      <div id="historyBody"></div>
     </div>
-    <div id="tgList"></div>
+    <div class="panel-box" id="split" style="display:none">
+      <div class="pb-head">🤝 Ma part / Part de l'associé</div>
+      <div id="splitBody"></div>
+    </div>
   </div>
 
-  <div class="panel-box" id="split" style="display:none">
-    <div class="pb-head">🤝 Ma part / Part de l'associé</div>
-    <div id="splitBody"></div>
+  <div class="pair-row">
+    <div class="tgrev" id="tgrev">
+      <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
+      <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main). Ça remonte dans le camembert et ton profit.</div>
+      <div class="tg-add">
+        <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
+        <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
+        <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
+        <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
+        <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
+      </div>
+      <div id="tgList"></div>
+    </div>
+    <div class="costs" id="costs">
+      <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
+      <div class="costs-add">
+        <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
+        <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
+      </div>
+      <div id="costsList"></div>
+    </div>
   </div>
 
   <div class="pair-row">
     <div class="panel-box" id="badges" style="display:none">
-      <div class="pb-head">🏅 Tes badges</div>
-      <div id="badgesBody" class="bdg-grid"></div>
+      <div class="pb-head">🏅 Badges &amp; progression</div>
+      <div id="badgesBody"></div>
     </div>
     <div class="panel-box" id="sim" style="display:none">
       <div class="pb-head">🔮 Simulateur « et si »</div>
@@ -902,15 +927,6 @@
       <input id="scUrl" placeholder="https://…" autocomplete="off" />
     </div>
     <div class="sc-grid" id="scGrid"></div>
-  </div>
-
-  <div class="costs" id="costs">
-    <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
-    <div class="costs-add">
-      <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
-      <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
-    </div>
-    <div id="costsList"></div>
   </div>
 
   <div class="antileak" id="antileak">
@@ -974,7 +990,7 @@ const TOOLS = [
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
-  { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"",
+  { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", external:true, metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
@@ -1187,7 +1203,7 @@ async function load(){
     IS_LIVE = true;
     render(j.tools||{});
     try{ localStorage.setItem("ccn_lastdata", JSON.stringify(j.tools||{})); }catch(_){}
-    $("#sub").textContent = "Mis à jour à l'instant";
+    $("#sub").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) + " · mis à jour à l'instant";
     $("#footnote").textContent = new Date().toLocaleString("fr-FR");
     setBanner("");
     $("#unlock").style.display = "none";
@@ -1669,8 +1685,9 @@ $("#ask").addEventListener("click",e=>{ const b=e.target.closest("[data-bilan]")
 /* ---------- conseil du jour (IA, 1x/jour) ---------- */
 async function loadTip(force){
   const panel=$("#tip"); if(!panel) return;
-  if(!TOKEN){ panel.style.display="none"; return; }
+  if(!TOKEN){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
   panel.style.display="block";
+  if(typeof fixPairs==="function") fixPairs();
   const box=$("#tipBody");
   const key=new Date().toISOString().slice(0,10);
   const cached=JSON.parse(localStorage.getItem("ccn_tip")||"null");
@@ -1678,7 +1695,7 @@ async function loadTip(force){
   box.className="tip-body muted"; box.textContent="L'assistant analyse tes chiffres…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/tip",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN}});
-    if(r.status===401){ panel.style.display="none"; return; }
+    if(r.status===401){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
     const j=await r.json();
     const t=j.answer||"Pas de conseil aujourd'hui.";
     const noData=/aucune donn|impossible d.analyser|pas de conseil/i.test(t);
@@ -1947,9 +1964,12 @@ $("#om").addEventListener("click",e=>{
 /* ---------- barre d'onglets (les outils s'ouvrent DANS le site) ---------- */
 let TABS = [], ACTIVE = "home";
 function renderTabStrip(){
+  // Pas d'outil ouvert = pas de barre (l'onglet « Accueil » seul ne servait à rien).
+  $("#tabbar").style.display = TABS.length ? "flex" : "none";
   const home = `<div class="tab ${ACTIVE==='home'?'on':''}" data-tab="home">🏠 Accueil</div>`;
   $("#tabbar").innerHTML = home + TABS.map(t=>`<div class="tab ${ACTIVE===t.id?'on':''}" data-tab="${t.id}">${escapeHtml(t.name)} <span class="x" data-close="${t.id}">✕</span></div>`).join("");
 }
+renderTabStrip();
 function updateView(){
   renderTabStrip();
   document.querySelectorAll('#frames iframe').forEach(f=>f.classList.toggle('on', f.getAttribute('data-fr')===ACTIVE));
@@ -2279,19 +2299,19 @@ function showMorningIfNew(){ if(!TOKEN) return; if(MORNING_SHOWN) return; MORNIN
 
 /* ---------- badges & paliers ---------- */
 const BADGES=[
-  {id:"streak7", icon:"🔥", label:"7 jours de série", cond:c=>c.streak>=7},
-  {id:"streak30", icon:"🌟", label:"30 jours de série", cond:c=>c.streak>=30},
-  {id:"streak100", icon:"☄️", label:"100 jours de série", cond:c=>c.streak>=100},
-  {id:"subs100", icon:"💯", label:"100 subs", cond:c=>c.subsTotal>=100},
-  {id:"subs500", icon:"⭐", label:"500 subs", cond:c=>c.subsTotal>=500},
-  {id:"subs1000", icon:"🚀", label:"1 000 subs", cond:c=>c.subsTotal>=1000},
-  {id:"subs5000", icon:"🛸", label:"5 000 subs", cond:c=>c.subsTotal>=5000},
-  {id:"subs10000", icon:"👑", label:"10 000 subs", cond:c=>c.subsTotal>=10000},
-  {id:"net1000", icon:"💵", label:"1 000 $ générés", cond:c=>c.netTotal>=1000},
-  {id:"net5000", icon:"💰", label:"5 000 $ générés", cond:c=>c.netTotal>=5000},
-  {id:"net10000", icon:"💎", label:"10 000 $ générés", cond:c=>c.netTotal>=10000},
-  {id:"net50000", icon:"🏦", label:"50 000 $ générés", cond:c=>c.netTotal>=50000},
-  {id:"net100000", icon:"🐋", label:"100 000 $ générés", cond:c=>c.netTotal>=100000},
+  {id:"streak7", icon:"🔥", label:"7 jours de série", metric:"streak", target:7, cond:c=>c.streak>=7},
+  {id:"streak30", icon:"🌟", label:"30 jours de série", metric:"streak", target:30, cond:c=>c.streak>=30},
+  {id:"streak100", icon:"☄️", label:"100 jours de série", metric:"streak", target:100, cond:c=>c.streak>=100},
+  {id:"subs100", icon:"💯", label:"100 subs", metric:"subsTotal", target:100, cond:c=>c.subsTotal>=100},
+  {id:"subs500", icon:"⭐", label:"500 subs", metric:"subsTotal", target:500, cond:c=>c.subsTotal>=500},
+  {id:"subs1000", icon:"🚀", label:"1 000 subs", metric:"subsTotal", target:1000, cond:c=>c.subsTotal>=1000},
+  {id:"subs5000", icon:"🛸", label:"5 000 subs", metric:"subsTotal", target:5000, cond:c=>c.subsTotal>=5000},
+  {id:"subs10000", icon:"👑", label:"10 000 subs", metric:"subsTotal", target:10000, cond:c=>c.subsTotal>=10000},
+  {id:"net1000", icon:"💵", label:"1 000 $ générés", metric:"netTotal", target:1000, cond:c=>c.netTotal>=1000},
+  {id:"net5000", icon:"💰", label:"5 000 $ générés", metric:"netTotal", target:5000, cond:c=>c.netTotal>=5000},
+  {id:"net10000", icon:"💎", label:"10 000 $ générés", metric:"netTotal", target:10000, cond:c=>c.netTotal>=10000},
+  {id:"net50000", icon:"🏦", label:"50 000 $ générés", metric:"netTotal", target:50000, cond:c=>c.netTotal>=50000},
+  {id:"net100000", icon:"🐋", label:"100 000 $ générés", metric:"netTotal", target:100000, cond:c=>c.netTotal>=100000},
   {id:"record", icon:"🏆", label:"Meilleur mois", cond:c=>c.isRecord},
   {id:"goal", icon:"🎯", label:"Objectif atteint", cond:c=>c.goalMet},
 ];
@@ -2307,7 +2327,23 @@ function renderBadges(){
   const newly=unlocked.filter(b=>BADGES_OWNED.indexOf(b.id)<0);
   if(newly.length){ newly.forEach(b=>BADGES_OWNED.push(b.id)); localStorage.setItem("ccn_badges",JSON.stringify(BADGES_OWNED)); if(typeof confetti==="function") setTimeout(confetti,300); }
   panel.style.display="block";
-  $("#badgesBody").innerHTML=BADGES.map(b=>{ const on=owned.has(b.id); return `<div class="bdg ${on?"on":""}"><div class="bdg-ico">${b.icon}</div><div class="bdg-lbl">${escapeHtml(b.label)}</div></div>`; }).join("");
+  // Nouveau rendu « progression » : badges gagnés en pastilles + prochain
+  // palier de chaque famille avec barre de progression (fini la grille grise).
+  const fmtV=(m,v)=>m==="netTotal"?(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $"):Math.round(v).toLocaleString("fr-FR");
+  const chips=unlocked.map(b=>`<span class="bp-chip" title="${escapeHtml(b.label)}">${b.icon} ${escapeHtml(b.label)}</span>`).join("");
+  const fams=[["streak","Série d'ouverture"],["subsTotal","Subs au total"],["netTotal","Argent généré"]];
+  const rows=fams.map(([m,lbl])=>{
+    const nxt=BADGES.find(b=>b.metric===m && !owned.has(b.id));
+    if(!nxt) return `<div class="bp-row"><span class="bp-ico">🏆</span><div class="bp-main"><div class="bp-lbl">${lbl} — tout débloqué, champion !</div></div></div>`;
+    const cur=Number(ctx[m])||0, pct=Math.max(2,Math.min(100,Math.round(cur/nxt.target*100)));
+    return `<div class="bp-row"><span class="bp-ico">${nxt.icon}</span>
+      <div class="bp-main">
+        <div class="bp-lbl"><b>${escapeHtml(nxt.label)}</b><span class="bp-n">${fmtV(m,cur)} / ${fmtV(m,nxt.target)}</span></div>
+        <div class="bp-bar"><i style="width:${pct}%"></i></div>
+      </div></div>`;
+  }).join("");
+  $("#badgesBody").innerHTML=`${chips?`<div class="bp-chips">${chips}</div>`:""}
+    <div class="bp-next-title">🎯 Prochains paliers</div>${rows}`;
 }
 function renderSim(){
   const panel=$("#sim"); if(!panel) return;
@@ -2433,7 +2469,11 @@ renderCal();
 
 /* ---------- soldes SMS ---------- */
 let SMS_DATA=null;
-async function loadSms(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST); } }catch(e){} }
+async function loadSms(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/sms",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); SMS_DATA=j.sms||null; if(typeof LAST!=="undefined"&&LAST) render(LAST);
+  // Cache serveur froid juste après un redéploiement → il répond null au 1er
+  // appel et se remplit en fond : on re-tente 2 fois à 8 s d'écart.
+  if(!SMS_DATA && (retry||0)<2) setTimeout(()=>loadSms((retry||0)+1), 8000);
+} }catch(e){} }
 
 /* ---------- parler à l'assistant (micro flottant) ---------- */
 function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=mkUtter(String(txt).slice(0,320)); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
@@ -2516,7 +2556,7 @@ loadLeakwatch();
 loadLeaks();
 loadIdentity();
 loadTgrev();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); } }, REFRESH_MS);
 </script>
 </body>
 </html>
