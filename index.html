@@ -2618,7 +2618,12 @@ async function speakServerChunks(text, onStart){
     if(seq!==_speakSeq) return true;
     const audio = i===0 ? first : await nextP;
     if(i+1<chunks.length) nextP=ttsFetch(chunks[i+1]);  // précharge le suivant AVANT de jouer
-    if(!audio) continue;
+    if(!audio){
+      // Un morceau n'a pas pu être généré (quota TTS) : plutôt que de SAUTER ce
+      // contenu, on lit tout le reste avec la voix du téléphone (rien n'est perdu).
+      if(seq===_speakSeq){ if(typeof onStart==="function"){ try{ onStart(); }catch(e){} } speakText(chunks.slice(i).join(" ")); }
+      return true;
+    }
     if(!played && typeof onStart==="function"){ played=true; try{ onStart(); }catch(e){} }
     await new Promise(res=>{
       try{ _ttsAudio.onended=res; _ttsAudio.onerror=res; _ttsAudio.src="data:audio/wav;base64,"+audio; const p=_ttsAudio.play(); if(p&&p.catch) p.catch(()=>res()); }
