@@ -2571,10 +2571,12 @@ function primeVoices(){ if(_voicePrimed) return; _voicePrimed=true;
 const _ttsCacheCli={};
 const _ttsInflightCli={};   // texte -> requête déjà en vol (ne jamais la demander 2 fois)
 let _speakSeq=0;
+// 1er morceau COURT (≤130 = son rapide), suivants gros (≤420) = peu de requêtes
+// TTS (quota Gemini gratuit ~3/min). DOIT rester identique à ttsChunksSrv() du cerveau.
 function ttsChunks(text){
   const parts=String(text||"").replace(/\s+/g," ").trim().match(/[^.!?…]+[.!?…]*/g)||[String(text||"")];
   const out=[]; let cur="";
-  parts.forEach(p=>{ p=p.trim(); if(!p) return; if((cur+" "+p).trim().length>150 && cur){ out.push(cur.trim()); cur=p; } else cur=(cur?cur+" ":"")+p; });
+  parts.forEach(p=>{ p=p.trim(); if(!p) return; const lim=out.length===0?130:420; if((cur+" "+p).trim().length>lim && cur){ out.push(cur.trim()); cur=p; } else cur=(cur?cur+" ":"")+p; });
   if(cur.trim()) out.push(cur.trim());
   return out.length?out:[String(text||"")];
 }
