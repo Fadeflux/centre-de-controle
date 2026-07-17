@@ -2489,7 +2489,7 @@ function renderMorning(){
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
-  const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ COACH_TEXT=""; loadBrief(true); };
+  const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
 }
 let COACH_TEXT="";
 function speakText(t){
@@ -2501,10 +2501,14 @@ function speakText(t){
     if(vs&&vs.length) doSpeak(); else { window.speechSynthesis.onvoiceschanged=doSpeak; setTimeout(doSpeak,600); }
   }catch(e){}
 }
+let _briefInflight=false;
 async function loadBrief(force){
-  if(!TOKEN) return;
+  if(!TOKEN || _briefInflight) return;   // un seul chargement à la fois (double-clic 🔄 = 1 seule régénération)
   const box=$("#mnCoach"), txt=$("#mnCoachTxt"); if(!box||!txt) return;
+  _briefInflight=true;
+  const nb=$("#mnCoachNew"); if(nb) nb.disabled=true;
   box.style.display="block"; txt.textContent=COACH_MODE==="evening"?"Ton coach prépare ton débrief du soir…":"Ton coach prépare ton briefing…";
+  const prev=COACH_TEXT;                 // si le rechargement échoue, on garde le briefing qui marchait
   try{
     const nm=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"";
     const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force})});
@@ -2514,7 +2518,8 @@ async function loadBrief(force){
     txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
     // Réchauffe la 1ère phrase en fond -> quand tu tapes « Écouter », ça démarre tout de suite.
     if(COACH_TEXT && typeof prewarmTts==="function") prewarmTts(COACH_TEXT);
-  }catch(e){ txt.textContent="Coach indisponible — réessaie."; }
+  }catch(e){ COACH_TEXT=prev; txt.textContent=prev||"Coach indisponible — réessaie."; }
+  finally{ _briefInflight=false; if(nb) nb.disabled=false; }
 }
 var _voiceCache=null;
 function pickFrenchVoice(){
@@ -2630,6 +2635,13 @@ async function speakCoach(text, btn){
   restore();
   if(!ok) speakText(text);
 }
+// Coupe toute lecture en cours (voix serveur + repli téléphone). Utilisé par 🔄
+// pour ne pas laisser l'ancien briefing parler pendant qu'un nouveau se prépare.
+function stopSpeaking(){
+  try{ _speakSeq++; }catch(e){}                                   // fait sortir la boucle speakServerChunks
+  try{ if(_ttsAudio){ _ttsAudio.pause(); _ttsAudio.currentTime=0; } }catch(e){}
+  try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){}
+}
 function speakBriefing(){
   try{
     if(!window.speechSynthesis) return;
@@ -2667,7 +2679,7 @@ async function loadBriefHistory(){
 }
 function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
 function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
-function closeMorning(){ $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
+function closeMorning(){ stopSpeaking(); $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
 function showMorningIfNew(){ if(!TOKEN) return;
   // Le soir (≥ 20h local), on propose le coach du soir 1×/jour ; sinon le matin.
   if(new Date().getHours()>=20){ if(!EVENING_SHOWN){ EVENING_SHOWN=true; if(localStorage.getItem("ccn_evening")!==todayStr()) showEvening(); } return; }
