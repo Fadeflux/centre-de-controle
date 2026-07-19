@@ -531,7 +531,10 @@
   .fr-empty{font-size:13px;color:var(--muted);padding:6px 0}
   .pair-row{display:grid;grid-template-columns:1fr;gap:16px;margin:16px 0 0}
   .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
-  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
+  /* `stretch` (au lieu de `start`) : les deux panneaux d'une rangée font la MÊME
+     hauteur. Ceux qui savent grandir (ex : le graphique des heures) remplissent
+     la place au lieu de laisser un grand vide sous eux. */
+  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:stretch} .pair-row > .panel-box.solo{grid-column:1 / -1} }
   .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
   .pie-total b{color:var(--text);font-size:18px;font-weight:800}
   .pie-note{font-size:11px;color:var(--muted);margin-top:10px}
@@ -567,10 +570,17 @@
   .sv-sugg{margin-left:auto;font-size:12.5px;white-space:nowrap}
   .sv-head{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
   .sv-note{font-size:12.5px;color:var(--muted);margin-top:11px;line-height:1.55}
-  .hr-grid{display:flex;align-items:flex-end;gap:2px;height:92px;margin:6px 0 4px}
+  /* Le panneau des heures s'étire à la hauteur de son voisin : le graphique
+     prend la place libre plutôt que de laisser un blanc en bas. */
+  #hours{display:flex;flex-direction:column}
+  #hoursBody{flex:1;display:flex;flex-direction:column}
+  .hr-grid{display:flex;align-items:flex-end;gap:2px;flex:1;min-height:92px;margin:6px 0 4px}
   .hr-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
   .hr-b{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));min-height:2px;transition:height .35s}
   .hr-b.top{background:linear-gradient(180deg,#facc15,#f59e0b)}
+  .hr-b.low{background:linear-gradient(180deg,#7f1d1d,#450a0a)}
+  .hr-grid-j{gap:6px;min-height:64px;flex:0 0 auto;height:64px}
+  .hr-sep{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;padding-top:12px;border-top:1px solid var(--line)}
   .hr-ax{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
   .hr-note{font-size:13px;color:var(--ink);margin-top:10px;line-height:1.5}
   .hr-warn{font-size:12px;color:var(--muted);margin-top:8px}
@@ -1101,6 +1111,10 @@
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
     </div>
+    <div class="panel-box" id="rw" style="display:none">
+      <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
+      <div id="rwBody"></div>
+    </div>
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
       <div id="convBody"></div>
@@ -1490,7 +1504,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2329,7 +2343,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion();
+    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway();
   }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -2977,6 +2991,48 @@ function renderBadges(){
     </div>`;
   const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
 }
+// 🚂 COÛT RAILWAY : ce que l'infra consomme, projet par projet, et surtout ce que
+// ça pèse face à ce qu'elle rapporte. C'est une ESTIMATION (Railway ne donne que
+// l'usage projeté, converti aux tarifs publics, hors abonnement) — on le dit.
+let RW_DATA=null;
+async function loadRailway(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/railway-cost",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    RW_DATA=await r.json(); renderRailway();
+  }catch(e){}
+}
+function renderRailway(){
+  const panel=$("#rw"); if(!panel) return;
+  const d=RW_DATA;
+  if(!d || !Array.isArray(d.projets) || !d.projets.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $";
+  const actifs=d.projets.filter(p=>p.cout>0.01);
+  const mx=Math.max.apply(null,actifs.map(p=>p.cout))||1;
+  const rows=actifs.slice(0,8).map(p=>{
+    const part=d.total>0?Math.round(p.cout/d.total*100):0;
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(p.projet)}</span>
+      <span class="sv-cell" style="flex:1;min-width:90px"><span style="display:block;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--acc),#7c3aed);width:${Math.max(4,Math.round(p.cout/mx*100))}%"></span></span>
+      <span class="sv-part mid">${money(p.cout)}</span>
+      <span class="sv-sugg sv-cell">${part} %</span></div>`;
+  }).join("");
+  // Rapport coût / revenus : la seule façon de savoir si l'infra est chère.
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
+  const net=Number((om.totals||{}).netMonth)||0;
+  const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+(Number(c.amount)||0),0):0;
+  const totalOutils=d.total+outils;
+  const pourCent = net>0 ? (totalOutils/net*100) : null;
+  const gros=actifs[0];
+  $("#rwBody").innerHTML=`${rows}
+    <div class="sv-note">
+      Total infra estimé : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
+      ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton net du mois — il te reste ${money(net-totalOutils)} avant paie des VA.`:""}
+      ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse à lui seul ${Math.round(gros.cout/d.total*100)} % de la facture.`:""}
+      <br><span style="opacity:.75">${escapeHtml(d.note||"")}</span>
+    </div>`;
+}
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
 // la comparaison des deux qui est parlante — bien convertir et ramener des fans
@@ -3008,7 +3064,24 @@ function renderConversion(){
       <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b>`:""}</span></div>`;
   }).join("");
   const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${l.cvr} %</b></span></div>`).join("");
+  // 🎭 Par MODÈLE : à trafic comparable, celui qui convertit moins a un souci de
+  // page ou de contenu, pas de volume.
+  const mods=(d.modeles||[]);
+  let blocMod="";
+  if(mods.length>=2){
+    const best=mods[0], last=mods[mods.length-1];
+    const rap=(last.cvr>0)?(best.cvr/last.cvr).toFixed(1):null;
+    blocMod=`<div class="sv-head" style="margin-top:12px">Par modèle — même trafic, pas le même résultat</div>`
+      + mods.map(m=>{
+          const cls = m.cvr>=moy*1.1 ? "good" : (m.cvr<moy*0.7 ? "bad" : "mid");
+          return `<div class="sv-row"><span class="sv-name">${escapeHtml(m.model)}</span>
+            <span class="sv-cell"><b>${m.clics.toLocaleString("fr-FR")}</b> clics → <b>${m.subs}</b> abonnés</span>
+            <span class="sv-part ${cls}">${m.cvr} %</span></div>`;
+        }).join("")
+      + (rap&&rap!=="1.0"?`<div class="sv-note"><b>${escapeHtml(best.model)}</b> convertit <b>${rap}×</b> mieux que <b>${escapeHtml(last.model)}</b> sur un trafic comparable — c'est la page ou le contenu, pas le volume.</div>`:"");
+  }
   $("#convBody").innerHTML=`<div class="sv-head">Sur ${d.days} jours · moyenne ${moy} %</div>${rows}
+    ${blocMod}
     ${pires?`<div class="sv-head" style="margin-top:12px">Liens qui convertissent le moins</div>${pires}`:""}
     <div class="sv-note">${d.exploitable?`Le trafic est mesuré via tes tracking links — <b>${(d.totalClics||0).toLocaleString("fr-FR")} clics</b> sur la période, aucun outil externe nécessaire.
       Bien convertir et ramener des fans qui dépensent sont deux choses différentes : compare le taux et la valeur d'un abonné sur chaque ligne.`
@@ -3095,11 +3168,26 @@ function renderHours(){
   const noms={nuit:"la nuit",matin:"le matin",aprem:"l'après-midi",soir:"le soir"};
   const tri=Object.keys(bl).sort((a,b)=>bl[b]-bl[a]);
   const fort=tri[0], faible=tri[tri.length-1];
+  // 📅 Jours de la semaine : comparés à la MOYENNE par occurrence (un jour tombé
+  // 5 fois dans la fenêtre paraîtrait sinon meilleur qu'un jour tombé 4 fois).
+  const pj=(d.parJour||[]).filter(x=>x && x.moyenne!=null);
+  let blocJours="";
+  if(pj.length===7){
+    const mxj=Math.max.apply(null,pj.map(x=>x.moyenne))||1;
+    const best=(d.meilleurJour||{}).jour, worst=(d.pireJour||{}).jour;
+    const cols2=pj.map(x=>`<div class="hr-col" title="${x.jour} : ${x.moyenne} abonnés/jour en moyenne"><div class="hr-b ${x.jour===best?"top":(x.jour===worst?"low":"")}" style="height:${Math.max(4,Math.round(x.moyenne/mxj*100))}%"></div></div>`).join("");
+    const ecart=(d.pireJour&&d.pireJour.moyenne>0)?(d.meilleurJour.moyenne/d.pireJour.moyenne).toFixed(1):null;
+    blocJours=`<div class="hr-sep">📅 Par jour de la semaine</div>
+      <div class="hr-grid hr-grid-j">${cols2}</div>
+      <div class="hr-ax">${pj.map(x=>`<span>${x.jour.slice(0,3)}</span>`).join("")}</div>
+      ${best?`<div class="hr-note">Ton meilleur jour est le <b>${best}</b> (${(d.meilleurJour||{}).moyenne} abonnés en moyenne), le plus faible le <b>${worst}</b> (${(d.pireJour||{}).moyenne})${ecart?` — soit <b>${ecart}×</b> d'écart`:""}.</div>`:""}`;
+  }
   $("#hoursBody").innerHTML=`
     <div class="hr-grid">${cols}</div>
     <div class="hr-ax"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
     <div class="hr-note">Meilleur créneau : <b>${mc.debut}h-${mc.fin}h</b> (${mc.part} % des abonnés).<br>
       Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]}), le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]}).</div>
+    ${blocJours}
     ${d.fiable?"":`<div class="hr-warn">⚠️ Seulement ${d.total} abonnés analysés — trop peu pour en tirer une règle, à revoir dans quelques jours.</div>`}
     <div class="hr-warn">Sur ${d.days} jours · ${d.total} abonnés · heure de ${d.tz.split("/").pop().replace("_"," ")}</div>`;
   try{ fixPairs(); }catch(e){}   // la rangée compte 5 panneaux : on recalcule les demi-largeurs
@@ -3397,6 +3485,7 @@ loadTgrev();
 loadFirstSale();
 loadHours();
 loadConversion();
+loadRailway();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
