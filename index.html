@@ -690,6 +690,12 @@
   .mn-act-txt{font-size:14px;font-weight:600;color:var(--ink);flex:1;min-width:170px}
   .mn-act-btn{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
   .mn-act-btn:disabled{opacity:.55;cursor:default}
+  .mn-act-btn.ghost{background:transparent;color:var(--acc-ink);border:1px solid var(--acc-line)}
+  .mn-coach-msg{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .mn-msg-hd{font-size:12px;font-weight:700;color:var(--acc-ink);margin-bottom:7px}
+  .mn-msg-note{font-weight:500;color:var(--muted)}
+  .mn-msg-txt{font-size:14px;line-height:1.5;color:var(--ink);white-space:pre-wrap;margin-bottom:10px}
+  .mn-msg-err{font-size:13px;color:#f87171}
   .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
   .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
   .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
@@ -2484,7 +2490,7 @@ function renderMorning(){
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
-    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div></div>
+    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
@@ -2502,12 +2508,52 @@ let COACH_TEXT="", COACH_ACTION="";
 // ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
 // « coach »), et c'est ce tag qui permet au coach de te relancer demain si elle
 // n'est toujours pas faite.
+// Retrouve le VA visé par l'action du jour (le coach le nomme dans sa phrase).
+function coachVaName(){
+  try{
+    const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).map(v=>v.va).filter(Boolean);
+    const low=(COACH_ACTION||"").toLowerCase();
+    return vas.find(n=>low.indexOf(String(n).toLowerCase())>=0)||"";
+  }catch(e){ return ""; }
+}
 function renderCoachAction(){
-  const box=$("#mnCoachAct"); if(!box) return;
+  const box=$("#mnCoachAct"), msg=$("#mnCoachMsg");
+  if(msg){ msg.style.display="none"; msg.innerHTML=""; }
+  if(!box) return;
   if(!COACH_ACTION){ box.style.display="none"; box.innerHTML=""; return; }
+  const va=coachVaName();
   box.style.display="flex";
-  box.innerHTML=`<span class="mn-act-txt">🎯 ${escapeHtml(COACH_ACTION)}</span><button class="mn-act-btn" id="mnActAdd">➕ Ajouter à mes tâches</button>`;
+  box.innerHTML=`<span class="mn-act-txt">🎯 ${escapeHtml(COACH_ACTION)}</span>`
+    +`<button class="mn-act-btn" id="mnActAdd">➕ Ajouter à mes tâches</button>`
+    +(va?`<button class="mn-act-btn ghost" id="mnActMsg">✉️ Écrire à ${escapeHtml(va)}</button>`:"")
+    +`<button class="mn-act-btn ghost" id="mnActVoice" title="Répondre à voix haute">🎤</button>`;
   const b=$("#mnActAdd"); if(b) b.onclick=()=>addCoachAction(b);
+  const m=$("#mnActMsg"); if(m) m.onclick=()=>prepareVaMessage(m,va);
+  const v=$("#mnActVoice"); if(v) v.onclick=()=>coachVoiceReply();
+}
+// ✉️ Le coach rédige le message à envoyer au VA. ⚠️ Le cerveau n'y met QUE ses
+// abonnés (jamais d'argent/ROI/LTV) et filtre le texte avant de le renvoyer.
+async function prepareVaMessage(btn,va){
+  const box=$("#mnCoachMsg"); if(!box||!va||!TOKEN) return;
+  const old=btn.textContent; btn.disabled=true; btn.textContent="⏳";
+  box.style.display="block"; box.innerHTML=`<div class="mn-msg-hd">✉️ Le coach rédige le message pour ${escapeHtml(va)}…</div>`;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-message",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, angle:COACH_ACTION})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.message){ box.innerHTML=`<div class="mn-msg-err">${escapeHtml(j.error||"Impossible de préparer le message, réessaie.")}</div>`; return; }
+    box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— uniquement ses abonnés, aucun chiffre d'argent</span></div>`
+      +`<div class="mn-msg-txt">${escapeHtml(j.message)}</div>`
+      +`<button class="mn-act-btn" id="mnMsgCopy">📋 Copier le message</button>`;
+    const c=$("#mnMsgCopy");
+    if(c) c.onclick=()=>{ try{ navigator.clipboard.writeText(j.message); c.textContent="✔ Copié"; c.disabled=true; }catch(e){} };
+  }catch(e){ box.innerHTML=`<div class="mn-msg-err">Connexion impossible, réessaie.</div>`; }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+// 🎤 Répondre au coach à l'oral (« j'ai appelé Welzy, elle est malade ») :
+// l'assistant comprend et met à jour tes tâches en conséquence.
+function coachVoiceReply(){
+  if(typeof voiceAsk!=="function") return;
+  voiceAsk(COACH_ACTION ? "Contexte : l'action que je devais faire aujourd'hui est « "+COACH_ACTION+" ». Ma réponse : " : "");
 }
 function addCoachAction(btn){
   if(!COACH_ACTION || typeof TASKS==="undefined") return;
@@ -2863,11 +2909,30 @@ function renderSim(){
     <div class="sim-block">
       <div class="sim-q">📈 Et si chaque VA faisait <input id="simN" class="sim-n" type="number" inputmode="numeric" value="5" min="1"> subs de plus ce mois ?</div>
       <div id="simAddRes" class="sim-res"></div>
+    </div>
+    <div class="sim-block">
+      <div class="sim-q">🚀 Et si <select id="simVa2" class="sim-sel">${opts}</select> faisait <select id="simMult" class="sim-sel"><option value="1.5">+50 %</option><option value="2" selected>le double</option><option value="3">le triple</option></select> ?</div>
+      <div id="simMultRes" class="sim-res"></div>
     </div>`;
   const cutSel=$("#simVa"), simN=$("#simN");
   function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round((Number(v.rev)||0)-marge), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
   function renderAdd(){ const n=Math.max(0,parseInt(simN.value,10)||0), cnt=vas.length, ltv=Number((om.totals||{}).ltv)||0, rev=n*cnt*ltv, pay=n*cnt*0.5, marge=rev-pay; $("#simAddRes").innerHTML=`Avec <b>${n}</b> subs de plus par VA (${cnt} VA), à ta LTV moyenne ${money(ltv)} :<br><span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>.`; }
-  cutSel.onchange=renderCut; simN.oninput=renderAdd; renderCut(); renderAdd();
+  // 🚀 Projection SI UN VA précis montait en volume : combien de subs en plus, ce
+  // que ça rapporte, et où finirait le mois. Les VA non payés (perso) ne coûtent rien.
+  function renderMult(){
+    const sel=$("#simVa2"), mu=$("#simMult"); if(!sel||!mu) return;
+    const v=vas.find(x=>x.va===sel.value); if(!v){ $("#simMultRes").innerHTML=""; return; }
+    const k=parseFloat(mu.value)||2, subs=Number(v.monthSubs)||0, add=Math.round(subs*(k-1));
+    const ltv=Number((om.totals||{}).ltv)||0, netM=Number((om.totals||{}).netMonth)||0;
+    const rev=add*ltv, pay=v.unpaid?0:add*0.5, marge=rev-pay;
+    const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
+    if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
+    $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
+      +`<span class="sim-verdict pos">+${money(rev)} de revenus</span> → <b>+${money(marge)} de marge</b>, le mois finirait vers <b>${money(netM+rev)}</b>.`;
+  }
+  cutSel.onchange=renderCut; simN.oninput=renderAdd;
+  { const s2=$("#simVa2"), mu=$("#simMult"); if(s2) s2.onchange=renderMult; if(mu) mu.onchange=renderMult; }
+  renderCut(); renderAdd(); renderMult();
 }
 function renderPie(){
   const panel=$("#pie"); if(!panel) return;
@@ -3011,7 +3076,9 @@ async function loadSms(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_B
 
 /* ---------- parler à l'assistant (micro flottant) ---------- */
 function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=mkUtter(String(txt).slice(0,320)); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
-function voiceAsk(){
+// prefixe = contexte optionnel ajouté devant ce que tu dictes (utilisé par le
+// coach pour que l'assistant sache de quelle action tu parles).
+function voiceAsk(prefixe){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
   if(!TOKEN){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
@@ -3021,9 +3088,10 @@ function voiceAsk(){
   rec.onend=()=>{ if(fab) fab.classList.remove("listening"); };
   rec.onresult=async(e)=>{
     const q=(e.results[0][0].transcript||"").trim(); if(!q) return;
+    const envoi=(typeof prefixe==="string"&&prefixe)?(prefixe+q):q;
     toast("🗣️ « "+q+" »","L'assistant réfléchit…");
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q,names:NAMES,history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
+      const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:envoi,names:NAMES,history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
       if(r.status===401){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
       const j=await r.json(); const ans=j.answer||j.error||"Pas de réponse.";
       if(typeof ASK_HISTORY!=="undefined") ASK_HISTORY.push({q,a:ans});
