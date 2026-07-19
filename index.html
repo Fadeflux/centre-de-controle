@@ -1789,10 +1789,34 @@ function confetti(){
     setTimeout(()=>s.remove(),2700);
   }
 }
+// 💡 Objectif de revenus SUGGÉRÉ : au lieu de le fixer au doigt mouillé, on part
+// de là où le mois finira au rythme actuel (projection) et du meilleur mois déjà
+// réalisé, et on vise un peu au-dessus. Ambitieux mais atteignable — et on
+// explique toujours d'où vient le chiffre.
+function suggestGoal(){
+  try{
+    const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
+    const proj=Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0;
+    const hist=(om.history||[]).map(m=>Number(m.net)||0).filter(v=>v>0);
+    const record=hist.length?Math.max.apply(null,hist):0;
+    const base=Math.max(proj, record);
+    if(base<=0) return null;
+    // +10 % au-dessus du meilleur des deux, arrondi à la centaine.
+    const v=Math.max(100, Math.round(base*1.1/100)*100);
+    const raison = proj>=record
+      ? `au rythme actuel tu finis vers ${Math.round(proj).toLocaleString("fr-FR")} $`
+      : `ton meilleur mois est à ${Math.round(record).toLocaleString("fr-FR")} $`;
+    return { value:v, raison:raison+" — on vise 10 % au-dessus" };
+  }catch(e){ return null; }
+}
 function renderGoal(data){
   if(!GOAL){
-    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div><div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`;
+    const sg=suggestGoal();
+    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
+      + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.value.toLocaleString("fr-FR")} $</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
+             :`<div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`);
     const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); };
     return;
   }
   const isRev = GOAL.type==="rev";
