@@ -2560,7 +2560,7 @@ async function sendVaMessage(btn, va, message){
   const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Envoi…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
-      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach"})});
+      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach", thread:true})});
     const j=await r.json().catch(()=>({}));
     if(r.ok && j.ok && j.added>0){ btn.textContent="✔ Envoyé à "+va; if(typeof toast==="function") toast("📨 Envoyé", va+" le recevra dans son ticket."); }
     else if(r.ok && j.ok){ btn.textContent="déjà en attente"; btn.disabled=false; }
