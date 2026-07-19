@@ -3011,12 +3011,13 @@ function renderRailway(){
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $";
   const actifs=d.projets.filter(p=>p.cout>0.01);
   const mx=Math.max.apply(null,actifs.map(p=>p.cout))||1;
+  const reel=!!(d.video&&d.video.factureSaisie);
   const rows=actifs.slice(0,8).map(p=>{
-    const part=d.total>0?Math.round(p.cout/d.total*100):0;
+    const part=(p.part!=null)?p.part:(d.total>0?Math.round(p.cout/d.total*100):0);
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(p.projet)}</span>
       <span class="sv-cell" style="flex:1;min-width:90px"><span style="display:block;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--acc),#7c3aed);width:${Math.max(4,Math.round(p.cout/mx*100))}%"></span></span>
-      <span class="sv-part mid">${money(p.cout)}</span>
-      <span class="sv-sugg sv-cell">${part} %</span></div>`;
+      <span class="sv-part mid">${part} %</span>
+      <span class="sv-sugg sv-cell">${reel?money(p.cout):""}</span></div>`;
   }).join("");
   // Rapport coût / revenus : la seule façon de savoir si l'infra est chère.
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
@@ -3025,13 +3026,37 @@ function renderRailway(){
   const totalOutils=d.total+outils;
   const pourCent = net>0 ? (totalOutils/net*100) : null;
   const gros=actifs[0];
+  const v=d.video;
+  const blocVideo = v ? `<div class="sv-note" style="margin-top:10px">
+      🎬 <b>${v.videos.toLocaleString("fr-FR")}</b> vidéos produites ce mois (${v.drives.toLocaleString("fr-FR")} drives)${reel?` pour <b>${money(v.cout)}</b> d'infra`:""}.
+      ${reel?`Soit <b>${v.centimesParVideo} centime${v.centimesParVideo>1?"s":""}</b> par vidéo, <b>${money(v.coutParDrive)}</b> par drive.`:`Saisis ta facture ci-dessous pour connaître le coût exact par vidéo.`}
+    </div>` : "";
   $("#rwBody").innerHTML=`${rows}
+    ${blocVideo}
     <div class="sv-note">
-      Total infra estimé : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
-      ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton net du mois — il te reste ${money(net-totalOutils)} avant paie des VA.`:""}
-      ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse à lui seul ${Math.round(gros.cout/d.total*100)} % de la facture.`:""}
-      <br><span style="opacity:.75">${escapeHtml(d.note||"")}</span>
+      ${reel
+        ? `Facture du mois : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
+           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton net du mois.`:""}
+           ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse ${gros.part!=null?gros.part:"?"} % de la facture.`:""}`
+        : `⚠️ Railway ne me donne pas de montant facturé, et son estimation d'usage varie trop d'un appel à l'autre pour être prise pour de l'argent.
+           Ce qui est fiable, c'est la <b>part de chaque projet</b> ci-dessus.
+           <br>Entre ta vraie facture du mois et je répartis dessus — les chiffres deviennent exacts.`}
+      <div class="bp-since" style="margin-top:10px">
+        💵 Ma facture Railway du mois :
+        <input type="number" id="rwBill" step="0.01" min="0" placeholder="ex : 27.50" value="${reel?(Number(d.total)||""):""}" style="max-width:120px">
+        <button class="mn-act-btn" id="rwBillSave" style="padding:6px 12px">Enregistrer</button>
+      </div>
     </div>`;
+  const b=$("#rwBillSave");
+  if(b) b.onclick=async()=>{
+    const val=parseFloat(($("#rwBill")||{}).value); if(!(val>=0)) return;
+    b.disabled=true; b.textContent="⏳";
+    try{
+      await fetch(HUB_BASE+"/api/hub/railway-bill",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({montant:val})});
+      await loadRailway();
+      if(typeof toast==="function") toast("💵 Facture enregistrée","La répartition par projet est maintenant exacte.");
+    }catch(e){ b.disabled=false; b.textContent="Enregistrer"; }
+  };
 }
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
