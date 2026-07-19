@@ -2543,11 +2543,29 @@ async function prepareVaMessage(btn,va){
     if(!r.ok||!j.message){ box.innerHTML=`<div class="mn-msg-err">${escapeHtml(j.error||"Impossible de préparer le message, réessaie.")}</div>`; return; }
     box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— uniquement ses abonnés, aucun chiffre d'argent</span></div>`
       +`<div class="mn-msg-txt">${escapeHtml(j.message)}</div>`
-      +`<button class="mn-act-btn" id="mnMsgCopy">📋 Copier le message</button>`;
+      +`<button class="mn-act-btn" id="mnMsgCopy">📋 Copier</button>`
+      +` <button class="mn-act-btn ghost" id="mnMsgSend">📨 Envoyer dans son ticket</button>`;
     const c=$("#mnMsgCopy");
     if(c) c.onclick=()=>{ try{ navigator.clipboard.writeText(j.message); c.textContent="✔ Copié"; c.disabled=true; }catch(e){} };
+    const s=$("#mnMsgSend");
+    if(s) s.onclick=()=>sendVaMessage(s, j.va||va, j.message);
   }catch(e){ box.innerHTML=`<div class="mn-msg-err">Connexion impossible, réessaie.</div>`; }
   finally{ btn.disabled=false; btn.textContent=old; }
+}
+// 📨 Envoi RÉEL dans le ticket du VA : on empile dans la file « va-relance » que
+// le bot Discord relève déjà (il retrouve le ticket et mentionne la personne).
+// Le cerveau refiltre le texte avant de l'empiler — dernier rempart avant Discord.
+async function sendVaMessage(btn, va, message){
+  if(!TOKEN || !va || !message) return;
+  const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Envoi…";
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach"})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok && j.ok && j.added>0){ btn.textContent="✔ Envoyé à "+va; if(typeof toast==="function") toast("📨 Envoyé", va+" le recevra dans son ticket."); }
+    else if(r.ok && j.ok){ btn.textContent="déjà en attente"; btn.disabled=false; }
+    else { btn.textContent="⚠️ Échec"; btn.disabled=false; }
+  }catch(e){ btn.textContent="⚠️ Échec"; btn.disabled=false; }
 }
 // 🎤 Répondre au coach à l'oral (« j'ai appelé Welzy, elle est malade ») :
 // l'assistant comprend et met à jour tes tâches en conséquence.
@@ -2907,7 +2925,7 @@ function renderSim(){
       <div id="simCutRes" class="sim-res"></div>
     </div>
     <div class="sim-block">
-      <div class="sim-q">📈 Et si chaque VA faisait <input id="simN" class="sim-n" type="number" inputmode="numeric" value="5" min="1"> subs de plus ce mois ?</div>
+      <div class="sim-q">📈 Et si chaque VA faisait <input id="simN" class="sim-n" type="number" inputmode="numeric" value="5" min="1"> subs de plus <select id="simPer" class="sim-sel"><option value="mois">ce mois</option><option value="jour">PAR JOUR</option></select> ?</div>
       <div id="simAddRes" class="sim-res"></div>
     </div>
     <div class="sim-block">
@@ -2916,7 +2934,26 @@ function renderSim(){
     </div>`;
   const cutSel=$("#simVa"), simN=$("#simN");
   function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round((Number(v.rev)||0)-marge), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
-  function renderAdd(){ const n=Math.max(0,parseInt(simN.value,10)||0), cnt=vas.length, ltv=Number((om.totals||{}).ltv)||0, rev=n*cnt*ltv, pay=n*cnt*0.5, marge=rev-pay; $("#simAddRes").innerHTML=`Avec <b>${n}</b> subs de plus par VA (${cnt} VA), à ta LTV moyenne ${money(ltv)} :<br><span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>.`; }
+  // « subs de plus » au CHOIX : pour tout le mois, ou PAR JOUR (× les jours qui
+  // restent). Les VA non payés (perso) ne coûtent rien, donc on ne compte que
+  // les VA réellement payés dans la paie.
+  function renderAdd(){
+    const n=Math.max(0,parseInt(simN.value,10)||0), cnt=vas.length;
+    const cntPayes=vas.filter(v=>!v.unpaid).length;
+    const per=(($("#simPer")||{}).value)||"mois";
+    const now=new Date(), lastD=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const joursRestants=Math.max(1,lastD-now.getDate()+1);
+    const parVa = per==="jour" ? n*joursRestants : n;      // total ajouté par VA d'ici la fin du mois
+    const ltv=Number((om.totals||{}).ltv)||0;
+    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*0.5, marge=rev-pay;
+    const netM=Number((om.totals||{}).netMonth)||0;
+    const intro = per==="jour"
+      ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
+      : `<b>${n}</b> subs de plus par VA d'ici la fin du mois (${cnt} VA)`;
+    $("#simAddRes").innerHTML=`${intro}, à ta LTV moyenne ${money(ltv)} :<br>`
+      +`<span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>`
+      +`<br>le mois finirait vers <b>${money(netM+rev)}</b>.`;
+  }
   // 🚀 Projection SI UN VA précis montait en volume : combien de subs en plus, ce
   // que ça rapporte, et où finirait le mois. Les VA non payés (perso) ne coûtent rien.
   function renderMult(){
@@ -2931,6 +2968,7 @@ function renderSim(){
       +`<span class="sim-verdict pos">+${money(rev)} de revenus</span> → <b>+${money(marge)} de marge</b>, le mois finirait vers <b>${money(netM+rev)}</b>.`;
   }
   cutSel.onchange=renderCut; simN.oninput=renderAdd;
+  { const sp=$("#simPer"); if(sp) sp.onchange=renderAdd; }
   { const s2=$("#simVa2"), mu=$("#simMult"); if(s2) s2.onchange=renderMult; if(mu) mu.onchange=renderMult; }
   renderCut(); renderAdd(); renderMult();
 }
