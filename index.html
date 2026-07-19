@@ -686,6 +686,10 @@
   .mn-coach-hd{font-size:13px;font-weight:700;color:var(--acc-ink);display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
   .mn-coach-play{margin-left:auto;font:inherit;font-size:12px;font-weight:600;background:var(--acc);color:#0a0a0a;border:0;border-radius:9px;padding:6px 12px;cursor:pointer}
   .mn-coach-txt{font-size:15px;line-height:1.5;color:var(--text)}
+  .mn-coach-act{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--acc-line)}
+  .mn-act-txt{font-size:14px;font-weight:600;color:var(--ink);flex:1;min-width:170px}
+  .mn-act-btn{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .mn-act-btn:disabled{opacity:.55;cursor:default}
   .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
   .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
   .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
@@ -2480,7 +2484,7 @@ function renderMorning(){
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
-    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div></div>
+    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
@@ -2492,8 +2496,29 @@ function renderMorning(){
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
   const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
+  renderCoachAction();   // le modal vient d'être reconstruit : on repeint l'action du jour
 }
-let COACH_TEXT="";
+let COACH_TEXT="", COACH_ACTION="";
+// ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
+// « coach »), et c'est ce tag qui permet au coach de te relancer demain si elle
+// n'est toujours pas faite.
+function renderCoachAction(){
+  const box=$("#mnCoachAct"); if(!box) return;
+  if(!COACH_ACTION){ box.style.display="none"; box.innerHTML=""; return; }
+  box.style.display="flex";
+  box.innerHTML=`<span class="mn-act-txt">🎯 ${escapeHtml(COACH_ACTION)}</span><button class="mn-act-btn" id="mnActAdd">➕ Ajouter à mes tâches</button>`;
+  const b=$("#mnActAdd"); if(b) b.onclick=()=>addCoachAction(b);
+}
+function addCoachAction(btn){
+  if(!COACH_ACTION || typeof TASKS==="undefined") return;
+  try{
+    tkNorm();
+    TASKS.moi.unshift({id:tkId(),text:COACH_ACTION,tags:["coach"],done:false,ts:Date.now(),repeat:"",prio:"h",upd:Date.now()});
+    saveTasks(); renderTasks();
+    if(btn){ btn.textContent="✔ Ajoutée"; btn.disabled=true; }
+    if(typeof toast==="function") toast("Ajoutée à tes tâches ✅");
+  }catch(e){}
+}
 function speakText(t){
   try{
     if(!window.speechSynthesis || !t) return;
@@ -2513,11 +2538,16 @@ async function loadBrief(force){
   const prev=COACH_TEXT;                 // si le rechargement échoue, on garde le briefing qui marchait
   try{
     const nm=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"";
-    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force})});
+    // On envoie l'objectif du mois : le coach le transforme en CIBLE DU JOUR
+    // (« il te faut X aujourd'hui ») au lieu de citer un cumul.
+    const g=(typeof GOAL!=="undefined"&&GOAL&&Number(GOAL.value)>0)?{type:GOAL.type,value:Number(GOAL.value)}:null;
+    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force, goal:g})});
     if(r.status===401){ box.style.display="none"; return; }
     const j=await r.json();
     COACH_TEXT=(j.brief||"").trim();
+    COACH_ACTION=(j.action||"").trim();
     txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
+    renderCoachAction();
     // Réchauffe la 1ère phrase en fond -> quand tu tapes « Écouter », ça démarre tout de suite.
     if(COACH_TEXT && typeof prewarmTts==="function") prewarmTts(COACH_TEXT);
   }catch(e){ COACH_TEXT=prev; txt.textContent=prev||"Coach indisponible — réessaie."; }
