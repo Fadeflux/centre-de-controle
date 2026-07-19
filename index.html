@@ -273,6 +273,8 @@
   .bp-lbl{font-size:13.5px;display:flex;justify-content:space-between;gap:10px;margin-bottom:5px}
   .bp-lbl b{font-weight:600}
   .bp-n{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bp-since{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+  .bp-since input{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:12.5px;font-family:inherit;color-scheme:dark}
   .bp-bar{height:8px;background:var(--surface-2);border-radius:20px;overflow:hidden}
   .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7c3aed);transition:width .5s}
   .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
@@ -1426,7 +1428,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2725,10 +2727,46 @@ function showWidgetHelp(){
 { const wb=$("#widget"); if(wb) wb.onclick=showWidgetHelp; }
 
 /* ---------- badges & paliers ---------- */
+// 📅 Point de départ des paliers = le jour de ta 1ère VENTE OnlyFans. Le système
+// ne peut PAS le deviner (les données ne commencent qu'à l'installation du
+// tracker, 06/26) -> c'est toi qui fixes la date, et elle est synchronisée sur le
+// cerveau pour être la même sur ton téléphone et ton PC.
+let FIRST_SALE=localStorage.getItem("ccn_firstsale")||"2026-06-28";
+function daysSinceFirstSale(){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(FIRST_SALE||"")) return 0;
+  const p=FIRST_SALE.split("-").map(Number);
+  // Calcul en UTC pur : différence de CALENDRIER exacte, insensible aux
+  // changements d'heure (sinon un passage heure d'été décale d'un jour).
+  const from=Date.UTC(p[0],p[1]-1,p[2]);
+  if(isNaN(from)) return 0;
+  const n=new Date(), today=Date.UTC(n.getFullYear(),n.getMonth(),n.getDate());
+  const d=Math.round((today-from)/86400000);
+  return d>0?d:0;
+}
+function saveFirstSale(v){
+  FIRST_SALE=(v||"").slice(0,10);
+  localStorage.setItem("ccn_firstsale",FIRST_SALE);
+  if(TOKEN) fetch(HUB_BASE+"/api/hub/first-sale",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({date:FIRST_SALE})}).catch(()=>{});
+  renderBadges();
+}
+async function loadFirstSale(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/first-sale",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j.date){ FIRST_SALE=j.date; localStorage.setItem("ccn_firstsale",FIRST_SALE); renderBadges(); }
+    else if(FIRST_SALE){ saveFirstSale(FIRST_SALE); }   // 1ère fois : on pousse la date connue au cerveau
+  }catch(e){}
+}
 const BADGES=[
-  {id:"streak7", icon:"🔥", label:"7 jours de série", metric:"streak", target:7, cond:c=>c.streak>=7},
-  {id:"streak30", icon:"🌟", label:"30 jours de série", metric:"streak", target:30, cond:c=>c.streak>=30},
-  {id:"streak100", icon:"☄️", label:"100 jours de série", metric:"streak", target:100, cond:c=>c.streak>=100},
+  // Ancienneté = jours depuis la 1ère VENTE OnlyFans (pas depuis l'installation du
+  // site) : ça mesure le vrai parcours business, et ça ne retombe jamais à zéro.
+  {id:"age30", icon:"🌱", label:"1 mois de business", metric:"daysSince", target:30, cond:c=>c.daysSince>=30},
+  {id:"age100", icon:"🌟", label:"100 jours de business", metric:"daysSince", target:100, cond:c=>c.daysSince>=100},
+  {id:"age180", icon:"☄️", label:"6 mois de business", metric:"daysSince", target:180, cond:c=>c.daysSince>=180},
+  {id:"age365", icon:"🎂", label:"1 an de business", metric:"daysSince", target:365, cond:c=>c.daysSince>=365},
+  {id:"age730", icon:"🏛️", label:"2 ans de business", metric:"daysSince", target:730, cond:c=>c.daysSince>=730},
   {id:"subs100", icon:"💯", label:"100 subs", metric:"subsTotal", target:100, cond:c=>c.subsTotal>=100},
   {id:"subs500", icon:"⭐", label:"500 subs", metric:"subsTotal", target:500, cond:c=>c.subsTotal>=500},
   {id:"subs1000", icon:"🚀", label:"1 000 subs", metric:"subsTotal", target:1000, cond:c=>c.subsTotal>=1000},
@@ -2748,7 +2786,7 @@ function renderBadges(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
   let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>Number(m.net)||0)); isRecord=(Number(c.net)||0)>prevMax && prevMax>0; }
   const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?(Number(tot.netMonth)||0):(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
-  const ctx={ streak:(typeof STREAK!=="undefined"?STREAK:0), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, isRecord, goalMet };
+  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, isRecord, goalMet };
   const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
   const owned=new Set(unlocked.map(b=>b.id));
   const newly=unlocked.filter(b=>BADGES_OWNED.indexOf(b.id)<0);
@@ -2756,9 +2794,9 @@ function renderBadges(){
   panel.style.display="block";
   // Nouveau rendu « progression » : badges gagnés en pastilles + prochain
   // palier de chaque famille avec barre de progression (fini la grille grise).
-  const fmtV=(m,v)=>m==="netTotal"?(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $"):Math.round(v).toLocaleString("fr-FR");
+  const fmtV=(m,v)=>m==="netTotal"?(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $"):(m==="daysSince"?Math.round(v).toLocaleString("fr-FR")+" j":Math.round(v).toLocaleString("fr-FR"));
   const chips=unlocked.map(b=>`<span class="bp-chip" title="${escapeHtml(b.label)}">${b.icon} ${escapeHtml(b.label)}</span>`).join("");
-  const fams=[["streak","Série d'ouverture"],["subsTotal","Subs au total"],["netTotal","Argent généré"]];
+  const fams=[["daysSince","Depuis ta 1ère vente"],["subsTotal","Subs au total"],["netTotal","Argent généré"]];
   const rows=fams.map(([m,lbl])=>{
     const nxt=BADGES.find(b=>b.metric===m && !owned.has(b.id));
     if(!nxt) return `<div class="bp-row"><span class="bp-ico">🏆</span><div class="bp-main"><div class="bp-lbl">${lbl} — tout débloqué, champion !</div></div></div>`;
@@ -2769,8 +2807,14 @@ function renderBadges(){
         <div class="bp-bar"><i style="width:${pct}%"></i></div>
       </div></div>`;
   }).join("");
+  const nd=ctx.daysSince;
   $("#badgesBody").innerHTML=`${chips?`<div class="bp-chips">${chips}</div>`:""}
-    <div class="bp-next-title">🎯 Prochains paliers</div>${rows}`;
+    <div class="bp-next-title">🎯 Prochains paliers</div>${rows}
+    <div class="bp-since">📅 Ma 1ère vente OnlyFans :
+      <input type="date" id="bpFirstSale" value="${escapeHtml(FIRST_SALE||"")}" max="${todayStr()}">
+      <span>${FIRST_SALE?`ça fait <b style="color:var(--ink)">${nd.toLocaleString("fr-FR")} jour${nd>1?"s":""}</b> que tu gagnes de l'argent 💪`:"choisis la date pour lancer le compteur"}</span>
+    </div>`;
+  const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
 }
 function renderSim(){
   const panel=$("#sim"); if(!panel) return;
@@ -3018,6 +3062,7 @@ loadLeakwatch();
 loadLeaks();
 loadIdentity();
 loadTgrev();
+loadFirstSale();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
