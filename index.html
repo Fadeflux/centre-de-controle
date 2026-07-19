@@ -1488,6 +1488,10 @@ $("#hide").onclick = ()=>{
   HIDE = !HIDE; localStorage.setItem("ccn_hide", HIDE?"1":"0");
   $("#hide").textContent = HIDE ? "🙈" : "👁️";
   render(LAST); renderCosts();
+  // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
+  // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta]
+    .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
 /* ---------- ma journée (à faire) ---------- */
@@ -1821,17 +1825,18 @@ function suggestGoal(){
     if(base<=0) return null;
     // +10 % au-dessus du meilleur des deux, arrondi à la centaine.
     const v=Math.max(100, Math.round(base*1.1/100)*100);
+    const m=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(x).toLocaleString("fr-FR")+" $";
     const raison = proj>=record
-      ? `au rythme actuel tu finis vers ${Math.round(proj).toLocaleString("fr-FR")} $`
-      : `ton meilleur mois est à ${Math.round(record).toLocaleString("fr-FR")} $`;
-    return { value:v, raison:raison+" — on vise 10 % au-dessus" };
+      ? `au rythme actuel tu finis vers ${m(proj)}`
+      : `ton meilleur mois est à ${m(record)}`;
+    return { value:v, affiche:m(v), raison:raison+" — on vise 10 % au-dessus" };
   }catch(e){ return null; }
 }
 function renderGoal(data){
   if(!GOAL){
     const sg=suggestGoal();
     $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
-      + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.value.toLocaleString("fr-FR")} $</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
+      + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.affiche}</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
              :`<div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`);
     const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
     const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); };
@@ -1958,7 +1963,10 @@ const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaqu
 function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && !x.del && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; x.upd=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length===1) vis[0].classList.add("solo"); }); }
+// La rangée compte maintenant 4 panneaux : avec un nombre IMPAIR de visibles, le
+// dernier restait orphelin en demi-largeur. On passe le dernier en pleine largeur
+// dès que le compte est impair (et pas seulement quand il n'y en a qu'un).
+function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); }
 function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 function saveTasks(){
@@ -3000,6 +3008,7 @@ function renderConversion(){
     <div class="sv-note">${d.exploitable?`Le trafic est mesuré via tes tracking links — <b>${(d.totalClics||0).toLocaleString("fr-FR")} clics</b> sur la période, aucun outil externe nécessaire.
       Bien convertir et ramener des fans qui dépensent sont deux choses différentes : compare le taux et la valeur d'un abonné sur chaque ligne.`
       :`⚠️ Seulement ${d.totalClics||0} clics remontés sur la période — trop peu pour en tirer une conclusion.`}</div>`;
+  try{ fixPairs(); }catch(e){}   // la rangée compte 5 panneaux : on recalcule les demi-largeurs
 }
 // 💳 CE QUE VAUT UN ABONNÉ, PAR VA.
 // Tu paies le même tarif à tout le monde, mais un abonné ramené par un VA ne
@@ -3026,25 +3035,35 @@ function renderSubValue(){
   const totRev=calc.reduce((a,x)=>a+x.rev,0), totPaye=calc.reduce((a,x)=>a+x.paye,0);
   const partEquipe = totRev>0 ? totPaye/totRev : 0;     // référence neutre : la part actuelle de l'équipe
   calc.sort((a,b)=>b.valeur-a.valeur);
+  // Le tarif payé est le MÊME pour tout le monde côté serveur : l'afficher sur
+  // chaque ligne laisserait croire à une différenciation qui n'existe pas.
+  // On le sort une seule fois, et on garde par ligne ce qui varie VRAIMENT.
+  const tauxMin=Math.min.apply(null,calc.map(x=>x.taux)), tauxMax=Math.max.apply(null,calc.map(x=>x.taux));
+  const tarifUnique = (tauxMax-tauxMin) < 0.02;
+  const pct=v=>HIDE?"•••":Math.round(v*100)+" %";
   const rows=calc.map(x=>{
     const part = x.valeur>0 ? x.taux/x.valeur : 0;
-    const juste = x.valeur*partEquipe;                   // tarif qui égaliserait la part
+    // Le « tarif juste » ne doit JAMAIS dépasser ce que l'abonné rapporte —
+    // sinon, dès que la part d'équipe frôle 100 %, on recommanderait de payer
+    // un abonné plus cher qu'il ne rapporte. Plafond de sécurité à 50 %.
+    const juste = Math.min(x.valeur*partEquipe, x.valeur*0.5);
     const ecart = juste-x.taux;
     const cls = part<partEquipe*0.75 ? "good" : (part>partEquipe*1.5 ? "bad" : "mid");
     const sugg = Math.abs(ecart)<0.02 ? `<span class="sv-cell">tarif cohérent</span>`
       : `<span class="sv-cell">tarif juste <b>${money(juste)}</b> ${ecart>0?"▲":"▼"}</span>`;
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(x.va)}</span>
       <span class="sv-cell">1 abonné vaut <b>${money(x.valeur)}</b></span>
-      <span class="sv-cell">tu paies <b>${money(x.taux)}</b></span>
-      <span class="sv-part ${cls}">${Math.round(part*100)} %</span>
+      <span class="sv-part ${cls}" title="part de la valeur qui revient au VA">${pct(part)}</span>
       <span class="sv-sugg">${sugg}</span></div>`;
   }).join("");
   const meilleur=calc[0], pire=calc[calc.length-1];
-  $("#subvalBody").innerHTML=`<div class="sv-head">Trié par valeur d'un abonné</div>${rows}
-    <div class="sv-note">Tu reverses en moyenne <b>${Math.round(partEquipe*100)} %</b> de ce que l'équipe rapporte.
+  const mult = (pire.valeur>0) ? (meilleur.valeur/pire.valeur).toFixed(1)+"×" : "—";
+  $("#subvalBody").innerHTML=`<div class="sv-head">Trié par valeur d'un abonné · ${tarifUnique?`tu paies <b>${money(tauxMax)}</b> par abonné à tout le monde`:`tarif variable selon les paliers`}</div>${rows}
+    <div class="sv-note">Tu reverses en moyenne <b>${pct(partEquipe)}</b> de ce que l'équipe rapporte.
       Un abonné de <b>${escapeHtml(meilleur.va)}</b> vaut <b>${money(meilleur.valeur)}</b>, un de <b>${escapeHtml(pire.va)}</b> <b>${money(pire.valeur)}</b> —
-      soit <b>${(meilleur.valeur/(pire.valeur||1)).toFixed(1)}×</b> plus, pour le même tarif.
-      Le « tarif juste » est celui qui donnerait à chacun la même part que la moyenne de l'équipe.</div>`;
+      soit <b>${HIDE?"•••":mult}</b> plus, <b>au même tarif</b>.
+      Le « tarif juste » est celui qui donnerait à chacun la même part que la moyenne de l'équipe (plafonné à la moitié de ce que l'abonné rapporte).</div>`;
+  try{ fixPairs(); }catch(e){}   // la rangée compte 5 panneaux : on recalcule les demi-largeurs
 }
 // ⏰ Répartition horaire des abonnés (source : subscribed_at d'OnlyMonster — les
 // snapshots quotidiens ne portent pas l'heure). On met en avant le meilleur
@@ -3078,6 +3097,7 @@ function renderHours(){
       Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]}), le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]}).</div>
     ${d.fiable?"":`<div class="hr-warn">⚠️ Seulement ${d.total} abonnés analysés — trop peu pour en tirer une règle, à revoir dans quelques jours.</div>`}
     <div class="hr-warn">Sur ${d.days} jours · ${d.total} abonnés · heure de ${d.tz.split("/").pop().replace("_"," ")}</div>`;
+  try{ fixPairs(); }catch(e){}   // la rangée compte 5 panneaux : on recalcule les demi-largeurs
 }
 function renderSim(){
   const panel=$("#sim"); if(!panel) return;
@@ -3085,6 +3105,8 @@ function renderSim(){
   if(!vas.length){ panel.style.display="none"; return; }
   panel.style.display="block";
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  // money() produit déjà le « − » : préfixer un « + » en dur donnait « +-320 $ ».
+  const signe=v=>{ const n=Number(v)||0; return (n>=0?"+":"")+money(n); };
   const opts=vas.map(v=>`<option value="${escapeHtml(v.va)}">${escapeHtml(v.va)}</option>`).join("");
   $("#simBody").innerHTML=`
     <div class="sim-block">
@@ -3119,7 +3141,7 @@ function renderSim(){
       ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
       : `<b>${n}</b> subs de plus par VA d'ici la fin du mois (${cnt} VA)`;
     $("#simAddRes").innerHTML=`${intro}, à ta LTV moyenne ${money(ltv)} :<br>`
-      +`<span class="sim-verdict pos">+${money(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b>+${money(marge)} de marge</b>`
+      +`<span class="sim-verdict ${rev>=0?"pos":"neg"}">${signe(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>`
       +`<br>le mois finirait vers <b>${money(netM+rev)}</b>.`;
   }
   // 🚀 Projection SI UN VA précis montait en volume : combien de subs en plus, ce
@@ -3133,7 +3155,7 @@ function renderSim(){
     const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
     if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
     $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
-      +`<span class="sim-verdict pos">+${money(rev)} de revenus</span> → <b>+${money(marge)} de marge</b>, le mois finirait vers <b>${money(netM+rev)}</b>.`;
+      +`<span class="sim-verdict ${rev>=0?"pos":"neg"}">${signe(rev)} de revenus</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>, le mois finirait vers <b>${money(netM+rev)}</b>.`;
   }
   cutSel.onchange=renderCut; simN.oninput=renderAdd;
   { const sp=$("#simPer"); if(sp) sp.onchange=renderAdd; }
