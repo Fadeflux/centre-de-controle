@@ -1101,6 +1101,10 @@
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
     </div>
+    <div class="panel-box" id="conv" style="display:none">
+      <div class="pb-head">🎯 Conversion : clics → abonnés</div>
+      <div id="convBody"></div>
+    </div>
     <div class="panel-box" id="subval" style="display:none">
       <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
       <div id="subvalBody"></div>
@@ -2317,7 +2321,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue();
+    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion();
   }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -2960,6 +2964,43 @@ function renderBadges(){
     </div>`;
   const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
 }
+// 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
+// outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
+// la comparaison des deux qui est parlante — bien convertir et ramener des fans
+// qui dépensent sont DEUX qualités différentes.
+let CONV_DATA=null;
+async function loadConversion(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/conversion?days=14",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    CONV_DATA=await r.json(); renderConversion();
+  }catch(e){}
+}
+function renderConversion(){
+  const panel=$("#conv"); if(!panel) return;
+  const d=CONV_DATA;
+  if(!d || !Array.isArray(d.vas) || !d.vas.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, cur=om.currency||"$";
+  const valeurDe={}; (om.vas||[]).forEach(v=>{ const s=Number(v.subs)||0; if(s>0) valeurDe[v.va]=(Number(v.rev)||0)/s; });
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
+  const moy=Number(d.cvrGlobal)||0;
+  const rows=d.vas.filter(v=>v.clics>=20).map(v=>{
+    const cls = v.cvr>=moy*1.1 ? "good" : (v.cvr<moy*0.7 ? "bad" : "mid");
+    const val = valeurDe[v.va];
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>
+      <span class="sv-cell"><b>${v.clics.toLocaleString("fr-FR")}</b> clics → <b>${v.subs}</b> abonnés</span>
+      <span class="sv-part ${cls}">${v.cvr} %</span>
+      <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b>`:""}</span></div>`;
+  }).join("");
+  const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${l.cvr} %</b></span></div>`).join("");
+  $("#convBody").innerHTML=`<div class="sv-head">Sur ${d.days} jours · moyenne ${moy} %</div>${rows}
+    ${pires?`<div class="sv-head" style="margin-top:12px">Liens qui convertissent le moins</div>${pires}`:""}
+    <div class="sv-note">${d.exploitable?`Le trafic est mesuré via tes tracking links — <b>${(d.totalClics||0).toLocaleString("fr-FR")} clics</b> sur la période, aucun outil externe nécessaire.
+      Bien convertir et ramener des fans qui dépensent sont deux choses différentes : compare le taux et la valeur d'un abonné sur chaque ligne.`
+      :`⚠️ Seulement ${d.totalClics||0} clics remontés sur la période — trop peu pour en tirer une conclusion.`}</div>`;
+}
 // 💳 CE QUE VAUT UN ABONNÉ, PAR VA.
 // Tu paies le même tarif à tout le monde, mais un abonné ramené par un VA ne
 // rapporte pas autant qu'un autre. On calcule, par VA :
@@ -3328,6 +3369,7 @@ loadIdentity();
 loadTgrev();
 loadFirstSale();
 loadHours();
+loadConversion();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
