@@ -557,6 +557,13 @@
   /* Peu de mois d'activité = barres regroupées au centre (plus de grand vide) */
   .hb-chart{display:flex;align-items:flex-end;justify-content:center;gap:10px;height:132px;padding:6px 2px 0}
   .hb{flex:1 1 0;max-width:96px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+  .hr-grid{display:flex;align-items:flex-end;gap:2px;height:92px;margin:6px 0 4px}
+  .hr-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+  .hr-b{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));min-height:2px;transition:height .35s}
+  .hr-b.top{background:linear-gradient(180deg,#facc15,#f59e0b)}
+  .hr-ax{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .hr-note{font-size:13px;color:var(--ink);margin-top:10px;line-height:1.5}
+  .hr-warn{font-size:12px;color:var(--muted);margin-top:8px}
   .hb-bar-wrap{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
   .hb-bar{width:64%;max-width:34px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 55%,transparent));transition:height .35s}
   .hb-bar.rec{background:linear-gradient(180deg,#facc15,#f59e0b)}
@@ -1083,6 +1090,10 @@
     <div class="panel-box" id="badges" style="display:none">
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
+    </div>
+    <div class="panel-box" id="hours" style="display:none">
+      <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
+      <div id="hoursBody"></div>
     </div>
     <div class="panel-box" id="sim" style="display:none">
       <div class="pb-head">🔮 Simulateur « et si »</div>
@@ -2911,6 +2922,39 @@ function renderBadges(){
     </div>`;
   const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
 }
+// ⏰ Répartition horaire des abonnés (source : subscribed_at d'OnlyMonster — les
+// snapshots quotidiens ne portent pas l'heure). On met en avant le meilleur
+// créneau et le plus faible, parce que c'est ça qui change les consignes.
+let HOURS_DATA=null;
+async function loadHours(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/subs-by-hour?days=30",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    HOURS_DATA=await r.json(); renderHours();
+  }catch(e){}
+}
+function renderHours(){
+  const panel=$("#hours"); if(!panel) return;
+  const d=HOURS_DATA;
+  if(!d || !d.total || !Array.isArray(d.heures)){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const h=d.heures, mx=Math.max.apply(null,h)||1;
+  const mc=d.meilleurCreneau||{};
+  const dansCreneau=i=>{ const a=mc.debut, b=(mc.debut+3)%24; return b>a ? (i>=a&&i<b) : (i>=a||i<b); };
+  const cols=h.map((n,i)=>`<div class="hr-col" title="${i}h : ${n} abonnés"><div class="hr-b ${dansCreneau(i)?"top":""}" style="height:${Math.max(2,Math.round(n/mx*100))}%"></div></div>`).join("");
+  const bl=d.blocs||{};
+  const noms={nuit:"la nuit",matin:"le matin",aprem:"l'après-midi",soir:"le soir"};
+  const tri=Object.keys(bl).sort((a,b)=>bl[b]-bl[a]);
+  const fort=tri[0], faible=tri[tri.length-1];
+  $("#hoursBody").innerHTML=`
+    <div class="hr-grid">${cols}</div>
+    <div class="hr-ax"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
+    <div class="hr-note">Meilleur créneau : <b>${mc.debut}h-${mc.fin}h</b> (${mc.part} % des abonnés).<br>
+      Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]}), le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]}).</div>
+    ${d.fiable?"":`<div class="hr-warn">⚠️ Seulement ${d.total} abonnés analysés — trop peu pour en tirer une règle, à revoir dans quelques jours.</div>`}
+    <div class="hr-warn">Sur ${d.days} jours · ${d.total} abonnés · heure de ${d.tz.split("/").pop().replace("_"," ")}</div>`;
+}
 function renderSim(){
   const panel=$("#sim"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, vas=(om.vas||[]), cur=om.currency||"$";
@@ -3200,6 +3244,7 @@ loadLeaks();
 loadIdentity();
 loadTgrev();
 loadFirstSale();
+loadHours();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
