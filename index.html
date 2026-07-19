@@ -557,6 +557,16 @@
   /* Peu de mois d'activité = barres regroupées au centre (plus de grand vide) */
   .hb-chart{display:flex;align-items:flex-end;justify-content:center;gap:10px;height:132px;padding:6px 2px 0}
   .hb{flex:1 1 0;max-width:96px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+  .sv-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:13px;flex-wrap:wrap}
+  .sv-row:last-child{border-bottom:0}
+  .sv-name{font-weight:600;min-width:78px}
+  .sv-cell{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .sv-cell b{color:var(--ink)}
+  .sv-part{font-weight:700;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .sv-part.good{color:var(--ok)} .sv-part.mid{color:#facc15} .sv-part.bad{color:var(--down)}
+  .sv-sugg{margin-left:auto;font-size:12.5px;white-space:nowrap}
+  .sv-head{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .sv-note{font-size:12.5px;color:var(--muted);margin-top:11px;line-height:1.55}
   .hr-grid{display:flex;align-items:flex-end;gap:2px;height:92px;margin:6px 0 4px}
   .hr-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
   .hr-b{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));min-height:2px;transition:height .35s}
@@ -1090,6 +1100,10 @@
     <div class="panel-box" id="badges" style="display:none">
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
+    </div>
+    <div class="panel-box" id="subval" style="display:none">
+      <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
+      <div id="subvalBody"></div>
     </div>
     <div class="panel-box" id="hours" style="display:none">
       <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
@@ -2303,7 +2317,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM(); renderGoal(LAST);
+    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue();
   }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -2945,6 +2959,51 @@ function renderBadges(){
       <span>${FIRST_SALE?`ça fait <b style="color:var(--ink)">${nd.toLocaleString("fr-FR")} jour${nd>1?"s":""}</b> que tu gagnes de l'argent 💪`:"choisis la date pour lancer le compteur"}</span>
     </div>`;
   const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
+}
+// 💳 CE QUE VAUT UN ABONNÉ, PAR VA.
+// Tu paies le même tarif à tout le monde, mais un abonné ramené par un VA ne
+// rapporte pas autant qu'un autre. On calcule, par VA :
+//   valeur d'un sub = revenus générés / subs          (sa vraie LTV)
+//   ce que tu paies = (revenus − marge) / subs         (taux réel, paliers inclus)
+//   part qui lui revient = payé / valeur
+// Le tarif « juste » est celui qui donnerait à chacun la MÊME part que la
+// moyenne de l'équipe : les VA à forte valeur sont sous-payés, les faibles
+// sur-payés. On n'invente rien, tout vient des chiffres déjà calculés.
+function renderSubValue(){
+  const panel=$("#subval"); if(!panel) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, cur=om.currency||"$";
+  // Les VA non payés (perso) n'entrent pas dans une réflexion sur la paie.
+  const vas=(om.vas||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>=10 && (Number(v.rev)||0)>0);
+  if(vas.length<2){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
+  const calc=vas.map(v=>{
+    const subs=Number(v.subs)||0, rev=Number(v.rev)||0, marge=Number(v.marge)||0;
+    const paye=Math.max(0, rev-marge);
+    return { va:v.va, subs, valeur:rev/subs, taux:paye/subs, paye, rev };
+  });
+  const totRev=calc.reduce((a,x)=>a+x.rev,0), totPaye=calc.reduce((a,x)=>a+x.paye,0);
+  const partEquipe = totRev>0 ? totPaye/totRev : 0;     // référence neutre : la part actuelle de l'équipe
+  calc.sort((a,b)=>b.valeur-a.valeur);
+  const rows=calc.map(x=>{
+    const part = x.valeur>0 ? x.taux/x.valeur : 0;
+    const juste = x.valeur*partEquipe;                   // tarif qui égaliserait la part
+    const ecart = juste-x.taux;
+    const cls = part<partEquipe*0.75 ? "good" : (part>partEquipe*1.5 ? "bad" : "mid");
+    const sugg = Math.abs(ecart)<0.02 ? `<span class="sv-cell">tarif cohérent</span>`
+      : `<span class="sv-cell">tarif juste <b>${money(juste)}</b> ${ecart>0?"▲":"▼"}</span>`;
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(x.va)}</span>
+      <span class="sv-cell">1 abonné vaut <b>${money(x.valeur)}</b></span>
+      <span class="sv-cell">tu paies <b>${money(x.taux)}</b></span>
+      <span class="sv-part ${cls}">${Math.round(part*100)} %</span>
+      <span class="sv-sugg">${sugg}</span></div>`;
+  }).join("");
+  const meilleur=calc[0], pire=calc[calc.length-1];
+  $("#subvalBody").innerHTML=`<div class="sv-head">Trié par valeur d'un abonné</div>${rows}
+    <div class="sv-note">Tu reverses en moyenne <b>${Math.round(partEquipe*100)} %</b> de ce que l'équipe rapporte.
+      Un abonné de <b>${escapeHtml(meilleur.va)}</b> vaut <b>${money(meilleur.valeur)}</b>, un de <b>${escapeHtml(pire.va)}</b> <b>${money(pire.valeur)}</b> —
+      soit <b>${(meilleur.valeur/(pire.valeur||1)).toFixed(1)}×</b> plus, pour le même tarif.
+      Le « tarif juste » est celui qui donnerait à chacun la même part que la moyenne de l'équipe.</div>`;
 }
 // ⏰ Répartition horaire des abonnés (source : subscribed_at d'OnlyMonster — les
 // snapshots quotidiens ne portent pas l'heure). On met en avant le meilleur
