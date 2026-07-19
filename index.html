@@ -2594,7 +2594,7 @@ async function prepareVaMessage(btn,va){
     const r=await fetch(HUB_BASE+"/api/hub/va-message",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, angle:COACH_ACTION})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.message){ box.innerHTML=`<div class="mn-msg-err">${escapeHtml(j.error||"Impossible de préparer le message, réessaie.")}</div>`; return; }
-    box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— uniquement ses abonnés, aucun chiffre d'argent</span></div>`
+    box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— filtré pour ne parler que de ses abonnés, relis avant d'envoyer</span></div>`
       +`<div class="mn-msg-txt">${escapeHtml(j.message)}</div>`
       +`<button class="mn-act-btn" id="mnMsgCopy">📋 Copier</button>`
       +` <button class="mn-act-btn ghost" id="mnMsgSend">📨 Envoyer dans son ticket</button>`;
