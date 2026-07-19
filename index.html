@@ -2623,7 +2623,12 @@ async function sendVaMessage(btn, va, message){
     const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
       body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach", thread:true})});
     const j=await r.json().catch(()=>({}));
-    if(r.ok && j.ok && j.added>0){ btn.textContent="✔ Envoyé à "+va; if(typeof toast==="function") toast("📨 Envoyé", va+" le recevra dans son ticket."); }
+    if(r.ok && j.ok && j.added>0){ btn.textContent="✔ Envoyé à "+va; if(typeof toast==="function") toast("📨 Envoyé", va+" le recevra dans son fil."); }
+    else if(r.ok && j.ok && j.refuses && j.refuses.length){
+      // Le filtre a tout supprimé : ne PAS laisser croire que c'est parti.
+      btn.textContent="⛔ Bloqué"; btn.disabled=false;
+      if(typeof toast==="function") toast("⛔ Message bloqué", "Il contenait des infos que le VA ne doit pas voir. Reformule en ne parlant que de ses abonnés.");
+    }
     else if(r.ok && j.ok){ btn.textContent="déjà en attente"; btn.disabled=false; }
     else { btn.textContent="⚠️ Échec"; btn.disabled=false; }
   }catch(e){ btn.textContent="⚠️ Échec"; btn.disabled=false; }
