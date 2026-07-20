@@ -2793,13 +2793,22 @@ async function speakServerChunks(text, onStart){
   let played=false;
   for(let i=0;i<chunks.length;i++){
     if(seq!==_speakSeq) return true;
-    const audio = i===0 ? first : await nextP;
+    let audio = i===0 ? first : await nextP;
     if(i+1<chunks.length) nextP=ttsFetch(chunks[i+1]);  // précharge le suivant AVANT de jouer
     if(!audio){
-      // Un morceau n'a pas pu être généré (quota TTS) : plutôt que de SAUTER ce
-      // contenu, on lit tout le reste avec la voix du téléphone (rien n'est perdu).
-      if(seq===_speakSeq){ if(typeof onStart==="function"){ try{ onStart(); }catch(e){} } speakText(chunks.slice(i).join(" ")); }
-      return true;
+      // Un morceau a échoué (quota TTS, qui se rétablit en moins d'une minute).
+      // On RÉESSAIE la belle voix au lieu de basculer sur celle du téléphone :
+      // changer de voix en plein briefing s'entend beaucoup plus qu'un court
+      // silence. On ne retombe sur le téléphone qu'en dernier recours.
+      for(let essai=0; essai<2 && !audio; essai++){
+        await new Promise(r=>setTimeout(r, 3000*(essai+1)));
+        if(seq!==_speakSeq) return true;
+        audio = await ttsFetch(chunks[i]);
+      }
+      if(!audio){
+        if(seq===_speakSeq){ if(typeof onStart==="function"){ try{ onStart(); }catch(e){} } speakText(chunks.slice(i).join(" ")); }
+        return true;
+      }
     }
     if(!played && typeof onStart==="function"){ played=true; try{ onStart(); }catch(e){} }
     await new Promise(res=>{
