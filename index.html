@@ -1502,7 +1502,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadHours(); loadConversion(); loadRailway(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -3052,7 +3052,7 @@ function renderRailway(){
   // Rapport coût / revenus : la seule façon de savoir si l'infra est chère.
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
   const net=Number((om.totals||{}).netMonth)||0;
-  const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+(Number(c.amount)||0),0):0;
+  const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+(Number(c.m)||0),0):0;   // la cle est `m` (pas `amount`) : avec `amount` le total valait toujours 0
   const totalOutils=d.total+outils;
   const pourCent = net>0 ? (totalOutils/net*100) : null;
   const gros=actifs[0];
@@ -3077,6 +3077,7 @@ function renderRailway(){
         <button class="mn-act-btn" id="rwBillSave" style="padding:6px 12px">Enregistrer</button>
       </div>
     </div>`;
+  try{ fixPairs(); }catch(e){}   // la visibilite du panneau vient de changer
   const b=$("#rwBillSave");
   if(b) b.onclick=async()=>{
     const val=parseFloat(($("#rwBill")||{}).value); if(!(val>=0)) return;
