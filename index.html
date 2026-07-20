@@ -664,7 +664,11 @@
   .sec-head.pin .t{color:var(--gold)}
   .sec-head .rule{flex:1;height:1px;background:var(--line)}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+  /* Flex plutôt que grid : en grille, une carte seule sur la dernière ligne
+     gardait la largeur d'UNE colonne et laissait un grand vide à côté. En flex,
+     les cartes de la dernière ligne s'étirent pour occuper toute la largeur. */
+  .grid{display:flex;flex-wrap:wrap;gap:13px}
+  .grid > *{flex:1 1 220px;min-width:220px}
   .card{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;display:flex;flex-direction:column;gap:11px;transition:transform .15s,border-color .15s,box-shadow .15s}
   .card:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(0,0,0,.75)}
   .card.featured{border-top-color:var(--acc)}
