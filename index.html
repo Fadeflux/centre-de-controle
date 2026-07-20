@@ -227,7 +227,7 @@
   .jr-time{font-size:11px;color:var(--faint);white-space:nowrap}
   .jr-empty{font-size:13px;color:var(--faint)}
 
-  .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
+  .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:18px 0 0}
   .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
   .pb-head .act:hover{background:var(--acc-bg)}
@@ -529,12 +529,17 @@
   .fr-total{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
   .fr-days{font-size:11px;color:var(--down);font-weight:600;white-space:nowrap;min-width:56px;text-align:right}
   .fr-empty{font-size:13px;color:var(--muted);padding:6px 0}
-  .pair-row{display:grid;grid-template-columns:1fr;gap:16px;margin:16px 0 0}
+  .pair-row{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0 0}
   .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
+  /* ⚠️ min-width:0 EST OBLIGATOIRE : un enfant de grille vaut `auto` par défaut,
+     il refuse donc de rétrécir sous la largeur de son contenu et DÉBORDE (mesuré :
+     385 px dans un conteneur de 343 px sur mobile) — c'est ce qui permettait de
+     faire glisser la page latéralement. Le retour à la ligne complète la garde. */
+  .pair-row > *{min-width:0;overflow-wrap:anywhere}
   /* `stretch` (au lieu de `start`) : les deux panneaux d'une rangée font la MÊME
      hauteur. Ceux qui savent grandir (ex : le graphique des heures) remplissent
      la place au lieu de laisser un grand vide sous eux. */
-  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:stretch} .pair-row > .panel-box.solo{grid-column:1 / -1} }
+  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
   .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
   .pie-total b{color:var(--text);font-size:18px;font-weight:800}
   .pie-note{font-size:11px;color:var(--muted);margin-top:10px}
@@ -574,7 +579,7 @@
      prend la place libre plutôt que de laisser un blanc en bas. */
   #hours{display:flex;flex-direction:column}
   #hoursBody{flex:1;display:flex;flex-direction:column}
-  .hr-grid{display:flex;align-items:flex-end;gap:2px;flex:1;min-height:92px;margin:6px 0 4px}
+  .hr-grid{display:flex;align-items:flex-end;gap:2px;flex:1;min-height:150px;margin:6px 0 4px}
   .hr-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
   .hr-b{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));min-height:2px;transition:height .35s}
   .hr-b.top{background:linear-gradient(180deg,#facc15,#f59e0b)}
@@ -657,7 +662,7 @@
   .tile.hero .val{color:var(--acc)}
   .tile .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
 
-  .section{margin:22px 0 24px}
+  .section{margin:16px 0 14px}
   #sections{margin-top:6px}
   .sec-head{display:flex;align-items:center;gap:12px;margin:0 2px 13px}
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
