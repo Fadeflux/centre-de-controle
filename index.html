@@ -1816,13 +1816,17 @@ function renderPaie(data){
   const total = vas.reduce((a,v)=>a+(Number(v.pay)||0),0), totalSubs = vas.reduce((a,v)=>a+(Number(v.subs)||0),0);
   const rows = vas.map(v=>{
     const paid=isPaid(v.va);
-    const btn = paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>` : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`;
+    // `unpaid` = associée/perso : jamais payée -> ni bouton « Payer », ni comptée
+    // dans « x/N payés » (sinon le compteur ne peut jamais atteindre son total).
+    const btn = v.unpaid ? `<span class="pv-note">perso · 0 paie</span>`
+      : (paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>` : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`);
     return `<div class="pv-row ${paid?"pv-done":""}"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span>${btn}</div>`;
   }).join("");
-  const paidCount = vas.filter(v=>isPaid(v.va)).length;
+  const aPayer = vas.filter(v=>!v.unpaid);
+  const paidCount = aPayer.filter(v=>isPaid(v.va)).length;
   const hist = PAYMENTS.slice(0,15).map(p=>`<div class="pay-h-row"><span>${escapeHtml(p.va)}</span><span class="pay-h-d">${new Date(p.ts).toLocaleDateString("fr-FR")}</span><span class="pay-h-a">${fmtCur(p.amount)}</span></div>`).join("") || `<div class="tk-empty">Aucun paiement encore.</div>`;
   $("#paieBody").innerHTML = rows
-    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note">${paidCount}/${vas.length} payés</span></div>`
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note">${paidCount}/${aPayer.length} payés</span></div>`
     + `<details class="pay-hist"><summary>📜 Historique de paie</summary><div class="pay-h-list">${hist}</div></details>`;
 }
 $("#paieBody").addEventListener("click",e=>{
@@ -1869,6 +1873,10 @@ function suggestGoal(){
 }
 function renderGoal(data){
   if(!GOAL){
+    // Ne PAS reconstruire le bloc si l'utilisateur est en train de saisir :
+    // le rafraîchissement automatique (60 s) effaçait ce qu'il tapait.
+    const enCours=$("#goalInput");
+    if(enCours && (document.activeElement===enCours || (enCours.value||"").length)) return;
     const sg=suggestGoal();
     $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
       + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.affiche}</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
@@ -2102,7 +2110,9 @@ const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,per
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
-  if(!OM_DATA) return;
+  // Même sans données OM, les panneaux qui dépendent de HIDE doivent être
+  // re-rendus (sinon un clic sur 🙈 laissait des montants en clair).
+  if(!OM_DATA){ try{ renderRenta(); renderHistory(); }catch(e){} return; }
   const d=OM_DATA, cur=d.currency||"$", models=Object.keys(d.models||{});
   $("#om").style.display="block";
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
@@ -2120,7 +2130,8 @@ function renderOM(){
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${fmtLtv(d.models[m].ltv,cur)}</div><div class="om-model-marge ${(d.models[m].marge||0)>=0?'pos':'neg'}">Marge ${(d.models[m].marge||0)>=0?'+':''}${omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   let vas=(d.vas||[]).slice(); vas.sort((a,b)=> OM_SORT==="rev"?(b.rev-a.rev): OM_SORT==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
   const vaRows=vas.slice(0,20).map((v,i)=>{const bad=!v.unpaid && v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`);
-    // Objectif de subs de la quinzaine (jauge). Progrès = subs du mois vs objectif.
+    // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
+  // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
     let goalHtml;
     if(v.unpaid){ goalHtml=""; }
@@ -2148,7 +2159,7 @@ async function loadVaGoals(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BA
 async function saveVaGoals(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-goals",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goals:VA_GOALS})}); }catch(e){} }
 function setVaGoal(va){
   const cur=Number(VA_GOALS[va])||0;
-  const v=prompt(`Objectif de subs de la quinzaine pour ${va} :`, cur||"");
+  const v=prompt(`Objectif de subs DU MOIS pour ${va} :`, cur||"");
   if(v===null) return;
   const n=Math.round(Number(String(v).replace(",","."))||0);
   if(n>0) VA_GOALS[va]=n; else delete VA_GOALS[va];
@@ -2833,8 +2844,13 @@ async function speakServerChunks(text, onStart){
     }
     if(!played && typeof onStart==="function"){ played=true; try{ onStart(); }catch(e){} }
     await new Promise(res=>{
-      try{ _ttsAudio.onended=res; _ttsAudio.onerror=res; _ttsAudio.src="data:audio/wav;base64,"+audio; const p=_ttsAudio.play(); if(p&&p.catch) p.catch(()=>res()); }
-      catch(e){ res(); }
+      // `pause` est écouté EN PLUS de `ended`/`error` : stopSpeaking() met en
+      // pause, ce qui ne déclenche ni l'un ni l'autre — la boucle restait alors
+      // bloquée sur cette promesse et la lecture ne repartait plus.
+      let fini=false; const fin=()=>{ if(!fini){ fini=true; res(); } };
+      try{ _ttsAudio.onended=fin; _ttsAudio.onerror=fin; _ttsAudio.onpause=fin;
+           _ttsAudio.src="data:audio/wav;base64,"+audio; const p=_ttsAudio.play(); if(p&&p.catch) p.catch(fin); }
+      catch(e){ fin(); }
     });
   }
   return played;
@@ -3093,6 +3109,18 @@ function renderRailway(){
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
 // la comparaison des deux qui est parlante — bien convertir et ramener des fans
 // qui dépensent sont DEUX qualités différentes.
+// Tarif RÉELLEMENT payé par sub, dérivé des données du serveur (pay = rev - marge)
+// plutôt que codé en dur : si OF_SUB_PRICE change côté serveur, les simulations
+// suivaient un ancien 0,50 $ et affichaient des marges fausses.
+function tarifVaReel(){
+  try{
+    const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>0);
+    if(!vas.length) return 0.5;
+    const taux=vas.map(v=>Math.max(0,(Number(v.rev)||0)-(Number(v.marge)||0))/(Number(v.subs)||1)).filter(x=>x>0);
+    if(!taux.length) return 0.5;
+    return taux.reduce((a,b)=>a+b,0)/taux.length;
+  }catch(e){ return 0.5; }
+}
 let CONV_DATA=null;
 async function loadConversion(){
   if(!TOKEN) return;
@@ -3117,7 +3145,7 @@ function renderConversion(){
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>
       <span class="sv-cell"><b>${v.clics.toLocaleString("fr-FR")}</b> clics → <b>${v.subs}</b> abonnés</span>
       <span class="sv-part ${cls}">${v.cvr} %</span>
-      <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b>`:""}</span></div>`;
+      <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b><span style="opacity:.6"> (depuis le début)</span>`:""}</span></div>`;
   }).join("");
   const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${l.cvr} %</b></span></div>`).join("");
   // 🎭 Par MODÈLE : à trafic comparable, celui qui convertit moins a un souci de
@@ -3284,7 +3312,7 @@ function renderSim(){
     const joursRestants=Math.max(1,lastD-now.getDate()+1);
     const parVa = per==="jour" ? n*joursRestants : n;      // total ajouté par VA d'ici la fin du mois
     const ltv=Number((om.totals||{}).ltv)||0;
-    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*0.5, marge=rev-pay;
+    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*tarifVaReel(), marge=rev-pay;
     const netM=Number((om.totals||{}).netMonth)||0;
     const intro = per==="jour"
       ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
@@ -3300,7 +3328,7 @@ function renderSim(){
     const v=vas.find(x=>x.va===sel.value); if(!v){ $("#simMultRes").innerHTML=""; return; }
     const k=parseFloat(mu.value)||2, subs=Number(v.monthSubs)||0, add=Math.round(subs*(k-1));
     const ltv=Number((om.totals||{}).ltv)||0, netM=Number((om.totals||{}).netMonth)||0;
-    const rev=add*ltv, pay=v.unpaid?0:add*0.5, marge=rev-pay;
+    const rev=add*ltv, pay=v.unpaid?0:add*tarifVaReel(), marge=rev-pay;
     const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
     if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
     $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
