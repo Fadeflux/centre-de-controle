@@ -539,11 +539,19 @@
   /* `stretch` (au lieu de `start`) : les deux panneaux d'une rangée font la MÊME
      hauteur. Ceux qui savent grandir (ex : le graphique des heures) remplissent
      la place au lieu de laisser un grand vide sous eux. */
-  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:start} .pair-row > .panel-box.solo{grid-column:1 / -1} }
+  @media (min-width:860px){ .pair-row{grid-template-columns:1fr 1fr;align-items:stretch} .pair-row > .panel-box.solo{grid-column:1 / -1} }
+  /* Panneaux appairés : même hauteur ET contenu qui occupe la place. Sans le
+     `flex:1` sur le corps, le panneau court affichait un bloc vide en bas. */
+  @media (min-width:860px){
+    .pair-row > .panel-box{display:flex;flex-direction:column}
+    .pair-row > .panel-box > div:last-child{flex:1;display:flex;flex-direction:column;justify-content:center}
+    .pair-row > .panel-box > .pb-head{flex:0 0 auto}
+  }
   .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
   .pie-total b{color:var(--text);font-size:18px;font-weight:800}
   .pie-note{font-size:11px;color:var(--muted);margin-top:10px}
-  .pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .pie-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .pie-svg{width:clamp(140px,42%,190px);height:auto}
   .pie-svg{flex:0 0 auto}
   .pie-legend{flex:1;min-width:160px}
   .pie-lg{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:14px}
@@ -676,7 +684,7 @@
   /* Les cartes s'étirent pour ne pas laisser de vide, mais PAS au-delà du double
      d'une carte normale : une carte seule occupant toute la largeur ressemblait
      à un bandeau vide plutôt qu'à une carte. */
-  .grid > *{flex:1 1 220px;min-width:220px;max-width:480px}
+  .grid > *{flex:1 1 280px;min-width:0}
   .card{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;display:flex;flex-direction:column;gap:11px;transition:transform .15s,border-color .15s,box-shadow .15s}
   .card:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(0,0,0,.75)}
   .card.featured{border-top-color:var(--acc)}
