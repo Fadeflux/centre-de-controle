@@ -668,7 +668,10 @@
      gardait la largeur d'UNE colonne et laissait un grand vide à côté. En flex,
      les cartes de la dernière ligne s'étirent pour occuper toute la largeur. */
   .grid{display:flex;flex-wrap:wrap;gap:13px}
-  .grid > *{flex:1 1 220px;min-width:220px}
+  /* Les cartes s'étirent pour ne pas laisser de vide, mais PAS au-delà du double
+     d'une carte normale : une carte seule occupant toute la largeur ressemblait
+     à un bandeau vide plutôt qu'à une carte. */
+  .grid > *{flex:1 1 220px;min-width:220px;max-width:480px}
   .card{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:15px 16px 13px;display:flex;flex-direction:column;gap:11px;transition:transform .15s,border-color .15s,box-shadow .15s}
   .card:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 12px 28px -14px rgba(0,0,0,.75)}
   .card.featured{border-top-color:var(--acc)}
@@ -1219,7 +1222,13 @@ const TOOLS = [
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
-  { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", external:true, metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
+  // ⚠️ `ext:true` sur les 2 liens : DiddySMS renvoie `frame-ancestors 'none'` +
+  // `X-Frame-Options: DENY` (vérifié), donc l'ouvrir dans un onglet interne
+  // afficherait une page blanche. Getatext bloque aussi les clients non-navigateur.
+  // Ces deux-là s'ouvrent donc forcément dans un onglet du navigateur.
+  { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", external:true,
+    links:[{n:"DiddySMS",u:"https://diddysms.com",ext:true},{n:"Getatext",u:"https://getatext.com",ext:true}],
+    metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
@@ -1296,9 +1305,17 @@ function cardHTML(t, data){
     body = `<div class="metrics">${m}</div>`;
   }
   const restartBtn = (t.restart && TOKEN) ? `<button class="restart-btn" data-restart="${escapeHtml(t.restart)}" data-restartname="${escapeHtml(t.name)}" title="Redémarrer ce bot">🔄 Redémarrer</button>` : "";
+  // `links` = plusieurs destinations pour un même outil (ex : les 2 fournisseurs
+  // de SMS). Un bouton par destination, ce qui remplit aussi la carte quand elle
+  // s'étire sur toute la largeur.
+  const multi = Array.isArray(t.links) && t.links.length
+    ? t.links.map(l=>`<a class="open" href="${escapeHtml(l.u)}" ${l.ext?"":`data-openurl="${escapeHtml(l.u)}" data-openid="${escapeHtml(t.id+"-"+l.n)}" data-openname="${escapeHtml(l.n)}"`} target="_blank" rel="noopener">${escapeHtml(l.n)}</a>`).join("")
+    : "";
   const foot = t.build
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
-    : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${(t.openUrl && !t.external)?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a>${restartBtn}</div>`;
+    : multi
+      ? `<div class="card-foot">${multi}${restartBtn}</div>`
+      : `<div class="card-foot"><a class="open ${t.openUrl?"":"disabled"}" href="${t.openUrl||"#"}" ${(t.openUrl && !t.external)?`data-openurl="${escapeHtml(t.openUrl)}" data-openid="${t.id}" data-openname="${escapeHtml(t.name)}"`:""} target="_blank" rel="noopener">${t.openUrl?"Ouvrir":"URL à définir"}</a>${restartBtn}</div>`;
   return `<div class="card ${t.featured?"featured":""}">
     <div class="card-top"><div class="ico">${t.icon}</div><div class="card-name">${t.name}</div>${star}${dot}</div>
     ${body}${foot}</div>`;
