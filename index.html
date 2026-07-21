@@ -1522,7 +1522,6 @@ async function doLogin(){
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
   closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
-loadCosts();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -3627,6 +3626,7 @@ loadLeaks();
 loadIdentity();
 loadTgrev();
 loadFirstSale();
+loadCosts();
 loadHours();
 loadConversion();
 loadRailway();
