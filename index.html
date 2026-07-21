@@ -108,6 +108,10 @@
   .costs-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .costs-add input:focus{border-color:var(--acc)}
   #costName{flex:1;min-width:0} #costAmount{width:96px}
+  .co-due{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;margin-left:auto}
+  .co-due.co-ok{color:var(--muted);background:var(--surface-2)}
+  .co-due.co-soon{color:#facc15;background:color-mix(in srgb,#facc15 14%,transparent)}
+  .co-due.co-late{color:#f87171;background:color-mix(in srgb,#f87171 16%,transparent)}
   .co-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .co-row:last-child{border-bottom:0}
   .co-name{flex:1;word-break:break-word}
@@ -1121,6 +1125,8 @@
       <div class="costs-add">
         <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
         <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
+        <input id="costDue" type="date" title="Prochaine échéance (facultatif) — je te préviens 3 jours avant" />
+        <select id="costEvery" title="Récurrence"><option value="mois">tous les mois</option><option value="an">tous les ans</option><option value="semaine">chaque semaine</option></select>
       </div>
       <div id="costsList"></div>
     </div>
@@ -1515,7 +1521,8 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadHours(); loadConversion(); loadRailway(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+loadCosts();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1602,18 +1609,53 @@ renderRappels();
 
 /* ---------- dépenses d'outils ---------- */
 let COSTS = JSON.parse(localStorage.getItem("ccn_costs") || "[]");
-function saveCosts(){ localStorage.setItem("ccn_costs", JSON.stringify(COSTS)); }
+function saveCosts(){
+  localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
+  // On pousse aussi au cerveau : c'est lui qui tourne 24h/24 et qui pourra te
+  // prévenir AVANT l'échéance (le localStorage seul ne prévient personne).
+  if(typeof TOKEN!=="undefined" && TOKEN){
+    fetch(HUB_BASE+"/api/hub/tool-costs",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({outils:COSTS})}).catch(()=>{});
+  }
+}
+// Au chargement : on récupère la liste du cerveau (elle fait foi entre appareils).
+async function loadCosts(){
+  if(typeof TOKEN==="undefined" || !TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tool-costs",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(Array.isArray(j.outils) && (j.outils.length || !COSTS.length)){
+      COSTS=j.outils; localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
+      renderCosts(); if(typeof renderRenta==="function") renderRenta();
+    } else if(COSTS.length){ saveCosts(); }   // 1re fois : on envoie ce qu'on a en local
+  }catch(e){}
+}
 function renderCosts(){
   const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
   $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
   if(!COSTS.length){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
-  $("#costsList").innerHTML = COSTS.map((c,i)=>`<div class="co-row"><span class="co-name">${escapeHtml(c.n)}</span><span class="co-amt">${fmtMoney(Number(c.m)||0)}</span><button class="co-del" data-cdel="${i}" aria-label="Supprimer">✕</button></div>`).join("");
+  // Compte à rebours : ce qui arrive dans <= 3 jours passe en orange, en retard en rouge.
+  const jours=(d)=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(d||"")) return null;
+    const a=d.split("-").map(Number), n=new Date();
+    return Math.round((Date.UTC(a[0],a[1]-1,a[2])-Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))/86400000); };
+  $("#costsList").innerHTML = COSTS.map((c,i)=>{
+    let ech="";
+    const j=jours(c.due);
+    if(j!=null){
+      const cls = j<0 ? "co-late" : (j<=3 ? "co-soon" : "co-ok");
+      const txt = j<0 ? `en retard de ${Math.abs(j)} j` : (j===0 ? "aujourd'hui" : `dans ${j} j`);
+      ech=`<span class="co-due ${cls}">${escapeHtml(txt)}</span>`;
+    }
+    return `<div class="co-row"><span class="co-name">${escapeHtml(c.n)}</span>${ech}<span class="co-amt">${fmtMoney(Number(c.m)||0)}</span><button class="co-del" data-cdel="${i}" aria-label="Supprimer">✕</button></div>`;
+  }).join("");
 }
 function addCost(){
   const n=$("#costName").value.trim(), m=parseFloat(String($("#costAmount").value).replace(",","."));
   if(!n || isNaN(m)) return;
-  COSTS.push({n:n,m:m}); saveCosts(); renderCosts(); renderRenta();
-  $("#costName").value=""; $("#costAmount").value=""; $("#costName").focus();
+  const due=($("#costDue")||{}).value||"", every=(($("#costEvery")||{}).value)||"mois";
+  const o={n:n,m:m}; if(due){ o.due=due; o.every=every; }
+  COSTS.push(o); saveCosts(); renderCosts(); renderRenta();
+  $("#costName").value=""; $("#costAmount").value=""; if($("#costDue")) $("#costDue").value=""; $("#costName").focus();
 }
 $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
