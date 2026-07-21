@@ -2609,21 +2609,26 @@ function renderMorning(){
   $("#morningBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
-    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${money(tot.netMonth)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
-    <div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
+    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth, money)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
+    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
     <div class="mn-tasks"><h4>${ev?"📋 À préparer pour demain":"📋 Ta journée"} ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
     <div class="mn-quote">💬 ${escapeHtml(quote)}</div>
     <button class="mn-go" id="mnGo">${ev?"Bonne soirée 🌙":"Commencer ma journée →"}</button>`;
-  const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE)) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
+  const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo()) animateCount(mv,tot.netMonth||0,v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
   const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
   renderCoachAction();   // le modal vient d'être reconstruit : on repeint l'action du jour
 }
+// Revenus indisponibles (API OnlyMonster KO) : on affiche « — », JAMAIS 0 $.
+// Un zéro affiché comme un vrai chiffre a fait dire au coach « on est à zéro
+// dollar aujourd'hui » alors que le mois était à 3 582 $.
+function revKo(){ try{ return !!(typeof OM_DATA!=="undefined" && OM_DATA && OM_DATA.revenusIndisponibles); }catch(e){ return false; } }
+function moneyOuTiret(v, f){ return revKo() ? "—" : f(v); }
 let COACH_TEXT="", COACH_ACTION="";
 // ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
 // « coach »), et c'est ce tag qui permet au coach de te relancer demain si elle
