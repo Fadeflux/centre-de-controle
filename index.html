@@ -119,6 +119,22 @@
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  /* 🏦 Trésorerie OnlyFans */
+  .tr-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .tr-big{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
+  .tr-lbl{font-size:12.5px;color:var(--muted)}
+  /* flex-wrap : les 4 éléments sont en nowrap ; sans repli, un nom de modèle long
+     déborderait la grille sur mobile (bug déjà vécu sur d'autres panneaux). */
+  .tr-row{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+  .tr-row .n{font-weight:600}
+  .tr-row .d{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+  .tr-row .p{font-variant-numeric:tabular-nums;color:var(--faint);font-size:11.5px;white-space:nowrap}
+  .tr-mode{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .tr-mode.man{color:#facc15;background:color-mix(in srgb,#facc15 14%,transparent)}
+  .tr-mode.auto{color:var(--muted);background:var(--surface-2)}
+  .tr-go{display:inline-block;margin-top:11px;font-size:12.5px;font-weight:600;color:var(--acc-ink);
+    border:1px solid var(--acc-line);border-radius:8px;padding:6px 12px;text-decoration:none}
+  .tr-go:hover{background:var(--acc-bg)}
   .tgrev{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .tg-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .tg-tot{margin-left:auto;font-size:12px;color:var(--acc);font-weight:700}
@@ -1133,6 +1149,10 @@
   </div>
 
   <div class="pair-row">
+    <div class="panel-box" id="tres" style="display:none">
+      <div class="pb-head">🏦 Ton argent sur OnlyFans</div>
+      <div id="tresBody"></div>
+    </div>
     <div class="panel-box" id="badges" style="display:none">
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
@@ -1521,7 +1541,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTresorerie(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1544,7 +1564,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -3096,6 +3116,64 @@ function renderBadges(){
     </div>`;
   const fs=$("#bpFirstSale"); if(fs) fs.onchange=()=>saveFirstSale(fs.value);
 }
+// 🏦 TRÉSORERIE ONLYFANS : l'argent gagné mais pas encore encaissé.
+//
+// ⚠️ Ce panneau est en LECTURE SEULE. Le bouton OUVRE OnlyFans dans un onglet,
+// il ne déclenche aucun virement : l'API OnlyMonster n'a aucun endpoint de
+// retrait, et un mouvement d'argent doit rester une action humaine.
+// (OnlyFans refuse l'iframe -> onglet externe, comme DiddySMS/Getatext.)
+let TRES_DATA=null;
+async function loadTresorerie(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tresorerie",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    TRES_DATA=await r.json(); renderTresorerie();
+  }catch(e){}
+}
+function renderTresorerie(){
+  const panel=$("#tres"); if(!panel) return;
+  const d=TRES_DATA;
+  if(!d || d.indisponible || !Array.isArray(d.modeles) || !d.modeles.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
+  const manuels=d.modeles.filter(m=>m.mode==="manual");
+  const delai=(d.modeles.find(m=>m.delaiJours>0)||{}).delaiJours||0;
+
+  const lignes=d.modeles.map(m=>`<div class="tr-row">
+      <span class="n">${escapeHtml(m.nom)}</span>
+      <span class="tr-mode ${m.mode==="manual"?"man":"auto"}">${escapeHtml(m.modeLabel||m.mode)}</span>
+      <span class="d">${money(m.dispo)}</span>
+      ${m.attente?`<span class="p">+${money(m.attente)}</span>`:""}
+    </div>`).join("");
+
+  // Le chiffre seul ne sert à rien : ce qui compte, c'est POURQUOI il grossit.
+  const note = manuels.length
+    ? `⚠️ ${manuels.length>1?"Tes comptes sont réglés":"Un compte est réglé"} sur versement <b>à la main</b> :
+       OnlyFans ne t'envoie rien tant que tu ne le demandes pas.
+       ${d.jamaisRetire?"Aucune demande de retrait n'a jamais été enregistrée.":""}
+       Passe-les en versement <b>hebdomadaire</b> et l'argent arrivera tout seul.`
+    : `Versement automatique actif : l'argent part tout seul, rien à faire.`;
+
+  // ⚠️ Lecture incomplète : on n'affiche JAMAIS un total amputé comme s'il était
+  // le total. « au moins X $ » + bandeau nommant le compte manquant — même règle
+  // que les revenus, où un faux chiffre a déjà fait prendre une mauvaise décision.
+  const alerte = d.partiel
+    ? `<div class="sv-note" style="color:#f87171">⚠️ Total incomplet : je n'ai pas pu lire
+       ${escapeHtml((d.manquants||[]).join(", "))}. Il y a <b>plus</b> que ce montant.</div>`
+    : "";
+
+  $("#tresBody").innerHTML=`
+    <div class="tr-top"><span class="tr-big">${money(d.dispo)}</span><span class="tr-lbl">${d.partiel?"au minimum (lecture incomplète)":"retirables maintenant"}</span></div>
+    ${alerte}
+    ${d.attente?`<div class="tr-lbl">+ ${money(d.attente)} en route${delai?` (dispo après ${delai} j)`:""}${d.minRetrait?` · minimum ${money(d.minRetrait)} par retrait`:""}</div>`:""}
+    <div style="margin-top:10px">${lignes}</div>
+    <div class="sv-note">${note}</div>
+    <a class="tr-go" href="https://onlyfans.com/my/banking" target="_blank" rel="noopener"
+       title="Ouvre OnlyFans dans un onglet. Si tu n'arrives pas directement sur la page : Earnings → Request Payout.">Ouvrir OnlyFans ↗</a>`;
+  if(typeof fixPairs==="function") fixPairs();
+}
+
 // 🚂 COÛT RAILWAY : ce que l'infra consomme, projet par projet, et surtout ce que
 // ça pèse face à ce qu'elle rapporte. C'est une ESTIMATION (Railway ne donne que
 // l'usage projeté, converti aux tarifs publics, hors abonnement) — on le dit.
@@ -3630,6 +3708,7 @@ loadCosts();
 loadHours();
 loadConversion();
 loadRailway();
+loadTresorerie();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
