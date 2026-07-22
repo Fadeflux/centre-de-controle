@@ -761,7 +761,12 @@
   .mn-coach-msg{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .mn-msg-hd{font-size:12px;font-weight:700;color:var(--acc-ink);margin-bottom:7px}
   .mn-msg-note{font-weight:500;color:var(--muted)}
-  .mn-msg-txt{font-size:14px;line-height:1.5;color:var(--ink);white-space:pre-wrap;margin-bottom:10px}
+  /* Zone ÉDITABLE : le message du coach est une proposition, pas un verdict —
+     on doit pouvoir le retoucher avant de l'envoyer. */
+  .mn-msg-txt{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:14px;line-height:1.5;
+    color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;margin-bottom:10px;resize:vertical;min-height:88px}
+  .mn-msg-txt:focus{outline:none;border-color:var(--acc-line);background:var(--surface)}
   .mn-msg-err{font-size:13px;color:#f87171}
   .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
   .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
@@ -2735,14 +2740,24 @@ async function prepareVaMessage(btn,va){
     const r=await fetch(HUB_BASE+"/api/hub/va-message",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, angle:COACH_ACTION})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.message){ box.innerHTML=`<div class="mn-msg-err">${escapeHtml(j.error||"Impossible de préparer le message, réessaie.")}</div>`; return; }
-    box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— filtré pour ne parler que de ses abonnés, relis avant d'envoyer</span></div>`
-      +`<div class="mn-msg-txt">${escapeHtml(j.message)}</div>`
+    // Le texte est une PROPOSITION : zone modifiable, et c'est le contenu à
+    // l'écran qui part (pas la version d'origine). Le cerveau refiltre de toute
+    // façon avant Discord, donc retoucher ne peut pas faire fuiter d'info.
+    box.innerHTML=`<div class="mn-msg-hd">✉️ Message pour ${escapeHtml(j.va||va)} <span class="mn-msg-note">— modifiable : relis, corrige, puis envoie</span></div>`
+      +`<textarea class="mn-msg-txt" id="mnMsgTxt" spellcheck="true" rows="4"></textarea>`
       +`<button class="mn-act-btn" id="mnMsgCopy">📋 Copier</button>`
       +` <button class="mn-act-btn ghost" id="mnMsgSend">📨 Envoyer dans son ticket</button>`;
+    const ta=$("#mnMsgTxt");
+    if(ta){
+      ta.value=j.message;                                  // .value : pas d'échappement HTML à faire
+      const grandir=()=>{ ta.style.height="auto"; ta.style.height=Math.min(400,ta.scrollHeight+2)+"px"; };
+      grandir(); ta.addEventListener("input",()=>{ grandir(); const s2=$("#mnMsgSend"); if(s2&&s2.disabled===false) s2.textContent="📨 Envoyer dans son ticket"; });
+    }
+    const lire=()=>((ta&&ta.value)||j.message||"").trim();
     const c=$("#mnMsgCopy");
-    if(c) c.onclick=()=>{ try{ navigator.clipboard.writeText(j.message); c.textContent="✔ Copié"; c.disabled=true; }catch(e){} };
+    if(c) c.onclick=()=>{ try{ navigator.clipboard.writeText(lire()); c.textContent="✔ Copié"; setTimeout(()=>{ c.textContent="📋 Copier"; },1600); }catch(e){} };
     const s=$("#mnMsgSend");
-    if(s) s.onclick=()=>sendVaMessage(s, j.va||va, j.message);
+    if(s) s.onclick=()=>sendVaMessage(s, j.va||va, lire());
   }catch(e){ box.innerHTML=`<div class="mn-msg-err">Connexion impossible, réessaie.</div>`; }
   finally{ btn.disabled=false; btn.textContent=old; }
 }
@@ -2754,9 +2769,22 @@ async function sendVaMessage(btn, va, message){
   const old=btn.textContent; btn.disabled=true; btn.textContent="⏳ Envoi…";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
-      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach", thread:true})});
+      // ⚠️ `thread:false` VOULU. Le fil « Subs » est réservé aux notifications
+      // automatiques d'abonnés ; un message personnel du boss y était noyé, alors
+      // que le bouton promet « dans son ticket ». Dans le ticket, le bot mentionne
+      // en plus le propriétaire — le VA est donc notifié pour de bon.
+      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach", thread:false})});
     const j=await r.json().catch(()=>({}));
-    if(r.ok && j.ok && j.added>0){ btn.textContent="✔ Envoyé à "+va; if(typeof toast==="function") toast("📨 Envoyé", va+" le recevra dans son fil."); }
+    // ⚠️ « Envoyé » était un MENSONGE : le message est mis en FILE, et le bot
+    // Discord ne la relève que toutes les VA_RELANCE_POLL_SEC secondes. Le bouton
+    // affichait « ✔ Envoyé à Welzy » alors que rien n'était encore parti — on
+    // regarde le ticket, il est vide, on croit que le bouton est cassé.
+    if(r.ok && j.ok && j.added>0){ btn.textContent="📬 En file d'attente"; if(typeof toast==="function") toast("📬 Message en file", va+" le recevra dans son fil d'ici une minute."); }
+    else if(r.ok && j.ok && j.partis && j.partis.length){
+      // VA archivé : personne ne lira ce message, il ne faut pas laisser croire l'inverse.
+      btn.textContent="⛔ A quitté l'équipe"; btn.disabled=false;
+      if(typeof toast==="function") toast("⛔ Non envoyé", va+" est archivé : plus aucun message ne lui est transmis.");
+    }
     else if(r.ok && j.ok && j.refuses && j.refuses.length){
       // Le filtre a tout supprimé : ne PAS laisser croire que c'est parti.
       btn.textContent="⛔ Bloqué"; btn.disabled=false;
