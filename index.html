@@ -2236,7 +2236,7 @@ function renderOM(){
       ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
       : "");
   const tiles=`<div class="om-tiles">
-    <div class="tile"><div class="lbl">Net du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${mnt(net)} ${delta}</div></div>
+    <div class="tile"><div class="lbl">CA brut du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${mnt(net)} ${delta}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
     <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
@@ -2261,7 +2261,10 @@ function renderOM(){
     return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${ko?'':(mp?'pos':'neg')}">${ko?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
-  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaRows;
+  // Rappel honnête : tout ici est du BRUT (avant la commission OnlyFans). Le vrai
+  // net, les 2 % Skrill et la part modèle se calculent sur Noctra Finance.
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
+  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaRows+noteBrut;
   renderRenta();
   renderHistory();
   renderBadges();
@@ -2373,7 +2376,7 @@ function renderVersus(){
   const ltv=v=>HIDE?"•••":(Number(v)||0).toFixed(2).replace(".",",")+" "+cur;
   // rentabilité = marge du mois (déjà calculée côté cerveau)
   const rows=[
-    ["Net du mois", money(A.net), money(B.net), (Number(A.net)||0), (Number(B.net)||0)],
+    ["CA brut du mois", money(A.net), money(B.net), (Number(A.net)||0), (Number(B.net)||0)],
     ["Subs du mois", HIDE?"•••":fmtInt(A.subs||0), HIDE?"•••":fmtInt(B.subs||0), (Number(A.subs)||0), (Number(B.subs)||0)],
     ["LTV (par sub)", ltv(A.ltv), ltv(B.ltv), (Number(A.ltv)||0), (Number(B.ltv)||0)],
     ["Rentabilité (marge)", money(A.marge), money(B.marge), (Number(A.marge)||0), (Number(B.marge)||0)],
@@ -2464,14 +2467,14 @@ function renderRenta(){
   const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):(day>0?Math.round(profitNet/day*dim):profitNet);
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
-    <div class="rn-line"><span>Revenus du mois</span><span class="rn-v">${money(netMonth)}</span></div>
+    <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
-    <div class="rn-line rn-total"><span>= Profit (avant part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
-    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet)}</b> de revenus${F&&F.net.low!=null?` <span style="opacity:.75">(entre ${money(F.net.low)} et ${money(F.net.high)})</span>`:""} · ~<b>${money(projProfit)}</b> de profit.</div>
+    <div class="rn-line rn-total"><span>= Marge brute (avant 20 % OF & part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet)}</b> de CA brut${F&&F.net.low!=null?` <span style="opacity:.75">(entre ${money(F.net.low)} et ${money(F.net.high)})</span>`:""} · ~<b>${money(projProfit)}</b> de marge brute.</div>
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
-    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>net OnlyMonster</b> (déjà après la commission OnlyFans 20 %). Les <b>2 % Skrill</b> et la <b>part reversée à la modèle</b> se gèrent sur ton site finance.</div>`;
+    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>CA brut</b> (AVANT la commission OnlyFans de 20 %). Ton <b>net réel</b>, les <b>2 % Skrill</b> et la <b>part modèle</b> se calculent sur ton site <b>Noctra Finance</b>.</div>`;
 }
 function renderSplit(){
   const panel=$("#split"); if(!panel) return;
@@ -2636,7 +2639,7 @@ function makeDayCard(){
   // ⛔ Cette image QUITTE le système (envoyée à l'associée, à l'équipe). Un « 0 $ »
   // gravé dedans est irrattrapable : sans revenus lus, on grave « — ».
   const arg=v=>revKo()?"—":money(v);
-  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["Net du mois",arg(tot.netMonth)],["À payer",(st.aPayer==null?"—":money(st.aPayer))]];
+  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["CA brut du mois",arg(tot.netMonth)],["À payer",(st.aPayer==null?"—":money(st.aPayer))]];
   const sy=290;
   for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*225; x.fillStyle="#141416"; roundRect(x,bx,by,440,195,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 29px Inter,Arial,sans-serif"; x.fillText(stats[i][0],bx+34,by+56); x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(stats[i][1],bx+34,by+146); }
   let vy=sy+2*225+70; x.fillStyle=acc; x.font="bold 40px Inter,Arial,sans-serif"; x.fillText("🏆 Top VA",80,vy);
@@ -2745,7 +2748,7 @@ function renderMorning(){
   $("#morningBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
-    <div class="mn-money"><div class="lbl">💰 Net du mois</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth, money)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
+    <div class="mn-money"><div class="lbl">💰 CA brut du mois</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth, money)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
     ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
@@ -3071,7 +3074,7 @@ function speakBriefing(){
     let p=[hi+" "+name+"."];
     if(today!=null) p.push(today+" sub"+(today>1?"s":"")+" aujourd'hui.");
     // La voix ne dit pas « zéro dollar » quand elle ne sait pas : elle se tait sur l'argent.
-    if(tot.netMonth!=null && !hidden && !revKo()) p.push("Net du mois : "+Math.round(tot.netMonth)+" dollars.");
+    if(tot.netMonth!=null && !hidden && !revKo()) p.push("Chiffre d'affaires brut du mois : "+Math.round(tot.netMonth)+" dollars.");
     if(topVA) p.push(topVA+" est en tête.");
     p.push(undone?(undone+" tâche"+(undone>1?"s":"")+" à faire."):"Aucune tâche en attente.");
     let spoken=false;
@@ -3109,7 +3112,7 @@ function showWidgetHelp(){
   const scriptable=`// Widget Scriptable — colle dans un widget Scriptable\nconst r=await new Request("${url}");\nr.headers={"x-hub-token":"${tok}"};\nconst d=await r.loadJSON();\nconst w=new ListWidget();\nw.addText("Noctra");\nlet a=w.addText((d.netMonth??"—")+" $");\na.font=Font.boldSystemFont(26);\nw.addText(d.line||"");\nScript.setWidget(w);\nScript.complete();`;
   $("#widgetHelpBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">📱 Widget iPhone</div><button class="mn-close" id="whClose">✕</button></div>
-    <div class="mn-date">Ton résumé (net du mois + subs) sur l'écran d'accueil, sans ouvrir le site.</div>
+    <div class="mn-date">Ton résumé (CA brut + subs) sur l'écran d'accueil, sans ouvrir le site.</div>
     <div class="mn-next" style="line-height:1.6">La façon la plus simple : l'app gratuite <b>Scriptable</b>.
       <ol style="margin:10px 0 0;padding-left:20px;font-size:14px;color:var(--muted);line-height:1.7">
         <li>Installe <b>Scriptable</b> depuis l'App Store.</li>
@@ -3326,7 +3329,7 @@ function renderRailway(){
     <div class="sv-note">
       ${reel
         ? `Facture du mois : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
-           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton net du mois.`:""}
+           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton CA brut du mois.`:""}
            ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse ${gros.part!=null?gros.part:"?"} % de la facture.`:""}`
         : `⚠️ Railway ne me donne pas de montant facturé, et son estimation d'usage varie trop d'un appel à l'autre pour être prise pour de l'argent.
            Ce qui est fiable, c'est la <b>part de chaque projet</b> ci-dessus.
