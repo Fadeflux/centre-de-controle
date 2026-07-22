@@ -1893,7 +1893,23 @@ function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now
   // Prévient le bot : il postera "ta paie a été envoyée" dans le ticket du VA (montant > 0 uniquement → exclut le perso à 0)
   if(TOKEN && (Number(amount)||0)>0){ fetch(HUB_BASE+"/api/hub/pay-notify",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, amount:Number(amount)||0, period:curPeriod()})}).then(()=>{ if(typeof toast==="function") toast("💸 Paie marquée",va+" — le bot prévient le VA dans son ticket"); }).catch(()=>{}); }
 }
-function unpayVa(va){ const p=curPeriod(); PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments(); renderPaie(LAST); }
+// ⚠️ Annuler ici ne suffisait pas : le VA avait déjà reçu « ta paie vient d'être
+// envoyée ✅ » avec le montant. Il n'a rien réclamé et a attendu un virement qui
+// n'arrivait pas, pendant qu'on le croyait au courant. On prévient le cerveau,
+// qui retire la notification si elle n'est pas encore partie, ou fait poster une
+// correction dans le ticket si elle l'est.
+function unpayVa(va){
+  const p=curPeriod();
+  PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments(); renderPaie(LAST);
+  if(!TOKEN) return;
+  fetch(HUB_BASE+"/api/hub/pay-notify/cancel",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify({va:va, period:p})})
+    .then(r=>r.json()).then(j=>{
+      if(typeof toast!=="function") return;
+      if(j && j.correctionEnvoyee) toast("↩️ Correction envoyée", va+" avait déjà été prévenu : le bot lui dit que le versement n'est pas parti.");
+      else if(j && j.retireeDeLaFile) toast("↩️ Annulé à temps", va+" n'a jamais reçu le message de paie.");
+    }).catch(()=>{});
+}
 function renderPaie(data){
   const vas = ((data["stats-tracker"]||{}).vas)||[];
   if(!vas.length){ $("#paie").style.display="none"; return; }
