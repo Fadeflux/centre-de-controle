@@ -1390,16 +1390,22 @@ function render(data){
 
   const live = TOOLS.filter(t=>!t.build && inWorld(t));
   const onCount = live.filter(t=>(data[t.id]||{}).status==="online").length;
-  const gg = (id,k)=>{ const d=data[id]; return d&&d.metrics?Number(d.metrics[k])||0:0; };
+  // ⚠️ « ABSENT » ET « ZÉRO » SONT DEUX CHOSES DIFFÉRENTES.
+  // `Number(x)||0` transformait une métrique manquante (le cerveau envoie `null`
+  // quand il ne sait pas) en « 0 $ ». On lisait « À payer 0 $ » / « Profit 0 $ »
+  // en haut de page pendant que la carte juste en dessous affichait « — » pour la
+  // même donnée. Deux chiffres contradictoires, et c'est le chiffré qui gagne.
+  const gg = (id,k)=>{ const d=data[id]; if(!d||!d.metrics) return null;
+    const v=d.metrics[k]; return (v==null||v==="")?null:(Number(v)||0); };
+  const tiret = (v,f)=> v==null ? "—" : f(v);
   const stInW = inWorld(toolById("stats-tracker"));
   const tiles = [`<div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>`];
   if(stInW){
-    tiles.push(`<div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${fmtMoney(gg("stats-tracker","aPayer"))}</div></div>`);
-    tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${fmtInt(gg("stats-tracker","subsQuinzaine"))}</div></div>`);
+    tiles.push(`<div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
+    tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
   }
-  let profit = 0;
-  if(inWorld(toolById("noctra-finance"))) profit += gg("noctra-finance","profitMonth");
-  tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${fmtMoney(profit)}</div></div>`);
+  const pf = inWorld(toolById("noctra-finance")) ? gg("noctra-finance","profitMonth") : 0;
+  tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${tiret(pf,fmtMoney)}</div></div>`);
   $("#summary").innerHTML = tiles.join("");
   { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const isMoney=/\$/.test(raw); animateCount(el,num,v=> isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR")); } }); } }
 
@@ -2194,21 +2200,41 @@ function renderOM(){
   if(!OM_DATA){ try{ renderRenta(); renderHistory(); }catch(e){} return; }
   const d=OM_DATA, cur=d.currency||"$", models=Object.keys(d.models||{});
   $("#om").style.display="block";
+  // ⛔ REVENUS MUETS : ce panneau affichait « 0 $ », « LTV 0,00 » en rouge et
+  // « ROI −1,0× » pour TOUTE l'équipe alors qu'aucun revenu n'avait été lu —
+  // c'est l'écran qui a failli faire virer un VA rentable le 2026-07-21.
+  // Le pop-up du matin savait dire « — » ; celui-ci, non. Un seul juge désormais :
+  // revKo(). Les ABONNÉS restent affichés : eux sont bien mesurés.
+  const ko=revKo();
+  const mnt=(v)=>ko?"—":omMoney(v,cur);         // tout montant
+  const ltvT=(v)=>ko?"—":fmtLtv(v,cur);         // toute LTV
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
   if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
   else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
-  const delta=(OM_MODEL==="all")?deltaHTML(d.totals.netMonth,d.totals.netLastMonth):"";
+  const delta=(!ko && OM_MODEL==="all")?deltaHTML(d.totals.netMonth,d.totals.netLastMonth):"";
+  // Deux avertissements distincts : « je ne sais rien » et « je ne sais pas tout ».
+  const bandeauKo=ko
+    ? `<div class="om-prep" style="border-left:3px solid #f87171;margin-bottom:10px">⚠️ Revenus illisibles en ce moment — tous les montants affichent « — ». Ce n'est <b>pas</b> zéro. Les abonnés, eux, sont justes.</div>`
+    : (d.revenusPartiels
+      ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
+      : "");
   const tiles=`<div class="om-tiles">
-    <div class="tile"><div class="lbl">Net du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${omMoney(net,cur)} ${delta}</div></div>
+    <div class="tile"><div class="lbl">Net du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${mnt(net)} ${delta}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
     <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
     <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div>
-    <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${fmtLtv((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv,cur)}</div></div></div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${omMoney(d.models[m].net,cur)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${fmtLtv(d.models[m].ltv,cur)}</div><div class="om-model-marge ${(d.models[m].marge||0)>=0?'pos':'neg'}">Marge ${(d.models[m].marge||0)>=0?'+':''}${omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
-  let vas=(d.vas||[]).slice(); vas.sort((a,b)=> OM_SORT==="rev"?(b.rev-a.rev): OM_SORT==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
-  const vaRows=vas.slice(0,20).map((v,i)=>{const bad=!v.unpaid && v.ltv<0.5,mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=rr==null?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`);
+    <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${ltvT((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv)}</div></div></div>`;
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${ko?'':((d.models[m].marge||0)>=0?'pos':'neg')}">Marge ${ko?"—":((d.models[m].marge||0)>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  let vas=(d.vas||[]).slice();
+  const tri = ko ? "subs" : OM_SORT;   // classer par argent inconnu = classement au hasard
+  vas.sort((a,b)=> tri==="rev"?(b.rev-a.rev): tri==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
+  const vaRows=vas.slice(0,20).map((v,i)=>{
+    // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
+    // « LTV 0,00 » en rouge, « −91 $ » de marge et « ROI −1,0× » — un tableau où
+    // toute l'équipe paraît déficitaire alors qu'on n'a rien lu.
+    const bad=!ko && !v.unpaid && v.ltv<0.5, mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(ko?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
@@ -2216,9 +2242,10 @@ function renderOM(){
     if(v.unpaid){ goalHtml=""; }
     else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal; goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
     else { goalHtml=`<span class="omv-goal"><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Fixer un objectif de subs">🎯 fixer un objectif</button></span>`; }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${omMoney(v.rev,cur)}</span><span class="omv-l ${bad?'lo':''}">LTV ${fmtLtv(v.ltv,cur)}</span><span class="omv-m ${mp?'pos':'neg'}">${mp?'+':''}${omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
-  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${OM_SORT==="rev"?"par 💰 généré":OM_SORT==="marge"?"par 📈 marge":"par 👥 subs"}</button></div>`;
-  $("#omBody").innerHTML=tiles+modelsRow+vaHead+vaRows;
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${ko?'':(mp?'pos':'neg')}">${ko?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+  // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
+  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
+  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaRows;
   renderRenta();
   renderHistory();
   renderBadges();
@@ -2398,6 +2425,15 @@ function renderHistory(){
 }
 function renderRenta(){
   if(!OM_DATA){ $("#renta").style.display="none"; return; }
+  // ⛔ Sans revenus lus, ce panneau fabriquait un COMPTE DE RÉSULTAT COMPLET :
+  // « Revenus 0 $ », coût des VA, perte du mois et projection de fin de mois —
+  // une perte inventée de toutes pièces, mise en page comme un vrai bilan.
+  if(revKo()){
+    $("#renta").style.display="block";
+    $("#rentaBody").innerHTML=`<div class="sv-note">⚠️ Je n'arrive pas à lire tes revenus en ce moment, donc je ne calcule <b>ni</b> ta rentabilité <b>ni</b> ta projection : ce serait une perte inventée. Le compte de résultat revient dès que la source répond.</div>`;
+    if(typeof fixPairs==="function") fixPairs();
+    return;
+  }
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
@@ -2447,15 +2483,26 @@ function renderSplit(){
   { const a=$("#spWme"); if(a) a.onchange=setW; } { const b=$("#spWother"); if(b) b.onchange=setW; }
   { const p=$("#spPct"); if(p) p.onchange=()=>{ localStorage.setItem("ccn_split",String(Math.min(100,Math.max(0,parseInt(p.value,10)||50)))); renderSplit(); }; }
 }
+// ⛔ LES CHIFFRES DE DÉMO NE SERVENT QU'À LA VITRINE (pas de cerveau configuré).
+// Ils ne doivent JAMAIS apparaître en cas de panne : ce sont des montants
+// inventés (720 $, Welzy à 22,83× de ROI) portant les VRAIS prénoms des VA, sans
+// rien qui les distingue de vraies données. Une coupure réseau affichait donc un
+// mois entier de chiffres qui n'ont jamais existé — pire qu'un zéro, parce que
+// c'est plausible. En panne : on le DIT, on n'invente pas.
+function omIndispo(msg){
+  const b=$("#omBody"); if(!b) return;
+  $("#om").style.display="block";
+  b.innerHTML=`<div class="om-prep">⚠️ ${escapeHtml(msg)}<br><span style="opacity:.75">Aucun chiffre n'est affiché tant que je ne peux pas les lire — mieux vaut rien qu'un montant faux.</span></div>`;
+}
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
   try{
     const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
-    if(!r.ok){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } return; }
+    if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
     OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway();
-  }catch(e){ if(!OM_DATA){ OM_DATA=DEMO_OM; renderOM(); } }
+  }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
@@ -2570,7 +2617,10 @@ function makeDayCard(){
   x.fillStyle=acc; x.font="600 33px Inter,Arial,sans-serif"; const dt=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}); x.fillText("Résumé du "+dt,80,205);
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{}, cur=om.currency||"$";
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["Net du mois",money(tot.netMonth)],["À payer",money(st.aPayer)]];
+  // ⛔ Cette image QUITTE le système (envoyée à l'associée, à l'équipe). Un « 0 $ »
+  // gravé dedans est irrattrapable : sans revenus lus, on grave « — ».
+  const arg=v=>revKo()?"—":money(v);
+  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["Net du mois",arg(tot.netMonth)],["À payer",(st.aPayer==null?"—":money(st.aPayer))]];
   const sy=290;
   for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*225; x.fillStyle="#141416"; roundRect(x,bx,by,440,195,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 29px Inter,Arial,sans-serif"; x.fillText(stats[i][0],bx+34,by+56); x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(stats[i][1],bx+34,by+146); }
   let vy=sy+2*225+70; x.fillStyle=acc; x.font="bold 40px Inter,Arial,sans-serif"; x.fillText("🏆 Top VA",80,vy);
@@ -2647,6 +2697,10 @@ function computeStreak(){
 function animateCount(el,to,fmt,dur){ to=Number(to)||0; dur=dur||900; const start=performance.now(); (function step(now){ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3); el.textContent=fmt(Math.round(to*e)); if(p<1) requestAnimationFrame(step); })(performance.now()); setTimeout(()=>{ el.textContent=fmt(to); }, dur+150); }
 function paceVerdict(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
+  // ⛔ Sans revenus, ce verdict sortait « 🚀 Bon rythme — projection ~0 $ » EN VERT,
+  // juste sous la bannière rouge « Revenus indisponibles ». Deux affirmations
+  // contradictoires côte à côte, et c'est la rassurante qui reste en tête.
+  if(revKo()) return null;
   const cur=om.currency||"$", nm=Number(om.totals.netMonth)||0, lm=Number(om.totals.netLastMonth)||0;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const FV=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net:null;
@@ -3000,7 +3054,8 @@ function speakBriefing(){
     const undone=(typeof TASKS!=="undefined")?["moi","other","general"].reduce((a,k)=>a+((TASKS[k]||[]).filter(t=>!t.done).length),0):0;
     let p=[hi+" "+name+"."];
     if(today!=null) p.push(today+" sub"+(today>1?"s":"")+" aujourd'hui.");
-    if(tot.netMonth!=null && !hidden) p.push("Net du mois : "+Math.round(tot.netMonth)+" dollars.");
+    // La voix ne dit pas « zéro dollar » quand elle ne sait pas : elle se tait sur l'argent.
+    if(tot.netMonth!=null && !hidden && !revKo()) p.push("Net du mois : "+Math.round(tot.netMonth)+" dollars.");
     if(topVA) p.push(topVA+" est en tête.");
     p.push(undone?(undone+" tâche"+(undone>1?"s":"")+" à faire."):"Aucune tâche en attente.");
     let spoken=false;
@@ -3453,6 +3508,15 @@ function renderSim(){
   const panel=$("#sim"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, vas=(om.vas||[]), cur=om.currency||"$";
   if(!vas.length){ panel.style.display="none"; return; }
+  // ⛔ Sans revenus, la marge d'un VA vaut exactement « − ce qu'il coûte », donc le
+  // simulateur concluait « le couper est rentable » EN VERT pour n'importe qui.
+  // C'est littéralement la décision qu'on a failli prendre le 2026-07-21.
+  if(revKo()){
+    panel.style.display="block";
+    $("#simBody").innerHTML=`<div class="sv-note">⚠️ Simulateur en pause : sans tes revenus, la marge de chaque VA vaut « moins ce qu'il coûte », et je conclurais que couper n'importe qui est rentable. Reviens quand la source répond.</div>`;
+    try{ fixPairs(); }catch(e){}
+    return;
+  }
   panel.style.display="block";
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   // money() produit déjà le « − » : préfixer un « + » en dur donnait « +-320 $ ».
