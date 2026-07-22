@@ -2694,9 +2694,17 @@ let COACH_TEXT="", COACH_ACTION="";
 // ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
 // « coach »), et c'est ce tag qui permet au coach de te relancer demain si elle
 // n'est toujours pas faite.
+// Un VA PUBLIE et amène du trafic ; il ne parle jamais aux abonnés (il n'est pas
+// chatteur). Si l'action porte sur les abonnés eux-mêmes, elle est POUR TOI :
+// on n'affiche pas « Écrire à … », qui enverrait au VA une consigne impossible.
+// (Vécu : « appelle Welzy pour lui demander de relancer ses abonnés inactifs ».)
+// On teste le verbe AVEC son objet dans la même proposition : « relance Welzy » est
+// une consigne normale, « relance ses abonnés » ne l'est pas.
+const ACT_CHAT=/(relanc\w*|r[ée]activ\w*|r[ée]engag\w*|r[ée]veill\w*|fid[ée]lis\w*|convertir|[ée]cri\w*|envo\w*|message\w*|\bDM\b|\bPPV\b|sexting)[^.,;!?\n]{0,30}?(abonn[ée]s?|\bfans?\b|\bsubs?\b|(?:les|des|ses|leurs)\s+(?:inactifs?|dormants?))/i;
 // Retrouve le VA visé par l'action du jour (le coach le nomme dans sa phrase).
 function coachVaName(){
   try{
+    if(ACT_CHAT.test(COACH_ACTION||"")) return "";
     const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).map(v=>v.va).filter(Boolean);
     const low=(COACH_ACTION||"").toLowerCase();
     return vas.find(n=>low.indexOf(String(n).toLowerCase())>=0)||"";
