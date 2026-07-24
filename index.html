@@ -715,6 +715,8 @@
   .star:hover{color:var(--gold)} .star.on{color:var(--gold)}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--idle);flex-shrink:0}
   .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(74,222,128,.15)} .dot.off{background:var(--down);box-shadow:0 0 0 3px rgba(248,113,113,.15)}
+  .dot.warn{background:#f0b429;box-shadow:0 0 0 3px rgba(240,180,41,.18)}
+  .card-note{font-size:12px;color:#f0b429;margin:2px 0 8px;font-weight:600}
   .metrics{display:flex;gap:20px;flex-wrap:wrap;min-height:40px}
   .metric .m-lbl{font-size:11px;color:var(--faint)}
   .metric .m-val{font-size:20px;font-weight:600;letter-spacing:-.3px;margin-top:2px;display:flex;align-items:baseline;gap:5px}
@@ -1264,6 +1266,8 @@ const TOOLS = [
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+  { id:"noctra-ig-worker", world:"noctra", cat:"Noctra", name:"Publication IG", icon:"▶", openUrl:"https://noctra-ig-worker-production.up.railway.app",
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes KO",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   // ⚠️ `ext:true` sur les 2 liens : DiddySMS renvoie `frame-ancestors 'none'` +
@@ -1285,6 +1289,7 @@ const DEMO = {
   "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]},vas:[{va:"Welzy",subs:120,pay:60},{va:"Prince",subs:88,pay:44},{va:"Yohan",subs:66,pay:33}]},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
+  "noctra-ig-worker":{status:"online",metrics:{postsJour:9,comptesKo:0,alertesNonLues:0},prev:{postsJour:7},series:{postsJour:[4,7,9,12,10,8,9]}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
   "sms":{status:"online",metrics:{diddysms:38,getatext:8}},
 };
@@ -1310,7 +1315,7 @@ function setWorld(w){
   applyAccent(); render(LAST);
 }
 
-function statusClass(s){ return s==="online"?"on":s==="offline"?"off":""; }
+function statusClass(s){ return s==="online"?"on":s==="offline"?"off":s==="warn"?"warn":""; }
 function toolById(id){ return TOOLS.find(t=>t.id===id); }
 
 function sparkSVG(arr){
@@ -1346,7 +1351,9 @@ function cardHTML(t, data){
       const spark = (raw!=null && d.series && d.series[mt.k]) ? sparkSVG(d.series[mt.k]) : "";
       return `<div class="metric"><div class="m-lbl">${mt.l}</div><div class="m-val">${val}${delta}</div>${spark}</div>`;
     }).join("");
-    body = `<div class="metrics">${m}</div>`;
+    // `note` = un état à faire ressortir (ex : « EN PAUSE »), envoyé par le cerveau.
+    const note = d.note ? `<div class="card-note">🛑 ${escapeHtml(String(d.note))}</div>` : "";
+    body = `${note}<div class="metrics">${m}</div>`;
   }
   const restartBtn = (t.restart && TOKEN) ? `<button class="restart-btn" data-restart="${escapeHtml(t.restart)}" data-restartname="${escapeHtml(t.name)}" title="Redémarrer ce bot">🔄 Redémarrer</button>` : "";
   // `links` = plusieurs destinations pour un même outil (ex : les 2 fournisseurs
