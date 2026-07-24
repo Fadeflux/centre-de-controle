@@ -152,6 +152,32 @@
   .cj-bar.best{background:linear-gradient(180deg,#4ade80,color-mix(in srgb,#4ade80 45%,transparent))}
   .cj-days{display:flex;gap:3px;margin-top:5px}
   .cj-days span{flex:1;min-width:0;text-align:center;font-size:9.5px;color:var(--faint)}
+  /* petit rappel du brut sous un montant net */
+  .tile-sub{font-size:11px;color:var(--faint);margin-top:3px;font-weight:500}
+  /* 🎯 ligne d'objectif posée sur le graphe CA/jour */
+  .cj-wrap{position:relative}
+  .cj-goal{position:absolute;left:0;right:0;border-top:2px dashed #facc15;pointer-events:none}
+  .cj-goal span{position:absolute;right:0;top:-19px;font-size:10.5px;font-weight:700;color:#facc15;background:var(--bg);padding:1px 6px;border-radius:6px}
+  /* 📇 nom de VA cliquable -> fiche */
+  .omv-va{cursor:pointer;text-decoration:underline dotted transparent;transition:.15s}
+  .omv-va:hover{color:var(--acc-ink);text-decoration-color:var(--acc-line)}
+  .vacard-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+  .vacard-stat{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .vacard-stat .l{font-size:11px;color:var(--muted);font-weight:600}
+  .vacard-stat .v{font-size:17px;font-weight:800;margin-top:2px}
+  .vacard-stat .s{font-size:10.5px;color:var(--faint);margin-top:1px}
+  .vacard-btns{display:flex;gap:8px;margin-top:4px}
+  .vacard-btns button{flex:1;font:inherit;font-size:13px;font-weight:600;border-radius:10px;padding:9px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);color:var(--text)}
+  .vacard-btns button:hover{border-color:var(--acc-line);background:var(--acc-bg)}
+  /* ⚖️ quinzaine vs précédente */
+  .qz-team{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .qz-big{font-size:25px;font-weight:800}
+  .qz-prev{font-size:12.5px;color:var(--muted)}
+  .qz-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+  .qz-row .n{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .qz-row .c{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700}
+  .qz-row .p{font-variant-numeric:tabular-nums;color:var(--faint);font-size:11.5px}
+  .qz-up{color:var(--ok);font-weight:700} .qz-dn{color:var(--down);font-weight:700} .qz-eq{color:var(--muted)}
   /* 👁 Choix des panneaux visibles */
   .ppick{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
   .ppick-box{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:20px 20px 16px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto}
@@ -1148,8 +1174,13 @@
   </div>
 
   <div class="panel-box" id="cajours" style="display:none">
-    <div class="pb-head">📅 CA brut par jour <span class="mn-msg-note" id="cjCap"></span></div>
+    <div class="pb-head">📅 CA par jour <span class="mn-msg-note" id="cjCap"></span></div>
     <div id="cjBody"></div>
+  </div>
+
+  <div class="panel-box" id="quinz" style="display:none">
+    <div class="pb-head">⚖️ Quinzaine vs précédente <span class="mn-msg-note" id="qzCap"></span></div>
+    <div id="qzBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1611,7 +1642,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTresorerie(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTresorerie(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2267,6 +2298,9 @@ renderRoutines();
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
 const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+// Ce que tu touches vraiment ≈ brut × 78 % (20 % OnlyFans + 2 % Skrill) — la
+// même règle que Noctra Finance. Le NET s'affiche en premier, le brut en petit.
+const NET_RATE=0.78;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -2283,6 +2317,9 @@ function renderOM(){
   const ko=revKo();
   const mnt=(v)=>ko?"—":omMoney(v,cur);         // tout montant
   const ltvT=(v)=>ko?"—":fmtLtv(v,cur);         // toute LTV
+  // 💡 Le NET d'abord, le brut en petit (comme OnlyFans) : net estimé = brut
+  // × 78 % (20 % OnlyFans + 2 % Skrill, la même règle que le site finances).
+  const netE=(v)=>ko?"—":omMoney((Number(v)||0)*NET_RATE,cur);
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
   if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
@@ -2295,7 +2332,7 @@ function renderOM(){
       ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
       : "");
   const tiles=`<div class="om-tiles">
-    <div class="tile"><div class="lbl">CA brut du mois${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${mnt(net)} ${delta}</div></div>
+    <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netE(net)} ${delta}</div><div class="tile-sub">brut : ${mnt(net)}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
     <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
@@ -2525,16 +2562,22 @@ function renderRenta(){
   const projTg=day>0?Math.round(tgMonth/day*dim):tgMonth;
   const projNet=F?F.net.value:(day>0?Math.round(netMonth/day*dim):netMonth);
   const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):(day>0?Math.round(profitNet/day*dim):profitNet);
+  // Le vrai profit retire la commission plateforme (brut × 22 %) — avant, le
+  // panneau la « oubliait » et surestimait le profit d'un quart.
+  const commission=Math.round(netMonth*(1-NET_RATE));
+  const profitReel=profitNet-commission;
+  const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE));
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
+    <div class="rn-line"><span>− Commission OnlyFans + Skrill (22 %)</span><span class="rn-v neg">−${money(commission)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
-    <div class="rn-line rn-total"><span>= Marge brute (avant 20 % OF & part modèle)</span><span class="rn-v ${profitNet>=0?'pos':'neg'}">${profitNet>=0?'':'−'}${money(Math.abs(profitNet))}</span></div>
-    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet)}</b> de CA brut${F&&F.net.low!=null?` <span style="opacity:.75">(entre ${money(F.net.low)} et ${money(F.net.high)})</span>`:""} · ~<b>${money(projProfit)}</b> de marge brute.</div>
+    <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span> · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
-    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Chiffre = <b>CA brut</b> (AVANT la commission OnlyFans de 20 %). Ton <b>net réel</b>, les <b>2 % Skrill</b> et la <b>part modèle</b> se calculent sur ton site <b>Noctra Finance</b>.</div>`;
+    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 78 % (20 % OnlyFans + 2 % Skrill), la même règle que ton site finances. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
 }
 function renderSplit(){
   const panel=$("#split"); if(!panel) return;
@@ -2827,7 +2870,7 @@ function renderMorning(){
   $("#morningBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
-    <div class="mn-money"><div class="lbl">💰 CA brut du mois</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth, money)}</div><div class="sub">${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
+    <div class="mn-money"><div class="lbl">💰 Net du mois (est.)</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth!=null?tot.netMonth*NET_RATE:tot.netMonth, money)}</div><div class="sub">brut : <b>${moneyOuTiret(tot.netMonth, money)}</b> · ${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
     ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
@@ -3883,6 +3926,97 @@ function toggleReorder(){ REORDERING=!REORDERING; document.body.classList.toggle
 function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > .panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
+/* ---------- 📇 fiche VA : clique sur un prénom dans le classement ---------- */
+function openVaCard(vaName){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
+  const v=(om.vas||[]).find(x=>x.va===vaName); if(!v) return;
+  const cur=om.currency||"$", ko=revKo();
+  const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
+  const arg=x=>ko?"—":money(x);
+  const conv=((typeof CONV_DATA!=="undefined"&&CONV_DATA&&CONV_DATA.vas)||[]).find(x=>x.va===vaName);
+  const qz=((typeof QUINZ_DATA!=="undefined"&&QUINZ_DATA&&QUINZ_DATA.vas)||[]).find(x=>x.va===vaName);
+  const goal=Number(((typeof VA_GOALS!=="undefined"&&VA_GOALS)||{})[vaName])||0;
+  const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>👤 ${escapeHtml(vaName)}${v.unpaid?' <span class="mn-msg-note">· perso, jamais payée</span>':''}</h3>
+    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(vaName)}, au même endroit.</div>
+    <div class="vacard-stats">
+      ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):"pas d'objectif fixé")}
+      ${stat("Abonnés au total", fmtInt(v.subs||0))}
+      ${stat("Net généré (est.)", ko?"—":money((Number(v.rev)||0)*NET_RATE), ko?"":"brut : "+money(v.rev))}
+      ${stat("LTV (par abonné)", ko?"—":fmtLtv(v.ltv,cur))}
+      ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
+      ${stat("Quinzaine", qz?fmtInt(qz.cur):"—", qz?("précédente : "+fmtInt(qz.prev)):"")}
+    </div>
+    <div class="vacard-btns">
+      <button data-vc="goal">🎯 Objectif</button>
+      <button data-vc="msg">✉️ Lui écrire</button>
+      <button data-vc="close">Fermer</button>
+    </div></div>`;
+  ov.addEventListener("click",async e=>{
+    if(e.target===ov){ ov.remove(); return; }
+    const b=e.target.closest("[data-vc]"); if(!b) return;
+    const act=b.getAttribute("data-vc");
+    if(act==="close"){ ov.remove(); return; }
+    if(act==="goal"){ ov.remove(); if(typeof setVaGoal==="function") setVaGoal(vaName); return; }
+    if(act==="msg"){
+      // Message direct dans son ticket, via la même file que le coach (le
+      // cerveau re-filtre : jamais d'argent ni d'autres membres dans le texte).
+      const msg=prompt("Message pour "+vaName+" (posté dans son ticket Discord d'ici ~1 min) :","");
+      if(!msg||!msg.trim()) return;
+      b.disabled=true; b.textContent="⏳";
+      try{
+        const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+          body:JSON.stringify({va:vaName,title:"💬 Message de ton boss",body:msg.trim().slice(0,900),reason:"coach",thread:false})});
+        const j=await r.json().catch(()=>({}));
+        if(r.ok&&j.ok&&j.added>0){ b.textContent="📬 En file"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."); }
+        else if(j&&j.refuses&&j.refuses.length){ b.disabled=false; b.textContent="⛔ Bloqué"; if(typeof toast==="function") toast("⛔ Non envoyé","Le message contenait une info interdite pour un VA (argent…). Reformule."); }
+        else if(j&&j.partis&&j.partis.length){ b.textContent="⛔ Parti(e)"; }
+        else { b.disabled=false; b.textContent="✉️ Lui écrire"; }
+      }catch(e2){ b.disabled=false; b.textContent="✉️ Lui écrire"; }
+    }
+  });
+  document.body.appendChild(ov);
+}
+
+/* ---------- ⚖️ quinzaine vs précédente ---------- */
+let QUINZ_DATA=null;
+async function loadQuinz(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/quinzaines",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    QUINZ_DATA=await r.json(); renderQuinz();
+  }catch(e){}
+}
+function renderQuinz(){
+  const panel=$("#quinz"); if(!panel) return;
+  const d=QUINZ_DATA;
+  if(!d||!Array.isArray(d.vas)||!d.vas.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  $("#qzCap").textContent="— "+(d.curLabel||"")+" · jour "+d.joursEcoules+"/"+d.joursTotal;
+  // Comparaison HONNÊTE : la quinzaine en cours est incomplète -> on compare au
+  // prorata des jours écoulés, pas au total final de la précédente.
+  const ratio=d.joursTotal>0?d.joursEcoules/d.joursTotal:1;
+  const fleche=(c,p)=>{ if(!p&&c) return `<span class="qz-up">🆕</span>`;
+    const att=p*ratio; if(!att&&!c) return `<span class="qz-eq">·</span>`;
+    return c>=att*1.1?`<span class="qz-up">▲</span>`:(c<att*0.9?`<span class="qz-dn">▼</span>`:`<span class="qz-eq">≈</span>`); };
+  const projEquipe=d.joursEcoules>0?Math.round(d.totalCur/d.joursEcoules*d.joursTotal):d.totalCur;
+  $("#qzBody").innerHTML=`
+    <div class="qz-team"><span class="qz-big">${fmtInt(d.totalCur)} subs</span>
+      <span class="qz-prev">vs <b>${fmtInt(d.totalPrev)}</b> la quinzaine précédente ${fleche(d.totalCur,d.totalPrev)}</span>
+      <span class="qz-prev">· à ce rythme ~<b>${fmtInt(projEquipe)}</b> en fin de quinzaine</span></div>
+    ${d.vas.map(x=>`<div class="qz-row"><span class="n omv-va" title="Voir la fiche">${escapeHtml(x.va)}</span>
+      ${fleche(x.cur,x.prev)}<span class="c">${fmtInt(x.cur)}</span><span class="p">vs ${fmtInt(x.prev)}</span></div>`).join("")}
+    <div class="sv-note">▲/▼ = comparé au prorata des jours écoulés (${d.joursEcoules}/${d.joursTotal}), pas au total final — sinon la quinzaine en cours perdrait toujours.</div>`;
+  if(typeof fixPairs==="function") fixPairs();
+}
+// Un prénom cliqué OÙ QUE CE SOIT (classement, quinzaines…) ouvre la fiche.
+document.addEventListener("click",e=>{
+  const vc=e.target.closest(".omv-va"); if(!vc) return;
+  const nom=(vc.textContent||"").trim(); if(nom) openVaCard(nom);
+});
+
 /* ---------- 🔠 taille du texte (écran 16" : « je vois rien ») ---------- */
 // zoom sur #home uniquement : le tableau de bord grossit, mais PAS les outils
 // embarqués (eux occupent déjà tout l'écran) ni les barres du haut.
@@ -3915,7 +4049,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 })();
 
 /* ---------- 🧭 menu de sections ---------- */
-const SECNAV=[["sections","🛠 Outils"],["om","💰 Argent"],["cajours","📅 CA/jour"],["tres","🏦 Banque"],
+const SECNAV=[["sections","🛠 Outils"],["om","💰 Argent"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
   ["renta","📊 Renta"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
@@ -3933,7 +4067,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["cajours","📅 CA brut par jour"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
+const PANNEAUX=[["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
@@ -3976,13 +4110,28 @@ function renderCaJours(){
   const tot=serie.reduce((a,x)=>a+(Number(x.v)||0),0);
   const best=serie.reduce((a,x)=>(Number(x.v)||0)>(Number(a.v)||0)?x:a,serie[0]);
   const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
-  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+money(tot/serie.length)+"/j";
+  // Le NET d'abord (comme OnlyFans), le brut entre parenthèses.
+  const net=v=>money((Number(v)||0)*NET_RATE);
+  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut)";
+  // 🎯 Ligne d'objectif : ce qu'il faut par jour, au rythme restant du mois.
+  let goalLine="";
+  try{
+    if(typeof GOAL!=="undefined" && GOAL && GOAL.type==="rev" && d.totals){
+      const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+      const reste=Math.max(1, dim-now.getDate()+1);
+      const need=(Number(GOAL.value)-(Number(d.totals.netMonth)||0))/reste;   // en BRUT (l'objectif est posé sur les chiffres bruts)
+      if(need>0){
+        const hh=Math.min(126,Math.max(3,Math.round(need/max*128)));
+        goalLine=`<div class="cj-goal" style="bottom:${hh}px" title="Objectif du mois : il te faut ~${money(need)} brut par jour (${net(need)} net)"><span>🎯 ${net(need)} net/j</span></div>`;
+      }
+    }
+  }catch(e){}
   $("#cjBody").innerHTML=`<div class="cj-wrap">`+serie.map(x=>{
       const v=Number(x.v)||0, h=Math.max(2,Math.round(v/max*128));
-      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" title="${fr(x.date)} : ${money(v)}"></div>`;
-    }).join("")+`</div>
+      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" title="${fr(x.date)} : ${net(v)} net · ${money(v)} brut"></div>`;
+    }).join("")+goalLine+`</div>
     <div class="cj-days">`+serie.map((x,i)=>`<span>${(i%4===0||x.date===best.date)?parseInt(x.date.slice(8),10):""}</span>`).join("")+`</div>
-    <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> (${money(best.v)}). La journée en cours n'apparaît pas (incomplète par nature).</div>`;
+    <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${net(best.v)} net (${money(best.v)} brut). La journée en cours n'apparaît pas (incomplète par nature).</div>`;
 }
 
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
@@ -4009,6 +4158,7 @@ loadHours();
 loadConversion();
 loadRailway();
 loadTresorerie();
+loadQuinz();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
 </body>
