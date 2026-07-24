@@ -129,6 +129,37 @@
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  /* 🙈 Panneau masqué par l'utilisateur : !important pour battre les renderers
+     qui forcent style.display="block" à chaque rafraîchissement. */
+  .user-hidden{display:none !important}
+  /* 🧭 Menu de sections : le site est long, ces puces amènent direct au bon
+     panneau. Collant sous la barre d'onglets, défilable au doigt. */
+  #secnav{position:sticky;top:calc(env(safe-area-inset-top,0px));z-index:7;display:flex;gap:6px;
+    padding:6px 0 10px;background:var(--bg);overflow-x:auto;scrollbar-width:none}
+  #secnav::-webkit-scrollbar{height:0}
+  #secnav:empty{display:none}
+  body.framing #secnav{display:none}
+  .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
+    border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .sec-chip:hover{color:var(--text);border-color:var(--acc-line);background:var(--acc-bg)}
+  /* les panneaux s'arrêtent SOUS les barres collantes quand on saute vers eux */
+  .panel-box[id],.costs,.tgrev,.todo,.journal,.antileak,#sections,#om{scroll-margin-top:64px}
+  /* 📅 CA brut par jour */
+  .cj-wrap{display:flex;align-items:flex-end;gap:3px;height:132px;margin-top:10px}
+  .cj-bar{flex:1;min-width:0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));
+    border-radius:4px 4px 0 0;min-height:2px;position:relative;cursor:default;transition:opacity .15s}
+  .cj-bar:hover{opacity:.75}
+  .cj-bar.best{background:linear-gradient(180deg,#4ade80,color-mix(in srgb,#4ade80 45%,transparent))}
+  .cj-days{display:flex;gap:3px;margin-top:5px}
+  .cj-days span{flex:1;min-width:0;text-align:center;font-size:9.5px;color:var(--faint)}
+  /* 👁 Choix des panneaux visibles */
+  .ppick{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
+  .ppick-box{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:20px 20px 16px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto}
+  .ppick-box h3{margin:0 0 4px;font-size:15px}
+  .ppick-sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .ppick-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer}
+  .ppick-row input{width:17px;height:17px;accent-color:var(--acc)}
+  .ppick-close{margin-top:14px;width:100%;font:inherit;font-size:13.5px;font-weight:600;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:10px;padding:10px;cursor:pointer}
   /* 🏦 Trésorerie OnlyFans */
   .tr-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   .tr-big{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
@@ -965,6 +996,7 @@
 
 <div class="wrap" id="app">
   <div class="tabbar" id="tabbar"></div>
+  <div id="secnav"></div>
   <div id="home">
   <header class="top">
     <div class="brand">
@@ -983,6 +1015,8 @@
       <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
+      <button class="btn" id="fontsize" title="Taille du texte">🔠</button>
+      <button class="btn" id="panels" title="Choisir les panneaux affichés">🧩</button>
       <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
@@ -1111,6 +1145,11 @@
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
     </div>
+  </div>
+
+  <div class="panel-box" id="cajours" style="display:none">
+    <div class="pb-head">📅 CA brut par jour <span class="mn-msg-note" id="cjCap"></span></div>
+    <div id="cjBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1595,7 +1634,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie, renderCaJours]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2130,7 +2169,7 @@ function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice
 // La rangée compte maintenant 4 panneaux : avec un nombre IMPAIR de visibles, le
 // dernier restait orphelin en demi-largeur. On passe le dernier en pleine largeur
 // dès que le compte est impair (et pas seulement quand il n'y en a qu'un).
-function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); }
+function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none" && !c.classList.contains("user-hidden")); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} }
 function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 function saveTasks(){
@@ -2285,6 +2324,7 @@ function renderOM(){
   // net, les 2 % Skrill et la part modèle se calculent sur Noctra Finance.
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
   $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaRows+noteBrut;
+  renderCaJours();
   renderRenta();
   renderHistory();
   renderBadges();
@@ -2566,6 +2606,10 @@ function updateView(){
   const framing = ACTIVE!=='home';
   document.body.classList.toggle('framing', framing);
   $("#frames").classList.toggle('show', framing);
+  // 💾 Un refresh ne perd plus rien : les onglets ouverts (ClipFusion…) et
+  // l'onglet actif sont rétablis au prochain chargement.
+  try{ localStorage.setItem("ccn_tabs", JSON.stringify(TABS.map(t=>({id:t.id,name:t.name,url:t.url}))));
+       localStorage.setItem("ccn_activetab", ACTIVE); }catch(e){}
 }
 function openTab(id,name,url){
   if(!url) return;
@@ -2575,6 +2619,21 @@ function openTab(id,name,url){
   }
   ACTIVE=id; updateView();
 }
+// Rouvre les onglets laissés ouverts avant le refresh, et revient sur celui
+// qui était affiché. Les iframes rechargent leur site (impossible de figer
+// l'intérieur d'un autre site), mais l'onglet est là, comme laissé.
+(function restoreTabs(){
+  try{
+    const saved=JSON.parse(localStorage.getItem("ccn_tabs")||"[]");
+    if(!Array.isArray(saved)||!saved.length) return;
+    saved.forEach(t=>{ if(!t||!t.id||!t.url||TABS.find(x=>x.id===t.id)) return;
+      TABS.push({id:t.id,name:t.name||t.id,url:t.url});
+      const f=document.createElement('iframe'); f.setAttribute('data-fr',t.id); f.src=t.url; $("#frames").appendChild(f); });
+    const act=localStorage.getItem("ccn_activetab");
+    if(act && (act==="home" || TABS.find(t=>t.id===act))) ACTIVE=act;
+    updateView();
+  }catch(e){}
+})();
 function closeTab(id){
   TABS=TABS.filter(t=>t.id!==id);
   const f=document.querySelector('#frames iframe[data-fr="'+id+'"]'); if(f) f.remove();
@@ -3790,7 +3849,7 @@ function voiceAsk(prefixe){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","reorder","hide","tv","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -3824,6 +3883,108 @@ function toggleReorder(){ REORDERING=!REORDERING; document.body.classList.toggle
 function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > .panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
+/* ---------- 🔠 taille du texte (écran 16" : « je vois rien ») ---------- */
+// zoom sur #home uniquement : le tableau de bord grossit, mais PAS les outils
+// embarqués (eux occupent déjà tout l'écran) ni les barres du haut.
+const ZOOMS=[100,115,130,145];
+function applyZoom(){
+  let z=parseInt(localStorage.getItem("ccn_zoom")||"0",10);
+  // Premier passage sur grand écran : 115 % d'office — c'est la demande.
+  if(!z){ z=matchMedia("(min-width:1180px)").matches?115:100; localStorage.setItem("ccn_zoom",String(z)); }
+  const h=$("#home"); if(h) h.style.zoom=(z/100);
+  const b=$("#fontsize"); if(b) b.textContent="🔠 "+z+"%";
+  return z;
+}
+{ const b=$("#fontsize"); if(b) b.onclick=()=>{ const z=applyZoom(); const n=ZOOMS[(ZOOMS.indexOf(z)+1)%ZOOMS.length]; localStorage.setItem("ccn_zoom",String(n)); applyZoom(); if(typeof toast==="function") toast("🔠 Taille "+n+" %","Re-clique pour ajuster encore."); }; }
+applyZoom();
+
+/* ---------- 💾 revenir au même endroit après un refresh ---------- */
+let _userScrolled=false;
+addEventListener("wheel",()=>{_userScrolled=true},{passive:true,once:true});
+addEventListener("touchmove",()=>{_userScrolled=true},{passive:true,once:true});
+let _scT=null;
+addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null;
+  if(document.body.classList.contains("framing")) return;   // en mode outil, home est caché
+  try{ localStorage.setItem("ccn_scroll", String(Math.round(scrollY))); }catch(e){}
+},400); },{passive:true});
+(function restoreScroll(){
+  const y=parseInt(localStorage.getItem("ccn_scroll")||"0",10); if(!y) return;
+  // Les panneaux se remplissent en plusieurs vagues : on re-tente tant que
+  // l'utilisateur n'a pas repris la main.
+  [350,1200,2600].forEach(ms=>setTimeout(()=>{ if(!_userScrolled && !document.body.classList.contains("framing")) scrollTo(0,y); },ms));
+})();
+
+/* ---------- 🧭 menu de sections ---------- */
+const SECNAV=[["sections","🛠 Outils"],["om","💰 Argent"],["cajours","📅 CA/jour"],["tres","🏦 Banque"],
+  ["renta","📊 Renta"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["todo","✅ Tâches"],["journal","📔 Journal"]];
+function refreshSecnav(){
+  const nav=$("#secnav"); if(!nav) return;
+  const chips=SECNAV.filter(([id])=>{ const el=document.getElementById(id);
+    return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; });
+  const html=chips.map(([id,lbl])=>`<span class="sec-chip" data-sec="${id}">${lbl}</span>`).join("");
+  if(nav.innerHTML!==html) nav.innerHTML=html;
+}
+$("#secnav").addEventListener("click",e=>{
+  const c=e.target.closest("[data-sec]"); if(!c) return;
+  const el=document.getElementById(c.getAttribute("data-sec"));
+  if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); }
+});
+refreshSecnav();
+
+/* ---------- 🧩 choisir les panneaux affichés ---------- */
+const PANNEAUX=[["cajours","📅 CA brut par jour"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
+  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
+  ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
+  ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
+  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
+function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
+function applyHiddenPanels(){
+  const h=hiddenSet();
+  PANNEAUX.forEach(([id])=>{ const el=document.getElementById(id); if(el) el.classList.toggle("user-hidden", h.has(id)); });
+  try{ fixPairs(); }catch(e){}
+}
+function openPanelPicker(){
+  const h=hiddenSet();
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
+    <div class="ppick-sub">Décoche ce que tu ne regardes jamais : la page devient plus courte. Tu peux tout remettre ici quand tu veux.</div>
+    ${PANNEAUX.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl}</label>`).join("")}
+    <button class="ppick-close">Fermer</button></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
+  ov.addEventListener("change",e=>{
+    const cb=e.target.closest("[data-pp]"); if(!cb) return;
+    const s=hiddenSet(); cb.checked?s.delete(cb.getAttribute("data-pp")):s.add(cb.getAttribute("data-pp"));
+    localStorage.setItem("ccn_hidden_panels", JSON.stringify([...s]));
+    applyHiddenPanels();
+  });
+  document.body.appendChild(ov);
+}
+{ const b=$("#panels"); if(b) b.onclick=openPanelPicker; }
+applyHiddenPanels();
+
+/* ---------- 📅 CA brut par jour (28 derniers jours) ---------- */
+function renderCaJours(){
+  const panel=$("#cajours"); if(!panel) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const serie=(d&&Array.isArray(d.dailyNet))?d.dailyNet:[];
+  if(!d || revKo() || serie.length<5){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const cur=d.currency||"$";
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const max=Math.max(...serie.map(x=>Number(x.v)||0),1);
+  const tot=serie.reduce((a,x)=>a+(Number(x.v)||0),0);
+  const best=serie.reduce((a,x)=>(Number(x.v)||0)>(Number(a.v)||0)?x:a,serie[0]);
+  const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
+  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+money(tot/serie.length)+"/j";
+  $("#cjBody").innerHTML=`<div class="cj-wrap">`+serie.map(x=>{
+      const v=Number(x.v)||0, h=Math.max(2,Math.round(v/max*128));
+      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" title="${fr(x.date)} : ${money(v)}"></div>`;
+    }).join("")+`</div>
+    <div class="cj-days">`+serie.map((x,i)=>`<span>${(i%4===0||x.date===best.date)?parseInt(x.date.slice(8),10):""}</span>`).join("")+`</div>
+    <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> (${money(best.v)}). La journée en cours n'apparaît pas (incomplète par nature).</div>`;
+}
+
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
 { const sb=$("#sidebar"); if(sb){ ["journal","tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
 { const h=$("#jrHead"); if(h) h.onclick=()=>{ const j=$("#journal"); if(j){ j.classList.toggle("folded"); localStorage.setItem("ccn_jrfold", j.classList.contains("folded")?"1":"0"); } }; if(localStorage.getItem("ccn_jrfold")==="0"){ const j=$("#journal"); if(j) j.classList.remove("folded"); } }
