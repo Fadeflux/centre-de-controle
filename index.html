@@ -166,6 +166,14 @@
   .vacard-stat .l{font-size:11px;color:var(--muted);font-weight:600}
   .vacard-stat .v{font-size:17px;font-weight:800;margin-top:2px}
   .vacard-stat .s{font-size:10.5px;color:var(--faint);margin-top:1px}
+  /* 📈 mini-courbe des quinzaines dans la fiche VA */
+  .vq-wrap{display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:4px}
+  .vq-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%}
+  .vq-col small{font-size:9.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .vq-bar{width:72%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));min-height:3px}
+  .vq-bar.cur{background:linear-gradient(180deg,#4ade80,color-mix(in srgb,#4ade80 45%,transparent))}
+  .vq-lbls{display:flex;gap:5px;margin:3px 0 10px}
+  .vq-lbls span{flex:1;min-width:0;text-align:center;font-size:8.5px;color:var(--faint);white-space:nowrap}
   .vacard-btns{display:flex;gap:8px;margin-top:4px}
   .vacard-btns button{flex:1;font:inherit;font-size:13px;font-weight:600;border-radius:10px;padding:9px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);color:var(--text)}
   .vacard-btns button:hover{border-color:var(--acc-line);background:var(--acc-bg)}
@@ -3948,6 +3956,7 @@ function openVaCard(vaName){
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${stat("Quinzaine", qz?fmtInt(qz.cur):"—", qz?("précédente : "+fmtInt(qz.prev)):"")}
     </div>
+    <div id="vqZone"><div class="ppick-sub">📈 Historique des quinzaines… (chargement)</div></div>
     <div class="vacard-btns">
       <button data-vc="goal">🎯 Objectif</button>
       <button data-vc="msg">✉️ Lui écrire</button>
@@ -3977,6 +3986,26 @@ function openVaCard(vaName){
     }
   });
   document.body.appendChild(ov);
+  // 📈 La courbe arrive en différé (une requête pour TOUS les VA, cachée 10 min).
+  chargeVaqz().then(q=>{
+    const z=ov.querySelector("#vqZone"); if(!z) return;
+    const serie=q&&q.parVa&&q.parVa[vaName];
+    if(!serie||!serie.some(x=>x>0)){ z.innerHTML=""; return; }
+    const max=Math.max(...serie,1);
+    z.innerHTML=`<div class="ppick-sub" style="margin-top:6px">📈 Ses ${serie.length} dernières quinzaines (subs) — la verte est en cours</div>
+      <div class="vq-wrap">${serie.map((x,i)=>`<div class="vq-col" title="${q.labels[i]} : ${x} subs"><small>${x||""}</small><div class="vq-bar ${i===q.enCours?"cur":""}" style="height:${Math.max(3,Math.round(x/max*52))}px"></div></div>`).join("")}</div>
+      <div class="vq-lbls">${q.labels.map((l,i)=>`<span>${i%2===1?l:""}</span>`).join("")}</div>`;
+  }).catch(()=>{});
+}
+let VAQZ_CACHE=null;
+async function chargeVaqz(){
+  if(VAQZ_CACHE) return VAQZ_CACHE;
+  if(!TOKEN) return null;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok) VAQZ_CACHE=await r.json();
+  }catch(e){}
+  return VAQZ_CACHE;
 }
 
 /* ---------- ⚖️ quinzaine vs précédente ---------- */
