@@ -845,6 +845,19 @@
     padding:10px 12px;margin-bottom:10px;resize:vertical;min-height:88px}
   .mn-msg-txt:focus{outline:none;border-color:var(--acc-line);background:var(--surface)}
   .mn-msg-err{font-size:13px;color:#f87171}
+  /* 🧠 mémoire du coach : ce qu'il retient, et le champ pour lui apprendre */
+  .mn-coach-mem{margin-top:10px}
+  .cm-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .cm-list:empty{display:none}
+  .cm-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;max-width:100%}
+  .cm-chip i{font-style:normal;color:var(--faint);font-size:10.5px}
+  .cm-chip b{cursor:pointer;color:var(--faint);font-weight:600;padding:0 2px}
+  .cm-chip b:hover{color:var(--down)}
+  .cm-add{display:flex;gap:7px}
+  .cm-add input{flex:1;min-width:0;font:inherit;font-size:12.5px;color:var(--text);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none}
+  .cm-add input:focus{border-color:var(--acc-line)}
   .mn-verdict{border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;line-height:1.5}
   .mn-verdict.up{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
   .mn-verdict.dn{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)}
@@ -2879,7 +2892,7 @@ function renderMorning(){
     <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money"><div class="lbl">💰 Net du mois (est.)</div><div class="big" id="mnMoney">${moneyOuTiret(tot.netMonth!=null?tot.netMonth*NET_RATE:tot.netMonth, money)}</div><div class="sub">brut : <b>${moneyOuTiret(tot.netMonth, money)}</b> · ${ev?"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b>":"aujourd'hui : <b>"+(tot.subsDay!=null?tot.subsDay:"—")+"</b> subs · <b>"+money(st.aPayer)+"</b> à payer"}</div></div>
-    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div></div>
+    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
@@ -3001,7 +3014,44 @@ async function sendVaMessage(btn, va, message){
 // l'assistant comprend et met à jour tes tâches en conséquence.
 function coachVoiceReply(){
   if(typeof voiceAsk!=="function") return;
-  voiceAsk(COACH_ACTION ? "Contexte : l'action que je devais faire aujourd'hui est « "+COACH_ACTION+" ». Ma réponse : " : "");
+  // {mem:true} : ta réponse passe AUSSI par la mémoire du coach — « Prince est
+  // en vacances » dit une fois à voix haute, et il s'en souvient les jours suivants.
+  voiceAsk(COACH_ACTION ? "Contexte : l'action que je devais faire aujourd'hui est « "+COACH_ACTION+" ». Ma réponse : " : "", {mem:true});
+}
+
+/* ---------- 🧠 mémoire du coach ---------- */
+let COACH_MEM=null;
+async function loadCoachMem(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/coach-memoire",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){ COACH_MEM=(await r.json()).notes||[]; renderCoachMem(); }
+  }catch(e){}
+}
+function renderCoachMem(){
+  const z=$("#mnCoachMem"); if(!z) return;
+  const notes=COACH_MEM||[];
+  const jr=exp=>{ try{ const d=Math.round((new Date(exp+"T00:00:00Z")-new Date(new Date().toISOString().slice(0,10)+"T00:00:00Z"))/86400000); return d>0?d:0; }catch(e){ return "?"; } };
+  z.innerHTML=`<div class="cm-list">${notes.map(n=>`<span class="cm-chip" title="dit le ${escapeHtml(n.d||"?")} — le coach s'en souvient encore ${jr(n.exp)} j">🧠 ${escapeHtml(n.texte)} <i>${jr(n.exp)} j</i><b data-cmdel="${escapeHtml(n.id)}" title="Oublier">✕</b></span>`).join("")}</div>
+    <div class="cm-add"><input id="cmTxt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)"><button class="mn-act-btn" id="cmAdd">Retenir</button></div>`;
+  const envoyer=async()=>{
+    const inp=$("#cmTxt"); const t=(inp&&inp.value||"").trim(); if(t.length<3||!TOKEN) return;
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/coach-memoire",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:t})});
+      const j=await r.json().catch(()=>({}));
+      if(r.ok&&j.ok){ if(typeof toast==="function") toast("🧠 Retenu 7 jours","Le coach en tiendra compte dès son prochain briefing."); COACH_MEM=null; loadCoachMem(); }
+    }catch(e){}
+  };
+  const b=$("#cmAdd"); if(b) b.onclick=envoyer;
+  const i=$("#cmTxt"); if(i) i.addEventListener("keydown",e=>{ if(e.key==="Enter") envoyer(); });
+  z.onclick=async e=>{
+    const d=e.target.closest("[data-cmdel]"); if(!d||!TOKEN) return;
+    try{
+      await fetch(HUB_BASE+"/api/hub/coach-memoire?id="+encodeURIComponent(d.getAttribute("data-cmdel")),{method:"DELETE",headers:{"x-hub-token":TOKEN}});
+      COACH_MEM=null; loadCoachMem();
+      if(typeof toast==="function") toast("🧠 Oublié","Cette note ne sera plus dans les briefings.");
+    }catch(e2){}
+  };
 }
 function addCoachAction(btn){
   if(!COACH_ACTION || typeof TASKS==="undefined") return;
@@ -3042,6 +3092,7 @@ async function loadBrief(force){
     COACH_ACTION=(j.action||"").trim();
     txt.textContent=COACH_TEXT||"Pas de briefing aujourd'hui.";
     renderCoachAction();
+    loadCoachMem();
     // Réchauffe la 1ère phrase en fond -> quand tu tapes « Écouter », ça démarre tout de suite.
     if(COACH_TEXT && typeof prewarmTts==="function") prewarmTts(COACH_TEXT);
   }catch(e){ COACH_TEXT=prev; txt.textContent=prev||"Coach indisponible — réessaie."; }
@@ -3869,7 +3920,7 @@ async function loadSms(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_B
 function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u=mkUtter(String(txt).slice(0,320)); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){} }
 // prefixe = contexte optionnel ajouté devant ce que tu dictes (utilisé par le
 // coach pour que l'assistant sache de quelle action tu parles).
-function voiceAsk(prefixe){
+function voiceAsk(prefixe, opts){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
   if(!TOKEN){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
@@ -3881,6 +3932,14 @@ function voiceAsk(prefixe){
     const q=(e.results[0][0].transcript||"").trim(); if(!q) return;
     const envoi=(typeof prefixe==="string"&&prefixe)?(prefixe+q):q;
     toast("🗣️ « "+q+" »","L'assistant réfléchit…");
+    // 🧠 Réponse au coach : en parallèle, l'IA décide si ta phrase contient un
+    // fait à retenir (« Prince est en vacances ») — indépendant de l'assistant,
+    // qui peut échouer sans faire perdre la mémoire.
+    if(opts&&opts.mem&&TOKEN){
+      fetch(HUB_BASE+"/api/hub/coach-memoire/auto",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:q})})
+        .then(r=>r.json()).then(j=>{ if(j&&j.retenu){ toast("🧠 Retenu "+(j.jours||7)+" j",j.note+" — le coach s'en souviendra."); COACH_MEM=null; if(typeof loadCoachMem==="function") loadCoachMem(); } })
+        .catch(()=>{});
+    }
     try{
       const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:envoi,names:NAMES,history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
       if(r.status===401){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
