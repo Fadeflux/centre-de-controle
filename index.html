@@ -2085,6 +2085,9 @@ let GOAL_CELEBRATED = false;
 // 🎉 Pop-up de félicitations quand un ou plusieurs badges sont débloqués.
 function celebrateBadges(list){
   if(!list||!list.length) return;
+  // Un seul pop à la fois : renderBadges peut être rappelé (par renderOM…) et
+  // sans ce garde, deux déblocages rapprochés empilaient deux modales.
+  if(document.querySelector(".badge-pop")) return;
   const ov=document.createElement("div"); ov.className="badge-pop";
   ov.innerHTML=`<div class="bpop-box">
     <div class="bpop-burst">${list.map(b=>b.icon).join(" ")}</div>
