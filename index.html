@@ -162,6 +162,10 @@
   .omv-va{cursor:pointer;text-decoration:underline dotted transparent;transition:.15s}
   .omv-va:hover{color:var(--acc-ink);text-decoration-color:var(--acc-line)}
   .vacard-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+  .va-verdict{border-radius:12px;padding:11px 13px;margin:2px 0 12px;font-size:13px;line-height:1.5}
+  .va-verdict.vv-ok{background:color-mix(in srgb,var(--ok) 13%,transparent);color:var(--text)}
+  .va-verdict.vv-bad{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--text)}
+  .va-verdict.vv-wait{background:var(--surface-2);color:var(--muted)}
   .vacard-stat{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
   .vacard-stat .l{font-size:11px;color:var(--muted);font-weight:600}
   .vacard-stat .v{font-size:17px;font-weight:800;margin-top:2px}
@@ -2377,8 +2381,10 @@ function renderOM(){
   // Le pop-up du matin savait dire « — » ; celui-ci, non. Un seul juge désormais :
   // revKo(). Les ABONNÉS restent affichés : eux sont bien mesurés.
   const ko=revKo();
-  const mnt=(v)=>ko?"—":omMoney(v,cur);         // tout montant
-  const ltvT=(v)=>ko?"—":fmtLtv(v,cur);         // toute LTV
+  // `x==null` -> « — » aussi : en filtre par modèle SANS API (repli), les revenus
+  // d'un VA sont INCONNUS (null), pas 0. Ne jamais afficher un faux zéro d'argent.
+  const mnt=(v)=>(ko||v==null)?"—":omMoney(v,cur);   // tout montant
+  const ltvT=(v)=>(ko||v==null)?"—":fmtLtv(v,cur);   // toute LTV
   // 💡 Le NET d'abord, le brut en petit (comme OnlyFans) : net estimé = brut
   // × 78 % (20 % OnlyFans + 2 % Skrill, la même règle que le site finances).
   const netE=(v)=>ko?"—":omMoney((Number(v)||0)*NET_RATE,cur);
@@ -2401,14 +2407,24 @@ function renderOM(){
     <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div>
     <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${ltvT((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv)}</div></div></div>`;
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${ko?'':((d.models[m].marge||0)>=0?'pos':'neg')}">Marge ${ko?"—":((d.models[m].marge||0)>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
-  let vas=(d.vas||[]).slice();
-  const tri = ko ? "subs" : OM_SORT;   // classer par argent inconnu = classement au hasard
+  // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
+  // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
+  // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
+  // NE retombe PAS sur le global sous un titre « sur Layla » (chiffres faux) :
+  // filtreDispo=false -> message dédié.
+  const filtreDispo = (OM_MODEL==="all") || !!(d.models && d.models[OM_MODEL] && Array.isArray(d.models[OM_MODEL].vas));
+  const modeleObj = (OM_MODEL!=="all" && d.models)?d.models[OM_MODEL]:null;
+  const vaSource = filtreDispo ? ((OM_MODEL!=="all" && modeleObj)?modeleObj.vas:(d.vas||[])) : [];
+  // Argent inconnu sur ce modèle (repli sans API) : on trie par subs, pas par argent.
+  const argFiltreKo = !!(modeleObj && modeleObj.revVentile===false);
+  let vas=vaSource.slice();
+  const tri = (ko||argFiltreKo) ? "subs" : OM_SORT;   // classer par argent inconnu = classement au hasard
   vas.sort((a,b)=> tri==="rev"?(b.rev-a.rev): tri==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
   const vaRows=vas.slice(0,20).map((v,i)=>{
     // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
     // « LTV 0,00 » en rouge, « −91 $ » de marge et « ROI −1,0× » — un tableau où
     // toute l'équipe paraît déficitaire alors qu'on n'a rien lu.
-    const bad=!ko && !v.unpaid && v.ltv<0.5, mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:(ko?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
+    const bad=!ko && !v.unpaid && v.ltv!=null && v.ltv<0.5, mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:((ko||v.rev==null)?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
@@ -2416,13 +2432,20 @@ function renderOM(){
     if(v.unpaid){ goalHtml=""; }
     else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal; goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
     else { goalHtml=`<span class="omv-goal"><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Fixer un objectif de subs">🎯 fixer un objectif</button></span>`; }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${ko?'':(mp?'pos':'neg')}">${ko?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}">${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
-  const vaHead=`<div class="om-va-head">Classement des VA <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
+  const vaHead=`<div class="om-va-head">Classement des VA${OM_MODEL!=="all"?" · sur "+escapeHtml(OM_MODEL):""} <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
   // Rappel honnête : tout ici est du BRUT (avant la commission OnlyFans). Le vrai
   // net, les 2 % Skrill et la part modèle se calculent sur Noctra Finance.
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
-  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaRows+noteBrut;
+  // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
+  // plutôt que le classement global sous un titre « sur Layla ».
+  const vaBloc = filtreDispo ? vaRows
+    : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
+  // Argent non ventilable par modèle (repli sans API) : on le dit.
+  const noteArg = (filtreDispo && argFiltreKo)
+    ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Par modèle, seuls les abonnés sont disponibles en ce moment — les montants (généré, LTV, ROI) reviennent dès que la source d'argent répond. Ils restent visibles sur l'onglet « Tout ».</div>` : "";
+  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
   renderCaJours();
   renderRenta();
   renderHistory();
@@ -3424,6 +3447,12 @@ const BADGES=[
   {id:"net10000", icon:"💎", label:"10 000 $ générés", metric:"netTotal", target:10000, cond:c=>c.netTotal>=10000},
   {id:"net50000", icon:"🏦", label:"50 000 $ générés", metric:"netTotal", target:50000, cond:c=>c.netTotal>=50000},
   {id:"net100000", icon:"🐋", label:"100 000 $ générés", metric:"netTotal", target:100000, cond:c=>c.netTotal>=100000},
+  // Paliers de QUINZAINE : plus rapprochés que les gros paliers « au total »,
+  // pour avoir des victoires (et des pop-ups) plus souvent.
+  {id:"quinz50", icon:"🥉", label:"50 subs en une quinzaine", metric:"subsQuinzaine", target:50, cond:c=>c.subsQuinzaine>=50},
+  {id:"quinz100", icon:"🥈", label:"100 subs en une quinzaine", metric:"subsQuinzaine", target:100, cond:c=>c.subsQuinzaine>=100},
+  {id:"quinz200", icon:"🥇", label:"200 subs en une quinzaine", metric:"subsQuinzaine", target:200, cond:c=>c.subsQuinzaine>=200},
+  {id:"quinz300", icon:"🔥", label:"300 subs en une quinzaine", metric:"subsQuinzaine", target:300, cond:c=>c.subsQuinzaine>=300},
   {id:"record", icon:"🏆", label:"Meilleur mois", cond:c=>c.isRecord},
   {id:"goal", icon:"🎯", label:"Objectif atteint", cond:c=>c.goalMet},
 ];
@@ -3433,7 +3462,8 @@ function renderBadges(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
   let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>Number(m.net)||0)); isRecord=(Number(c.net)||0)>prevMax && prevMax>0; }
   const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?(Number(tot.netMonth)||0):(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
-  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, isRecord, goalMet };
+  const subsQz=Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
+  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, subsQuinzaine:subsQz, isRecord, goalMet };
   const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
   const owned=new Set(unlocked.map(b=>b.id));
   // ⚠️ 1er chargement (aucun badge encore en localStorage) : on ADOPTE les badges
@@ -3448,7 +3478,7 @@ function renderBadges(){
   // palier de chaque famille avec barre de progression (fini la grille grise).
   const fmtV=(m,v)=>m==="netTotal"?(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $"):(m==="daysSince"?Math.round(v).toLocaleString("fr-FR")+" j":Math.round(v).toLocaleString("fr-FR"));
   const chips=unlocked.map(b=>`<span class="bp-chip" title="${escapeHtml(b.label)}">${b.icon} ${escapeHtml(b.label)}</span>`).join("");
-  const fams=[["daysSince","Depuis ta 1ère vente"],["subsTotal","Subs au total"],["netTotal","Argent généré"]];
+  const fams=[["subsQuinzaine","Subs cette quinzaine"],["daysSince","Depuis ta 1ère vente"],["subsTotal","Subs au total"],["netTotal","Argent généré"]];
   const rows=fams.map(([m,lbl])=>{
     const nxt=BADGES.find(b=>b.metric===m && !owned.has(b.id));
     if(!nxt) return `<div class="bp-row"><span class="bp-ico">🏆</span><div class="bp-main"><div class="bp-lbl">${lbl} — tout débloqué, champion !</div></div></div>`;
@@ -4076,6 +4106,20 @@ function openVaCard(vaName){
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${stat("Quinzaine", qz?fmtInt(qz.cur):"—", qz?("précédente : "+fmtInt(qz.prev)):"")}
     </div>
+    ${(function(){
+      // 🧮 VERDICT : « ce VA vaut-il le coup ? » en une phrase claire.
+      if(v.unpaid) return `<div class="va-verdict vv-ok">✅ Perso — jamais payée. Tout ce qu'elle génère est du <b>bonus</b> pur.</div>`;
+      if(ko) return "";
+      const rev=Number(v.rev)||0, marge=Number(v.marge)||0, paie=Math.max(0,rev-marge), roi=v.roi;
+      if((v.subs||0)<5) return `<div class="va-verdict vv-wait">⏳ Encore trop peu d'abonnés pour juger sa rentabilité.</div>`;
+      if(roi==null) return "";
+      if(marge>0){
+        const chaque=(roi+1);
+        const fort=roi>=3;
+        return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés génèrent <b>${money(rev)}</b> (brut). Chaque 1&nbsp;$ versé te rapporte <b>${(chaque).toFixed(1).replace(".",",")}&nbsp;$</b> → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
+      }
+      return `<div class="va-verdict vv-bad">⚠️ Ses abonnés génèrent <b>${money(rev)}</b> pour ~<b>${money(paie)}</b> versés : il te <b>coûte plus qu'il ne rapporte</b>. À surveiller — regarde ses liens et sa conversion avant de trancher.</div>`;
+    })()}
     <div id="vlZone"></div>
     <div id="vqZone"><div class="ppick-sub">📈 Historique des quinzaines… (chargement)</div></div>
     <div class="vacard-btns">
