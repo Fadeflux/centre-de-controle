@@ -166,6 +166,14 @@
   .vacard-stat .l{font-size:11px;color:var(--muted);font-weight:600}
   .vacard-stat .v{font-size:17px;font-weight:800;margin-top:2px}
   .vacard-stat .s{font-size:10.5px;color:var(--faint);margin-top:1px}
+  /* 📎 liens cumulés d'un VA dans la fiche */
+  .vl-head{font-size:12px;color:var(--muted);margin:10px 0 6px;font-weight:600}
+  .vl-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}
+  .vl-row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .vl-row .sb{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+  .vl-row .cl{font-variant-numeric:tabular-nums;color:var(--faint);font-size:11px;white-space:nowrap}
+  .vl-tot{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:2px solid var(--acc-line);margin-top:2px;font-size:13px;font-weight:800}
+  .vl-tot .sb{margin-left:auto;color:var(--acc-ink);font-variant-numeric:tabular-nums}
   /* 📈 mini-courbe des quinzaines dans la fiche VA */
   .vq-wrap{display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:4px}
   .vq-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%}
@@ -816,6 +824,9 @@
 
   .morning{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:26px 20px 40px;z-index:20;overflow-x:hidden;overflow-y:auto}
   .morning.show{display:flex}
+  /* L'écran du matin a SON défilement : on coupe celui de la page derrière,
+     sinon deux barres côte à côte à droite (dont une qui ne sert à rien). */
+  body:has(.morning.show){overflow:hidden}
   .mn-inner{max-width:520px;margin:0 auto;width:100%}
   .mn-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
   .mn-hi{font-size:26px;font-weight:800;line-height:1.2}
@@ -4015,6 +4026,7 @@ function openVaCard(vaName){
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${stat("Quinzaine", qz?fmtInt(qz.cur):"—", qz?("précédente : "+fmtInt(qz.prev)):"")}
     </div>
+    <div id="vlZone"></div>
     <div id="vqZone"><div class="ppick-sub">📈 Historique des quinzaines… (chargement)</div></div>
     <div class="vacard-btns">
       <button data-vc="goal">🎯 Objectif</button>
@@ -4045,6 +4057,17 @@ function openVaCard(vaName){
     }
   });
   document.body.appendChild(ov);
+  // 📎 Les liens cumulés (une requête pour tous les VA, cachée). Rend visible
+  // que les 3 (bientôt 50) liens de Yohan comptent tous sur un seul « Yohan ».
+  chargeVaLiens().then(L=>{
+    const z=ov.querySelector("#vlZone"); if(!z) return;
+    const info=L&&L.parVa&&L.parVa[vaName];
+    if(!info||!info.liens||!info.liens.length){ z.innerHTML=""; return; }
+    const n=info.liens.length;
+    z.innerHTML=`<div class="vl-head">📎 ${n} lien${n>1?"s":""} — tous comptés ensemble sur ${escapeHtml(vaName)}</div>`
+      +info.liens.map(l=>`<div class="vl-row"><span class="nm" title="${escapeHtml(l.nom)}${l.modele?" · "+escapeHtml(l.modele):""}">${escapeHtml(l.nom||"(sans nom)")}</span><span class="cl">${fmtInt(l.clics)} clics</span><span class="sb">${fmtInt(l.subs)} subs</span></div>`).join("")
+      +(n>1?`<div class="vl-tot"><span>Total ${escapeHtml(vaName)}</span><span class="sb">${fmtInt(info.total)} subs</span></div>`:"");
+  }).catch(()=>{});
   // 📈 La courbe arrive en différé (une requête pour TOUS les VA, cachée 10 min).
   chargeVaqz().then(q=>{
     const z=ov.querySelector("#vqZone"); if(!z) return;
@@ -4055,6 +4078,16 @@ function openVaCard(vaName){
       <div class="vq-wrap">${serie.map((x,i)=>`<div class="vq-col" title="${q.labels[i]} : ${x} subs"><small>${x||""}</small><div class="vq-bar ${i===q.enCours?"cur":""}" style="height:${Math.max(3,Math.round(x/max*52))}px"></div></div>`).join("")}</div>
       <div class="vq-lbls">${q.labels.map((l,i)=>`<span>${i%2===1?l:""}</span>`).join("")}</div>`;
   }).catch(()=>{});
+}
+let VALIENS_CACHE=null;
+async function chargeVaLiens(){
+  if(VALIENS_CACHE) return VALIENS_CACHE;
+  if(!TOKEN) return null;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-liens",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok) VALIENS_CACHE=await r.json();
+  }catch(e){}
+  return VALIENS_CACHE;
 }
 let VAQZ_CACHE=null;
 async function chargeVaqz(){
