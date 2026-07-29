@@ -2557,14 +2557,17 @@ function renderVersus(){
   const mkSel=(id,val)=>`<select id="${id}">${models.map(m=>`<option value="${escapeHtml(m)}" ${m===val?"selected":""}>${escapeHtml(m)}</option>`).join("")}</select>`;
   $("#vsSel").innerHTML=mkSel("vsA",VS_A)+`<span style="align-self:center;color:var(--faint)">vs</span>`+mkSel("vsB",VS_B);
   const A=d.models[VS_A]||{}, B=d.models[VS_B]||{};
-  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-  const ltv=v=>HIDE?"•••":(Number(v)||0).toFixed(2).replace(".",",")+" "+cur;
+  // ⛔ Revenus muets : les montants par modèle valent 0/marge négative fabriquée.
+  // On affiche « — » (jamais un faux zéro), comme le classement et la Rentabilité.
+  const ko=revKo();
+  const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
+  const ltv=v=>ko?"—":(HIDE?"•••":(Number(v)||0).toFixed(2).replace(".",",")+" "+cur);
   // rentabilité = marge du mois (déjà calculée côté cerveau)
   const rows=[
-    ["CA brut du mois", money(A.net), money(B.net), (Number(A.net)||0), (Number(B.net)||0)],
+    ["CA brut du mois", money(A.net), money(B.net), ko?0:(Number(A.net)||0), ko?0:(Number(B.net)||0)],
     ["Subs du mois", HIDE?"•••":fmtInt(A.subs||0), HIDE?"•••":fmtInt(B.subs||0), (Number(A.subs)||0), (Number(B.subs)||0)],
-    ["LTV (par sub)", ltv(A.ltv), ltv(B.ltv), (Number(A.ltv)||0), (Number(B.ltv)||0)],
-    ["Rentabilité (marge)", money(A.marge), money(B.marge), (Number(A.marge)||0), (Number(B.marge)||0)],
+    ["LTV (par sub)", ltv(A.ltv), ltv(B.ltv), ko?0:(Number(A.ltv)||0), ko?0:(Number(B.ltv)||0)],
+    ["Rentabilité (marge)", money(A.marge), money(B.marge), ko?0:(Number(A.marge)||0), ko?0:(Number(B.marge)||0)],
   ];
   const statHtml=rows.map(r=>{ const aw=r[3]>r[4], bw=r[4]>r[3]; return `<div class="vs-stat"><span class="vs-a ${aw?"win":""}">${r[1]}</span><span class="vs-lbl">${r[0]}</span><span class="vs-b ${bw?"win":""}">${r[2]}</span></div>`; }).join("");
   // Mini-courbe net par mois (depuis history.byModel)
@@ -2623,7 +2626,9 @@ function renderHistory(){
     }
   }
   const tot=OM_DATA.totals||{};
-  const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":omMoney(tot.netTotal||0,cur)}</div><div class="hb-c-l">généré depuis le début</div></div></div>`;
+  // Argent muet -> « — » (le cumul de vie réel ne doit pas devenir 0 $).
+  const genereTot=revKo()?"—":(HIDE?"•••":omMoney(tot.netTotal||0,cur));
+  const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début</div></div></div>`;
   $("#history").style.display="block";
   $("#historyBody").innerHTML=`${recordBanner}${cumul}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
 }
@@ -2670,12 +2675,19 @@ function renderRenta(){
 function renderSplit(){
   const panel=$("#split"); if(!panel) return;
   if(!OM_DATA){ panel.style.display="none"; return; }
+  // ⛔ Revenus muets : pas de partage sur un profit inconnu (il vaudrait 0/négatif).
+  if(revKo()){ panel.style.display="block"; $("#splitBody").innerHTML=`<div class="sv-note">⚠️ Partage en pause : je ne peux pas lire tes revenus, donc pas de profit à répartir. Il revient dès que la source répond.</div>`; if(typeof fixPairs==="function") fixPairs(); return; }
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const margeMonth=Number(d.totals.margeMonth)||0;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
-  const profit=margeMonth-coutOutils+tgMonth;
+  // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
+  // (brut × 22 %), comme le panneau Rentabilité. Avant, on partageait la marge
+  // BRUTE -> chaque associé se voyait attribuer ~508 $ que la plateforme prélève
+  // et qui n'entre jamais. netMonth = CA brut du mois.
+  const commission=Math.round((Number(d.totals.netMonth)||0)*(1-NET_RATE));
+  const profit=margeMonth-commission-coutOutils+tgMonth;
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
@@ -2933,7 +2945,10 @@ function paceVerdict(){
   const cur=om.currency||"$", nm=Number(om.totals.netMonth)||0, lm=Number(om.totals.netLastMonth)||0;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const FV=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net:null;
-  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>Math.round(v).toLocaleString("fr-FR")+" "+cur;
+  // Projection en NET (× 0,78), étiquetée — cohérent avec le panneau Rentabilité
+  // et la grande carte (qui affichent le net). Avant : brut non étiqueté ici, net
+  // ailleurs → confusion net/brut sur la carte la plus consultée.
+  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>Math.round(v*NET_RATE).toLocaleString("fr-FR")+" "+cur+" net";
   if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmt(proj)} ce mois.`};
   const pct=Math.round((proj-lm)/lm*100);
   if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
@@ -3472,9 +3487,13 @@ function renderBadges(){
   // ⚠️ 1er chargement (aucun badge encore en localStorage) : on ADOPTE les badges
   // déjà mérités SANS pop-up — sinon 10 félicitations d'un coup à la 1ère visite.
   // Le pop ne se déclenche que pour un badge gagné APRÈS.
+  // ⛔ Mode VITRINE (pas connecté, OM_DATA = démo) : on affiche les badges mais
+  // on NE persiste NI NE célèbre — sinon le rendu démo « consommait » le garde
+  // premiereFois, et au vrai login les vrais badges poppaient en rafale.
+  const enDemo=(typeof TOKEN==="undefined"||!TOKEN||(typeof DEMO_OM!=="undefined"&&OM_DATA===DEMO_OM));
   const premiereFois=(localStorage.getItem("ccn_badges")===null);
   const newly=unlocked.filter(b=>BADGES_OWNED.indexOf(b.id)<0);
-  if(newly.length){ newly.forEach(b=>BADGES_OWNED.push(b.id)); localStorage.setItem("ccn_badges",JSON.stringify(BADGES_OWNED));
+  if(newly.length && !enDemo){ newly.forEach(b=>BADGES_OWNED.push(b.id)); localStorage.setItem("ccn_badges",JSON.stringify(BADGES_OWNED));
     if(!premiereFois) celebrateBadges(newly); }
   panel.style.display="block";
   // Nouveau rendu « progression » : badges gagnés en pastilles + prochain
