@@ -273,6 +273,7 @@
   .al-badge.sent{background:rgba(250,204,21,.15);color:#facc15}
   .al-badge.removed{background:rgba(74,222,128,.15);color:#4ade80}
   .al-badge.ignored{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  .al-badge.repost{background:rgba(139,124,246,.16);color:#a78bfa}
   .al-leak-actions{display:flex;flex-direction:column;gap:6px}
   .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
   .al-leak-act.prim{border-color:var(--acc);color:var(--acc);font-weight:600}
@@ -1318,6 +1319,10 @@
       <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
       <div id="rwBody"></div>
     </div>
+    <div class="panel-box" id="proxy" style="display:none">
+      <div class="pb-head">🛰️ État de tes proxies</div>
+      <div id="proxyBody"></div>
+    </div>
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
       <div id="convBody"></div>
@@ -1712,7 +1717,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadTresorerie(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1735,7 +1740,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie, renderCaJours, renderModeles]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -1911,11 +1916,12 @@ function renderLeaks(){
   if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
   if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi pour activer la surveillance.</div>`; return; }
   if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Rien pour l'instant — les fuites détectées apparaîtront ici avec tous les détails.</div>`; return; }
-  const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée"};
+  const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée",repost:"♻️ repost"};
   box.innerHTML=LEAKS.slice(0,50).map(l=>{
     const st=l.status||"new";
     let actions;
     if(st==="ignored") actions=`<button class="al-leak-act" data-alreopen="${escapeHtml(l.id)}">Rouvrir</button>`;
+    else if(st==="repost") actions=`<a class="al-leak-act prim" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">🚩 Signaler</a><button class="al-leak-act" data-alremoved="${escapeHtml(l.id)}">✓ Traité</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else if(st==="sent"||st==="removed") actions=`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else actions=`<button class="al-leak-act prim" data-aldmca="${escapeHtml(l.id)}">📤 DMCA</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${st}">${stLabel[st]||st}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
@@ -1941,6 +1947,7 @@ function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.sta
   const dm=e.target.closest("[data-aldmca]"); if(dm){ sendLeakDmca(dm.getAttribute("data-aldmca")); return; }
   const ig=e.target.closest("[data-alignore]"); if(ig){ setLeakStatus(ig.getAttribute("data-alignore"),"ignored"); return; }
   const ro=e.target.closest("[data-alreopen]"); if(ro){ setLeakStatus(ro.getAttribute("data-alreopen"),"new"); return; }
+  const rm=e.target.closest("[data-alremoved]"); if(rm){ setLeakStatus(rm.getAttribute("data-alremoved"),"removed"); return; }
 }); }
 /* ---- infos titulaire DMCA + envoi ---- */
 let IDENTITY = JSON.parse(localStorage.getItem("ccn_dmca_id")||"{}"); if(!IDENTITY||typeof IDENTITY!=="object") IDENTITY={};
@@ -3699,6 +3706,40 @@ function renderRailway(){
     }catch(e){ b.disabled=false; b.textContent="Enregistrer"; }
   };
 }
+// 🛰️ PROXY : tes proxies (4G + résidentiel) répondent-ils, et quelle IP tu
+// présentes ? Ton scraping de vues Instagram passe par eux : à sec, les chiffres
+// arrêtent de remonter en silence. Le serveur les ping activement.
+let PROXY_DATA=null;
+async function loadProxy(force){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/proxy"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    PROXY_DATA=await r.json(); renderProxy();
+  }catch(e){}
+}
+function renderProxy(){
+  const panel=$("#proxy"), body=$("#proxyBody"); if(!panel||!body) return;
+  const d=PROXY_DATA;
+  const noms={"4g":"Proxy 4G","residentiel":"Proxy résidentiel"};
+  const items=d?[["4g",d.proxy4g],["residentiel",d.residentiel]].filter(([,p])=>p&&p.configure):[];
+  if(!d||!items.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const ligne=([key,p])=>{
+    const vivant=p.vivant===true;
+    const pastille=vivant?"🟢":"🔴";
+    const etat=vivant?`en ligne · IP <b>${escapeHtml(p.ip||"?")}</b>`:`<b style="color:#f87171">ne répond pas</b>${p.erreur?` <span style="color:var(--faint)">(${escapeHtml(p.erreur)})</span>`:""}`;
+    return `<div class="sv-row"><span class="sv-name">${pastille} ${noms[key]||key}</span><span class="sv-cell" style="flex:1">${etat}</span></div>`;
+  };
+  const alerte=(Array.isArray(d.morts)&&d.morts.length)
+    ? `<div class="sv-note" style="margin-top:8px;color:#f87171">⚠️ Un proxy est à sec — ton scraping de vues Instagram va se figer. Vérifie l'abonnement/les identifiants du proxy.</div>`
+    : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
+  body.innerHTML=items.map(ligne).join("")+alerte+
+    `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${d.maj?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
+  try{ fixPairs(); }catch(e){}
+  const rb=$("#proxyRefresh");
+  if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳ test en cours…"; await loadProxy(true); };
+}
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
 // la comparaison des deux qui est parlante — bien convertir et ramener des fans
@@ -4341,7 +4382,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
   ["renta","📊 Renta"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
-  ["todo","✅ Tâches"],["journal","📔 Journal"]];
+  ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
   const chips=SECNAV.filter(([id])=>{ const el=document.getElementById(id);
@@ -4358,7 +4399,7 @@ refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
 const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
-  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
+  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
@@ -4474,6 +4515,7 @@ loadCosts();
 loadHours();
 loadConversion();
 loadRailway();
+loadProxy();
 loadTresorerie();
 loadQuinz();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
