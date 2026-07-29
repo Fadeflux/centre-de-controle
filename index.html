@@ -345,6 +345,16 @@
   .pv-pay{min-width:78px;text-align:right;font-weight:600}
   .pv-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700}
   .pv-total .pv-pay{color:var(--acc)}
+  .pv-proj{margin-top:9px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .goal-danger{margin-top:8px;font-size:12.5px;line-height:1.5;background:color-mix(in srgb,var(--down) 14%,transparent);border-radius:10px;padding:9px 11px}
+  .goal-ontrack{margin-top:8px;font-size:12.5px;background:color-mix(in srgb,var(--ok) 13%,transparent);border-radius:10px;padding:8px 11px}
+  /* 🎭 widget par modèle sur l'accueil */
+  .mdl-row{display:flex;gap:10px;flex-wrap:wrap}
+  .mdl-card{flex:1 1 140px;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:12px 14px}
+  .mdl-card .nm{font-size:14px;font-weight:800;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+  .mdl-card .big{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .mdl-card .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .mdl-card .day{font-size:11.5px;color:var(--acc-ink);margin-top:6px;font-weight:600}
   .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#fff;cursor:pointer}
   .pv-paid{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer}
   .pv-row.pv-done .pv-va{color:var(--muted)}
@@ -845,6 +855,11 @@
   .mn-today .t-big{font-size:20px;font-weight:800;color:var(--acc-ink)}
   .mn-today .t-sub{font-size:12.5px;color:var(--muted);font-weight:500}
   .mn-pay{margin-top:7px;font-size:13px;color:var(--muted)}
+  /* ⚡ mode express : on cache le pavé du coach, l'historique, les tâches, le
+     verdict et l'action suivante — on garde les chiffres + l'action du coach. */
+  body.mn-express .mn-coach-txt, body.mn-express .mn-hist, body.mn-express .mn-tasks,
+  body.mn-express .mn-verdict, body.mn-express .mn-next, body.mn-express .mn-coach-mem,
+  body.mn-express .mn-quote{display:none}
   /* 🎉 pop-up de badge débloqué */
   .badge-pop{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;animation:bpFade .25s ease}
   @keyframes bpFade{from{opacity:0}to{opacity:1}}
@@ -1203,6 +1218,11 @@
   </div>
 
   <div id="sections"></div>
+
+  <div class="panel-box" id="modeles" style="display:none">
+    <div class="pb-head">🎭 Tes modèles en un coup d'œil</div>
+    <div id="modelesBody"></div>
+  </div>
 
   <div class="panel-box om" id="om" style="display:none">
     <div class="pb-head">◎ OnlyMonster
@@ -1715,7 +1735,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie, renderCaJours]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderTresorerie, renderCaJours, renderModeles]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2066,8 +2086,22 @@ function renderPaie(data){
   const aPayer = vas.filter(v=>!v.unpaid);
   const paidCount = aPayer.filter(v=>isPaid(v.va)).length;
   const hist = PAYMENTS.slice(0,15).map(p=>`<div class="pay-h-row"><span>${escapeHtml(p.va)}</span><span class="pay-h-d">${new Date(p.ts).toLocaleDateString("fr-FR")}</span><span class="pay-h-a">${fmtCur(p.amount)}</span></div>`).join("") || `<div class="tk-empty">Aucun paiement encore.</div>`;
+  // 📊 PRÉVISION DE PAIE : au rythme actuel de la quinzaine, ce que tu paieras à
+  // la fin. « total » = dû à cet instant ; on projette sur les jours restants
+  // pour anticiper la sortie de trésorerie (pas de surprise le jour de la paie).
+  let prevPaie="";
+  { const now=new Date(), d=now.getDate();
+    const dansA=(d<=15), joursEcoules=dansA?d:(d-15);
+    const finMois=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const joursTotal=dansA?15:(finMois-15);
+    if(joursEcoules>0 && joursTotal>joursEcoules && total>0){
+      const proj=Math.round(total/joursEcoules*joursTotal);
+      prevPaie=`<div class="pv-proj">📊 À ce rythme, tu paieras <b>${fmtCur(proj)}</b> en fin de quinzaine (jour ${joursEcoules}/${joursTotal}) — anticipe ta trésorerie.</div>`;
+    }
+  }
   $("#paieBody").innerHTML = rows
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note">${paidCount}/${aPayer.length} payés</span></div>`
+    + prevPaie
     + `<details class="pay-hist"><summary>📜 Historique de paie</summary><div class="pay-h-list">${hist}</div></details>`;
 }
 $("#paieBody").addEventListener("click",e=>{
@@ -2151,12 +2185,25 @@ function renderGoal(data){
   const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
   const R=52, CIRC=2*Math.PI*R, dash=Math.round(CIRC*pct/100);
-  let proj="";
+  let proj="", danger="";
   if(isRev){
     const FG=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
     const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const projFin=FG?FG.value:(day>0&&current>0?Math.round(current/day*dim):null);
     if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(FG.value)}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(FG.low)} – ${fmt(FG.high)})</span>`:""}</div>`; }
     else if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; }
+    // 🎯 VERDICT « en danger » : au rythme actuel, on rate l'objectif ? On chiffre
+    // le manque ET le rythme/jour qu'il faudrait pour rattraper — avant qu'il soit
+    // trop tard. (objectif « revenus » uniquement ; les subs se jugent autrement.)
+    if(!win && projFin!=null && day>0){
+      const jr=Math.max(1,dim-day+1);
+      if(projFin < GOAL.value*0.98){
+        const manque=GOAL.value-projFin, besoinJour=Math.ceil((GOAL.value-current)/jr), rythmeJour=Math.round(current/day);
+        danger=`<div class="goal-danger">🔴 <b>En danger</b> : au rythme actuel tu finis à ~${fmt(projFin)}, soit <b>${fmt(manque)}</b> sous ton objectif. Il te faut <b>${fmt(besoinJour)}/jour</b> sur les ${jr} jours restants (tu es à ${fmt(rythmeJour)}/jour).</div>`;
+      } else {
+        danger=`<div class="goal-ontrack">🟢 <b>Sur la bonne voie</b> : au rythme actuel tu atteins ton objectif.</div>`;
+      }
+    }
   }
   $("#goalBody").innerHTML = `<div class="goal-wrap">
     <svg class="goal-ring" viewBox="0 0 120 120" width="118" height="118" aria-hidden="true">
@@ -2168,7 +2215,7 @@ function renderGoal(data){
     <div class="goal-side">
       <div class="goal-cur"><b>${fmt(current)}</b> / ${fmt(GOAL.value)} ${unit}</div>
       <div class="goal-info">${win?`<span class="goal-win">🎉 Objectif atteint — bravo 👏</span>`:`Il te manque <b style="color:var(--text)">${fmt(GOAL.value-current)}</b> ${unit}`}</div>
-      ${proj}
+      ${proj}${danger}
       <a href="#" id="goalReset" class="goal-change">changer d'objectif</a>
     </div>
   </div>`;
@@ -2449,6 +2496,7 @@ function renderOM(){
   const noteArg = (filtreDispo && argFiltreKo)
     ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Par modèle, seuls les abonnés sont disponibles en ce moment — les montants (généré, LTV, ROI) reviennent dès que la source d'argent répond. Ils restent visibles sur l'onglet « Tout ».</div>` : "";
   $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
+  renderModeles();
   renderCaJours();
   renderRenta();
   renderHistory();
@@ -2971,7 +3019,7 @@ function renderMorning(){
   const QUOTES=["Chaque sub compte. Reste constant.","Le succès = la somme de petits efforts répétés.","Concentre-toi sur ce qui rapporte.","Un VA motivé vaut dix VA à surveiller.","Discipline > motivation.","Ce que tu mesures, tu l'améliores.","Aujourd'hui, fais mieux qu'hier.","Les détails font la différence.","Avance, même d'un petit pas.","Ton business grandit pendant que tu bosses."];
   const quote=QUOTES[new Date().getDate()%QUOTES.length];
   $("#morningBody").innerHTML=`
-    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnExpress" title="Version express : chiffres + action">⚡</button><button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="mn-money">${(function(){
       // Net d'abord (× 0,78), brut en petit — et surtout le CA D'AUJOURD'HUI en
@@ -2999,6 +3047,11 @@ function renderMorning(){
   const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,Math.round(tot.netMonth*NET_RATE),v=>v.toLocaleString("fr-FR")+" "+cur);
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
+  // ⚡ EXPRESS : pour les matins pressés, on ne garde que les chiffres + l'action
+  // (on masque le pavé du coach, l'historique, les tâches). Choix persistant.
+  const applyExpress=()=>{ const on=localStorage.getItem("ccn_express")==="1"; document.body.classList.toggle("mn-express",on); const b=$("#mnExpress"); if(b) b.style.opacity=on?"1":".55"; };
+  { const ex=$("#mnExpress"); if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_express", localStorage.getItem("ccn_express")==="1"?"0":"1"); applyExpress(); if(typeof toast==="function") toast(localStorage.getItem("ccn_express")==="1"?"⚡ Mode express":"📄 Mode complet", localStorage.getItem("ccn_express")==="1"?"Chiffres + action seulement.":"Briefing complet."); }; }
+  applyExpress();
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
   const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
   renderCoachAction();   // le modal vient d'être reconstruit : on repeint l'action du jour
@@ -4286,7 +4339,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 })();
 
 /* ---------- 🧭 menu de sections ---------- */
-const SECNAV=[["sections","🛠 Outils"],["om","💰 Argent"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
+const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
   ["renta","📊 Renta"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
@@ -4304,7 +4357,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
@@ -4333,6 +4386,33 @@ function openPanelPicker(){
 }
 { const b=$("#panels"); if(b) b.onclick=openPanelPicker; }
 applyHiddenPanels();
+
+/* ---------- 🎭 tes modèles en un coup d'œil (Layla, Zoe…) ---------- */
+function renderModeles(){
+  const panel=$("#modeles"); if(!panel) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const noms=(d&&d.models)?Object.keys(d.models):[];
+  if(!d || noms.length<2){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block";
+  const cur=d.currency||"$", ko=revKo();
+  const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
+  // Net d'abord (× 0,78), brut en petit — comme partout ailleurs.
+  const net=v=>ko?"—":money((Number(v)||0)*NET_RATE);
+  // subs du jour par modèle : somme des subs du jour des VA du modèle si dispo,
+  // sinon on l'omet (le total du jour global reste sur la carte).
+  const html=noms.map(m=>{
+    const mo=d.models[m]||{};
+    return `<div class="mdl-card">
+      <div class="nm">${escapeHtml(m)}</div>
+      <div class="big">${net(mo.net)} <span class="sub">net</span></div>
+      <div class="sub">brut ${money(mo.net)} · ${fmtInt(mo.subs||0)} subs ce mois</div>
+      ${(!ko&&mo.ltv!=null)?`<div class="day">LTV ${fmtLtv(mo.ltv,cur)} · marge ${money(mo.marge)}</div>`:""}
+    </div>`;
+  }).join("");
+  $("#modelesBody").innerHTML=`<div class="mdl-row">${html}</div>`
+    +`<div class="sv-note" style="margin-top:8px">Net estimé = brut × 78 %. Détail par VA : clique sur un modèle dans le panneau OnlyMonster.</div>`;
+  if(typeof fixPairs==="function") fixPairs();
+}
 
 /* ---------- 📅 CA brut par jour (28 derniers jours) ---------- */
 function renderCaJours(){
