@@ -3731,9 +3731,12 @@ function renderProxy(){
     const etat=vivant?`en ligne · IP <b>${escapeHtml(p.ip||"?")}</b>`:`<b style="color:#f87171">ne répond pas</b>${p.erreur?` <span style="color:var(--faint)">(${escapeHtml(p.erreur)})</span>`:""}`;
     return `<div class="sv-row"><span class="sv-name">${pastille} ${noms[key]||key}</span><span class="sv-cell" style="flex:1">${etat}</span></div>`;
   };
-  const alerte=(Array.isArray(d.morts)&&d.morts.length)
-    ? `<div class="sv-note" style="margin-top:8px;color:#f87171">⚠️ Un proxy est à sec — ton scraping de vues Instagram va se figer. Vérifie l'abonnement/les identifiants du proxy.</div>`
-    : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
+  const has4gMort=Array.isArray(d.morts)&&d.morts.indexOf("4g")>=0;
+  const alerte=d.critique
+    ? `<div class="sv-note" style="margin-top:8px;color:#f87171">⚠️ Ton proxy résidentiel est à sec — ton scraping de vues Instagram va se figer. Vérifie l'abonnement/les identifiants du proxy.</div>`
+    : has4gMort
+      ? `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent par le résidentiel. Le 4G (secours) est à sec, mais ce n'est pas bloquant.</div>`
+      : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
   body.innerHTML=items.map(ligne).join("")+alerte+
     `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${d.maj?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   try{ fixPairs(); }catch(e){}
