@@ -4214,6 +4214,7 @@ function renderSources(L){
     return `<div class="src-row"><div class="src-conv ${cls}">${fmtConv(l.conv)}</div><div class="src-info"><div class="src-name">${escapeHtml(l.nom)} <span class="src-va">· ${escapeHtml(l.va)}${l.modele?" · "+escapeHtml(l.modele):""}</span></div><div class="src-meta">${fmtInt(l.clics)} clics → ${fmtInt(l.subs)} subs${(l.ltv!=null)?` · sub vaut ${fmtLtv(l.ltv,cur)}`:""}</div></div></div>`;
   }).join("");
   body.innerHTML=`<div class="cac-intro">Tes liens classés par <b>conversion</b> (abonnés pour 100 clics), croisés avec la valeur d'un abonné du VA. Les meilleures sources en tête — c'est là qu'il faut envoyer plus de trafic. (Liens avec ≥ 20 clics.)</div>${rows}`;
+  if(typeof renderOnboarding==="function") renderOnboarding();   // #10 : va-liens alimente le côté OF
   try{ fixPairs(); }catch(e){}
 }
 
@@ -4275,8 +4276,11 @@ function renderOnboarding(){
   const all={}; Object.keys(ofNames).forEach(k=>all[k]=ofNames[k]); Object.keys(igNames).forEach(k=>{ if(!all[k]) all[k]=igNames[k]; });
   const incomplete=[];
   Object.keys(all).forEach(k=>{ const hasOF=!!ofNames[k], hasIG=!!igNames[k]; if(hasOF&&hasIG) return; if(hasIG&&!hasOF) incomplete.push({va:all[k],type:"nolink"}); else if(hasOF&&!hasIG) incomplete.push({va:all[k],type:"noig"}); });
-  // Si aucune donnée des deux côtés (pas encore chargées), on ne montre rien de faux.
-  const known=Object.keys(ofNames).length>0 && Object.keys(igNames).length>0;
+  // Si les données ne sont pas TOUTES chargées, on ne montre rien de faux. ⚠️ il
+  // FAUT que va-liens (VALIENS_CACHE) soit chargé, sinon un VA avec un lien mais
+  // 0 sub serait absent du côté OF → faux « aucun lien » (il en a un).
+  const liensPrets=(typeof VALIENS_CACHE!=="undefined" && VALIENS_CACHE!==null);
+  const known=liensPrets && Object.keys(ofNames).length>0 && Object.keys(igNames).length>0;
   panel.style.display="block";
   let alerts;
   if(!known){ alerts=`<div class="ob-ok">Données en cours de chargement…</div>`; }
@@ -5455,7 +5459,8 @@ async function runDiagnostic(){
   ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-diagclose]")) ov.remove(); });
   document.body.appendChild(ov);
   try{
-    const r=await fetch(HUB_BASE+"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN}});
+    const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 15000);   // le probe proxy peut traîner → timeout
+    const r=await fetch(HUB_BASE+"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN},signal:ctrl.signal}); clearTimeout(to);
     const j=await r.json(); const body=ov.querySelector("#diagBody"); if(!body) return;
     if(!r.ok||!Array.isArray(j.checks)){ body.innerHTML=`<div class="ppick-sub">${escapeHtml(j.error||"Diagnostic indisponible.")}</div>`; return; }
     const ic={ok:"🟢",warn:"🟠",bad:"🔴"};
