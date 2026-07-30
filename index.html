@@ -3949,7 +3949,7 @@ async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_B
 function renderDecroche(){
   const panel=$("#decroche"), body=$("#decrocheBody"), cnt=$("#dcCount"); if(!panel||!body) return;
   const d=VAQZ_DATA;
-  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ panel.style.display="none"; return; }
+  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ DECROCHE_FLAGS=[]; panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
   const prof={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va) prof[v.va.toLowerCase()]={roi:v.roi,marge:v.marge,unpaid:v.unpaid}; });
   const enCours=(typeof d.enCours==="number")?d.enCours:(d.labels.length-1);
   const flags=[];
@@ -4031,7 +4031,7 @@ function buildActions(){
   const pd=(typeof PROXY_DATA!=="undefined")?PROXY_DATA:null;
   if(pd && pd.critique) push(3,"🛰️","Proxy résidentiel mort — ton scraping de vues est figé","proxy");
   if(typeof LEAKS!=="undefined" && Array.isArray(LEAKS)){
-    const nouv=LEAKS.filter(l=>(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l.status==="repost").length;
+    const nouv=LEAKS.filter(l=>l&&(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l&&l.status==="repost").length;
     if(nouv) push(2,"🚨",`${nouv} fuite${nouv>1?"s":""} à traiter (DMCA)`,"antileak");
     if(rep) push(1,"♻️",`${rep} repost${rep>1?"s":""} à signaler`,"antileak");
   }
@@ -4063,7 +4063,7 @@ function renderEssentiel(){
   const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
   const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
   const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
-  const netMois=ko?"—":money((Number(tot.netMonth)||0)*NET);
+  const netMois=(ko||!om||tot.netMonth==null)?"—":money((Number(tot.netMonth)||0)*NET);   // absent ≠ 0
   const subsAuj=(tot.subsDay!=null)?String(tot.subsDay):"—";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   const apres=(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—";
@@ -4895,7 +4895,7 @@ loadCash();
 loadCac();
 loadDecroche();
 loadQuinz();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
 setTimeout(refreshEssentiel, 3500);
 </script>
 </body>
