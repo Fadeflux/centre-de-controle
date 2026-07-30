@@ -2880,8 +2880,10 @@ function renderRenta(){
   const commission=Math.round(netMonth*(1-NET_RATE));
   const profitReel=profitNet-commission;
   const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE));
-  // #6 — record du meilleur mois (max de l'historique brut) + fourchette de prévision
-  const hist=Array.isArray(d.history)?d.history:[];
+  // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
+  // l'historique et encore partiel) + fourchette de prévision
+  const histAll=Array.isArray(d.history)?d.history:[];
+  const hist=histAll.length>1?histAll.slice(0,-1):[];
   const rec=hist.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0});
   const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*NET_RATE))}–${money(Math.round(F.net.high*NET_RATE))} net</span>`:"";
   let recordLine="";
