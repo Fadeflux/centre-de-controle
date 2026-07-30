@@ -307,7 +307,40 @@
   .dc-spark{display:inline-flex;align-items:flex-end;gap:3px;height:24px}
   .dc-spark span{width:7px;background:linear-gradient(180deg,var(--acc),#7c3aed);border-radius:2px;display:block}
   .dc-body{flex:1;min-width:0} .dc-name{font-size:14px;font-weight:600} .dc-meta{font-size:12px;color:var(--muted)}
-  .dc-down{color:#f87171;font-weight:700}
+  .dc-down{color:#f87171;font-weight:700} .dc-up{color:#4ade80;font-weight:700}
+  .op-c{font-size:11px;color:#4ade80;font-weight:700}
+  .dc-spark.up span{background:linear-gradient(180deg,#4ade80,#16a34a)}
+  /* 🎯 Écran d'accueil + file d'actions */
+  .essentiel{margin:0 0 20px}
+  .ess-hero{background:linear-gradient(135deg,var(--surface),var(--bg));border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:12px}
+  .ess-greet{font-size:15px;font-weight:700;margin-bottom:12px}
+  .ess-date{font-weight:500;color:var(--muted);font-size:13px}
+  .ess-figs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .ess-fig{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .ess-fl{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:5px}
+  .ess-fv{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+  .ess-actions-wrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+  .ess-actions-head{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .ess-ac{background:var(--acc);color:#0a0a0a;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:800}
+  .ess-actions{display:flex;flex-direction:column;gap:7px}
+  .act-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:1px solid var(--line);border-left-width:3px;border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--text);cursor:pointer;font:inherit;font-size:13.5px}
+  .act-row:hover{border-color:var(--acc)}
+  .act-ico{font-size:16px;flex-shrink:0} .act-txt{flex:1;min-width:0} .act-go{color:var(--muted);font-weight:700}
+  .act-row.sev-crit{border-left-color:#f87171} .act-row.sev-high{border-left-color:#fb923c} .act-row.sev-med{border-left-color:#facc15} .act-row.sev-info{border-left-color:#4ade80}
+  @media(max-width:620px){ .ess-figs{grid-template-columns:1fr 1fr} .ess-fv{font-size:19px} }
+  /* 🔎 Recherche globale */
+  .gsearch{position:relative;margin:0 0 14px}
+  .gsearch input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;font-size:14px}
+  .gsearch input:focus{outline:none;border-color:var(--acc)}
+  .gs-res{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.4);z-index:16;overflow:hidden;display:none}
+  .gs-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 13px;background:none;border:0;border-bottom:1px solid var(--line);color:var(--text);cursor:pointer;font:inherit;font-size:13.5px}
+  .gs-item:last-child{border-bottom:0} .gs-item:hover{background:var(--bg)}
+  .gs-ic{font-size:15px} .gs-lbl{flex:1;font-weight:600} .gs-sub{color:var(--muted);font-size:12px}
+  .gs-empty{padding:12px 13px;color:var(--muted);font-size:13px}
+  /* 🕒 Fraîcheur */
+  .fresh{font-size:11px;font-weight:600;white-space:nowrap}
+  .fresh.fresh-ok{color:#4ade80} .fresh.fresh-mid{color:#facc15} .fresh.fresh-old{color:#f87171}
+  .pb-fresh{margin-left:6px}
   .al-leak-actions{display:flex;flex-direction:column;gap:6px}
   .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
   .al-leak-act.prim{border-color:var(--acc);color:var(--acc);font-weight:600}
@@ -1160,6 +1193,19 @@
   <div class="alert" id="alert"></div>
   <div class="daily" id="daily"></div>
 
+  <div class="gsearch" id="gsearch" style="display:none">
+    <input id="gsInput" type="search" placeholder="🔎 Chercher un VA ou un panneau…" autocomplete="off" />
+    <div class="gs-res" id="gsRes"></div>
+  </div>
+
+  <div class="essentiel" id="essentiel" style="display:none">
+    <div class="ess-hero" id="essHero"></div>
+    <div class="ess-actions-wrap" id="essActionsWrap" style="display:none">
+      <div class="ess-actions-head">🎯 À faire maintenant <span class="ess-ac" id="essActCount"></span></div>
+      <div class="ess-actions" id="essActions"></div>
+    </div>
+  </div>
+
   <aside id="sidebar"></aside>
 
   <div class="panel-box tasks-hero" id="tasks">
@@ -1260,7 +1306,7 @@
   </div>
 
   <div class="panel-box om" id="om" style="display:none">
-    <div class="pb-head">◎ OnlyMonster
+    <div class="pb-head">◎ OnlyMonster <span id="omFresh" class="pb-fresh"></span>
       <div class="om-models" id="omModels"></div>
       <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
     </div>
@@ -1279,6 +1325,10 @@
     <div class="panel-box" id="decroche" style="display:none">
       <div class="pb-head">📉 VA en décrochage <span class="dc-c" id="dcCount"></span></div>
       <div id="decrocheBody"></div>
+    </div>
+    <div class="panel-box" id="opportunites" style="display:none">
+      <div class="pb-head">🚀 Ça décolle <span class="op-c" id="opCount"></span></div>
+      <div id="oppBody"></div>
     </div>
   </div>
 
@@ -1952,7 +2002,7 @@ let LEAKWATCH = JSON.parse(localStorage.getItem("ccn_leakwatch")||"[]"); if(!Arr
 let LEAKS = [];
 function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(LEAKWATCH)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})}).catch(()=>{}); } }
 async function loadLeakwatch(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-watch",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.watch)){ LEAKWATCH=j.watch; localStorage.setItem("ccn_leakwatch",JSON.stringify(LEAKWATCH)); } } }catch(e){} } renderWatch(); }
-async function loadLeaks(){ if(!TOKEN){ LEAKS=[]; renderLeaks(); return; } try{ const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; } }catch(e){} renderLeaks(); }
+async function loadLeaks(){ if(!TOKEN){ LEAKS=[]; renderLeaks(); return; } try{ const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; } }catch(e){} renderLeaks(); if(typeof renderActions==="function") renderActions(); }
 function renderWatch(){
   const list=$("#alList"); if(!list) return;
   if(!LEAKWATCH.length){ list.innerHTML=`<div class="al-empty">Aucun modèle surveillé. Ajoute-en un ci-dessus 👆</div>`; return; }
@@ -2581,6 +2631,7 @@ function renderOM(){
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
   $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
+  { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
   renderModeles();
   renderCaJours();
   renderRenta();
@@ -2610,7 +2661,7 @@ function setVaGoal(va){
 }
 // ---------- Radar fans endormis ----------
 let FAN_RADAR=null;
-async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
+async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); if(typeof renderActions==="function") renderActions(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
 function renderFanRadar(){
   const panel=$("#fanradar"); if(!panel) return;
   const d=FAN_RADAR;
@@ -2629,7 +2680,7 @@ function renderFanRadar(){
 }
 // ---------- VA fantômes (rien produit depuis longtemps) ----------
 let GHOSTS=null;
-async function loadGhosts(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/ghosts",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); GHOSTS=j.data||null; renderGhosts(); if(!GHOSTS && (retry||0)<2) setTimeout(()=>loadGhosts((retry||0)+1),9000); } }catch(e){} }
+async function loadGhosts(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/ghosts",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); GHOSTS=j.data||null; renderGhosts(); if(typeof renderActions==="function") renderActions(); if(!GHOSTS && (retry||0)<2) setTimeout(()=>loadGhosts((retry||0)+1),9000); } }catch(e){} }
 function renderGhosts(){
   const panel=$("#ghosts"); if(!panel) return;
   const d=GHOSTS;
@@ -2856,7 +2907,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -3793,7 +3844,7 @@ async function loadProxy(force){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/proxy"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    PROXY_DATA=await r.json(); renderProxy();
+    PROXY_DATA=await r.json(); renderProxy(); if(typeof renderActions==="function") renderActions();
   }catch(e){}
 }
 function renderProxy(){
@@ -3862,6 +3913,7 @@ function renderCash(){
     +`<div class="cash-block"><div class="cash-h">Ce que tu as / attends</div>${tresoHtml}</div>${verdict}`
     +`<div class="bp-since" style="margin-top:8px"><button class="mn-act-btn" id="cashRefresh" style="padding:6px 12px">🔄 Rafraîchir</button>${d.maj?` <span style="color:var(--faint);font-size:11px">à jour ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   const rb=$("#cashRefresh"); if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳"; await loadCash(true); };
+  if(typeof refreshEssentiel==="function") refreshEssentiel();
 }
 
 // 🎯 #2 CAC PAR VA : ce que te coûte un abonné (coût/sub de la quinzaine) vs ce
@@ -3892,8 +3944,8 @@ function renderCac(){
 // après quinzaine. Calculé côté front depuis /api/hub/va-quinzaines (subs par
 // quinzaine) + la rentabilité courante d'OM_DATA (un VA EN PERTE relève du
 // détecteur « à couper », pas d'ici).
-let VAQZ_DATA=null;
-async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); }catch(e){} }
+let VAQZ_DATA=null, DECROCHE_FLAGS=[], OPP_FLAGS=[];
+async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); renderOpp(); }catch(e){} }
 function renderDecroche(){
   const panel=$("#decroche"), body=$("#decrocheBody"), cnt=$("#dcCount"); if(!panel||!body) return;
   const d=VAQZ_DATA;
@@ -3918,6 +3970,8 @@ function renderDecroche(){
     flags.push({va, seq:l3, chute});
   });
   flags.sort((x,y)=>y.chute-x.chute);
+  DECROCHE_FLAGS=flags.slice();   // réutilisé par la file d'actions (#1)
+  if(typeof renderActions==="function") renderActions();
   if(cnt) cnt.textContent=flags.length?String(flags.length):"";
   if(!flags.length){ panel.style.display="none"; return; }
   panel.style.display="block";
@@ -3926,6 +3980,139 @@ function renderDecroche(){
     +flags.slice(0,12).map(f=>`<div class="dc-row">${spark(f.seq)}<div class="dc-body"><div class="dc-name">${escapeHtml(f.va)}</div><div class="dc-meta">${f.seq.join(" → ")} subs · <span class="dc-down">▼ ${f.chute} %</span> sur 3 quinzaines</div></div></div>`).join("");
   try{ fixPairs(); }catch(e){}
 }
+
+// 🚀 #6 OPPORTUNITÉS : l'inverse du décrochage — VA dont les subs MONTENT fort.
+// Même source (VAQZ_DATA) ; « pousse pendant que ça marche ».
+function renderOpp(){
+  const panel=$("#opportunites"), body=$("#oppBody"), cnt=$("#opCount"); if(!panel||!body) return;
+  const d=VAQZ_DATA; OPP_FLAGS=[];
+  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
+  const prof={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va) prof[v.va.toLowerCase()]={unpaid:v.unpaid}; });
+  const enCours=(typeof d.enCours==="number")?d.enCours:(d.labels.length-1);
+  const flags=[];
+  Object.keys(d.parVa).forEach(va=>{
+    const seq=(d.parVa[va]||[]).slice(0,enCours);
+    if(seq.length<3) return;
+    const l3=seq.slice(-3), a=l3[0], b=l3[1], c=l3[2];
+    const deuxHausses=(a<b && b<c && c>=5);
+    const bond=(c>=10 && c>=Math.max(a,b)*1.6);
+    if(!(deuxHausses||bond)) return;
+    const p=prof[va.toLowerCase()]; if(p && p.unpaid) return;   // comptes perso : pas un levier budget
+    const pos=l3.filter(x=>x>0); const base=pos.length?Math.min.apply(null,pos):0;
+    const hausse=base>0?Math.round((c-base)/base*100):0;
+    flags.push({va, seq:l3, hausse});
+  });
+  flags.sort((x,y)=>y.hausse-x.hausse);
+  OPP_FLAGS=flags.slice();
+  if(typeof renderActions==="function") renderActions();
+  if(cnt) cnt.textContent=flags.length?String(flags.length):"";
+  if(!flags.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const spark=arr=>{ const mx=Math.max(1,...arr); return `<span class="dc-spark up">${arr.map(v=>`<span style="height:${Math.max(6,Math.round((v/mx)*22))}px" title="${v} subs"></span>`).join("")}</span>`; };
+  body.innerHTML=`<div class="dc-intro">Ces VA <b>montent fort</b> en ce moment. C'est le bon moment pour leur donner <b>plus de budget ou de contenu</b> — pousse pendant que ça marche.</div>`
+    +flags.slice(0,12).map(f=>`<div class="dc-row">${spark(f.seq)}<div class="dc-body"><div class="dc-name">${escapeHtml(f.va)}</div><div class="dc-meta">${f.seq.join(" → ")} subs · <span class="dc-up">▲ ${f.hausse} %</span> sur 3 quinzaines</div></div></div>`).join("");
+  try{ fixPairs(); }catch(e){}
+}
+
+// 🎯 #1 FILE D'ACTIONS + #3 ÉCRAN D'ACCUEIL « L'ESSENTIEL »
+// Une seule liste priorisée qui rassemble TOUS les signaux déjà chargés (cash,
+// fuites, proxy, décrochage, opportunités, fans endormis, VA fantômes, revenus
+// muets) et les classe par gravité. On ne recalcule rien : on agrège.
+function jumpPanel(id){ const el=document.getElementById(id); if(el){ try{ _userScrolled=true; }catch(e){} el.scrollIntoView({behavior:"smooth",block:"start"}); } }
+function buildActions(){
+  const A=[], push=(sev,icon,text,panel)=>A.push({sev,icon,text,panel});
+  const eur=v=>Math.round(Math.abs(Number(v)||0)).toLocaleString("fr-FR")+" $";
+  const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
+  if(cd && !cd.error){
+    if(cd.apresPaie!=null && Number(cd.apresPaie)<0) push(3,"🔴",`Cash serré : il te manquera ${eur(cd.apresPaie)} pour tout payer`,"cash");
+    if(Number(cd.resteRetard)>0){ const noms=(cd.restantsPrev||[]).slice(0,3).map(o=>o.va).join(", "); push(2,"💸",`Quinzaine passée pas soldée : ${eur(cd.resteRetard)}${noms?` (${noms})`:""}`,"cash"); }
+  }
+  if(typeof revKo==="function" && revKo()) push(3,"🔌","Revenus illisibles — vérifie OnlyMonster","om");
+  const pd=(typeof PROXY_DATA!=="undefined")?PROXY_DATA:null;
+  if(pd && pd.critique) push(3,"🛰️","Proxy résidentiel mort — ton scraping de vues est figé","proxy");
+  if(typeof LEAKS!=="undefined" && Array.isArray(LEAKS)){
+    const nouv=LEAKS.filter(l=>(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l.status==="repost").length;
+    if(nouv) push(2,"🚨",`${nouv} fuite${nouv>1?"s":""} à traiter (DMCA)`,"antileak");
+    if(rep) push(1,"♻️",`${rep} repost${rep>1?"s":""} à signaler`,"antileak");
+  }
+  if(DECROCHE_FLAGS && DECROCHE_FLAGS.length){ const n=DECROCHE_FLAGS.length; push(1,"📉",`${n} VA en décrochage : ${DECROCHE_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"decroche"); }
+  if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites"); }
+  const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
+  if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
+  const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
+  if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
+  A.sort((x,y)=>y.sev-x.sev);
+  return A;
+}
+function renderActions(){
+  const wrap=$("#essActionsWrap"), box=$("#essActions"), cnt=$("#essActCount"); if(!wrap||!box) return;
+  if(!TOKEN){ wrap.style.display="none"; return; }
+  const A=buildActions();
+  if(!A.length){ wrap.style.display="none"; box.innerHTML=""; if(cnt)cnt.textContent=""; return; }
+  wrap.style.display="block";
+  if(cnt) cnt.textContent=String(A.length);
+  const sevCls=["info","med","high","crit"];
+  box.innerHTML=A.map(a=>`<button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>`).join("");
+}
+function renderEssentiel(){
+  const wrap=$("#essentiel"), hero=$("#essHero"); if(!wrap||!hero) return;
+  if(!TOKEN){ wrap.style.display="none"; return; }
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const ko=(typeof revKo==="function")?revKo():false;
+  const tot=(om&&om.totals)||{};
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
+  const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+  const netMois=ko?"—":money((Number(tot.netMonth)||0)*NET);
+  const subsAuj=(tot.subsDay!=null)?String(tot.subsDay):"—";
+  const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
+  const apres=(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—";
+  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(OM_FETCHED_AT)}</div>`
+    +`<div class="ess-figs">`
+    +`<div class="ess-fig"><div class="ess-fl">Net du mois (est.)</div><div class="ess-fv">${netMois}</div></div>`
+    +`<div class="ess-fig"><div class="ess-fl">Subs aujourd'hui</div><div class="ess-fv">${subsAuj}</div></div>`
+    +`<div class="ess-fig"><div class="ess-fl">Après la paie</div><div class="ess-fv">${apres}</div></div>`
+    +`</div>`;
+  wrap.style.display="block";
+}
+// 🕒 #9 FRAÎCHEUR : « est-ce que je regarde du frais ? » Vert < 10 min, orange
+// < 1 h, rouge au-delà (chiffres peut-être périmés).
+let OM_FETCHED_AT=0;
+function fraicheur(ts){
+  ts=Number(ts)||0; if(!ts) return "";
+  const m=Math.max(0,Math.round((Date.now()-ts)/60000));
+  const c=m<10?"fresh-ok":m<60?"fresh-mid":"fresh-old";
+  const txt=m<1?"à jour à l'instant":m<60?`à jour il y a ${m} min`:`⚠️ vieux de ${Math.round(m/60)} h`;
+  return `<span class="fresh ${c}">● ${txt}</span>`;
+}
+function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
+{ const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
+
+// 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
+// panneau → saute dessus. Index construit à la volée (VA depuis OM_DATA, panneaux
+// depuis PANNEAUX). La fiche VA elle-même existe déjà (openVaCard).
+function gsNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function gsIndex(){
+  const items=[];
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  if(om&&Array.isArray(om.vas)) om.vas.forEach(v=>{ if(v&&v.va) items.push({type:"va", label:v.va, sub:(v.unpaid?"perso":`${v.subs||0} subs`), key:v.va}); });
+  const seen={};
+  (typeof PANNEAUX!=="undefined"?PANNEAUX:[]).forEach(a=>{ if(a&&a[0]){ seen[a[0]]=1; items.push({type:"panel", label:String(a[1]||a[0]).replace(/^[^\p{L}]+/u,"").trim()||a[1], sub:"panneau", key:a[0]}); } });
+  [["om","Argent (OnlyMonster)"],["cash","Cash à venir"],["paie","Paie"],["antileak","Anti-leak"],["tasks","Tâches d'équipe"],["journal","Journal"],["costs","Dépenses d'outils"],["proxy","État des proxies"]].forEach(p=>{ if(!seen[p[0]]){ seen[p[0]]=1; items.push({type:"panel",label:p[1],sub:"panneau",key:p[0]}); } });
+  return items;
+}
+function gsRender(q){
+  const box=$("#gsRes"); if(!box) return;
+  q=gsNorm(q).trim();
+  if(!q){ box.innerHTML=""; box.style.display="none"; return; }
+  const hits=gsIndex().filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
+  if(!hits.length){ box.innerHTML=`<div class="gs-empty">Aucun résultat</div>`; box.style.display="block"; return; }
+  box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
+  box.style.display="block";
+}
+{ const inp=$("#gsInput"); if(inp){ inp.addEventListener("input",()=>gsRender(inp.value)); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
+{ const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else jumpPanel(k); }); }
+document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
@@ -4568,7 +4755,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -4585,7 +4772,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
@@ -4708,7 +4895,8 @@ loadCash();
 loadCac();
 loadDecroche();
 loadQuinz();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
+setTimeout(refreshEssentiel, 3500);
 </script>
 </body>
 </html>
