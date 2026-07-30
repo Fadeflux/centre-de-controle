@@ -4280,7 +4280,7 @@ function renderCharge(){
   let satHtml="";
   if(sat.length){
     satHtml=`<div class="ch-sat"><div class="ch-sat-h">🔴 Poste plus mais rapporte moins</div>`
-      +sat.slice(0,5).map(v=>`<div class="ch-sat-row"><b>${escapeHtml(v.va)}</b> : ${v.postsPrev7}→${v.posts7} posts/sem, mais ${_fmtVues(v.viewsPrev7)}→${_fmtVues(v.views7)} vues${(v.subsQ!=null&&v.subsPrevQ!=null)?` · ${v.subsPrevQ}→${v.subsQ} subs`:""}</div>`).join("")
+      +sat.slice(0,5).map(v=>`<div class="ch-sat-row"><b>${escapeHtml(v.va)}</b> : ${v.postsPrev7}→${v.posts7} posts/sem, mais ${_fmtVues(v.viewsPrev7)}→${_fmtVues(v.views7)} vues</div>`).join("")
       +`<div class="ch-sat-note">Rendement en baisse : change l'angle / l'accroche plutôt que le volume.</div></div>`;
   }
   const rows=vas.slice(0,20).map(v=>{
