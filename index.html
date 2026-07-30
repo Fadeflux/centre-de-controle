@@ -362,6 +362,12 @@
   .diag-sum{font-size:15px;font-weight:700;text-align:center;margin:10px 0 14px}
   .diag-row{display:flex;align-items:flex-start;gap:11px;padding:8px 0;border-bottom:1px solid var(--line)} .diag-row:last-child{border-bottom:0}
   .diag-ic{font-size:13px;line-height:1.5} .diag-body{flex:1;min-width:0} .diag-name{font-size:13.5px;font-weight:600} .diag-detail{font-size:12.5px;color:var(--muted)}
+  /* #10 onboarding */
+  .ob-h{font-size:13px;font-weight:700;margin:12px 0 8px} .ob-h:first-child{margin-top:0}
+  .ob-alert{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);border-radius:10px;padding:9px 12px;margin-bottom:7px;font-size:13px;line-height:1.5}
+  .ob-ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:10px 12px;font-size:13px}
+  .ob-check{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .ob-step{font-size:13px;padding:4px 0;color:var(--text)}
   /* #10 vue associé : on masque tout ce qui touche à l'argent, la paie, la config, l'édition */
   #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   #assocBanner button{margin-left:12px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
@@ -375,7 +381,7 @@
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
-  body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare,
+  body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
   body.assoc-mode #refresh, body.assoc-mode #diag{display:none !important}
@@ -1464,6 +1470,10 @@
     <div class="panel-box" id="churn" style="display:none">
       <div class="pb-head">💔 Gros fans qui viennent de partir</div>
       <div id="churnBody"></div>
+    </div>
+    <div class="panel-box" id="onboarding" style="display:none">
+      <div class="pb-head">🆕 Onboarding des VA</div>
+      <div id="onboardingBody"></div>
     </div>
     <div class="panel-box" id="ghosts" style="display:none">
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
@@ -3147,7 +3157,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -4247,6 +4257,45 @@ function renderCompareResult(){
     +`<tr><td>CA net / jour</td><td>${money(net(A.ca)/Math.max(1,A.jours))}</td><td>${money(net(B.ca)/Math.max(1,B.jours))}</td><td>${delta(net(A.ca)/Math.max(1,A.jours),net(B.ca)/Math.max(1,B.jours),money)}</td></tr></table>`;
 }
 
+// 🆕 #10 ONBOARDING DES VA : un VA doit être branché des DEUX côtés (lien
+// OnlyMonster ET compte Instagram), sinon il devient « fantôme ». On croise le
+// côté OF (om.vas/va-liens) et le côté IG (va-charge) pour détecter les setups
+// incomplets. + une checklist pour un nouveau VA.
+function renderOnboarding(){
+  const panel=$("#onboarding"), body=$("#onboardingBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const charge=(typeof CHARGE_DATA!=="undefined"&&CHARGE_DATA)||null;
+  const liens=(typeof VALIENS_CACHE!=="undefined"&&VALIENS_CACHE)||null;
+  const ofNames={};
+  if(om&&Array.isArray(om.vas)) om.vas.forEach(v=>{ if(v&&v.va&&!v.unpaid&&(Number(v.subs)>0)) ofNames[v.va.toLowerCase()]=v.va; });
+  if(liens&&liens.parVa) Object.keys(liens.parVa).forEach(va=>{ if((liens.parVa[va].liens||[]).length) ofNames[va.toLowerCase()]=va; });
+  const igNames={};
+  if(charge&&Array.isArray(charge.vas)) charge.vas.forEach(v=>{ if(v&&v.va&&((v.posts7||0)>0||(v.postsPrev7||0)>0)) igNames[v.va.toLowerCase()]=v.va; });
+  const all={}; Object.keys(ofNames).forEach(k=>all[k]=ofNames[k]); Object.keys(igNames).forEach(k=>{ if(!all[k]) all[k]=igNames[k]; });
+  const incomplete=[];
+  Object.keys(all).forEach(k=>{ const hasOF=!!ofNames[k], hasIG=!!igNames[k]; if(hasOF&&hasIG) return; if(hasIG&&!hasOF) incomplete.push({va:all[k],type:"nolink"}); else if(hasOF&&!hasIG) incomplete.push({va:all[k],type:"noig"}); });
+  // Si aucune donnée des deux côtés (pas encore chargées), on ne montre rien de faux.
+  const known=Object.keys(ofNames).length>0 && Object.keys(igNames).length>0;
+  panel.style.display="block";
+  let alerts;
+  if(!known){ alerts=`<div class="ob-ok">Données en cours de chargement…</div>`; }
+  else if(incomplete.length){
+    alerts=`<div class="ob-h" style="color:#fb923c">⚠️ Setup incomplet détecté (${incomplete.length})</div>`
+      +incomplete.slice(0,10).map(x=>`<div class="ob-alert">${x.type==="nolink"
+        ?`<b>${escapeHtml(x.va)}</b> poste sur Instagram mais n'a <b>aucun lien de tracking</b> → ses abonnés ne lui sont pas attribués. Crée son lien dans OnlyMonster.`
+        :`<b>${escapeHtml(x.va)}</b> a un lien mais <b>aucun compte Instagram lié</b> détecté → ses posts/vues ne remontent pas. Lie son compte IG au bot.`}</div>`).join("");
+  } else { alerts=`<div class="ob-ok">✅ Tous tes VA sont branchés des deux côtés (lien OnlyMonster + compte Instagram).</div>`; }
+  const checklist=`<div class="ob-check"><div class="ob-h">📋 Checklist d'un nouveau VA</div>
+    <div class="ob-step">1️⃣ Créer son <b>lien de tracking</b> dans OnlyMonster</div>
+    <div class="ob-step">2️⃣ Lier son ou ses <b>comptes Instagram</b> au bot</div>
+    <div class="ob-step">3️⃣ Le mettre dans la <b>paie</b> (tarif / bonus)</div>
+    <div class="ob-step">4️⃣ Lui fixer un <b>premier objectif</b></div>
+    <div class="ob-step">5️⃣ Lui envoyer une <b>première tâche / bienvenue</b></div></div>`;
+  body.innerHTML=`<div class="cac-intro">Un nouveau VA doit être branché des DEUX côtés, sinon il devient « fantôme ». Voici ce qui manque + la checklist.</div>${alerts}${checklist}`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🎯 #5 MEILLEURE COMBINAISON VA × MODÈLE : quel VA cartonne sur quel modèle.
 // Source : OM_DATA.models[m].vas (perf par VA et par modèle).
 function renderVaModel(){
@@ -4542,6 +4591,7 @@ function renderCharge(){
       +sat.slice(0,5).map(v=>`<div class="ch-sat-row"><b>${escapeHtml(v.va)}</b> : ${v.postsPrev7}→${v.posts7} posts/sem, mais ${_fmtVues(v.viewsPrev7)}→${_fmtVues(v.views7)} vues</div>`).join("")
       +`<div class="ch-sat-note">Rendement en baisse : change l'angle / l'accroche plutôt que le volume.</div></div>`;
   }
+  if(typeof renderOnboarding==="function") renderOnboarding();   // #10 : va-charge alimente le côté IG
   const rows=vas.slice(0,20).map(v=>{
     const p=v.posts7||0;
     let badge=(p>=med*1.5 && p>=6)?`<span class="ch-badge fond">⚡ à fond</span>`:(p<=Math.max(1,med*0.5))?`<span class="ch-badge marge">🌱 de la marge</span>`:"";
@@ -5686,7 +5736,7 @@ refreshSecnav();
 const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
-  ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["ghosts","👻 VA fantômes"],
+  ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
