@@ -2518,7 +2518,8 @@ function renderOM(){
   // Comparaison HONNÊTE : mois en cours vs mois dernier À LA MÊME DATE (pas le
   // mois entier — comparer 12 jours à 30 ferait toujours paraître en retard).
   const prevTD = d.totals.netLastMonthToDate;
-  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(d.totals.netMonth,prevTD):"";
+  // delta à l'échelle NET (comme le chiffre affiché juste à côté), pas en brut.
+  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(Math.round((Number(d.totals.netMonth)||0)*NET_RATE),Math.round((Number(prevTD)||0)*NET_RATE)):"";
   // Deux avertissements distincts : « je ne sais rien » et « je ne sais pas tout ».
   const bandeauKo=ko
     ? `<div class="om-prep" style="border-left:3px solid #f87171;margin-bottom:10px">⚠️ Revenus illisibles en ce moment — tous les montants affichent « — ». Ce n'est <b>pas</b> zéro. Les abonnés, eux, sont justes.</div>`
@@ -2855,7 +2856,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway();
+    OM_DATA=j.data; renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -3912,7 +3913,8 @@ function renderDecroche(){
     if(p && p.unpaid) return;                          // comptes perso non payés : pas un « VA à pousser »
     const enPerte=p && !p.unpaid && p.roi!=null && Number(p.roi)<0 && Number(p.marge)<0;
     if(enPerte) return;                                // déjà géré par le détecteur « à couper »
-    const chute=a>0?Math.round((a-c)/a*100):0;
+    const base=Math.max(a,b);   // référence = le pic récent, pas forcément la 1re case (qui peut être 0)
+    const chute=base>0?Math.round((base-c)/base*100):0;
     flags.push({va, seq:l3, chute});
   });
   flags.sort((x,y)=>y.chute-x.chute);
