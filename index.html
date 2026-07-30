@@ -2924,6 +2924,7 @@ function renderHistory(){
 }
 function renderRenta(){
   if(!OM_DATA){ $("#renta").style.display="none"; return; }
+  { const ae=document.activeElement; if(ae && ae.id==="taxRate") return; }   // ne pas effacer le taux d'impôt en cours de saisie
   // ⛔ Sans revenus lus, ce panneau fabriquait un COMPTE DE RÉSULTAT COMPLET :
   // « Revenus 0 $ », coût des VA, perte du mois et projection de fin de mois —
   // une perte inventée de toutes pièces, mise en page comme un vrai bilan.
@@ -4564,6 +4565,7 @@ function ruleLabel(r){ const M=RULE_METRICS.find(m=>m.k===r.metric)||{label:r.me
 function renderRules(){
   const panel=$("#rules"), body=$("#rulesBody"); if(!panel||!body) return;
   if(!TOKEN){ panel.style.display="none"; return; }
+  { const ae=document.activeElement; if(ae && panel.contains(ae) && /INPUT|SELECT/.test(ae.tagName)) return; }   // ne pas effacer un champ en cours de saisie
   panel.style.display="block";
   const metOpts=RULE_METRICS.map(m=>`<option value="${m.k}">${escapeHtml(m.label)}</option>`).join("");
   const list=RULES.length?RULES.map(r=>{
