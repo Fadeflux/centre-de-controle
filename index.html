@@ -308,6 +308,18 @@
   .src-conv{font-size:15px;font-weight:800;min-width:64px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text)}
   .src-conv.pos{color:#4ade80} .src-conv.neg{color:#f87171}
   .src-info{flex:1;min-width:0} .src-name{font-size:13.5px;font-weight:600} .src-va{color:var(--muted);font-weight:400;font-size:12px} .src-meta{font-size:12px;color:var(--muted)}
+  /* #11 incidents */
+  .inc-h{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px} .inc-h:first-child{margin-top:0}
+  .inc-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)} .inc-row:last-child{border-bottom:0}
+  .inc-dot{font-size:12px;line-height:1.5} .inc-body{flex:1;min-width:0} .inc-lbl{font-size:13.5px;font-weight:600} .inc-meta{font-size:12px;color:var(--muted)}
+  .inc-warn{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);border-radius:10px;padding:9px 12px;margin:10px 0;font-size:12.5px;color:#fb923c}
+  /* #2 règles */
+  .rule-form{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+  .rule-form select,.rule-form input{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
+  .rule-form input{max-width:120px}
+  .rule-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .rule-row:last-child{border-bottom:0}
+  .rule-dot{font-size:12px} .rule-body{flex:1;min-width:0} .rule-lbl{font-size:13.5px;font-weight:600} .rule-sub{font-size:12px;color:var(--muted)}
+  .rule-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .rule-del:hover{color:#f87171}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -1240,6 +1252,9 @@
       <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
+      <button class="btn" id="backup" title="Télécharger ma sauvegarde" style="display:none">💾</button>
+      <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" />
       <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
       <div class="settings-wrap">
         <button class="btn" id="settingsBtn" title="Paramètres">⚙️</button>
@@ -1486,6 +1501,14 @@
     <div class="panel-box" id="proxy" style="display:none">
       <div class="pb-head">🛰️ État de tes proxies</div>
       <div id="proxyBody"></div>
+    </div>
+    <div class="panel-box" id="incidents" style="display:none">
+      <div class="pb-head">🗂️ Historique des incidents</div>
+      <div id="incidentsBody"></div>
+    </div>
+    <div class="panel-box" id="rules" style="display:none">
+      <div class="pb-head">🔔 Mes alertes perso (si… alors préviens-moi)</div>
+      <div id="rulesBody"></div>
     </div>
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
@@ -1898,7 +1921,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -4448,7 +4471,7 @@ function renderReco(){
   el.innerHTML=`<div class="reco-lbl">🎯 Ta priorité de la semaine</div><button class="reco-body" data-jump="${reco.jump}"><span class="reco-ico">${reco.ico}</span><span class="reco-txt">${reco.txt}</span><span class="act-go">→</span></button>`;
   { const b=el.querySelector("[data-jump]"); if(b) b.onclick=()=>jumpPanel(b.getAttribute("data-jump")); }
 }
-function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
+function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); if(typeof checkRules==="function") checkRules(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
 { const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const qk=e.target.closest("[data-qk]"); if(qk){ e.stopPropagation(); const a=(LAST_ACTIONS||[])[Number(qk.getAttribute("data-qk"))]; if(a) doQuickAction(a.quick); return; } const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
 
 // 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
@@ -4477,6 +4500,101 @@ function gsRender(q){
 { const inp=$("#gsInput"); if(inp){ inp.addEventListener("input",()=>gsRender(inp.value)); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
 { const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else jumpPanel(k); }); }
 document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
+
+// 🗂️ #11 HISTORIQUE DES INCIDENTS : pannes passées + en cours (durée, récurrences).
+let INCIDENTS_DATA=null;
+async function loadIncidents(refresh){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/incidents"+(refresh?"?refresh=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; INCIDENTS_DATA=await r.json(); renderIncidents(); }catch(e){} }
+function _fmtDuree(ms){ ms=Number(ms)||0; const m=Math.round(ms/60000); if(m<60) return m+" min"; const h=Math.round(m/60); if(h<48) return h+" h"; return Math.round(h/24)+" j"; }
+function renderIncidents(){
+  const panel=$("#incidents"), body=$("#incidentsBody"); if(!panel||!body) return;
+  const inc=(INCIDENTS_DATA&&Array.isArray(INCIDENTS_DATA.incidents))?INCIDENTS_DATA.incidents:[];
+  if(!TOKEN||!inc.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const enCours=inc.filter(x=>x&&x.end==null);
+  const passes=inc.filter(x=>x&&x.end!=null).slice(0,20);
+  const row=(x,ongoing)=>{
+    const dur=ongoing?_fmtDuree(Date.now()-x.start):_fmtDuree(x.durationMs);
+    const quand=new Date(Number(x.start)||0).toLocaleDateString("fr-FR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+    return `<div class="inc-row"><span class="inc-dot">${ongoing?"🔴":"🟢"}</span><div class="inc-body"><div class="inc-lbl">${escapeHtml(x.label||x.subject||"")}</div><div class="inc-meta">${quand} · ${ongoing?"en cours depuis "+dur:"a duré "+dur}</div></div></div>`;
+  };
+  const compte={}; passes.forEach(x=>{ compte[x.subject]=(compte[x.subject]||0)+1; });
+  const recur=Object.keys(compte).filter(k=>compte[k]>=3).map(k=>{ const lab=(inc.find(x=>x.subject===k)||{}).label||k; return `${escapeHtml(lab)} (${compte[k]}×)`; });
+  body.innerHTML=(enCours.length?`<div class="inc-h">🔴 En cours</div>${enCours.map(x=>row(x,true)).join("")}`:"")
+    +(recur.length?`<div class="inc-warn">↻ Récurrent : ${recur.join(", ")} — à renforcer en priorité.</div>`:"")
+    +(passes.length?`<div class="inc-h">Historique (résolus)</div>${passes.map(x=>row(x,false)).join("")}`:"");
+  try{ fixPairs(); }catch(e){}
+}
+
+// 🔔 #2 RÈGLES PERSO : « si X alors préviens-moi ». Configurées ici, stockées
+// serveur (hub_rules), évaluées côté serveur pour push + côté front pour l'état live.
+const RULE_METRICS=[
+  {k:"cash_apres_paie",label:"Cash après la paie",unit:"$",bool:false},
+  {k:"ca_mois",label:"CA brut du mois",unit:"$",bool:false},
+  {k:"subs_jour",label:"Subs aujourd'hui",unit:"",bool:false},
+  {k:"subs_mois",label:"Subs du mois",unit:"",bool:false},
+  {k:"proxy_mort",label:"Proxy en panne",bool:true},
+  {k:"revenus_muets",label:"Revenus illisibles",bool:true}
+];
+let RULES=[], RULE_SEEN={};
+async function loadRules(){
+  if(!TOKEN){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e){ RULES=[]; } renderRules(); return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/rules",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); RULES=Array.isArray(j.rules)?j.rules:[]; localStorage.setItem("ccn_rules",JSON.stringify(RULES)); } }
+  catch(e){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e2){ RULES=[]; } }
+  renderRules();
+}
+function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
+function ruleMetricVal(k){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null, ko=(typeof revKo==="function")?revKo():false, t=(om&&om.totals)||{};
+  if(k==="revenus_muets") return ko?1:0;
+  if(k==="proxy_mort") return (typeof PROXY_DATA!=="undefined"&&PROXY_DATA&&PROXY_DATA.critique)?1:0;
+  if(k==="ca_mois") return (ko||t.netMonth==null)?undefined:Number(t.netMonth);
+  if(k==="subs_jour") return t.subsDay!=null?Number(t.subsDay):undefined;
+  if(k==="subs_mois") return t.subsMonth!=null?Number(t.subsMonth):undefined;
+  if(k==="cash_apres_paie"){ const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null; return (cd&&!cd.error&&!cd.tresoIndispo&&cd.apresPaie!=null)?Number(cd.apresPaie):undefined; }
+  return undefined;
+}
+function ruleTriggered(r){
+  const M=RULE_METRICS.find(m=>m.k===r.metric); if(!M) return null;
+  const v=ruleMetricVal(r.metric); if(v===undefined) return null;
+  if(M.bool) return !!v;
+  const t=Number(r.value)||0;
+  switch(r.op){ case"<":return v<t; case"<=":return v<=t; case">":return v>t; case">=":return v>=t; case"==":return v===t; default:return null; }
+}
+function ruleLabel(r){ const M=RULE_METRICS.find(m=>m.k===r.metric)||{label:r.metric,unit:""}; return M.bool?M.label:`${M.label} ${r.op} ${fmtInt(r.value)}${M.unit?" "+M.unit:""}`; }
+function renderRules(){
+  const panel=$("#rules"), body=$("#rulesBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const metOpts=RULE_METRICS.map(m=>`<option value="${m.k}">${escapeHtml(m.label)}</option>`).join("");
+  const list=RULES.length?RULES.map(r=>{
+    const trig=ruleTriggered(r), dot=trig===true?"🔴":trig===false?"🟢":"⚪";
+    return `<div class="rule-row"><span class="rule-dot" title="${trig===true?"déclenchée":trig===false?"OK":"donnée indispo"}">${dot}</span><div class="rule-body"><div class="rule-lbl">${escapeHtml(r.label||("Alerte : "+ruleLabel(r)))}</div><div class="rule-sub">quand ${escapeHtml(ruleLabel(r))}</div></div><button class="rule-del" data-ruledel="${escapeHtml(r.id)}">✕</button></div>`;
+  }).join(""):`<div class="cac-intro">Aucune règle. Crée-en une : tu recevras une notif dès qu'elle se déclenche (même dashboard fermé, si les notifs sont activées).</div>`;
+  body.innerHTML=`<div class="rule-form">
+      <select id="ruleMetric">${metOpts}</select>
+      <select id="ruleOp"><option value="<">passe sous</option><option value=">">dépasse</option><option value="<=">≤</option><option value=">=">≥</option></select>
+      <input id="ruleVal" type="number" placeholder="valeur" inputmode="numeric">
+      <input id="ruleLabelInput" placeholder="Nom (optionnel)">
+      <button class="mn-act-btn" id="ruleAdd">＋</button>
+    </div>${list}`;
+  const syncForm=()=>{ const M=RULE_METRICS.find(x=>x.k===(($("#ruleMetric")||{}).value))||{}; const op=$("#ruleOp"), val=$("#ruleVal"); if(op) op.style.display=M.bool?"none":""; if(val) val.style.display=M.bool?"none":""; };
+  { const ms=$("#ruleMetric"); if(ms){ ms.onchange=syncForm; syncForm(); } }
+  { const b=$("#ruleAdd"); if(b) b.onclick=addRule; }
+  try{ fixPairs(); }catch(e){}
+}
+function addRule(){
+  const m=($("#ruleMetric")||{}).value, M=RULE_METRICS.find(x=>x.k===m); if(!M) return;
+  const op=(($("#ruleOp")||{}).value)||"<", val=Number(($("#ruleVal")||{}).value)||0, label=(($("#ruleLabelInput")||{}).value||"").trim();
+  RULES.unshift({id:(typeof tkId==="function"?tkId():Date.now().toString(36)+Math.random().toString(36).slice(2,6)), metric:m, op:M.bool?"==":op, value:M.bool?1:val, label:label, active:true});
+  saveRules(); renderRules();
+  if(typeof toast==="function") toast("🔔 Alerte créée","Tu seras prévenu dès qu'elle se déclenche.");
+}
+function checkRules(){
+  if(!TOKEN||!Array.isArray(RULES)) return;
+  RULES.forEach(r=>{ const t=ruleTriggered(r); if(t===true && !RULE_SEEN[r.id]){ RULE_SEEN[r.id]=1; if(typeof toast==="function") toast("🔔 "+(r.label||"Alerte"), ruleLabel(r)); } else if(t===false){ RULE_SEEN[r.id]=0; } });
+  renderRules();
+}
+{ const rb=$("#rulesBody"); if(rb) rb.addEventListener("click",e=>{ const d=e.target.closest("[data-ruledel]"); if(d){ RULES=RULES.filter(x=>x.id!==d.getAttribute("data-ruledel")); saveRules(); renderRules(); } }); }
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
@@ -4911,7 +5029,7 @@ function voiceAsk(prefixe, opts){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","backup","restore","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -4927,6 +5045,38 @@ function voiceAsk(prefixe, opts){
   }
 }
 { const vb=$("#voix"); if(vb) vb.onclick=()=>{ try{ primeVoices(); }catch(e){} speakCoach("Bonjour Andre, c'est ta voix pour le coach du matin. On va faire une belle journée.", vb); }; }
+
+/* ---------- 💾 #12 sauvegarde / restauration de la config ---------- */
+async function doBackup(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord pour sauvegarder."); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/config-export",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok){ if(typeof toast==="function") toast("⚠️ Sauvegarde impossible",""); return; }
+    const j=await r.json();
+    const blob=new Blob([JSON.stringify(j,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob); const a=document.createElement("a");
+    const d=new Date(), stamp=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    a.href=url; a.download="noctra-sauvegarde-"+stamp+".json"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+    localStorage.setItem("ccn_last_backup", d.toISOString());
+    if(typeof toast==="function") toast("💾 Sauvegarde téléchargée",(j.keys||0)+" réglages enregistrés.");
+  }catch(e){ if(typeof toast==="function") toast("⚠️ Erreur",""); }
+}
+async function doRestore(file){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  if(!file) return;
+  try{
+    const txt=await file.text(); const j=JSON.parse(txt);
+    const data=(j&&j.data&&typeof j.data==="object")?j.data:(typeof j==="object"?j:null);
+    if(!data){ if(typeof toast==="function") toast("⚠️ Fichier invalide",""); return; }
+    if(!confirm("Restaurer cette sauvegarde ? Tes réglages actuels (tâches, paie, objectifs…) seront REMPLACÉS par ceux du fichier.")) return;
+    const r=await fetch(HUB_BASE+"/api/hub/config-import",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({data:data})});
+    const res=await r.json().catch(()=>({}));
+    if(r.ok&&res.ok){ if(typeof toast==="function") toast("♻️ Restauré",(res.restored||[]).length+" réglages restaurés. Rechargement…"); setTimeout(()=>location.reload(),1500); }
+    else if(typeof toast==="function") toast("⚠️ Restauration échouée","");
+  }catch(e){ if(typeof toast==="function") toast("⚠️ Fichier illisible",""); }
+}
+{ const b=$("#backup"); if(b) b.onclick=doBackup; }
+{ const rb=$("#restore"), rf=$("#restoreFile"); if(rb&&rf){ rb.onclick=()=>rf.click(); rf.onchange=()=>{ const f=rf.files&&rf.files[0]; if(f) doRestore(f); rf.value=""; }; } }
 
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
@@ -5165,7 +5315,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
   ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
-  ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
+  ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
   const chips=SECNAV.filter(([id])=>{ const el=document.getElementById(id);
@@ -5182,7 +5332,7 @@ refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
 const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
-  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
+  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
