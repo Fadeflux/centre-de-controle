@@ -2557,6 +2557,9 @@ $("#paieCopy").onclick = ()=>{
    quinzaine réclamait un « reste 1-15 » déjà réglé. Marquer payé avance la base et
    prévient le VA du montant dans son ticket (même canal que la fiche de paie). */
 let PCUMUL=null, PCUMUL_HIST=null;
+// Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
+// les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
+function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
 async function loadPaieCumul(){
   if(!TOKEN){ $("#paiecumul").style.display="none"; return; }
   try{
@@ -2587,11 +2590,11 @@ function renderPaieCumul(){
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
     const right = (nouveaux>0)
-      ? `<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${fmtCur(montant)}</button>`
+      ? `<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button>`
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row ${nouveaux>0?"":"pv-done"}"><span class="pv-va">${nom}</span>`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
-      +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${fmtCur(montant)}</span>${right}</div>`;
+      +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${right}</div>`;
   }).join("");
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
@@ -2600,10 +2603,10 @@ function renderPaieCumul(){
     return `<div class="pay-h-row"><span>${escapeHtml(h.va||"")}</span>`
       +`<span class="pay-h-d">${okd?dt.toLocaleDateString("fr-FR"):""}</span>`
       +`<span class="pay-h-n">+${fmtInt(h.subsPaid||0)} subs</span>`
-      +`<span class="pay-h-a">${fmtCur(h.amount||0)}</span></div>`;
+      +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span></div>`;
   }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
   $("#pcumulBody").innerHTML = rows
-    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note"></span></div>`
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}</span><span class="pv-note"></span></div>`
     + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
 }
@@ -2611,12 +2614,12 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${fmtMoney(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${pcMoney(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${fmtMoney(j.amount||0)}`+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
       else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
     }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
     return;
@@ -2643,8 +2646,8 @@ $("#pcumulRefresh").onclick=()=>loadPaieCumul();
 $("#pcumulCopy").onclick=()=>{
   const d=PCUMUL, vas=(d&&d.vas)||[]; if(!vas.length) return;
   const lignes=vas.filter(v=>!v.unpaid&&v.base!=null&&(Number(v.nouveaux)||0)>0)
-    .map(v=>`${v.va} : +${v.nouveaux} subs → ${fmtMoney(Number(v.aPayer)||0)}`);
-  const txt="💸 Paie au cumul (depuis la dernière paie)\n"+lignes.join("\n")+`\nTOTAL : ${fmtMoney(Number(d.total)||0)}`;
+    .map(v=>`${v.va} : +${v.nouveaux} subs → ${pcMoney(Number(v.aPayer)||0)}`);
+  const txt="💸 Paie au cumul (depuis la dernière paie)\n"+lignes.join("\n")+`\nTOTAL : ${pcMoney(Number(d.total)||0)}`;
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{ $("#pcumulCopy").textContent="✓ Copié"; setTimeout(()=>$("#pcumulCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
