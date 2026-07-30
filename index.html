@@ -368,6 +368,34 @@
   .ob-ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:10px 12px;font-size:13px}
   .ob-check{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .ob-step{font-size:13px;padding:4px 0;color:var(--text)}
+  /* #8 heatmap */
+  .hm-wrap{overflow-x:auto;padding-bottom:6px}
+  .hm{display:grid;grid-template-columns:34px repeat(24,minmax(13px,1fr));gap:2px;min-width:420px}
+  .hm-cell{height:18px;border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center}
+  .hm-c{border:1px solid var(--line)}
+  .hm-lbl{color:var(--muted);font-size:10px;font-weight:600;justify-content:flex-end;padding-right:3px}
+  .hm-h{color:var(--faint);font-size:9px}
+  /* #5 saison */
+  .sea-row{font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line);line-height:1.5} .sea-row:last-of-type{border-bottom:0}
+  .sea-tip{margin-top:10px;background:rgba(139,124,246,.1);border:1px solid var(--acc-line,var(--line));border-radius:10px;padding:9px 12px;font-size:12.5px}
+  /* #6 burnout */
+  .bo-row{background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);border-radius:10px;padding:9px 12px;margin-bottom:7px;font-size:13px;line-height:1.5} .bo-tip{color:#fb923c;font-weight:600}
+  /* #9 sim 3 mois */
+  .s3-slider{font-size:13px;margin-bottom:12px} .s3-slider input{width:100%;accent-color:var(--acc);margin-top:6px}
+  .s3-rows{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px}
+  .s3-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;text-transform:capitalize} .s3-row:last-child{border-bottom:0}
+  .s3-row.s3-tot{font-weight:700;font-size:15px;text-transform:none}
+  /* #10 streak */
+  .st-big{text-align:center;font-size:22px;margin:8px 0 4px} .st-big b{font-size:30px;color:var(--acc)}
+  .st-sub{text-align:center;font-size:12.5px;color:var(--muted)} .st-msg{text-align:center;font-size:13.5px;margin-top:10px;font-weight:600}
+  /* #3 insights + #1 convo */
+  .ins-row{background:rgba(139,124,246,.08);border:1px solid var(--acc-line,var(--line));border-radius:10px;padding:10px 12px;margin-bottom:7px;font-size:13.5px;line-height:1.5}
+  #askConvo.on{background:var(--acc);color:#0a0a0a}
+  #askConvo.listening{animation:convoPulse 1s ease-in-out infinite}
+  @keyframes convoPulse{0%,100%{opacity:1}50%{opacity:.45}}
+  /* #7 coaching */
+  .co-sug{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px;background:var(--bg);color:var(--text);cursor:pointer;font:inherit;font-size:13px;line-height:1.5}
+  .co-sug:hover{border-color:var(--acc)} .co-sug-ico{font-size:16px;flex-shrink:0} .co-sug-txt{flex:1;min-width:0}
   /* #10 vue associé : on masque tout ce qui touche à l'argent, la paie, la config, l'édition */
   #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   #assocBanner button{margin-left:12px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
@@ -382,9 +410,10 @@
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
-  body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements{display:none !important}
+  body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
+  body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching, body.assoc-mode #ask{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
-  body.assoc-mode #refresh, body.assoc-mode #diag{display:none !important}
+  body.assoc-mode #refresh, body.assoc-mode #diag, body.assoc-mode #monthReport{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -431,6 +460,7 @@
   .reco-lbl{font-size:11px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
   .reco-body{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:14px;line-height:1.5}
   .reco-ico{font-size:18px;flex-shrink:0} .reco-txt{flex:1;min-width:0}
+  .ess-btn-row{display:flex;gap:8px;flex-wrap:wrap} .ess-btn-row .ess-revue-btn{flex:1;min-width:150px}
   .ess-revue-btn{margin-top:0;width:100%;padding:11px;border-radius:12px;border:1px dashed var(--acc-line,var(--line));background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
   .ess-revue-btn:hover{border-color:var(--acc);color:var(--acc)}
   /* #12 revue de la semaine */
@@ -1321,6 +1351,7 @@
       <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
       <button class="btn" id="assocView" title="Vue associé (lecture seule)" style="display:none">👥</button>
       <button class="btn" id="diag" title="Diagnostic santé complet" style="display:none">🩺</button>
+      <button class="btn" id="monthReport" title="Rapport du mois (image à partager/archiver)" style="display:none">📄</button>
       <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" />
       <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
       <div class="settings-wrap">
@@ -1344,7 +1375,10 @@
   <div class="essentiel" id="essentiel" style="display:none">
     <div class="ess-hero" id="essHero"></div>
     <div class="ess-reco" id="essReco" style="display:none"></div>
-    <button class="ess-revue-btn" id="revueBtn">📅 Faire la revue de la semaine</button>
+    <div class="ess-btn-row">
+      <button class="ess-revue-btn" id="revueBtn">📅 Faire la revue de la semaine</button>
+      <button class="ess-revue-btn" id="audioBtn">🔊 Écouter mon résumé</button>
+    </div>
     <div class="ess-actions-wrap" id="essActionsWrap" style="display:none">
       <div class="ess-actions-head">🎯 À faire maintenant <span class="ess-ac" id="essActCount"></span></div>
       <div class="ess-actions" id="essActions"></div>
@@ -1437,9 +1471,13 @@
     </div>
     <div class="panel-box" id="ask">
       <div class="pb-head">🤖 Demande à tes chiffres</div>
-      <div class="ask-row"><input id="askInput" placeholder="Ex : pourquoi mon CA a baissé cette semaine ? · qui m'a fait gagner le plus ?" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
+      <div class="ask-row"><input id="askInput" placeholder="Ex : pourquoi mon CA a baissé cette semaine ? · qui m'a fait gagner le plus ?" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askConvo" class="ask-mic" title="Mode conversation vocale (parle, il te répond à voix haute)">🎙️</button><button id="askGo">Envoyer</button></div>
       <div class="ask-ex">Essaie : <a data-q="Qui m'a fait gagner le plus ce mois ?">qui gagne le plus</a> · <a data-q="Pourquoi mon CA a baissé cette semaine ?">pourquoi ça baisse</a> · <a data-q="Est-ce que je vais battre mon record ce mois ?">battre mon record</a> · <a data-q="Combien à payer cette quinzaine et il me reste combien après ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
       <div class="ask-ans" id="askAns"></div>
+    </div>
+    <div class="panel-box" id="insights" style="display:none">
+      <div class="pb-head">🔍 Patterns cachés (l'IA analyse tes chiffres)</div>
+      <div id="insightsBody"></div>
     </div>
   </div>
 
@@ -1474,6 +1512,14 @@
     <div class="panel-box" id="onboarding" style="display:none">
       <div class="pb-head">🆕 Onboarding des VA</div>
       <div id="onboardingBody"></div>
+    </div>
+    <div class="panel-box" id="burnout" style="display:none">
+      <div class="pb-head">😮‍💨 Fatigue / burnout des VA</div>
+      <div id="burnoutBody"></div>
+    </div>
+    <div class="panel-box" id="coaching" style="display:none">
+      <div class="pb-head">🎓 Conseils à donner à tes VA</div>
+      <div id="coachingBody"></div>
     </div>
     <div class="panel-box" id="ghosts" style="display:none">
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
@@ -1587,6 +1633,10 @@
       <div class="pb-head">🏆 Tes accomplissements</div>
       <div id="achievementsBody"></div>
     </div>
+    <div class="panel-box" id="streak" style="display:none">
+      <div class="pb-head">🔥 Ta série (objectif du jour)</div>
+      <div id="streakBody"></div>
+    </div>
     <div class="panel-box" id="rw" style="display:none">
       <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
       <div id="rwBody"></div>
@@ -1630,6 +1680,18 @@
     <div class="panel-box" id="hours" style="display:none">
       <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
       <div id="hoursBody"></div>
+    </div>
+    <div class="panel-box" id="heatmap" style="display:none">
+      <div class="pb-head">🔥 Carte de chaleur (jour × heure)</div>
+      <div id="heatmapBody"></div>
+    </div>
+    <div class="panel-box" id="saison" style="display:none">
+      <div class="pb-head">📅 Saisonnalité &amp; meilleurs moments</div>
+      <div id="saisonBody"></div>
+    </div>
+    <div class="panel-box" id="sim3" style="display:none">
+      <div class="pb-head">🔮 Simulateur 3 mois</div>
+      <div id="sim3Body"></div>
     </div>
     <div class="panel-box" id="sim" style="display:none">
       <div class="pb-head">🔮 Simulateur « et si »</div>
@@ -2023,7 +2085,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions(); loadVaNotes();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions(); loadVaNotes(); loadInsights();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -3157,7 +3219,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); if(typeof renderSaison==="function") renderSaison(); if(typeof renderBurnout==="function") renderBurnout(); if(typeof renderSim3==="function") renderSim3(); if(typeof renderStreak==="function") renderStreak(); if(typeof renderCoaching==="function") renderCoaching(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -3318,6 +3380,41 @@ async function shareDayCard(){
   },"image/png");
 }
 { const cb=$("#card"); if(cb) cb.onclick=shareDayCard; }
+
+// 📄 #11 RAPPORT DU MOIS : image récap à partager / archiver.
+function makeMonthReport(){
+  const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  const brand=(document.querySelector("h1")||{}).textContent||"Noctra";
+  x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
+  const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.32; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
+  const HIDEv=(typeof HIDE!=="undefined"&&HIDE), ko=(typeof revKo==="function")?revKo():false, NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const money=v=>HIDEv?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const mois=new Date().toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  x.fillStyle="#fff"; x.font="bold 60px Inter,Arial,sans-serif"; x.fillText(brand,80,140);
+  x.fillStyle=acc; x.font="600 33px Inter,Arial,sans-serif"; x.fillText("Rapport du mois — "+mois,80,196);
+  const curNet=Math.round((Number(tot.netMonth)||0)*NET);
+  const prevTD=(tot.netLastMonthToDate!=null)?Math.round((Number(tot.netLastMonthToDate)||0)*NET):null;
+  const growth=(prevTD!=null&&prevTD>0)?Math.round((curNet-prevTD)/prevTD*100):null;
+  const stats=[["CA net (est.)",ko?"—":money(curNet)],["Subs du mois",(tot.subsMonth!=null?String(tot.subsMonth):"—")],["Subs au total",(tot.subsTotal!=null?String(tot.subsTotal):"—")],["vs mois dernier",(growth!=null?(growth>=0?"+":"")+growth+" %":"—")]];
+  const sy=280;
+  for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*200; x.fillStyle="#141416"; roundRect(x,bx,by,440,175,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 28px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText(stats[i][0],bx+32,by+54); x.fillStyle="#fff"; x.font="bold 56px Inter,Arial,sans-serif"; x.fillText(String(stats[i][1]),bx+32,by+134); }
+  let vy=sy+2*200+62; x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText("🏆 Top VA du mois",80,vy);
+  ((om.vas||[]).slice(0,5)).forEach((v,i)=>{ vy+=64; x.textAlign="left"; x.fillStyle="#fff"; x.font="600 34px Inter,Arial,sans-serif"; x.fillText((i+1)+". "+String(v.va),90,vy); x.fillStyle="#8a8a92"; x.font="500 30px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText((v.monthSubs!=null?v.monthSubs:v.subs)+" subs",1000,vy); });
+  x.textAlign="left"; x.fillStyle="#57575f"; x.font="500 27px Inter,Arial,sans-serif"; x.fillText("Généré par ton Centre de contrôle",80,1300);
+  return c;
+}
+async function shareMonthReport(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const c=makeMonthReport();
+  c.toBlob(async(blob)=>{ if(!blob) return;
+    try{ const file=new File([blob],"rapport-du-mois.png",{type:"image/png"}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:"Rapport du mois"}); return; } }catch(e){}
+    const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="rapport-du-mois.png"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  },"image/png");
+  if(typeof toast==="function") toast("📄 Rapport du mois","Image générée — à partager ou archiver.");
+}
+{ const b=$("#monthReport"); if(b) b.onclick=shareMonthReport; }
 function makeRankCard(){
   const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
   const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
@@ -4258,6 +4355,121 @@ function renderCompareResult(){
     +`<tr><td>CA net / jour</td><td>${money(net(A.ca)/Math.max(1,A.jours))}</td><td>${money(net(B.ca)/Math.max(1,B.jours))}</td><td>${delta(net(A.ca)/Math.max(1,A.jours),net(B.ca)/Math.max(1,B.jours),money)}</td></tr></table>`;
 }
 
+// 🎓 #7 CONSEILS AUX VA : suggestions de coaching perso, dérivées des flags.
+function renderCoaching(){
+  const panel=$("#coaching"), body=$("#coachingBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  const sug=[];
+  if(typeof OPP_FLAGS!=="undefined"&&Array.isArray(OPP_FLAGS)) OPP_FLAGS.slice(0,3).forEach(f=>sug.push({va:f.va,ico:"🚀",txt:`Félicite <b>${escapeHtml(f.va)}</b> : il décolle (+${f.hausse} %). Capitalise sur sa motivation, demande-lui d'en remettre une couche.`}));
+  if(typeof DECROCHE_FLAGS!=="undefined"&&Array.isArray(DECROCHE_FLAGS)) DECROCHE_FLAGS.slice(0,3).forEach(f=>sug.push({va:f.va,ico:"📉",txt:`Relance <b>${escapeHtml(f.va)}</b> : ses subs baissent. Un mot d'encouragement + un objectif clair.`}));
+  if(typeof SAT_FLAGS!=="undefined"&&Array.isArray(SAT_FLAGS)) SAT_FLAGS.slice(0,3).forEach(va=>sug.push({va:va,ico:"🔴",txt:`Conseille <b>${escapeHtml(va)}</b> de <b>changer d'angle / d'accroche</b> : il poste plus mais convertit moins.`}));
+  const seen={}, uniq=sug.filter(s=>{ const k=String(s.va).toLowerCase(); if(seen[k]) return false; seen[k]=1; return true; });
+  if(!uniq.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Des conseils personnalisés à donner à tes VA, tirés de leurs chiffres. Clique pour ouvrir sa fiche et lui écrire.</div>`
+    +uniq.slice(0,10).map(s=>`<button class="co-sug" data-cova="${escapeHtml(s.va)}"><span class="co-sug-ico">${s.ico}</span><span class="co-sug-txt">${s.txt}</span><span class="act-go">✉️</span></button>`).join("");
+  { const b=$("#coachingBody"); if(b && !b._wired){ b._wired=1; b.addEventListener("click",e=>{ const x=e.target.closest("[data-cova]"); if(x && typeof openVaCard==="function") openVaCard(x.getAttribute("data-cova")); }); } }
+  try{ fixPairs(); }catch(e){}
+}
+
+// 📅 #5 SAISONNALITÉ : meilleurs jours/créneaux/mois pour anticiper.
+function renderSaison(){
+  const panel=$("#saison"), body=$("#saisonBody"); if(!panel||!body) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null, hd=(typeof HOURS_DATA!=="undefined")?HOURS_DATA:null;
+  if(!TOKEN||!om){ panel.style.display="none"; return; }
+  const cur=(om.currency)||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const lignes=[];
+  // meilleur mois (historique)
+  if(!revKo()&&Array.isArray(om.history)&&om.history.length>=2){ const rec=om.history.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0}); if(rec.m) lignes.push(`🏆 Ton meilleur mois jusqu'ici : <b>${escapeHtml(rec.m)}</b> (${money(Math.round(rec.net*NET_RATE))} net).`); }
+  // meilleur jour de la semaine
+  if(hd&&hd.fiable&&hd.meilleurJour&&hd.meilleurJour.jour){ lignes.push(`📆 Ton meilleur jour : <b>${escapeHtml(hd.meilleurJour.jour)}</b> (${hd.meilleurJour.moyenne} abonnés en moyenne)${hd.pireJour?`, le plus faible le <b>${escapeHtml(hd.pireJour.jour)}</b>`:""}.`); }
+  // meilleur créneau horaire
+  if(hd&&hd.fiable&&hd.meilleurCreneau&&hd.meilleurCreneau.debut!=null){ lignes.push(`⏰ Ton meilleur créneau : <b>${hd.meilleurCreneau.debut}h-${hd.meilleurCreneau.fin}h</b> (${hd.meilleurCreneau.part} % des abonnés).`); }
+  if(!lignes.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Tes tendances récurrentes, pour anticiper et concentrer tes efforts au bon moment.</div>`
+    +lignes.map(l=>`<div class="sea-row">${l}</div>`).join("")
+    +`<div class="sea-tip">💡 Programme un peu plus de contenu tes bons jours/créneaux, et prépare tes VA à l'avance.</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+// 😮‍💨 #6 BURNOUT VA : effort (posts) ET résultats (subs/vues) qui chutent ENSEMBLE.
+function renderBurnout(){
+  const panel=$("#burnout"), body=$("#burnoutBody"); if(!panel||!body) return;
+  const charge=(typeof CHARGE_DATA!=="undefined"&&CHARGE_DATA)||null;
+  if(!TOKEN||!charge||!Array.isArray(charge.vas)){ panel.style.display="none"; return; }
+  const decro={}; if(typeof DECROCHE_FLAGS!=="undefined"&&Array.isArray(DECROCHE_FLAGS)) DECROCHE_FLAGS.forEach(f=>{ if(f&&f.va) decro[f.va.toLowerCase()]=1; });
+  const flags=charge.vas.filter(v=>{
+    if(!v||v.statsOnly) return false;
+    const p=v.posts7||0, pp=v.postsPrev7||0; if(pp<3) return false;
+    const postsDown=p<=pp*0.65;                                   // poste ~35% de moins
+    const viewsDown=(v.viewsPrev7||0)>0 && (v.views7||0)<(v.viewsPrev7||0)*0.7;
+    const subsDown=!!decro[String(v.va).toLowerCase()];
+    return postsDown && (viewsDown||subsDown);                     // effort ET résultat en baisse
+  }).map(v=>({va:v.va, p:v.posts7||0, pp:v.postsPrev7||0}));
+  if(!flags.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Ces VA <b>ralentissent sur tous les fronts</b> (moins de posts ET moins de résultats) — souvent un signe de fatigue, pas de fainéantise. Prends de leurs nouvelles avant qu'ils décrochent.</div>`
+    +flags.slice(0,10).map(f=>`<div class="bo-row">😮‍💨 <b>${escapeHtml(f.va)}</b> : ${f.pp}→${f.p} posts/sem et résultats en baisse. <span class="bo-tip">Un petit message ?</span></div>`).join("");
+  try{ fixPairs(); }catch(e){}
+}
+// 🔮 #9 SIMULATEUR 3 MOIS : projette CA + subs selon un taux de croissance réglable.
+let SIM3_GROWTH=null;
+function renderSim3(){
+  const panel=$("#sim3"), body=$("#sim3Body"); if(!panel||!body) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  if(!TOKEN||!om||!om.totals||revKo()){ panel.style.display="none"; return; }
+  { const ae=document.activeElement; if(ae&&ae.id==="s3r") return; }   // ne pas casser le curseur en cours de glissement
+  const cur=(om.currency)||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const F=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net.value:null;
+  const baseNet=Math.round(((F!=null?F:Number(om.totals.netMonth))||0)*NET_RATE);   // mois en cours projeté, net
+  // croissance par défaut = évolution mois dernier -> ce mois (à date)
+  let defG=0; const prev=Number(om.totals.netLastMonthToDate);
+  if(prev>0) defG=Math.max(-30,Math.min(50,Math.round((Number(om.totals.netMonth)-prev)/prev*100)));
+  if(SIM3_GROWTH===null) SIM3_GROWTH=defG;
+  panel.style.display="block";
+  const g=SIM3_GROWTH/100;
+  const proj=[1,2,3].map(k=>Math.round(baseNet*Math.pow(1+g,k)));
+  const total3=proj.reduce((a,b)=>a+b,0)+baseNet;
+  const moisNom=k=>{ const d=new Date(); d.setMonth(d.getMonth()+k); return d.toLocaleDateString("fr-FR",{month:"long"}); };
+  body.innerHTML=`<div class="cac-intro">Projette ton agence sur 3 mois selon un rythme de croissance. Base : ~${money(baseNet)} net ce mois.</div>
+    <div class="s3-slider">Croissance mensuelle : <b id="s3v">${SIM3_GROWTH>=0?"+":""}${SIM3_GROWTH}</b> % <input type="range" id="s3r" min="-30" max="50" step="5" value="${SIM3_GROWTH}"></div>
+    <div class="s3-rows">
+      <div class="s3-row"><span>${escapeHtml(moisNom(1))}</span><b>${money(proj[0])}</b></div>
+      <div class="s3-row"><span>${escapeHtml(moisNom(2))}</span><b>${money(proj[1])}</b></div>
+      <div class="s3-row"><span>${escapeHtml(moisNom(3))}</span><b>${money(proj[2])}</b></div>
+      <div class="s3-row s3-tot"><span>Total sur 4 mois</span><b>${money(total3)}</b></div>
+    </div>
+    <div class="cac-intro" style="margin-top:8px">Estimation à rythme constant — la réalité dépendra de tes décisions (pousser un VA qui décolle, couper une perte…).</div>`;
+  { const r=$("#s3r"); if(r) r.oninput=()=>{ SIM3_GROWTH=Number(r.value)||0; renderSim3(); }; }
+  try{ fixPairs(); }catch(e){}
+}
+// 🔥 #10 STREAK PATRON : jours consécutifs au-dessus de ta cible du jour.
+function renderStreak(){
+  const panel=$("#streak"), body=$("#streakBody"); if(!panel||!body) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  if(!TOKEN||!om||!Array.isArray(om.dailyNet)||revKo()){ panel.style.display="none"; return; }
+  const cur=(om.currency)||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const dn=om.dailyNet.map(x=>(Number(x.v)||0)*NET_RATE); if(dn.length<4){ panel.style.display="none"; return; }
+  const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const G=(typeof GOAL!=="undefined")?GOAL:null;
+  let cible=0;
+  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)*NET_RATE/dim);
+  else { const lm=Math.round((Number(om.totals.netLastMonth)||0)*NET_RATE); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
+  if(cible<=0) cible=Math.round(dn.reduce((a,b)=>a+b,0)/dn.length);
+  let streak=0; for(let i=dn.length-1;i>=0;i--){ if(dn[i]>=cible) streak++; else break; }
+  let best=0,c=0; dn.forEach(v=>{ if(v>=cible){ c++; best=Math.max(best,c); } else c=0; });
+  panel.style.display="block";
+  const flame=streak>=3?"🔥".repeat(Math.min(5,Math.ceil(streak/3))):"🔥";
+  body.innerHTML=`<div class="cac-intro">Tes jours consécutifs au-dessus de ta cible (~${money(cible)}/jour). Garde la série !</div>
+    <div class="st-big">${flame} <b>${streak}</b> jour${streak>1?"s":""} d'affilée</div>
+    <div class="st-sub">Record : <b>${best}</b> jour${best>1?"s":""} · cible du jour ~${money(cible)}</div>
+    <div class="st-msg">${streak>=best&&best>0?"🏆 Tu es sur ta meilleure série !":streak>=3?"💪 Belle série, continue !":streak===0?"Un bon jour aujourd'hui et c'est reparti.":"En route pour une série."}</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🆕 #10 ONBOARDING DES VA : un VA doit être branché des DEUX côtés (lien
 // OnlyMonster ET compte Instagram), sinon il devient « fantôme ». On croise le
 // côté OF (om.vas/va-liens) et le côté IG (va-charge) pour détecter les setups
@@ -4568,6 +4780,28 @@ function openRevue(){
 }
 { const b=$("#revueBtn"); if(b) b.onclick=openRevue; }
 
+// 🔊 #2 RÉSUMÉ AUDIO : un débrief parlé en ~30 s, une phrase par chiffre clé.
+function audioSummary(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals){ if(typeof toast==="function") toast("🔊","Chiffres pas encore prêts."); return; }
+  const ko=(typeof revKo==="function")?revKo():false;
+  const arr=Math.round((Number(om.totals.netMonth)||0)*NET_RATE/100)*100;
+  const parts=["Salut, voici ton résumé du "+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+"."];
+  if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+arr.toLocaleString("fr-FR")+" dollars net.");
+  if(om.totals.subsDay!=null) parts.push(om.totals.subsDay+" nouveaux abonnés aujourd'hui, "+(om.totals.subsMonth||0)+" ce mois.");
+  const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
+  if(cd&&!cd.error&&cd.apresPaie!=null){ const a=Math.round((Number(cd.apresPaie)||0)/100)*100; parts.push("Après la prochaine paie, il te resterait environ "+a.toLocaleString("fr-FR")+" dollars."); }
+  if(!ko&&Array.isArray(om.vas)){ const t=om.vas.find(v=>v&&!v.unpaid); if(t) parts.push(t.va+" porte l'équipe en ce moment."); }
+  if(typeof DECROCHE_FLAGS!=="undefined"&&DECROCHE_FLAGS.length) parts.push("Pense à relancer "+DECROCHE_FLAGS[0].va+", il ralentit.");
+  parts.push("Bonne journée !");
+  const txt=parts.join(" ");
+  try{ primeVoices(); }catch(e){}
+  try{ if(typeof mkUtter==="function"&&window.speechSynthesis){ const u=mkUtter(txt); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } else if(typeof speakText==="function") speakText(txt); }catch(e){}
+  const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent="🔊 "+txt; }
+  if(typeof toast==="function") toast("🔊 Résumé audio","Je te le lis à voix haute.");
+}
+{ const b=$("#audioBtn"); if(b) b.onclick=audioSummary; }
+
 // 💪 #8/#9 CHARGE, CAPACITÉ & SATURATION : effort (posts IG 7j) vs résultat
 // (vues/subs). Source serveur /api/hub/va-charge.
 let CHARGE_DATA=null, SAT_FLAGS=[];
@@ -4596,6 +4830,8 @@ function renderCharge(){
       +`<div class="ch-sat-note">Rendement en baisse : change l'angle / l'accroche plutôt que le volume.</div></div>`;
   }
   if(typeof renderOnboarding==="function") renderOnboarding();   // #10 : va-charge alimente le côté IG
+  if(typeof renderBurnout==="function") renderBurnout();
+  if(typeof renderCoaching==="function") renderCoaching();
   const rows=vas.slice(0,20).map(v=>{
     const p=v.posts7||0;
     let badge=(p>=med*1.5 && p>=6)?`<span class="ch-badge fond">⚡ à fond</span>`:(p<=Math.max(1,med*0.5))?`<span class="ch-badge marge">🌱 de la marge</span>`:"";
@@ -5079,8 +5315,28 @@ async function loadHours(){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/subs-by-hour?days=30",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    HOURS_DATA=await r.json(); renderHours();
+    HOURS_DATA=await r.json(); renderHours(); if(typeof renderHeatmap==="function") renderHeatmap(); if(typeof renderSaison==="function") renderSaison();
   }catch(e){}
+}
+// 🔥 #8 CARTE DE CHALEUR : matrice jour × heure des arrivées d'abonnés (HOURS_DATA.heatmap).
+function renderHeatmap(){
+  const panel=$("#heatmap"), body=$("#heatmapBody"); if(!panel||!body) return;
+  const d=(typeof HOURS_DATA!=="undefined")?HOURS_DATA:null;
+  const heat=(d&&Array.isArray(d.heatmap))?d.heatmap:null;
+  if(!TOKEN||!heat||!d.total||!d.fiable){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  let max=1; heat.forEach(row=>(row||[]).forEach(v=>{ if(v>max)max=v; }));
+  const labels=(d.parJour&&d.parJour.length===heat.length)?d.parJour.map(x=>String(x.jour||"").slice(0,3)):["","","","","","",""];
+  let html=`<div class="cac-intro">Quand tes abonnés arrivent, jour par jour et heure par heure. Plus c'est chaud, plus il y en a — c'est là qu'il faut publier et être présent.</div><div class="hm-wrap"><div class="hm">`;
+  html+=`<div class="hm-cell hm-lbl"></div>`;
+  for(let h=0;h<24;h++) html+=`<div class="hm-cell hm-h">${h%6===0?h+"h":""}</div>`;
+  for(let r=0;r<heat.length;r++){
+    html+=`<div class="hm-cell hm-lbl">${escapeHtml(labels[r]||"")}</div>`;
+    for(let h=0;h<24;h++){ const v=Number((heat[r]||[])[h])||0, a=v/max; html+=`<div class="hm-cell hm-c" title="${escapeHtml(labels[r]||"")} ${h}h : ${v} abonnés" style="background:${a>0?`rgba(139,124,246,${(0.1+a*0.9).toFixed(2)})`:"var(--bg)"}"></div>`; }
+  }
+  html+=`</div></div>`;
+  body.innerHTML=html;
+  try{ fixPairs(); }catch(e){}
 }
 function renderHours(){
   const panel=$("#hours"); if(!panel) return;
@@ -5377,11 +5633,59 @@ function voiceAsk(prefixe, opts){
 }
 { const f=$("#voiceFab"); if(f) f.onclick=voiceAsk; }
 
+// 🔍 #3 PATTERNS CACHÉS : consomme /api/hub/insights (IA).
+let INSIGHTS_DATA=null;
+async function loadInsights(refresh){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/insights"+(refresh?"?refresh=1":""),{headers:{"x-hub-token":TOKEN}}); if(r.ok){ INSIGHTS_DATA=await r.json(); renderInsights(); } }catch(e){} }
+function renderInsights(){
+  const panel=$("#insights"), body=$("#insightsBody"); if(!panel||!body) return;
+  const d=INSIGHTS_DATA; if(!TOKEN||!d){ panel.style.display="none"; return; }
+  const ins=Array.isArray(d.insights)?d.insights:[];
+  if(!ins.length && !d.error){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Des tendances cachées repérées par l'IA dans tes chiffres. <button class="mn-act-btn" id="insRefresh" style="padding:4px 10px;font-size:11px;margin-left:6px">🔄 Ré-analyser</button></div>`
+    +(ins.length?ins.map(x=>`<div class="ins-row">🔍 ${escapeHtml(x)}</div>`).join(""):`<div class="cac-intro">${escapeHtml(d.error||"Pas assez de données pour l'instant.")}</div>`);
+  { const b=$("#insRefresh"); if(b) b.onclick=()=>{ body.innerHTML=`<div class="cac-intro">🔎 Analyse en cours (quelques secondes)…</div>`; loadInsights(true); }; }
+}
+// 🎙️ #1 CONVERSATION VOCALE : parle, l'IA répond à voix haute, en boucle.
+let CONVO_ON=false;
+function convoSpeak(txt,cb){ try{ if(!window.speechSynthesis){ if(cb)cb(); return; } const u=(typeof mkUtter==="function")?mkUtter(String(txt).slice(0,400)):new SpeechSynthesisUtterance(String(txt).slice(0,400)); u.onend=()=>{ if(cb)cb(); }; u.onerror=()=>{ if(cb)cb(); }; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){ if(cb)cb(); } }
+function convoTurn(){
+  if(!CONVO_ON) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ CONVO_ON=false; return; }
+  const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
+  const b=$("#askConvo"); if(b) b.classList.add("listening");
+  rec.onresult=async(e)=>{
+    const q=(e.results[0][0].transcript||"").trim();
+    if(!q){ if(CONVO_ON) setTimeout(convoTurn,300); return; }
+    const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent="🗣️ « "+q+" »"; }
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/agent",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({message:q,names:(typeof NAMES!=="undefined"?NAMES:{}),history:(typeof ASK_HISTORY!=="undefined")?ASK_HISTORY.slice(-4):[]})});
+      const j=await r.json(); const ans=j.answer||j.error||"Je n'ai pas compris, tu peux répéter ?";
+      if(typeof ASK_HISTORY!=="undefined") ASK_HISTORY.push({q,a:ans});
+      if(ae) ae.textContent=ans; if(j.reloadTasks && typeof loadTasks==="function") loadTasks();
+      convoSpeak(ans, ()=>{ if(CONVO_ON) setTimeout(convoTurn,250); });
+    }catch(e2){ if(CONVO_ON) setTimeout(convoTurn,600); }
+  };
+  rec.onerror=()=>{ if(b) b.classList.remove("listening"); if(CONVO_ON) setTimeout(convoTurn,700); };
+  rec.onend=()=>{ if(b) b.classList.remove("listening"); };
+  try{ rec.start(); }catch(e){}
+}
+function toggleConvo(){
+  const b=$("#askConvo");
+  if(CONVO_ON){ CONVO_ON=false; if(b) b.classList.remove("listening","on"); try{ window.speechSynthesis.cancel(); }catch(e){} if(typeof toast==="function") toast("🎙️ Conversation terminée",""); return; }
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ alert("La voix n'est pas dispo sur ce navigateur (essaie Chrome ou Safari)."); return; }
+  try{ primeVoices(); }catch(e){}
+  CONVO_ON=true; if(b) b.classList.add("on"); if(typeof toast==="function") toast("🎙️ Mode conversation","Parle, je te réponds à voix haute. Re-clique 🎙️ pour arrêter.");
+  convoSpeak("Je t'écoute.", ()=>convoTurn());
+}
+{ const b=$("#askConvo"); if(b) b.onclick=toggleConvo; }
+
 /* ---------- menu paramètres (désencombre l'entête) ---------- */
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","diag","backup","restore","assocView","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","restore","assocView","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -5578,6 +5882,7 @@ function openVaCard(vaName){
       <div class="va-notes-save" id="vaNoteSaved"></div></div>
     <div class="vacard-btns">
       <button data-vc="goal">🎯 Objectif</button>
+      <button data-vc="draft">✍️ Rédige-le (IA)</button>
       <button data-vc="msg">✉️ Lui écrire</button>
       <button data-vc="close">Fermer</button>
     </div></div>`;
@@ -5587,6 +5892,26 @@ function openVaCard(vaName){
     const act=b.getAttribute("data-vc");
     if(act==="close"){ ov.remove(); return; }
     if(act==="goal"){ ov.remove(); if(typeof setVaGoal==="function") setVaGoal(vaName); return; }
+    if(act==="draft"){
+      // ✍️ #4 : l'IA rédige un message pour ce VA (respecte la règle subs-only côté serveur).
+      const intent=prompt("Objectif du message pour "+vaName+" ? (ex : le motiver, lui demander de poster plus, le féliciter)","");
+      if(intent===null||!intent.trim()) return;
+      b.disabled=true; b.textContent="✍️…";
+      try{
+        const r=await fetch(HUB_BASE+"/api/hub/va-message",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:vaName, angle:intent.trim()})});
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok||!j.message){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; if(typeof toast==="function") toast("⚠️", j.error||"Impossible de rédiger."); return; }
+        const finalMsg=prompt("Brouillon (modifie si besoin, OK = envoyer dans son ticket, Annuler = ne rien envoyer) :", j.message);
+        if(finalMsg===null||!finalMsg.trim()){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; return; }
+        b.textContent="📨…";
+        const r2=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:vaName,title:"💬 Message de ton boss",body:finalMsg.trim().slice(0,900),reason:"coach",thread:false})});
+        const j2=await r2.json().catch(()=>({}));
+        if(r2.ok&&j2.ok&&j2.added>0){ b.textContent="📬 Envoyé"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."); }
+        else if(j2&&j2.refuses&&j2.refuses.length){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; if(typeof toast==="function") toast("⛔ Bloqué","Le message contenait une info interdite pour un VA — reformule."); }
+        else { b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; }
+      }catch(e){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; }
+      return;
+    }
     if(act==="msg"){
       // Message direct dans son ticket, via la même file que le coach (le
       // cerveau re-filtre : jamais d'argent ni d'autres membres dans le texte).
@@ -5738,9 +6063,9 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
+const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["heatmap","🔥 Carte de chaleur"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
-  ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
+  ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
