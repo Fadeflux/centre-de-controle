@@ -301,6 +301,13 @@
   .cac-badge.pos{background:rgba(74,222,128,.15);color:#4ade80} .cac-badge.neg{background:rgba(248,113,113,.15);color:#f87171}
   .cac-badge.unk{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   .co-manque{font-size:12px;font-weight:800;color:#fb923c}
+  .hr-reco{background:rgba(139,124,246,.1);border:1px solid var(--acc-line,var(--line));border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:13px;line-height:1.5}
+  /* #4 sources */
+  .src-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .src-row:last-child{border-bottom:0}
+  .src-conv{font-size:15px;font-weight:800;min-width:64px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text)}
+  .src-conv.pos{color:#4ade80} .src-conv.neg{color:#f87171}
+  .src-info{flex:1;min-width:0} .src-name{font-size:13.5px;font-weight:600} .src-va{color:var(--muted);font-weight:400;font-size:12px} .src-meta{font-size:12px;color:var(--muted)}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -339,6 +346,9 @@
   .act-row:hover{border-color:var(--acc)}
   .act-ico{font-size:16px;flex-shrink:0} .act-txt{flex:1;min-width:0} .act-go{color:var(--muted);font-weight:700}
   .act-row.sev-crit{border-left-color:#f87171} .act-row.sev-high{border-left-color:#fb923c} .act-row.sev-med{border-left-color:#facc15} .act-row.sev-info{border-left-color:#4ade80}
+  .act-wrap{display:flex;align-items:stretch;gap:7px} .act-wrap .act-row{flex:1}
+  .act-quick{flex-shrink:0;border:1px solid var(--acc);background:var(--acc);color:#0a0a0a;border-radius:10px;font:inherit;font-size:12px;font-weight:700;padding:0 12px;cursor:pointer;white-space:nowrap}
+  .act-quick:hover{opacity:.9}
   @media(max-width:620px){ .ess-figs{grid-template-columns:1fr 1fr} .ess-fv{font-size:19px} }
   .ess-reco{margin-bottom:12px;background:linear-gradient(135deg,rgba(139,124,246,.12),var(--surface));border:1px solid var(--acc-line,var(--line));border-radius:14px;padding:13px 15px}
   .reco-lbl{font-size:11px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
@@ -379,6 +389,8 @@
   /* #6 record */
   .rn-record{margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13px}
   .rn-record.best{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
+  .rn-tax-set{margin-top:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .rn-tax-set input{max-width:64px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit}
   /* #3 réallocation */
   .rl-intro{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
   .rl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13.5px}
@@ -1479,6 +1491,10 @@
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
       <div id="convBody"></div>
     </div>
+    <div class="panel-box" id="sources" style="display:none">
+      <div class="pb-head">🔗 Qualité de tes sources (par lien)</div>
+      <div id="sourcesBody"></div>
+    </div>
     <div class="panel-box" id="subval" style="display:none">
       <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
       <div id="subvalBody"></div>
@@ -1882,7 +1898,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2910,6 +2926,12 @@ function renderRenta(){
   // panneau la « oubliait » et surestimait le profit d'un quart.
   const commission=Math.round(netMonth*(1-NET_RATE));
   const profitReel=profitNet-commission;
+  // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
+  const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
+  const provision=Math.round(Math.max(0,profitReel)*TAX/100);
+  const vraiment=profitReel-provision;
+  const taxLines=(TAX>0)?`<div class="rn-line"><span>− Impôts/charges à mettre de côté (${TAX} %)</span><span class="rn-v neg">−${money(provision)}</span></div>`
+    +`<div class="rn-line rn-total"><span>= Vraiment à toi (dépensable)</span><span class="rn-v ${vraiment>=0?'pos':'neg'}">${vraiment>=0?'':'−'}${money(Math.abs(vraiment))}</span></div>`:"";
   const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE));
   // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
   // l'historique et encore partiel) + fourchette de prévision
@@ -2930,10 +2952,13 @@ function renderRenta(){
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
+    ${taxLines}
+    <div class="rn-tax-set">🧾 Mettre de côté pour impôts/charges : <input type="number" id="taxRate" min="0" max="60" step="1" value="${TAX}" inputmode="numeric"> % <button class="mn-act-btn" id="taxSave">OK</button></div>
     <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 78 % (20 % OnlyFans + 2 % Skrill), la même règle que ton site finances. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
+  { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
 }
 function renderSplit(){
   const panel=$("#split"); if(!panel) return;
@@ -4019,6 +4044,33 @@ function renderCac(){
     +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`);
 }
 
+// 🔗 #4 QUALITÉ DES SOURCES : tes liens de tracking classés par conversion
+// (subs / clics). Le revenu par lien n'existe pas → on croise la conversion du
+// lien avec la LTV du VA (valeur d'un sub) pour juger la QUALITÉ de la source.
+async function loadSources(){ if(!TOKEN) return; try{ const L=await chargeVaLiens(); renderSources(L); }catch(e){} }
+function renderSources(L){
+  const panel=$("#sources"), body=$("#sourcesBody"); if(!panel||!body) return;
+  L=L||(typeof VALIENS_CACHE!=="undefined"?VALIENS_CACHE:null);
+  const parVa=(L&&L.parVa)||null;
+  if(!TOKEN||!parVa){ panel.style.display="none"; return; }
+  const ltvMap={}; const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  if(om&&Array.isArray(om.vas)&&!revKo()) om.vas.forEach(v=>{ if(v&&v.va&&v.ltv!=null) ltvMap[String(v.va).toLowerCase()]=Number(v.ltv); });
+  const cur=(om&&om.currency)||"$";
+  const links=[];
+  Object.keys(parVa).forEach(va=>{ (parVa[va].liens||[]).forEach(l=>{ const clics=Number(l.clics)||0, subs=Number(l.subs)||0; if(clics>=20) links.push({nom:l.nom, modele:l.modele, va:va, subs:subs, clics:clics, conv:clics>0?subs/clics*100:0, ltv:ltvMap[String(va).toLowerCase()]}); }); });
+  if(links.length<2){ panel.style.display="none"; return; }
+  links.sort((a,b)=>b.conv-a.conv);
+  const best=links[0];
+  panel.style.display="block";
+  const fmtConv=c=>c.toFixed(1).replace(".",",")+" %";
+  const rows=links.slice(0,12).map(l=>{
+    const cls=l.conv>=(best.conv*0.66)?"pos":(l.conv<=1?"neg":"");
+    return `<div class="src-row"><div class="src-conv ${cls}">${fmtConv(l.conv)}</div><div class="src-info"><div class="src-name">${escapeHtml(l.nom)} <span class="src-va">· ${escapeHtml(l.va)}${l.modele?" · "+escapeHtml(l.modele):""}</span></div><div class="src-meta">${fmtInt(l.clics)} clics → ${fmtInt(l.subs)} subs${(l.ltv!=null)?` · sub vaut ${fmtLtv(l.ltv,cur)}`:""}</div></div></div>`;
+  }).join("");
+  body.innerHTML=`<div class="cac-intro">Tes liens classés par <b>conversion</b> (abonnés pour 100 clics), croisés avec la valeur d'un abonné du VA. Les meilleures sources en tête — c'est là qu'il faut envoyer plus de trafic. (Liens avec ≥ 20 clics.)</div>${rows}`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 💡 #6 COÛT D'OPPORTUNITÉ : si les abonnés de chaque VA valaient autant que ceux
 // de ton MEILLEUR VA, combien tu « laisses sur la table » ce mois. Piste, pas
 // reproche. Source : OM_DATA.vas (monthSubs × écart de LTV × NET_RATE).
@@ -4299,31 +4351,39 @@ function renderCharge(){
 // muets) et les classe par gravité. On ne recalcule rien : on agrège.
 function jumpPanel(id){ const el=document.getElementById(id); if(el){ try{ _userScrolled=true; }catch(e){} el.scrollIntoView({behavior:"smooth",block:"start"}); } }
 function buildActions(){
-  const A=[], push=(sev,icon,text,panel)=>A.push({sev,icon,text,panel});
+  const A=[], push=(sev,icon,text,panel,quick)=>A.push({sev,icon,text,panel,quick:quick||null});
   const eur=v=>Math.round(Math.abs(Number(v)||0)).toLocaleString("fr-FR")+" $";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   if(cd && !cd.error){
     if(cd.apresPaie!=null && Number(cd.apresPaie)<0) push(3,"🔴",`Cash serré : il te manquera ${eur(cd.apresPaie)} pour tout payer`,"cash");
-    if(Number(cd.resteRetard)>0){ const noms=(cd.restantsPrev||[]).slice(0,3).map(o=>o.va).join(", "); push(2,"💸",`Quinzaine passée pas soldée : ${eur(cd.resteRetard)}${noms?` (${noms})`:""}`,"cash"); }
+    if(Number(cd.resteRetard)>0){ const noms=(cd.restantsPrev||[]).slice(0,3).map(o=>o.va).join(", "); push(2,"💸",`Quinzaine passée pas soldée : ${eur(cd.resteRetard)}${noms?` (${noms})`:""}`,"cash",{kind:"jump",panel:"paie",label:"💸 Payer"}); }
   }
-  if(typeof revKo==="function" && revKo()) push(3,"🔌","Revenus illisibles — vérifie OnlyMonster","om");
+  if(typeof revKo==="function" && revKo()) push(3,"🔌","Revenus illisibles — vérifie OnlyMonster","om",{kind:"reload",label:"🔄 Recharger"});
   const pd=(typeof PROXY_DATA!=="undefined")?PROXY_DATA:null;
-  if(pd && pd.critique) push(3,"🛰️","Proxy résidentiel mort — ton scraping de vues est figé","proxy");
+  if(pd && pd.critique) push(3,"🛰️","Proxy résidentiel mort — ton scraping de vues est figé","proxy",{kind:"retest",label:"🔄 Re-tester"});
   if(typeof LEAKS!=="undefined" && Array.isArray(LEAKS)){
     const nouv=LEAKS.filter(l=>l&&(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l&&l.status==="repost").length;
     if(nouv) push(2,"🚨",`${nouv} fuite${nouv>1?"s":""} à traiter (DMCA)`,"antileak");
     if(rep) push(1,"♻️",`${rep} repost${rep>1?"s":""} à signaler`,"antileak");
   }
-  if(DECROCHE_FLAGS && DECROCHE_FLAGS.length){ const n=DECROCHE_FLAGS.length; push(1,"📉",`${n} VA en décrochage : ${DECROCHE_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"decroche"); }
-  if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites"); }
+  if(DECROCHE_FLAGS && DECROCHE_FLAGS.length){ const n=DECROCHE_FLAGS.length; push(1,"📉",`${n} VA en décrochage : ${DECROCHE_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"decroche",{kind:"vacard",va:DECROCHE_FLAGS[0].va,label:"👤 Fiche"}); }
+  if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites",{kind:"vacard",va:OPP_FLAGS[0].va,label:"👤 Fiche"}); }
   const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
   if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
-  if(typeof SAT_FLAGS!=="undefined" && SAT_FLAGS.length){ push(1,"🔴",`${SAT_FLAGS.length} VA poste${SAT_FLAGS.length>1?"nt":""} plus mais rapporte${SAT_FLAGS.length>1?"nt":""} moins : ${SAT_FLAGS.slice(0,2).join(", ")}${SAT_FLAGS.length>2?"…":""}`,"charge"); }
+  if(typeof SAT_FLAGS!=="undefined" && SAT_FLAGS.length){ push(1,"🔴",`${SAT_FLAGS.length} VA poste${SAT_FLAGS.length>1?"nt":""} plus mais rapporte${SAT_FLAGS.length>1?"nt":""} moins : ${SAT_FLAGS.slice(0,2).join(", ")}${SAT_FLAGS.length>2?"…":""}`,"charge",{kind:"vacard",va:SAT_FLAGS[0],label:"👤 Fiche"}); }
   A.sort((x,y)=>y.sev-x.sev);
   return A;
+}
+let LAST_ACTIONS=[];
+function doQuickAction(q){
+  if(!q) return;
+  if(q.kind==="retest"){ if(typeof loadProxy==="function") loadProxy(true); if(typeof toast==="function") toast("🔄 Test des proxies…",""); }
+  else if(q.kind==="reload"){ if(typeof loadOM==="function") loadOM(); if(typeof loadCash==="function") loadCash(true); if(typeof toast==="function") toast("🔄 Rechargement des chiffres…",""); }
+  else if(q.kind==="vacard" && q.va){ if(typeof openVaCard==="function") openVaCard(q.va); }
+  else if(q.kind==="jump" && q.panel){ jumpPanel(q.panel); }
 }
 function renderActions(){
   const wrap=$("#essActionsWrap"), box=$("#essActions"), cnt=$("#essActCount"); if(!wrap||!box) return;
@@ -4333,7 +4393,8 @@ function renderActions(){
   wrap.style.display="block";
   if(cnt) cnt.textContent=String(A.length);
   const sevCls=["info","med","high","crit"];
-  box.innerHTML=A.map(a=>`<button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>`).join("");
+  LAST_ACTIONS=A;
+  box.innerHTML=A.map((a,i)=>`<div class="act-wrap"><button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>${a.quick?`<button class="act-quick" data-qk="${i}">${a.quick.label}</button>`:""}</div>`).join("");
 }
 function renderEssentiel(){
   const wrap=$("#essentiel"), hero=$("#essHero"); if(!wrap||!hero) return;
@@ -4388,7 +4449,7 @@ function renderReco(){
   { const b=el.querySelector("[data-jump]"); if(b) b.onclick=()=>jumpPanel(b.getAttribute("data-jump")); }
 }
 function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
-{ const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
+{ const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const qk=e.target.closest("[data-qk]"); if(qk){ e.stopPropagation(); const a=(LAST_ACTIONS||[])[Number(qk.getAttribute("data-qk"))]; if(a) doQuickAction(a.quick); return; } const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
 
 // 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
 // panneau → saute dessus. Index construit à la volée (VA depuis OM_DATA, panneaux
@@ -4578,7 +4639,14 @@ function renderHours(){
       <div class="hr-ax">${pj.map(x=>`<span>${x.jour.slice(0,3)}</span>`).join("")}</div>
       ${best?`<div class="hr-note">Ton meilleur jour est le <b>${best}</b> (${(d.meilleurJour||{}).moyenne} abonnés en moyenne), le plus faible le <b>${worst}</b> (${(d.pireJour||{}).moyenne})${ecart?` — soit <b>${ecart}×</b> d'écart`:""}.</div>`:""}`;
   }
+  // 💡 #5 — recommandation de POST : poster ~2 h avant le pic d'arrivée pour que
+  // le reel soit frais quand les abonnés arrivent le plus.
+  const bestJour=(d.meilleurJour||{}).jour;
+  const posteReco=(d.fiable && mc.debut!=null)
+    ? `<div class="hr-reco">💡 <b>Poste tes reels vers ${((mc.debut-2)+24)%24}h-${mc.debut}h</b> : ils seront frais pile quand tes abonnés arrivent le plus (${mc.debut}h-${mc.fin}h)${bestJour?`, surtout le <b>${bestJour}</b>`:""}.</div>`
+    : "";
   $("#hoursBody").innerHTML=`
+    ${posteReco}
     <div class="hr-grid">${cols}</div>
     <div class="hr-ax"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
     <div class="hr-note">Meilleur créneau : <b>${mc.debut}h-${mc.fin}h</b> (${mc.part} % des abonnés).<br>
@@ -5096,7 +5164,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -5113,7 +5181,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
