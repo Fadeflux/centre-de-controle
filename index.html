@@ -4373,7 +4373,7 @@ function renderReco(){
   if(!TOKEN){ el.style.display="none"; return; }
   const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   let reco=null;
-  if(typeof OPP_FLAGS!=="undefined" && OPP_FLAGS.length){ const o=OPP_FLAGS[0]; reco={ico:"🚀", txt:`Pousse <b>${escapeHtml(o.va)}</b> cette semaine : ses subs montent fort (+${o.hausse} % sur 3 quinzaines). Donne-lui plus de budget ou de contenu pendant que ça marche.`, jump:"opportunites"}; }
+  if(typeof OPP_FLAGS!=="undefined" && OPP_FLAGS.length){ const o=OPP_FLAGS.find(f=>Number(f.hausse)>0)||null; if(o) reco={ico:"🚀", txt:`Pousse <b>${escapeHtml(o.va)}</b> cette semaine : ses subs montent fort (+${o.hausse} % sur 3 quinzaines). Donne-lui plus de budget ou de contenu pendant que ça marche.`, jump:"opportunites"}; }
   if(!reco && d && Array.isArray(d.vas) && !revKo()){
     const payes=d.vas.filter(v=>v&&!v.unpaid&&v.ltv!=null&&Number(v.ltv)>0&&Number(v.monthSubs)>0);
     if(payes.length>=2){ const ref=payes.reduce((a,v)=>Number(v.ltv)>Number(a.ltv)?v:a,payes[0]);
