@@ -4442,7 +4442,15 @@ function renderSim3(){
       <div class="s3-row s3-tot"><span>Total sur 4 mois</span><b>${money(total3)}</b></div>
     </div>
     <div class="cac-intro" style="margin-top:8px">Estimation à rythme constant — la réalité dépendra de tes décisions (pousser un VA qui décolle, couper une perte…).</div>`;
-  { const r=$("#s3r"); if(r) r.oninput=()=>{ SIM3_GROWTH=Number(r.value)||0; renderSim3(); }; }
+  // ⚠️ On met à jour EN PLACE (le curseur garde le focus → un renderSim3() complet
+  // serait bloqué par le garde activeElement ci-dessus, donc le slider paraîtrait mort).
+  { const r=$("#s3r"); if(r) r.oninput=()=>{
+    SIM3_GROWTH=Number(r.value)||0;
+    const pv=$("#s3v"); if(pv) pv.textContent=(SIM3_GROWTH>=0?"+":"")+SIM3_GROWTH;
+    const gg=SIM3_GROWTH/100, pr=[1,2,3].map(k=>Math.round(baseNet*Math.pow(1+gg,k))), t3=pr.reduce((a,b)=>a+b,0)+baseNet;
+    const bs=document.querySelectorAll("#sim3Body .s3-row b");
+    if(bs.length>=4){ bs[0].textContent=money(pr[0]); bs[1].textContent=money(pr[1]); bs[2].textContent=money(pr[2]); bs[3].textContent=money(t3); }
+  }; }
   try{ fixPairs(); }catch(e){}
 }
 // 🔥 #10 STREAK PATRON : jours consécutifs au-dessus de ta cible du jour.
@@ -5647,7 +5655,7 @@ function renderInsights(){
   { const b=$("#insRefresh"); if(b) b.onclick=()=>{ body.innerHTML=`<div class="cac-intro">🔎 Analyse en cours (quelques secondes)…</div>`; loadInsights(true); }; }
 }
 // 🎙️ #1 CONVERSATION VOCALE : parle, l'IA répond à voix haute, en boucle.
-let CONVO_ON=false;
+let CONVO_ON=false, CONVO_ERR=0;
 function convoSpeak(txt,cb){ try{ if(!window.speechSynthesis){ if(cb)cb(); return; } const u=(typeof mkUtter==="function")?mkUtter(String(txt).slice(0,400)):new SpeechSynthesisUtterance(String(txt).slice(0,400)); u.onend=()=>{ if(cb)cb(); }; u.onerror=()=>{ if(cb)cb(); }; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }catch(e){ if(cb)cb(); } }
 function convoTurn(){
   if(!CONVO_ON) return;
@@ -5655,6 +5663,7 @@ function convoTurn(){
   const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
   const b=$("#askConvo"); if(b) b.classList.add("listening");
   rec.onresult=async(e)=>{
+    CONVO_ERR=0;   // une reconnaissance a réussi → on réarme le compteur d'échecs
     const q=(e.results[0][0].transcript||"").trim();
     if(!q){ if(CONVO_ON) setTimeout(convoTurn,300); return; }
     const ae=$("#askAns"); if(ae){ ae.className="ask-ans"; ae.textContent="🗣️ « "+q+" »"; }
@@ -5666,7 +5675,9 @@ function convoTurn(){
       convoSpeak(ans, ()=>{ if(CONVO_ON) setTimeout(convoTurn,250); });
     }catch(e2){ if(CONVO_ON) setTimeout(convoTurn,600); }
   };
-  rec.onerror=()=>{ if(b) b.classList.remove("listening"); if(CONVO_ON) setTimeout(convoTurn,700); };
+  rec.onerror=(ev)=>{ if(b) b.classList.remove("listening"); CONVO_ERR++;
+    if((ev&&ev.error==="not-allowed")||CONVO_ERR>=5){ CONVO_ON=false; if(b) b.classList.remove("on"); if(typeof toast==="function") toast("🎙️ Micro indisponible","Vérifie l'autorisation micro, puis réessaie."); return; }
+    if(CONVO_ON) setTimeout(convoTurn, 700*Math.min(4,CONVO_ERR)); };
   rec.onend=()=>{ if(b) b.classList.remove("listening"); };
   try{ rec.start(); }catch(e){}
 }
@@ -5676,7 +5687,7 @@ function toggleConvo(){
   if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ alert("La voix n'est pas dispo sur ce navigateur (essaie Chrome ou Safari)."); return; }
   try{ primeVoices(); }catch(e){}
-  CONVO_ON=true; if(b) b.classList.add("on"); if(typeof toast==="function") toast("🎙️ Mode conversation","Parle, je te réponds à voix haute. Re-clique 🎙️ pour arrêter.");
+  CONVO_ON=true; CONVO_ERR=0; if(b) b.classList.add("on"); if(typeof toast==="function") toast("🎙️ Mode conversation","Parle, je te réponds à voix haute. Re-clique 🎙️ pour arrêter.");
   convoSpeak("Je t'écoute.", ()=>convoTurn());
 }
 { const b=$("#askConvo"); if(b) b.onclick=toggleConvo; }
