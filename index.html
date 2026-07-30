@@ -301,6 +301,20 @@
   .cac-badge.pos{background:rgba(74,222,128,.15);color:#4ade80} .cac-badge.neg{background:rgba(248,113,113,.15);color:#f87171}
   .cac-badge.unk{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   .co-manque{font-size:12px;font-weight:800;color:#fb923c}
+  /* #5 VA×modèle */
+  .vm-h{font-size:13px;font-weight:700;margin-bottom:8px}
+  .vm-row{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px} .vm-row:last-child{border-bottom:0}
+  .vm-model{min-width:120px;font-weight:600} .vm-va{color:var(--muted)} .vm-va b{color:var(--text)}
+  .vm-combo{padding:8px 0;border-bottom:1px solid var(--line)} .vm-combo:last-child{border-bottom:0}
+  .vm-va-name{font-size:13.5px;font-weight:600} .vm-combo-meta{font-size:12.5px;color:var(--muted)} .vm-combo-meta b{color:var(--text)}
+  /* #7 comparaison */
+  .cmp-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .cmp-per{display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap} .cmp-per span{color:var(--faint)}
+  .cmp-per input{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px}
+  .cmp-table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .cmp-table th,.cmp-table td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line)} .cmp-table th:first-child,.cmp-table td:first-child{text-align:left;color:var(--muted)}
+  .cmp-table th{font-size:12px;color:var(--muted);font-weight:600} .cmp-table th span{font-weight:400;font-size:10px;color:var(--faint)}
+  .cmp-table .pos{color:#4ade80} .cmp-table .neg{color:#f87171} .cmp-brut{font-size:10px;color:var(--faint)}
   .hr-reco{background:rgba(139,124,246,.1);border:1px solid var(--acc-line,var(--line));border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:13px;line-height:1.5}
   /* #4 sources */
   .src-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -320,6 +334,37 @@
   .rule-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .rule-row:last-child{border-bottom:0}
   .rule-dot{font-size:12px} .rule-body{flex:1;min-width:0} .rule-lbl{font-size:13.5px;font-weight:600} .rule-sub{font-size:12px;color:var(--muted)}
   .rule-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .rule-del:hover{color:#f87171}
+  /* #9 bus factor */
+  .bf-score{text-align:center;margin:6px 0 14px} .bf-score-v{font-size:34px;font-weight:800;color:var(--acc)} .bf-score-l{font-size:12px;color:var(--muted)}
+  .bf-h{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px}
+  .bf-item{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line)} .bf-item:last-child{border-bottom:0}
+  .bf-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(248,113,113,.15);color:#f87171;white-space:nowrap} .bf-tag.ok{background:rgba(74,222,128,.15);color:#4ade80}
+  .bf-away{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:13px;line-height:1.5}
+  /* #8 journal décisions */
+  .dj-form{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .dj-form input[type=date]{max-width:150px} .dj-form input:not([type=date]){flex:1;min-width:160px}
+  .dj-form input{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
+  .dj-row{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)} .dj-row:last-child{border-bottom:0}
+  .dj-date{font-size:12px;font-weight:700;color:var(--muted);min-width:74px;padding-top:1px}
+  .dj-body{flex:1;min-width:0} .dj-txt{font-size:13.5px;font-weight:600;margin-bottom:3px}
+  .dj-impact{font-size:12.5px} .dj-impact.pos{color:#4ade80} .dj-impact.neg{color:#f87171} .dj-impact.muted{color:var(--muted)}
+  .dj-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .dj-del:hover{color:#f87171}
+  /* #10 vue associé : on masque tout ce qui touche à l'argent, la paie, la config, l'édition */
+  #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  #assocBanner button{margin-left:12px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+  body.assoc-mode{padding-top:38px}
+  body.assoc-mode #essentiel, body.assoc-mode #gsearch, body.assoc-mode #om, body.assoc-mode #modeles,
+  body.assoc-mode #cash, body.assoc-mode #cajours, body.assoc-mode #quinz, body.assoc-mode #tres,
+  body.assoc-mode #renta, body.assoc-mode #pie, body.assoc-mode #cac, body.assoc-mode #coutopp,
+  body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
+  body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie,
+  body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #fanradar,
+  body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
+  body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
+  body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
+  body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare{display:none !important}
+  body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
+  body.assoc-mode #refresh{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -1254,6 +1299,7 @@
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="backup" title="Télécharger ma sauvegarde" style="display:none">💾</button>
       <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
+      <button class="btn" id="assocView" title="Vue associé (lecture seule)" style="display:none">👥</button>
       <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" />
       <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
       <div class="settings-wrap">
@@ -1396,6 +1442,14 @@
       <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
       <div id="fanradarBody"></div>
     </div>
+    <div class="panel-box" id="vips" style="display:none">
+      <div class="pb-head">💎 Tes baleines (gros fans actifs)</div>
+      <div id="vipsBody"></div>
+    </div>
+    <div class="panel-box" id="churn" style="display:none">
+      <div class="pb-head">💔 Gros fans qui viennent de partir</div>
+      <div id="churnBody"></div>
+    </div>
     <div class="panel-box" id="ghosts" style="display:none">
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
@@ -1442,6 +1496,16 @@
   <div class="panel-box" id="versus" style="display:none">
     <div class="pb-head">⚔️ Comparateur de modèles <span class="vs-sel" id="vsSel"></span></div>
     <div id="versusBody"></div>
+  </div>
+
+  <div class="panel-box" id="vamodel" style="display:none">
+    <div class="pb-head">🎯 Meilleure combinaison VA × modèle</div>
+    <div id="vamodelBody"></div>
+  </div>
+
+  <div class="panel-box" id="compare" style="display:none">
+    <div class="pb-head">🆚 Comparaison sur mesure</div>
+    <div id="compareBody"></div>
   </div>
 
   <div class="pair-row">
@@ -1510,6 +1574,10 @@
       <div class="pb-head">🔔 Mes alertes perso (si… alors préviens-moi)</div>
       <div id="rulesBody"></div>
     </div>
+    <div class="panel-box" id="busfactor" style="display:none">
+      <div class="pb-head">🏖️ Que se passe-t-il si tu t'absentes ?</div>
+      <div id="busfactorBody"></div>
+    </div>
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
       <div id="convBody"></div>
@@ -1552,6 +1620,11 @@
   <div class="journal folded" id="journal" style="display:none">
     <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
     <div id="jrList"></div>
+  </div>
+
+  <div class="panel-box" id="decisions" style="display:none">
+    <div class="pb-head">📓 Journal de mes décisions</div>
+    <div id="decisionsBody"></div>
   </div>
 
   <div class="shortcuts" id="shortcuts">
@@ -1921,7 +1994,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2767,7 +2840,27 @@ function setVaGoal(va){
 }
 // ---------- Radar fans endormis ----------
 let FAN_RADAR=null;
-async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); if(typeof renderActions==="function") renderActions(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
+async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); renderVips(); renderChurn(); if(typeof renderActions==="function") renderActions(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
+// 💎 #3 baleines (gros fans ENCORE actifs) + 💔 #4 gros fans partis — même source FAN_RADAR.
+function _frMoney(v,cur){ return HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
+function renderVips(){
+  const panel=$("#vips"), body=$("#vipsBody"); if(!panel||!body) return;
+  const d=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null, vips=(d&&Array.isArray(d.vips))?d.vips:[];
+  if(!TOKEN||!vips.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block"; const cur=(d.currency)||"$";
+  body.innerHTML=`<div class="fr-intro">Tes plus gros dépenseurs <b>encore actifs</b> — tes baleines. Choie-les (message perso, contenu exclu) pour qu'ils restent.</div>`
+    +vips.slice(0,15).map(v=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(v.fan)}${v.model?` <span class="fr-meta">· ${escapeHtml(v.model)}</span>`:""}</span>${v.va?`<span class="fr-va">👤 ${escapeHtml(v.va)}</span>`:""}<span class="fr-total">${_frMoney(v.total,cur)}</span>${v.days!=null?`<span class="fr-days">${v.days<=1?"actif":"il y a "+v.days+" j"}</span>`:""}</div>`).join("");
+  if(typeof fixPairs==="function") fixPairs();
+}
+function renderChurn(){
+  const panel=$("#churn"), body=$("#churnBody"); if(!panel||!body) return;
+  const d=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null, ch=(d&&Array.isArray(d.churned))?d.churned:[];
+  if(!TOKEN||!ch.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
+  panel.style.display="block"; const cur=(d.currency)||"$";
+  body.innerHTML=`<div class="fr-intro">Gros fans dont l'abonnement vient d'expirer. Tente de les récupérer vite (👤 = le VA qui les avait amenés).</div>`
+    +ch.slice(0,15).map(c=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(c.fan)}${c.model?` <span class="fr-meta">· ${escapeHtml(c.model)}</span>`:""}</span>${c.va?`<span class="fr-va">👤 ${escapeHtml(c.va)}</span>`:""}<span class="fr-total">${_frMoney(c.total,cur)}</span><span class="fr-days" style="color:#f87171">parti il y a ${c.partiIlYa} j 💔</span></div>`).join("");
+  if(typeof fixPairs==="function") fixPairs();
+}
 function renderFanRadar(){
   const panel=$("#fanradar"); if(!panel) return;
   const d=FAN_RADAR;
@@ -3035,7 +3128,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -4095,6 +4188,77 @@ function renderSources(L){
   try{ fixPairs(); }catch(e){}
 }
 
+// 🆚 #7 COMPARAISON SUR MESURE : deux plages de dates au choix → CA + subs.
+// À la DEMANDE (le calcul interroge OnlyMonster), pas au refresh auto.
+function _dateShift(days){ const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+let COMPARE_DATA=null;
+async function loadCompare(a1,a2,b1,b2){
+  if(!TOKEN) return; const res=$("#cmpRes");
+  if(res) res.innerHTML=`<div class="cac-intro">Calcul en cours… (interroge OnlyMonster, quelques secondes)</div>`;
+  try{ const r=await fetch(HUB_BASE+`/api/hub/compare?a1=${a1}&a2=${a2}&b1=${b1}&b2=${b2}`,{headers:{"x-hub-token":TOKEN}}); const j=await r.json();
+    if(r.ok&&j.a){ COMPARE_DATA=j; renderCompareResult(); } else if(res){ res.innerHTML=`<div class="cac-intro">${escapeHtml(j.error||"Comparaison indisponible.")}</div>`; } }
+  catch(e){ if(res) res.innerHTML=`<div class="cac-intro">Erreur — réessaie.</div>`; }
+}
+function renderCompare(){
+  const panel=$("#compare"), body=$("#compareBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  if(body.dataset.built){ panel.style.display="block"; return; }   // formulaire construit une seule fois
+  panel.style.display="block";
+  const A1=_dateShift(-7), A2=_dateShift(-1), B1=_dateShift(-14), B2=_dateShift(-8);
+  body.innerHTML=`<div class="cac-intro">Choisis deux périodes et compare ton CA + tes subs (ex : cette semaine vs la précédente, ce mois vs le même mois l'an dernier…).</div>
+    <div class="cmp-form">
+      <div class="cmp-per"><b>Période A</b> <input type="date" id="cmpA1" value="${A1}"><span>→</span><input type="date" id="cmpA2" value="${A2}"></div>
+      <div class="cmp-per"><b>Période B</b> <input type="date" id="cmpB1" value="${B1}"><span>→</span><input type="date" id="cmpB2" value="${B2}"></div>
+      <button class="mn-act-btn" id="cmpGo">Comparer</button>
+    </div><div id="cmpRes"></div>`;
+  body.dataset.built="1";
+  { const b=$("#cmpGo"); if(b) b.onclick=()=>{ loadCompare(($("#cmpA1")||{}).value,($("#cmpA2")||{}).value,($("#cmpB1")||{}).value,($("#cmpB2")||{}).value); }; }
+  try{ fixPairs(); }catch(e){}
+}
+function renderCompareResult(){
+  const res=$("#cmpRes"); if(!res||!COMPARE_DATA) return;
+  const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const A=COMPARE_DATA.a, B=COMPARE_DATA.b, net=v=>Math.round((Number(v)||0)*NET);
+  const delta=(a,b,fmt)=>{ const dd=a-b, up=dd>=0, pct=b>0?Math.round(dd/b*100):null; return `<span class="${up?'pos':'neg'}">${up?'▲':'▼'} ${fmt(Math.abs(dd))}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span>`; };
+  res.innerHTML=`<table class="cmp-table"><tr><th></th><th>A<br><span>${escapeHtml(A.start)}→${escapeHtml(A.end)}</span></th><th>B<br><span>${escapeHtml(B.start)}→${escapeHtml(B.end)}</span></th><th>A vs B</th></tr>`
+    +`<tr><td>CA net (est.)</td><td><b>${money(net(A.ca))}</b><div class="cmp-brut">brut ${money(A.ca)}</div></td><td><b>${money(net(B.ca))}</b></td><td>${delta(net(A.ca),net(B.ca),money)}</td></tr>`
+    +`<tr><td>Subs</td><td><b>${fmtInt(A.subs)}</b></td><td><b>${fmtInt(B.subs)}</b></td><td>${delta(A.subs,B.subs,fmtInt)}</td></tr>`
+    +`<tr><td>CA net / jour</td><td>${money(net(A.ca)/Math.max(1,A.jours))}</td><td>${money(net(B.ca)/Math.max(1,B.jours))}</td><td>${delta(net(A.ca)/Math.max(1,A.jours),net(B.ca)/Math.max(1,B.jours),money)}</td></tr></table>`;
+}
+
+// 🎯 #5 MEILLEURE COMBINAISON VA × MODÈLE : quel VA cartonne sur quel modèle.
+// Source : OM_DATA.models[m].vas (perf par VA et par modèle).
+function renderVaModel(){
+  const panel=$("#vamodel"), body=$("#vamodelBody"); if(!panel||!body) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const models=(d&&d.models)?Object.keys(d.models):[];
+  if(!TOKEN||!d||models.length<1||revKo()){ panel.style.display="none"; return; }
+  const cur=d.currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  // top VA par modèle (par subs)
+  const topParModele=models.map(m=>{
+    const vas=(d.models[m].vas||[]).filter(v=>v&&!v.unpaid).slice().sort((a,b)=>(Number(b.subs)||0)-(Number(a.subs)||0));
+    return {model:m, top:vas[0]||null, n:vas.length};
+  }).filter(x=>x.top);
+  // VA présents sur PLUSIEURS modèles → où ils performent le mieux (par ROI sinon subs)
+  const parVa={};
+  models.forEach(m=>{ (d.models[m].vas||[]).forEach(v=>{ if(!v||v.unpaid) return; const k=String(v.va).toLowerCase(); (parVa[k]=parVa[k]||{va:v.va,rows:[]}).rows.push({model:m, subs:Number(v.subs)||0, roi:v.roi, ltv:v.ltv, marge:v.marge}); }); });
+  const multi=Object.values(parVa).filter(x=>x.rows.length>=2).map(x=>{
+    const rows=x.rows.slice().sort((a,b)=>{ const ra=(a.roi!=null?a.roi:a.subs/1000), rb=(b.roi!=null?b.roi:b.subs/1000); return rb-ra; });
+    return {va:x.va, best:rows[0], worst:rows[rows.length-1], rows:rows};
+  }).sort((a,b)=>(b.best.subs||0)-(a.best.subs||0));
+  panel.style.display="block";
+  const perf=r=>`${escapeHtml(r.model)} (${fmtInt(r.subs)} subs${r.roi!=null?`, ROI ${(Number(r.roi)).toFixed(1).replace(".",",")}×`:""})`;
+  const secTop=`<div class="vm-h">🥇 Meilleur VA par modèle</div>`
+    +topParModele.map(x=>`<div class="vm-row"><span class="vm-model">🎭 ${escapeHtml(x.model)}</span><span class="vm-va">→ <b>${escapeHtml(x.top.va)}</b> (${fmtInt(x.top.subs)} subs${x.top.roi!=null?`, ROI ${(Number(x.top.roi)).toFixed(1).replace(".",",")}×`:""})</span></div>`).join("");
+  const secMulti=multi.length?`<div class="vm-h" style="margin-top:14px">🔀 VA sur plusieurs modèles — où les mettre</div>`
+    +multi.slice(0,10).map(x=>`<div class="vm-combo"><div class="vm-va-name">${escapeHtml(x.va)}</div><div class="vm-combo-meta">✅ meilleur sur <b>${perf(x.best)}</b>${x.rows.length>1?` · plus faible sur ${perf(x.worst)}`:""}</div></div>`).join(""):"";
+  body.innerHTML=`<div class="cac-intro">Où chaque VA performe le mieux, pour réaffecter intelligemment.</div>${secTop}${secMulti}`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 💡 #6 COÛT D'OPPORTUNITÉ : si les abonnés de chaque VA valaient autant que ceux
 // de ton MEILLEUR VA, combien tu « laisses sur la table » ce mois. Piste, pas
 // reproche. Source : OM_DATA.vas (monthSubs × écart de LTV × NET_RATE).
@@ -4394,6 +4558,7 @@ function buildActions(){
   if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites",{kind:"vacard",va:OPP_FLAGS[0].va,label:"👤 Fiche"}); }
   const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
+  if(fr && Array.isArray(fr.churned) && fr.churned.length) push(2,"💔",`${fr.churned.length} gros fan${fr.churned.length>1?"s":""} vient${fr.churned.length>1?"nent":""} de partir — à récupérer`,"churn");
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
   if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
@@ -4472,7 +4637,7 @@ function renderReco(){
   el.innerHTML=`<div class="reco-lbl">🎯 Ta priorité de la semaine</div><button class="reco-body" data-jump="${reco.jump}"><span class="reco-ico">${reco.ico}</span><span class="reco-txt">${reco.txt}</span><span class="act-go">→</span></button>`;
   { const b=el.querySelector("[data-jump]"); if(b) b.onclick=()=>jumpPanel(b.getAttribute("data-jump")); }
 }
-function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); if(typeof checkRules==="function") checkRules(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
+function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); if(typeof checkRules==="function") checkRules(); if(typeof renderBusFactor==="function") renderBusFactor(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
 { const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const qk=e.target.closest("[data-qk]"); if(qk){ e.stopPropagation(); const a=(LAST_ACTIONS||[])[Number(qk.getAttribute("data-qk"))]; if(a) doQuickAction(a.quick); return; } const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
 
 // 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
@@ -4597,6 +4762,85 @@ function checkRules(){
   renderRules();
 }
 { const rb=$("#rulesBody"); if(rb) rb.addEventListener("click",e=>{ const d=e.target.closest("[data-ruledel]"); if(d){ RULES=RULES.filter(x=>x.id!==d.getAttribute("data-ruledel")); saveRules(); renderRules(); } }); }
+
+// 🏖️ #9 BUS FACTOR : ce qui tourne sans toi vs ce qui dépend de toi, et quoi
+// déléguer si tu t'absentes. Croise l'état réel (paie, fuites) et les automatismes.
+function renderBusFactor(){
+  const panel=$("#busfactor"), body=$("#busfactorBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const auto=[
+    "🤖 Le scraping des vues Instagram (en continu)",
+    "🔔 Les alertes Discord + notifs (revenus muets, proxy, SMS, règles…)",
+    "🛡️ La détection des fuites (radar anti-leak)",
+    "💰 La synchro du CA vers ton site finances (6h30)",
+    "🗂️ Le journal des incidents",
+    "🧠 Le coach du matin/soir"
+  ];
+  const manuel=[];
+  const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
+  if(cd&&!cd.error&&((Number(cd.projete)||0)>0||(Number(cd.resteRetard)||0)>0)) manuel.push({t:`Payer les VA (prochaine paie le ${(typeof fmtJourFr==="function"?fmtJourFr(cd.payday):cd.payday)})`, deleg:true});
+  const nouv=(typeof LEAKS!=="undefined"&&Array.isArray(LEAKS))?LEAKS.filter(l=>l&&(l.status||"new")==="new").length:0;
+  if(nouv) manuel.push({t:`Envoyer les DMCA (${nouv} fuite${nouv>1?"s":""} en attente)`, deleg:false});
+  manuel.push({t:"Répondre / relancer les VA (via leur ticket)", deleg:true});
+  manuel.push({t:"Décider quoi couper ou pousser (décrochage, opportunités)", deleg:false});
+  manuel.push({t:"Restaurer un proxy / renouveler un abonnement en panne", deleg:false});
+  const score=Math.round(auto.length/(auto.length+manuel.length)*100);
+  const deleg=manuel.filter(m=>m.deleg).map(m=>m.t);
+  body.innerHTML=`<div class="cac-intro">Ce qui tient sans toi, et ce qui casse si tu t'absentes. Plus le score est haut, plus ton agence tourne toute seule.</div>
+    <div class="bf-score"><div class="bf-score-v">${score} %</div><div class="bf-score-l">tourne en automatique</div></div>
+    <div class="bf-h">🤖 Tourne tout seul (${auto.length})</div>${auto.map(a=>`<div class="bf-item ok">${a}</div>`).join("")}
+    <div class="bf-h">✋ Dépend de toi (${manuel.length})</div>${manuel.map(m=>`<div class="bf-item"><span>${escapeHtml(m.t)}</span>${m.deleg?'<span class="bf-tag ok">délégable</span>':'<span class="bf-tag">toi seul</span>'}</div>`).join("")}
+    <div class="bf-away">🏖️ <b>Si tu pars une semaine :</b> ${deleg.length?`délègue à Manon → ${deleg.map(t=>escapeHtml(t)).join(" ; ")}.`:"peu de choses bloquent."} ${nouv?`Les DMCA (${nouv}) `:"Les décisions stratégiques "}t'attendront à ton retour.</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+
+// 📓 #8 JOURNAL DES DÉCISIONS : note une décision, vois son effet sur le CA
+// (7 jours avant vs 7 jours après, depuis OM_DATA.dailyNet). Stocké serveur.
+let DECISIONS=[];
+async function loadDecisions(){
+  if(!TOKEN){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e){ DECISIONS=[]; } renderDecisions(); return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/decisions",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); DECISIONS=Array.isArray(j.decisions)?j.decisions:[]; localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); } }
+  catch(e){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e2){ DECISIONS=[]; } }
+  renderDecisions();
+}
+function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
+function decisionImpact(dateStr){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!Array.isArray(om.dailyNet)||revKo()) return null;
+  const dn=om.dailyNet, idx=dn.findIndex(x=>x.date===dateStr); if(idx<0) return null;
+  const before=dn.slice(Math.max(0,idx-7),idx).map(x=>Number(x.v)||0), after=dn.slice(idx+1,idx+8).map(x=>Number(x.v)||0);
+  if(before.length<3||after.length<3) return null;
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length, b=avg(before), a=avg(after);
+  return {avant:b, apres:a, pct:b>0?Math.round((a-b)/b*100):null};
+}
+function renderDecisions(){
+  const panel=$("#decisions"), body=$("#decisionsBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  { const ae=document.activeElement; if(ae && panel.contains(ae) && /INPUT|TEXTAREA/.test(ae.tagName)) return; }
+  panel.style.display="block";
+  const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const today=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10);
+  const list=DECISIONS.length?DECISIONS.slice().sort((a,b)=>(Number(b.ts)||0)-(Number(a.ts)||0)).map(d=>{
+    const imp=decisionImpact(d.date);
+    let impHtml;
+    if(imp){ const up=imp.apres>=imp.avant; impHtml=`<div class="dj-impact ${up?'pos':'neg'}">CA/jour : ${money(imp.avant)} avant → ${money(imp.apres)} après ${up?'▲':'▼'}${imp.pct!=null?` ${up?'+':'−'}${Math.abs(imp.pct)} %`:''}</div>`; }
+    else impHtml=`<div class="dj-impact muted">Effet pas encore mesurable (décision trop récente, ou hors des 4 dernières semaines).</div>`;
+    return `<div class="dj-row"><div class="dj-date">${d.date?escapeHtml((typeof fmtJourFr==="function"?fmtJourFr(d.date):d.date)):"—"}</div><div class="dj-body"><div class="dj-txt">${escapeHtml(d.text)}</div>${impHtml}</div><button class="dj-del" data-djdel="${escapeHtml(d.id)}">✕</button></div>`;
+  }).join(""):`<div class="cac-intro">Note tes décisions (« coupé le VA X », « changé l'accroche de Layla »). Le dashboard te montrera ensuite l'effet sur ton CA — pour apprendre de tes choix.</div>`;
+  body.innerHTML=`<div class="dj-form"><input type="date" id="djDate" value="${today}"><input id="djText" placeholder="Ex : coupé le VA X, changé l'accroche…"><button class="mn-act-btn" id="djAdd">＋</button></div>${list}`;
+  { const b=$("#djAdd"); if(b) b.onclick=addDecision; }
+  { const t=$("#djText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDecision(); }); }
+  try{ fixPairs(); }catch(e){}
+}
+function addDecision(){
+  const text=(($("#djText")||{}).value||"").trim(); if(!text) return;
+  const date=(($("#djDate")||{}).value||((typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10)));
+  DECISIONS.unshift({id:(typeof tkId==="function"?tkId():Date.now().toString(36)+Math.random().toString(36).slice(2,6)), date:date, text:text, ts:Date.now()});
+  saveDecisions(); renderDecisions();
+  if(typeof toast==="function") toast("📓 Décision notée","Je te montrerai son effet sur le CA.");
+}
+{ const b=$("#decisionsBody"); if(b) b.addEventListener("click",e=>{ const d=e.target.closest("[data-djdel]"); if(d){ DECISIONS=DECISIONS.filter(x=>x.id!==d.getAttribute("data-djdel")); saveDecisions(); renderDecisions(); } }); }
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
@@ -5031,7 +5275,7 @@ function voiceAsk(prefixe, opts){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","backup","restore","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","backup","restore","assocView","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -5079,6 +5323,20 @@ async function doRestore(file){
 }
 { const b=$("#backup"); if(b) b.onclick=doBackup; }
 { const rb=$("#restore"), rf=$("#restoreFile"); if(rb&&rf){ rb.onclick=()=>rf.click(); rf.onchange=()=>{ const f=rf.files&&rf.files[0]; if(f) doRestore(f); rf.value=""; }; } }
+
+/* ---------- 👥 #10 vue associé (présentation lecture seule) ---------- */
+function applyAssoc(){
+  const on=localStorage.getItem("ccn_assoc")==="1";
+  document.body.classList.toggle("assoc-mode", on);
+  let b=$("#assocBanner");
+  if(on){
+    if(!b){ b=document.createElement("div"); b.id="assocBanner"; b.innerHTML=`👥 <b>Vue associé</b> — lecture seule, chiffres sensibles masqués <button id="assocExit">Quitter</button>`; document.body.appendChild(b);
+      const ex=b.querySelector("#assocExit"); if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_assoc","0"); applyAssoc(); }; }
+  } else if(b){ b.remove(); }
+  try{ if(typeof refreshSecnav==="function") refreshSecnav(); }catch(e){}
+}
+{ const b=$("#assocView"); if(b) b.onclick=()=>{ const on=localStorage.getItem("ccn_assoc")==="1"; localStorage.setItem("ccn_assoc", on?"0":"1"); applyAssoc(); if(!on && typeof toast==="function") toast("👥 Vue associé activée","Chiffres sensibles masqués. Clique « Quitter » pour revenir."); }; }
+applyAssoc();
 
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
@@ -5316,8 +5574,8 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
-  ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["todo","✅ Tâches"],["journal","📔 Journal"]];
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
   const chips=SECNAV.filter(([id])=>{ const el=document.getElementById(id);
@@ -5333,10 +5591,10 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
-  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
+  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
-  ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
+  ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
