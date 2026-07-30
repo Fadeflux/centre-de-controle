@@ -362,7 +362,8 @@
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
-  body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare{display:none !important}
+  body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare,
+  body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
   body.assoc-mode #refresh{display:none !important}
   /* 📉 Décrochage */
@@ -5328,6 +5329,13 @@ async function doRestore(file){
 function applyAssoc(){
   const on=localStorage.getItem("ccn_assoc")==="1";
   document.body.classList.toggle("assoc-mode", on);
+  // 🔒 Défense en profondeur : en vue associé on FORCE le masquage des montants
+  // (au cas où un panneau argent ne serait pas dans la liste ci-dessus).
+  try{
+    if(on){ if(localStorage.getItem("ccn_assoc_prevhide")===null) localStorage.setItem("ccn_assoc_prevhide", HIDE?"1":"0"); if(!HIDE){ HIDE=true; localStorage.setItem("ccn_hide","1"); if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); if(typeof renderOM==="function") renderOM(); } }
+    else { const prev=localStorage.getItem("ccn_assoc_prevhide"); if(prev!==null){ HIDE=(prev==="1"); localStorage.setItem("ccn_hide",prev); localStorage.removeItem("ccn_assoc_prevhide"); if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); if(typeof renderOM==="function") renderOM(); } }
+    const hb=$("#hide"); if(hb) hb.textContent=HIDE?"🙈":"👁️";
+  }catch(e){}
   let b=$("#assocBanner");
   if(on){
     if(!b){ b=document.createElement("div"); b.id="assocBanner"; b.innerHTML=`👥 <b>Vue associé</b> — lecture seule, chiffres sensibles masqués <button id="assocExit">Quitter</button>`; document.body.appendChild(b);
