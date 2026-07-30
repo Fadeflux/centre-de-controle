@@ -4081,7 +4081,7 @@ function renderAnomalies(){
       const z=(last-m)/sd;
       if(Math.abs(z)>=2.2 && Math.abs(last-m)>=m*0.35){
         const up=last>m;
-        ANOM_LIST.push({icon:up?"📈":"📉", sev:up?0:2, texte:`CA d'hier ${up?"anormalement HAUT":"anormalement BAS"} : <b>${money(last)}</b> vs habituel ~${money(m)}`, jump:"om"});
+        ANOM_LIST.push({icon:up?"📈":"📉", sev:up?0:2, texte:`CA d'hier ${up?"anormalement HAUT":"anormalement BAS"} : <b>${money(last)}</b> vs habituel ~${money(m)}`, plain:`CA d'hier ${up?"anormalement haut":"anormalement bas"} : ${money(last)} vs habituel ~${money(m)}`, jump:"om"});
       }
     }
   }
@@ -4098,7 +4098,7 @@ function renderAnomalies(){
         const z=(last-m)/sd;
         if(Math.abs(z)>=2.2 && Math.abs(last-m)>=Math.max(6,m*0.4)){
           const up=last>m;
-          ANOM_LIST.push({icon:up?"⚡":"🔻", sev:1, texte:`${escapeHtml(va)} : ${up?"pic":"chute"} soudain de subs — <b>${last}</b> cette quinzaine vs ~${Math.round(m)} d'habitude`, jump:"decroche"});
+          ANOM_LIST.push({icon:up?"⚡":"🔻", sev:1, texte:`${escapeHtml(va)} : ${up?"pic":"chute"} soudain de subs — <b>${last}</b> cette quinzaine vs ~${Math.round(m)} d'habitude`, plain:`${va} : ${up?"pic":"chute"} soudain de subs — ${last} cette quinzaine vs ~${Math.round(m)} d'habitude`, jump:"decroche"});
         }
       }
     });
@@ -4139,12 +4139,15 @@ function renderRealloc(){
     <input type="range" id="rlPct" min="0" max="100" step="5" value="${RALLOC.pct}" class="rl-slider">
     <div class="rl-out" id="rlOut"></div>`;
   const calc=()=>{
+    const out=$("#rlOut"); if(!out) return;
+    if(RALLOC.cut===RALLOC.boost){ out.innerHTML=`<div class="rl-line" style="color:var(--muted)">Choisis <b>deux VA différents</b> (un à couper, un à booster).</div>`; return; }
     const cut=payes.find(v=>v.va===RALLOC.cut), boost=payes.find(v=>v.va===RALLOC.boost);
     const gainCut=cut?-(Number(cut.marge)||0):0, gainBoost=boost?(Number(boost.marge)||0)*(RALLOC.pct/100):0;
-    const total=gainCut+gainBoost, out=$("#rlOut"); if(!out) return;
+    const total=gainCut+gainBoost;
     out.innerHTML=`<div class="rl-line"><span>✂️ Couper ${escapeHtml(RALLOC.cut)}${(cut&&Number(cut.marge)<0)?" (il te fait perdre)":""}</span><b class="${gainCut>=0?'pos':'neg'}">${money(gainCut)}</b></div>`
       +`<div class="rl-line"><span>🚀 ${escapeHtml(RALLOC.boost)} +${RALLOC.pct} %</span><b class="${gainBoost>=0?'pos':'neg'}">${money(gainBoost)}</b></div>`
-      +`<div class="rl-line rl-tot"><span>= Effet sur ton profit</span><b class="${total>=0?'pos':'neg'}">${money(total)} ${total>=0?"🟢":"🔴"}</b></div>`;
+      +`<div class="rl-line rl-tot"><span>= Effet estimé (marge cumulée)</span><b class="${total>=0?'pos':'neg'}">${money(total)} ${total>=0?"🟢":"🔴"}</b></div>`
+      +`<div class="rl-line" style="color:var(--muted);font-size:11px;border:0;padding-top:2px">Ordre de grandeur pour décider, pas une garantie : basé sur la rentabilité de chaque VA depuis le début.</div>`;
   };
   { const c=$("#rlCut"); if(c) c.onchange=()=>{ RALLOC.cut=c.value; calc(); }; }
   { const b=$("#rlBoost"); if(b) b.onchange=()=>{ RALLOC.boost=b.value; calc(); }; }
@@ -4165,7 +4168,7 @@ function openRevue(){
   const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   let caBloc="";
   const dn=Array.isArray(d.dailyNet)?d.dailyNet.map(x=>Number(x.v)||0):[];
-  if(!ko && dn.length>=8){
+  if(!ko && dn.length>=14){   // 2 semaines pleines pour une compa 7 vs 7 honnête
     const s7=dn.slice(-7).reduce((a,b)=>a+b,0), p7=dn.slice(-14,-7).reduce((a,b)=>a+b,0);
     const diff=s7-p7, up=diff>=0, pct=p7>0?Math.round(diff/p7*100):null;
     caBloc=`<div class="rv-stat"><div class="rv-l">CA des 7 derniers jours</div><div class="rv-v">${money(Math.round(s7*NET))} net <span style="opacity:.65">(${money(s7)} brut)</span></div><div class="rv-chg ${up?'pos':'neg'}">${up?'▲':'▼'} ${pct!=null?(up?'+':'−')+Math.abs(pct)+' %':''} vs 7 jours d'avant</div></div>`;
@@ -4225,7 +4228,7 @@ function buildActions(){
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
-  if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
+  if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
   A.sort((x,y)=>y.sev-x.sev);
   return A;
 }
