@@ -274,6 +274,40 @@
   .al-badge.removed{background:rgba(74,222,128,.15);color:#4ade80}
   .al-badge.ignored{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
   .al-badge.repost{background:rgba(139,124,246,.16);color:#a78bfa}
+  .al-roi{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0 0 10px;font-size:12px}
+  .al-roi-lbl{color:var(--muted);font-weight:600}
+  .al-roi-item{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-weight:600}
+  .om-cmp{margin:2px 0 12px;padding:9px 13px;border-radius:11px;background:var(--surface);border:1px solid var(--line);font-size:13px;line-height:1.5}
+  .om-cmp.up{border-left:3px solid #4ade80} .om-cmp.down{border-left:3px solid #f87171}
+  .om-cmp-d{font-weight:700;white-space:nowrap} .om-cmp.up .om-cmp-d{color:#4ade80} .om-cmp.down .om-cmp-d{color:#f87171}
+  /* 💵 Cash à venir */
+  .cash-pay{font-size:14px;margin-bottom:12px}
+  .cash-block{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .cash-h{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+  .cash-line{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;padding:3px 0}
+  .cash-line b{font-variant-numeric:tabular-nums} .cash-line.warn{color:#f87171} .cash-line.muted{color:var(--muted)}
+  .cash-line.total{border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;font-weight:700}
+  .cash-sub{font-size:12px;color:var(--muted);margin:2px 0 6px}
+  .cash-verdict{border-radius:11px;padding:11px 14px;font-size:14px;line-height:1.5;margin-top:2px}
+  .cash-verdict.ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
+  .cash-verdict.bad{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35)}
+  /* 🎯 CAC par VA */
+  .cac-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .cac-row{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:7px;background:var(--bg)}
+  .cac-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .cac-cells{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted)}
+  .cac-cells b{color:var(--text);font-variant-numeric:tabular-nums} .cac-cells .pos b{color:#4ade80} .cac-cells .neg b{color:#f87171}
+  .cac-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .cac-badge.pos{background:rgba(74,222,128,.15);color:#4ade80} .cac-badge.neg{background:rgba(248,113,113,.15);color:#f87171}
+  .cac-badge.unk{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  /* 📉 Décrochage */
+  .dc-c{font-size:11px;color:#f87171;font-weight:700}
+  .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .dc-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:7px;background:var(--bg)}
+  .dc-spark{display:inline-flex;align-items:flex-end;gap:3px;height:24px}
+  .dc-spark span{width:7px;background:linear-gradient(180deg,var(--acc),#7c3aed);border-radius:2px;display:block}
+  .dc-body{flex:1;min-width:0} .dc-name{font-size:14px;font-weight:600} .dc-meta{font-size:12px;color:var(--muted)}
+  .dc-down{color:#f87171;font-weight:700}
   .al-leak-actions{display:flex;flex-direction:column;gap:6px}
   .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
   .al-leak-act.prim{border-color:var(--acc);color:var(--acc);font-weight:600}
@@ -1242,6 +1276,10 @@
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
     </div>
+    <div class="panel-box" id="decroche" style="display:none">
+      <div class="pb-head">📉 VA en décrochage <span class="dc-c" id="dcCount"></span></div>
+      <div id="decrocheBody"></div>
+    </div>
   </div>
 
   <div class="panel-box" id="cajours" style="display:none">
@@ -1306,6 +1344,11 @@
     </div>
   </div>
 
+  <div class="panel-box" id="cash" style="display:none">
+    <div class="pb-head">💵 Cash à venir</div>
+    <div id="cashBody"></div>
+  </div>
+
   <div class="pair-row">
     <div class="panel-box" id="tres" style="display:none">
       <div class="pb-head">🏦 Ton argent sur OnlyFans</div>
@@ -1330,6 +1373,10 @@
     <div class="panel-box" id="subval" style="display:none">
       <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
       <div id="subvalBody"></div>
+    </div>
+    <div class="panel-box" id="cac" style="display:none">
+      <div class="pb-head">🎯 Ce que te coûte un abonné, par VA</div>
+      <div id="cacBody"></div>
     </div>
     <div class="panel-box" id="hours" style="display:none">
       <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
@@ -1370,6 +1417,7 @@
     </div>
     <div id="alList"></div>
     <div class="al-leaks-head">🚨 Fuites détectées <span class="al-lc" id="alLeakCount"></span></div>
+    <div id="alRoi" class="al-roi"></div>
     <div id="alLeaks"></div>
     <details class="al-idbox">
       <summary>⚖️ Mes infos DMCA <span class="al-idstate" id="dmState"></span></summary>
@@ -1717,7 +1765,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -1740,7 +1788,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -1910,8 +1958,26 @@ function renderWatch(){
   if(!LEAKWATCH.length){ list.innerHTML=`<div class="al-empty">Aucun modèle surveillé. Ajoute-en un ci-dessus 👆</div>`; return; }
   list.innerHTML=LEAKWATCH.map((m,i)=>`<div class="al-row"><div class="al-m"><span class="al-m-name">${escapeHtml(m.name||"—")}</span><span class="al-m-alias">${(m.aliases||[]).map(escapeHtml).join(" · ")||"aucun pseudo — ajoute-en pour un meilleur radar"}</span></div><button class="al-tog ${m.active!==false?"on":""}" data-altog="${i}">${m.active!==false?"🟢 actif":"⏸ en pause"}</button><button class="al-del" data-aldel="${i}" aria-label="Retirer">✕</button></div>`).join("");
 }
+function renderLeakRoi(){
+  const el=$("#alRoi"); if(!el) return;
+  if(!TOKEN || !LEAKS.length){ el.innerHTML=""; return; }
+  const now=new Date(), moisDeb=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+  const ceMois=LEAKS.filter(l=>Number(l.ts)>=moisDeb);
+  const detectees=ceMois.length;
+  const reposts=ceMois.filter(l=>l.status==="repost"||l.source==="repost").length;
+  const dmca=ceMois.filter(l=>l.status==="sent"||Number(l.dmcaTs)>=moisDeb).length;
+  const retirees=ceMois.filter(l=>l.status==="removed").length;
+  if(!detectees){ el.innerHTML=`<span class="al-roi-item">✅ Aucune fuite détectée ce mois-ci</span>`; return; }
+  const mois=now.toLocaleDateString("fr-FR",{month:"long"});
+  el.innerHTML=`<span class="al-roi-lbl">📊 En ${escapeHtml(mois)} :</span>`
+    +`<span class="al-roi-item">🚨 ${detectees} détectée${detectees>1?"s":""}</span>`
+    +(dmca?`<span class="al-roi-item">📤 ${dmca} DMCA envoyé${dmca>1?"s":""}</span>`:"")
+    +(retirees?`<span class="al-roi-item">🟢 ${retirees} retirée${retirees>1?"s":""}</span>`:"")
+    +(reposts?`<span class="al-roi-item">♻️ ${reposts} repost${reposts>1?"s":""}</span>`:"");
+}
 function renderLeaks(){
   const box=$("#alLeaks"), cnt=$("#alLeakCount"); if(!box) return;
+  renderLeakRoi();
   const active=LEAKS.filter(l=>l.status!=="ignored"&&l.status!=="removed");
   if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
   if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi pour activer la surveillance.</div>`; return; }
@@ -2420,7 +2486,7 @@ renderRoutines();
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
-const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 // Ce que tu touches vraiment ≈ brut × 78 % (20 % OnlyFans + 2 % Skrill) — la
 // même règle que Noctra Finance. Le NET s'affiche en premier, le brut en petit.
 const NET_RATE=0.78;
@@ -2449,7 +2515,10 @@ function renderOM(){
   let net,subsMonth;
   if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
   else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
-  const delta=(!ko && OM_MODEL==="all")?deltaHTML(d.totals.netMonth,d.totals.netLastMonth):"";
+  // Comparaison HONNÊTE : mois en cours vs mois dernier À LA MÊME DATE (pas le
+  // mois entier — comparer 12 jours à 30 ferait toujours paraître en retard).
+  const prevTD = d.totals.netLastMonthToDate;
+  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(d.totals.netMonth,prevTD):"";
   // Deux avertissements distincts : « je ne sais rien » et « je ne sais pas tout ».
   const bandeauKo=ko
     ? `<div class="om-prep" style="border-left:3px solid #f87171;margin-bottom:10px">⚠️ Revenus illisibles en ce moment — tous les montants affichent « — ». Ce n'est <b>pas</b> zéro. Les abonnés, eux, sont justes.</div>`
@@ -2502,7 +2571,15 @@ function renderOM(){
   // Argent non ventilable par modèle (repli sans API) : on le dit.
   const noteArg = (filtreDispo && argFiltreKo)
     ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Par modèle, seuls les abonnés sont disponibles en ce moment — les montants (généré, LTV, ROI) reviennent dès que la source d'argent répond. Ils restent visibles sur l'onglet « Tout ».</div>` : "";
-  $("#omBody").innerHTML=bandeauKo+tiles+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
+  // 📅 #7 — « à date » : où j'en suis aujourd'hui vs le mois dernier au même jour.
+  let cmpMois="";
+  if(!ko && OM_MODEL==="all" && prevTD!=null && !isNaN(prevTD)){
+    const curN=Math.round((Number(d.totals.netMonth)||0)*NET_RATE), prevN=Math.round((Number(prevTD)||0)*NET_RATE);
+    const j=new Date().getDate(), diff=curN-prevN, up=diff>=0;
+    const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
+    cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
+  }
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
   renderModeles();
   renderCaJours();
   renderRenta();
@@ -3743,6 +3820,111 @@ function renderProxy(){
   const rb=$("#proxyRefresh");
   if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳ test en cours…"; await loadProxy(true); };
 }
+// 💵 #1 CASH À VENIR : ce que je vais devoir sortir bientôt (paie) vs ce que
+// j'ai / j'attends sur OnlyFans. Source serveur /api/hub/cash (lecture seule).
+function fmtJourFr(s){ try{ const p=String(s).split("-").map(Number); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}); }catch(e){ return s; } }
+let CASH_DATA=null;
+async function loadCash(force){
+  if(!TOKEN) return;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/cash"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; CASH_DATA=await r.json(); renderCash(); }catch(e){}
+}
+function renderCash(){
+  const panel=$("#cash"), body=$("#cashBody"); if(!panel||!body) return;
+  const d=CASH_DATA;
+  if(!d || d.error){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const cur=v=>HIDE?"••• $":(Math.round(Number(v)||0)).toLocaleString("fr-FR")+" $";
+  const retard=Number(d.resteRetard)||0;
+  const retardHtml=retard>0
+    ? `<div class="cash-line warn"><span>⚠️ Quinzaine passée pas soldée</span><b>${cur(retard)}</b></div>`
+      +`<div class="cash-sub">${(d.restantsPrev||[]).slice(0,6).map(o=>`${escapeHtml(o.va)} ${cur(o.pay)}`).join(" · ")}</div>`
+    : "";
+  const enCoursHtml=`<div class="cash-line"><span>Quinzaine en cours (${escapeHtml(d.curLabel||"")})</span><b>${cur(d.duEnCours)}</b></div>`
+    +`<div class="cash-sub">à ce jour (jour ${d.joursEcoules}/${d.joursTotal}) · projeté fin de quinzaine ≈ <b>${cur(d.projete)}</b></div>`;
+  let tresoHtml;
+  if(d.tresoIndispo){ tresoHtml=`<div class="cash-line muted"><span>Argent sur OnlyFans</span><b>—</b></div><div class="cash-sub">trésorerie illisible pour l'instant</div>`; }
+  else{
+    tresoHtml=`<div class="cash-line"><span>💰 Dispo (retirable)</span><b>${cur(d.dispo)}</b></div>`
+      +`<div class="cash-line"><span>⏳ En attente de versement</span><b>${cur(d.attente)}</b></div>`
+      +(d.tresoPartiel?`<div class="cash-sub">⚠️ lecture partielle — c'est un minimum</div>`:"");
+  }
+  let verdict="";
+  if(d.apresPaie!=null){
+    const ok=Number(d.apresPaie)>=0;
+    verdict=`<div class="cash-verdict ${ok?'ok':'bad'}">${ok
+      ?`🟢 Après avoir tout payé, il te resterait <b>${cur(d.apresPaie)}</b>.`
+      :`🔴 Il te manquerait <b>${cur(Math.abs(d.apresPaie))}</b> pour tout payer — pense à retirer de OnlyFans ou à étaler.`}</div>`;
+  }
+  body.innerHTML=`<div class="cash-pay">📅 Prochaine paie : <b>${fmtJourFr(d.payday)}</b></div>`
+    +`<div class="cash-block"><div class="cash-h">À payer</div>${enCoursHtml}${retardHtml}`
+    +`<div class="cash-line total"><span>Total à sortir bientôt</span><b>${cur(d.totalASortir)}</b></div></div>`
+    +`<div class="cash-block"><div class="cash-h">Ce que tu as / attends</div>${tresoHtml}</div>${verdict}`
+    +`<div class="bp-since" style="margin-top:8px"><button class="mn-act-btn" id="cashRefresh" style="padding:6px 12px">🔄 Rafraîchir</button>${d.maj?` <span style="color:var(--faint);font-size:11px">à jour ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
+  const rb=$("#cashRefresh"); if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳"; await loadCash(true); };
+}
+
+// 🎯 #2 CAC PAR VA : ce que te coûte un abonné (coût/sub de la quinzaine) vs ce
+// qu'il rapporte (LTV). Source serveur /api/hub/va-cac.
+let CAC_DATA=null;
+async function loadCac(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-cac",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; CAC_DATA=await r.json(); renderCac(); }catch(e){} }
+function renderCac(){
+  const panel=$("#cac"), body=$("#cacBody"); if(!panel||!body) return;
+  const d=CAC_DATA;
+  const vas=(d&&Array.isArray(d.vas))?d.vas.filter(v=>(v.pay>0||v.subs>0)):[];
+  if(!d||!vas.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const cur=v=>HIDE?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $";
+  const rows=vas.slice(0,20).map(v=>{
+    const co1=v.coutSub!=null?cur(v.coutSub):"—", val=v.ltv!=null?cur(v.ltv):"—", marge=v.margeSub;
+    const cls=marge==null?"":(marge>=0?"pos":"neg");
+    const badge=marge==null?`<span class="cac-badge unk">valeur inconnue</span>`
+      :marge>=0?`<span class="cac-badge pos">✅ rentable</span>`:`<span class="cac-badge neg">⚠️ coûte + qu'il ne vaut</span>`;
+    return `<div class="cac-row"><div class="cac-name">${escapeHtml(v.va)} ${badge}</div>`
+      +`<div class="cac-cells"><span>${fmtInt(v.subs)} subs</span><span>coût/sub <b>${co1}</b></span><span>vaut <b>${val}</b></span>`
+      +`${marge!=null?`<span class="${cls}">marge/sub <b>${marge>=0?'+':''}${cur(marge)}</b></span>`:""}</div></div>`;
+  }).join("");
+  body.innerHTML=`<div class="cac-intro">Quinzaine ${escapeHtml(d.curLabel||"")} — ce que tu paies pour chaque abonné ramené, comparé à ce qu'un abonné de ce VA rapporte (LTV). Les moins rentables en haut.</div>${rows}`
+    +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`);
+}
+
+// 📉 #3 DÉCROCHAGE : VA encore rentables mais dont les subs baissent quinzaine
+// après quinzaine. Calculé côté front depuis /api/hub/va-quinzaines (subs par
+// quinzaine) + la rentabilité courante d'OM_DATA (un VA EN PERTE relève du
+// détecteur « à couper », pas d'ici).
+let VAQZ_DATA=null;
+async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); }catch(e){} }
+function renderDecroche(){
+  const panel=$("#decroche"), body=$("#decrocheBody"), cnt=$("#dcCount"); if(!panel||!body) return;
+  const d=VAQZ_DATA;
+  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ panel.style.display="none"; return; }
+  const prof={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va) prof[v.va.toLowerCase()]={roi:v.roi,marge:v.marge,unpaid:v.unpaid}; });
+  const enCours=(typeof d.enCours==="number")?d.enCours:(d.labels.length-1);
+  const flags=[];
+  Object.keys(d.parVa).forEach(va=>{
+    const seq=(d.parVa[va]||[]).slice(0,enCours);   // quinzaines COMPLÈTES seulement (on exclut celle en cours, partielle)
+    if(seq.length<3) return;
+    const l3=seq.slice(-3), a=l3[0], b=l3[1], c=l3[2];
+    const maxAB=Math.max(a,b);
+    const deuxBaisses=(a>b && b>c && a>0);
+    const chuteForte=(maxAB>=8 && c<=maxAB*0.55);
+    if(!(deuxBaisses||chuteForte)) return;
+    const p=prof[va.toLowerCase()];
+    if(p && p.unpaid) return;                          // comptes perso non payés : pas un « VA à pousser »
+    const enPerte=p && !p.unpaid && p.roi!=null && Number(p.roi)<0 && Number(p.marge)<0;
+    if(enPerte) return;                                // déjà géré par le détecteur « à couper »
+    const chute=a>0?Math.round((a-c)/a*100):0;
+    flags.push({va, seq:l3, chute});
+  });
+  flags.sort((x,y)=>y.chute-x.chute);
+  if(cnt) cnt.textContent=flags.length?String(flags.length):"";
+  if(!flags.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const spark=arr=>{ const mx=Math.max(1,...arr); return `<span class="dc-spark">${arr.map(v=>`<span style="height:${Math.max(6,Math.round((v/mx)*22))}px" title="${v} subs"></span>`).join("")}</span>`; };
+  body.innerHTML=`<div class="dc-intro">Ces VA sont <b>encore rentables</b> mais leurs subs <b>baissent quinzaine après quinzaine</b>. Un coup de pouce maintenant évite qu'ils passent en perte.</div>`
+    +flags.slice(0,12).map(f=>`<div class="dc-row">${spark(f.seq)}<div class="dc-body"><div class="dc-name">${escapeHtml(f.va)}</div><div class="dc-meta">${f.seq.join(" → ")} subs · <span class="dc-down">▼ ${f.chute} %</span> sur 3 quinzaines</div></div></div>`).join("");
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
 // la comparaison des deux qui est parlante — bien convertir et ramener des fans
@@ -4383,8 +4565,8 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 })();
 
 /* ---------- 🧭 menu de sections ---------- */
-const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -4401,7 +4583,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
@@ -4520,6 +4702,9 @@ loadConversion();
 loadRailway();
 loadProxy();
 loadTresorerie();
+loadCash();
+loadCac();
+loadDecroche();
 loadQuinz();
 setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); } }, REFRESH_MS);
 </script>
