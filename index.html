@@ -404,7 +404,7 @@
   body.assoc-mode #cash, body.assoc-mode #cajours, body.assoc-mode #quinz, body.assoc-mode #tres,
   body.assoc-mode #renta, body.assoc-mode #pie, body.assoc-mode #cac, body.assoc-mode #coutopp,
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
-  body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie,
+  body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
   body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #fanradar,
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
@@ -571,6 +571,11 @@
 
   .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:18px 0 0}
   .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
+  .pcumul-base{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+  .pcumul-warn{color:var(--warn,#c88);font-size:11.5px}
+  .pcumul-tip{font-size:11.5px;line-height:1.5;color:var(--muted);margin:10px 0 4px}
+  .pay-h-n{color:var(--muted);font-size:11.5px;text-align:right}
   .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
   .pb-head .act:hover{background:var(--acc-bg)}
   .pv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -1704,8 +1709,15 @@
   </div>
 
   <div class="panel-box" id="paie" style="display:none">
-    <div class="pb-head">🧾 Fiche de paie <button class="act" id="paieCopy">📋 Copier</button></div>
+    <div class="pb-head">🧾 Fiche de paie (par quinzaine) <button class="act" id="paieCopy">📋 Copier</button></div>
+    <div class="pb-sub">Vue par quinzaine 1-15 / 16-fin (calcul historique). Pour payer au plus juste, utilise plutôt <b>💸 Paie au cumul</b> ci-dessous — c'est celle qui colle à tes vrais versements.</div>
     <div id="paieBody"></div>
+  </div>
+
+  <div class="panel-box" id="paiecumul" style="display:none">
+    <div class="pb-head">💸 Paie au cumul <button class="act" id="pcumulCopy">📋 Copier</button> <button class="act" id="pcumulRefresh">🔄</button></div>
+    <div class="pb-sub">Ce que tu dois payer <b>depuis ta dernière paie</b> = cumul actuel du lien de tracking − cumul au moment où tu as payé. Le vrai calcul, pas la quinzaine.</div>
+    <div id="pcumulBody"></div>
   </div>
 
   <div class="journal folded" id="journal" style="display:none">
@@ -2505,6 +2517,103 @@ $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
   const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${fmtMoney(v.pay)}`).join("\n") + `\nTOTAL : ${fmtMoney(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
+};
+
+/* ---------- 💸 paie au cumul (repère exact, la source de vérité pour payer) ----------
+   « À payer » = cumul actuel du lien de tracking − cumul au moment où tu as payé.
+   Coller au vrai geste de l'opérateur (il paie au cumul, quand il veut), là où la
+   quinzaine réclamait un « reste 1-15 » déjà réglé. Marquer payé avance la base et
+   prévient le VA du montant dans son ticket (même canal que la fiche de paie). */
+let PCUMUL=null, PCUMUL_HIST=null;
+async function loadPaieCumul(){
+  if(!TOKEN){ $("#paiecumul").style.display="none"; return; }
+  try{
+    const [r1,r2]=await Promise.all([
+      fetch(HUB_BASE+"/api/hub/paie-cumul",{headers:{"x-hub-token":TOKEN}}),
+      fetch(HUB_BASE+"/api/hub/pay-history",{headers:{"x-hub-token":TOKEN}})
+    ]);
+    if(r1.ok) PCUMUL=await r1.json();
+    if(r2.ok) PCUMUL_HIST=((await r2.json()).history)||[];
+  }catch(e){ /* garde l'ancien affichage en cas de coupure réseau */ }
+  renderPaieCumul();
+}
+function renderPaieCumul(){
+  const box=$("#paiecumul"); if(!box) return;
+  const d=PCUMUL, vas=(d&&Array.isArray(d.vas))?d.vas:[];
+  if(!vas.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  const rows=vas.map(v=>{
+    const nom=escapeHtml(v.va);
+    if(v.unpaid){
+      return `<div class="pv-row"><span class="pv-va">${nom}</span><span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
+    }
+    if(v.base==null){
+      return `<div class="pv-row"><span class="pv-va">${nom}</span><span class="pv-subs">${fmtInt(v.cumul)} subs cumul</span>`
+        +`<span class="pv-pay pcumul-warn">base ?</span>`
+        +`<button class="pv-pay-btn" data-pcbase="${nom}">Définir la base</button></div>`;
+    }
+    const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
+    const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
+    const right = (nouveaux>0)
+      ? `<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${fmtCur(montant)}</button>`
+      : `<span class="pv-note">à jour ✓</span>`;
+    return `<div class="pv-row ${nouveaux>0?"":"pv-done"}"><span class="pv-va">${nom}</span>`
+      +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
+      +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${fmtCur(montant)}</span>${right}</div>`;
+  }).join("");
+  const total=Number(d.total)||0;
+  const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
+  const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
+    const dt=new Date(h.ts||0), okd=!isNaN(dt.getTime());
+    return `<div class="pay-h-row"><span>${escapeHtml(h.va||"")}</span>`
+      +`<span class="pay-h-d">${okd?dt.toLocaleDateString("fr-FR"):""}</span>`
+      +`<span class="pay-h-n">+${fmtInt(h.subsPaid||0)} subs</span>`
+      +`<span class="pay-h-a">${fmtCur(h.amount||0)}</span></div>`;
+  }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
+  $("#pcumulBody").innerHTML = rows
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${fmtCur(total)}</span><span class="pv-note"></span></div>`
+    + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
+    + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
+}
+$("#pcumulBody").addEventListener("click", async e=>{
+  const pay=e.target.closest("[data-pcpay]");
+  if(pay){
+    const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${fmtMoney(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    pay.disabled=true; const old=pay.textContent; pay.textContent="…";
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va})});
+      const j=await r.json();
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${fmtMoney(j.amount||0)}`+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
+      else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
+    }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
+    return;
+  }
+  const base=e.target.closest("[data-pcbase]");
+  if(base){
+    const va=base.getAttribute("data-pcbase");
+    const row=((PCUMUL&&PCUMUL.vas)||[]).find(v=>v.va===va);
+    const def=(row&&row.base!=null)?String(row.base):"";
+    const val=prompt(`Cumul de subs de ${va} au moment de ta DERNIÈRE paie ?\n\n(Ce que tu lui avais déjà payé. « À payer » = cumul actuel − ce nombre.)`,def);
+    if(val==null) return;
+    const subs=parseInt(String(val).replace(/[^0-9]/g,""),10);
+    if(isNaN(subs)){ alert("Entre un nombre."); return; }
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/baseline",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va,subs})});
+      const j=await r.json();
+      if(j&&j.ok){ if(typeof toast==="function") toast("✎ Base corrigée",`${va} → ${subs} subs`); await loadPaieCumul(); }
+      else alert("Erreur : "+((j&&j.error)||"inconnue"));
+    }catch(err){ alert("Réseau : "+err.message); }
+    return;
+  }
+});
+$("#pcumulRefresh").onclick=()=>loadPaieCumul();
+$("#pcumulCopy").onclick=()=>{
+  const d=PCUMUL, vas=(d&&d.vas)||[]; if(!vas.length) return;
+  const lignes=vas.filter(v=>!v.unpaid&&v.base!=null&&(Number(v.nouveaux)||0)>0)
+    .map(v=>`${v.va} : +${v.nouveaux} subs → ${fmtMoney(Number(v.aPayer)||0)}`);
+  const txt="💸 Paie au cumul (depuis la dernière paie)\n"+lignes.join("\n")+`\nTOTAL : ${fmtMoney(Number(d.total)||0)}`;
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{ $("#pcumulCopy").textContent="✓ Copié"; setTimeout(()=>$("#pcumulCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
 let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
@@ -6057,7 +6166,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -6078,7 +6187,7 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
+  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
   const h=hiddenSet();
@@ -6177,6 +6286,7 @@ loadOM();
 loadTip();
 loadTasks();
 loadPayments();
+loadPaieCumul();
 loadReminders();
 loadSms();
 loadVaGoals();
