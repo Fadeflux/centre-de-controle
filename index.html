@@ -349,6 +349,19 @@
   .dj-body{flex:1;min-width:0} .dj-txt{font-size:13.5px;font-weight:600;margin-bottom:3px}
   .dj-impact{font-size:12.5px} .dj-impact.pos{color:#4ade80} .dj-impact.neg{color:#f87171} .dj-impact.muted{color:var(--muted)}
   .dj-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .dj-del:hover{color:#f87171}
+  /* #9 notes VA */
+  .va-notes{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .va-notes-h{font-size:13px;font-weight:700;margin-bottom:8px}
+  .va-notes-box{width:100%;min-height:74px;resize:vertical;background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 11px;font:inherit;font-size:13.5px;line-height:1.5}
+  .va-notes-box:focus{outline:none;border-color:var(--acc)}
+  .va-notes-save{font-size:11px;color:#4ade80;height:14px;margin-top:3px}
+  /* #12 accomplissements */
+  .ach-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px} .ach-row:last-child{border-bottom:0}
+  .ach-ico{font-size:16px} .ach-lbl{flex:1;font-weight:600}
+  /* #14 diagnostic */
+  .diag-sum{font-size:15px;font-weight:700;text-align:center;margin:10px 0 14px}
+  .diag-row{display:flex;align-items:flex-start;gap:11px;padding:8px 0;border-bottom:1px solid var(--line)} .diag-row:last-child{border-bottom:0}
+  .diag-ic{font-size:13px;line-height:1.5} .diag-body{flex:1;min-width:0} .diag-name{font-size:13.5px;font-weight:600} .diag-detail{font-size:12.5px;color:var(--muted)}
   /* #10 vue associé : on masque tout ce qui touche à l'argent, la paie, la config, l'édition */
   #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   #assocBanner button{margin-left:12px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
@@ -363,9 +376,9 @@
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare,
-  body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval{display:none !important}
+  body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
-  body.assoc-mode #refresh{display:none !important}
+  body.assoc-mode #refresh, body.assoc-mode #diag{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -1301,6 +1314,7 @@
       <button class="btn" id="backup" title="Télécharger ma sauvegarde" style="display:none">💾</button>
       <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
       <button class="btn" id="assocView" title="Vue associé (lecture seule)" style="display:none">👥</button>
+      <button class="btn" id="diag" title="Diagnostic santé complet" style="display:none">🩺</button>
       <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" />
       <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
       <div class="settings-wrap">
@@ -1558,6 +1572,10 @@
     <div class="panel-box" id="badges" style="display:none">
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
+    </div>
+    <div class="panel-box" id="achievements" style="display:none">
+      <div class="pb-head">🏆 Tes accomplissements</div>
+      <div id="achievementsBody"></div>
     </div>
     <div class="panel-box" id="rw" style="display:none">
       <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
@@ -1995,7 +2013,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions(); loadVaNotes();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -4638,7 +4656,40 @@ function renderReco(){
   el.innerHTML=`<div class="reco-lbl">🎯 Ta priorité de la semaine</div><button class="reco-body" data-jump="${reco.jump}"><span class="reco-ico">${reco.ico}</span><span class="reco-txt">${reco.txt}</span><span class="act-go">→</span></button>`;
   { const b=el.querySelector("[data-jump]"); if(b) b.onclick=()=>jumpPanel(b.getAttribute("data-jump")); }
 }
-function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); if(typeof checkRules==="function") checkRules(); if(typeof renderBusFactor==="function") renderBusFactor(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
+// 🎉 #12 CÉLÉBRATIONS DE MILESTONES : confettis + notif quand tu franchis un palier
+// (abonnés du mois, abonnés au total, mois à X$ net). Premier chargement = on
+// « ensemence » les paliers déjà atteints SANS fêter (sinon rafale au démarrage).
+const MILESTONE_PALIERS={
+  subsMonth:{list:[250,500,750,1000,1500,2000,3000,5000,7500,10000], label:v=>`${v.toLocaleString("fr-FR")} abonnés ce mois`},
+  subsTotal:{list:[1000,2500,5000,10000,25000,50000,100000], label:v=>`${v.toLocaleString("fr-FR")} abonnés au total`},
+  netMonth:{list:[1000,2000,3000,5000,7500,10000,15000,20000], label:v=>`Mois à ${v.toLocaleString("fr-FR")} $ net`}
+};
+function _milestonesDone(){ try{ return JSON.parse(localStorage.getItem("ccn_milestones")||"{}"); }catch(e){ return {}; } }
+function checkMilestones(){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals||(typeof revKo==="function"&&revKo())) return;
+  const t=om.totals, done=_milestonesDone(), seeded=!!done.__seeded; let changed=false;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const vals={ subsMonth:Number(t.subsMonth)||0, subsTotal:Number(t.subsTotal)||0, netMonth:Math.round((Number(t.netMonth)||0)*NET) };
+  Object.keys(MILESTONE_PALIERS).forEach(metric=>{
+    const cfg=MILESTONE_PALIERS[metric], v=vals[metric];
+    cfg.list.forEach(p=>{ if(v>=p){ const key=metric+"_"+p; if(!done[key]){ done[key]=Date.now(); changed=true; if(seeded){ if(typeof confetti==="function") setTimeout(confetti,200); if(typeof toast==="function") toast("🎉 "+cfg.label(p)+" !","Palier franchi 💪 bravo !"); } } } });
+  });
+  if(!seeded){ done.__seeded=1; changed=true; }
+  if(changed) localStorage.setItem("ccn_milestones", JSON.stringify(done));
+  if(typeof renderAchievements==="function") renderAchievements();
+}
+function renderAchievements(){
+  const panel=$("#achievements"), body=$("#achievementsBody"); if(!panel||!body) return;
+  if(!TOKEN){ panel.style.display="none"; return; }
+  const done=_milestonesDone(), items=[];
+  Object.keys(MILESTONE_PALIERS).forEach(metric=>{ const cfg=MILESTONE_PALIERS[metric]; cfg.list.forEach(p=>{ const key=metric+"_"+p; if(done[key]) items.push({label:cfg.label(p), ts:done[key]}); }); });
+  items.sort((a,b)=>(Number(b.ts)||0)-(Number(a.ts)||0));
+  if(!items.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Tes paliers franchis. Prochain objectif : continue ! 🚀</div>`
+    +items.slice(0,24).map(x=>`<div class="ach-row"><span class="ach-ico">🏆</span><span class="ach-lbl">${escapeHtml(x.label)}</span></div>`).join("");
+}
+function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); if(typeof checkRules==="function") checkRules(); if(typeof renderBusFactor==="function") renderBusFactor(); if(typeof checkMilestones==="function") checkMilestones(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
 { const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const qk=e.target.closest("[data-qk]"); if(qk){ e.stopPropagation(); const a=(LAST_ACTIONS||[])[Number(qk.getAttribute("data-qk"))]; if(a) doQuickAction(a.quick); return; } const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
 
 // 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
@@ -5276,7 +5327,7 @@ function voiceAsk(prefixe, opts){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","backup","restore","assocView","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","fontsize","panels","reorder","hide","tv","diag","backup","restore","assocView","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -5346,6 +5397,24 @@ function applyAssoc(){
 { const b=$("#assocView"); if(b) b.onclick=()=>{ const on=localStorage.getItem("ccn_assoc")==="1"; localStorage.setItem("ccn_assoc", on?"0":"1"); applyAssoc(); if(!on && typeof toast==="function") toast("👥 Vue associé activée","Chiffres sensibles masqués. Clique « Quitter » pour revenir."); }; }
 applyAssoc();
 
+/* ---------- 🩺 #14 diagnostic santé complet ---------- */
+async function runDiagnostic(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🩺 Diagnostic santé</h3><div class="ppick-sub">Test en direct de tous tes systèmes.</div><div id="diagBody"><div class="ppick-sub">⏳ Analyse en cours (quelques secondes)…</div></div><div class="vacard-btns"><button data-diagclose="1">Fermer</button></div></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-diagclose]")) ov.remove(); });
+  document.body.appendChild(ov);
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN}});
+    const j=await r.json(); const body=ov.querySelector("#diagBody"); if(!body) return;
+    if(!r.ok||!Array.isArray(j.checks)){ body.innerHTML=`<div class="ppick-sub">${escapeHtml(j.error||"Diagnostic indisponible.")}</div>`; return; }
+    const ic={ok:"🟢",warn:"🟠",bad:"🔴"};
+    const summary=j.bad>0?`🔴 ${j.bad} problème${j.bad>1?"s":""} à régler`:(j.ok<j.total?`🟠 ${j.total-j.ok} point${(j.total-j.ok)>1?"s":""} à surveiller`:"🟢 Tout est vert — ton agence tourne bien !");
+    body.innerHTML=`<div class="diag-sum">${summary}</div>`+j.checks.map(c=>`<div class="diag-row"><span class="diag-ic">${ic[c.status]||"⚪"}</span><div class="diag-body"><div class="diag-name">${escapeHtml(c.name)}</div><div class="diag-detail">${escapeHtml(c.detail||"")}</div></div></div>`).join("");
+  }catch(e){ const body=ov.querySelector("#diagBody"); if(body) body.innerHTML=`<div class="ppick-sub">Erreur — réessaie.</div>`; }
+}
+{ const b=$("#diag"); if(b) b.onclick=runDiagnostic; }
+
 /* ---------- réorganiser les panneaux ---------- */
 function applyOrder(){
   const saved=JSON.parse(localStorage.getItem("ccn_order")||"[]"); if(!saved.length) return;
@@ -5364,6 +5433,16 @@ function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > 
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
 /* ---------- 📇 fiche VA : clique sur un prénom dans le classement ---------- */
+// 🗒️ #9 NOTES PAR VA : un carnet par VA, stocké serveur, affiché dans sa fiche.
+let VANOTES={};
+async function loadVaNotes(){
+  if(!TOKEN){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e){ VANOTES={}; } return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/va-notes",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VANOTES=(j.notes&&typeof j.notes==="object")?j.notes:{}; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); } }
+  catch(e){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e2){ VANOTES={}; } }
+}
+function vaNoteGet(va){ return VANOTES[String(va||"").toLowerCase()]||""; }
+function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
+
 // 🎭 #2 FICHE MODÈLE : miroir de la fiche VA, mais par modèle. Depuis OM_DATA.
 function openModelCard(modelName){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
@@ -5439,6 +5518,9 @@ function openVaCard(vaName){
     })()}
     <div id="vlZone"></div>
     <div id="vqZone"><div class="ppick-sub">📈 Historique des quinzaines… (chargement)</div></div>
+    <div class="va-notes"><div class="va-notes-h">🗒️ Mes notes sur ${escapeHtml(vaName)}</div>
+      <textarea id="vaNoteBox" class="va-notes-box" placeholder="Dispo, forces/faiblesses, ce que tu lui as dit, à suivre…">${escapeHtml((typeof vaNoteGet==="function"?vaNoteGet(vaName):""))}</textarea>
+      <div class="va-notes-save" id="vaNoteSaved"></div></div>
     <div class="vacard-btns">
       <button data-vc="goal">🎯 Objectif</button>
       <button data-vc="msg">✉️ Lui écrire</button>
@@ -5468,6 +5550,8 @@ function openVaCard(vaName){
     }
   });
   document.body.appendChild(ov);
+  // 🗒️ #9 notes : sauvegarde auto (debounce) quand on tape.
+  { const box=ov.querySelector("#vaNoteBox"), saved=ov.querySelector("#vaNoteSaved"); if(box){ let nt=null; box.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ if(typeof vaNoteSet==="function") vaNoteSet(vaName, box.value); if(saved){ saved.textContent="✓ enregistré"; setTimeout(()=>{ saved.textContent=""; },1500); } },500); }); } }
   // 📎 Les liens cumulés (une requête pour tous les VA, cachée). Rend visible
   // que les 3 (bientôt 50) liens de Yohan comptent tous sur un seul « Yohan ».
   chargeVaLiens().then(L=>{
@@ -5600,7 +5684,7 @@ refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
 const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["sources","🔗 Qualité des sources"],
-  ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
+  ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
