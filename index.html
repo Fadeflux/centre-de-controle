@@ -309,6 +309,7 @@
   .dc-body{flex:1;min-width:0} .dc-name{font-size:14px;font-weight:600} .dc-meta{font-size:12px;color:var(--muted)}
   .dc-down{color:#f87171;font-weight:700} .dc-up{color:#4ade80;font-weight:700}
   .op-c{font-size:11px;color:#4ade80;font-weight:700}
+  .an-c{font-size:11px;color:#fb923c;font-weight:700}
   .dc-spark.up span{background:linear-gradient(180deg,#4ade80,#16a34a)}
   /* 🎯 Écran d'accueil + file d'actions */
   .essentiel{margin:0 0 20px}
@@ -328,6 +329,18 @@
   .act-ico{font-size:16px;flex-shrink:0} .act-txt{flex:1;min-width:0} .act-go{color:var(--muted);font-weight:700}
   .act-row.sev-crit{border-left-color:#f87171} .act-row.sev-high{border-left-color:#fb923c} .act-row.sev-med{border-left-color:#facc15} .act-row.sev-info{border-left-color:#4ade80}
   @media(max-width:620px){ .ess-figs{grid-template-columns:1fr 1fr} .ess-fv{font-size:19px} }
+  .ess-revue-btn{margin-top:10px;width:100%;padding:11px;border-radius:12px;border:1px dashed var(--acc-line,var(--line));background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .ess-revue-btn:hover{border-color:var(--acc);color:var(--acc)}
+  /* #12 revue de la semaine */
+  .rv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+  .rv-stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .rv-l{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .rv-v{font-size:22px;font-weight:800}
+  .rv-chg{font-size:12px;font-weight:700;margin-top:5px} .rv-chg.pos{color:#4ade80} .rv-chg.neg{color:#f87171}
+  .rv-sec{border-top:1px solid var(--line);padding:14px 0}
+  .rv-h{font-size:13px;font-weight:700;color:var(--acc-ink,var(--acc));margin-bottom:7px}
+  .rv-txt{font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap}
+  @media(max-width:620px){ .rv-grid{grid-template-columns:1fr} }
   /* 🔎 Recherche globale */
   .gsearch{position:relative;margin:0 0 14px}
   .gsearch input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;font-size:14px}
@@ -341,6 +354,19 @@
   .fresh{font-size:11px;font-weight:600;white-space:nowrap}
   .fresh.fresh-ok{color:#4ade80} .fresh.fresh-mid{color:#facc15} .fresh.fresh-old{color:#f87171}
   .pb-fresh{margin-left:6px}
+  /* #6 record */
+  .rn-record{margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13px}
+  .rn-record.best{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
+  /* #3 réallocation */
+  .rl-intro{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+  .rl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13.5px}
+  .rl-row label{color:var(--muted);font-weight:600;min-width:92px}
+  .rl-row select{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;max-width:100%}
+  .rl-slider{width:100%;margin:2px 0 12px;accent-color:var(--acc)}
+  .rl-out{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .rl-line{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:4px 0}
+  .rl-line b{font-variant-numeric:tabular-nums} .rl-line .pos{color:#4ade80} .rl-line .neg{color:#f87171}
+  .rl-line.rl-tot{border-top:1px dashed var(--line);margin-top:6px;padding-top:9px;font-weight:700;font-size:15px}
   .al-leak-actions{display:flex;flex-direction:column;gap:6px}
   .al-leak-act{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;font-size:11px;padding:4px 8px;white-space:nowrap}
   .al-leak-act.prim{border-color:var(--acc);color:var(--acc);font-weight:600}
@@ -1150,6 +1176,7 @@
 
 <div class="morning" id="morning"><div class="mn-inner" id="morningBody"></div></div>
 <div class="morning" id="widgetHelp"><div class="mn-inner" id="widgetHelpBody"></div></div>
+<div class="morning" id="revue"><div class="mn-inner" id="revueBody"></div></div>
 
 <button id="voiceFab" class="voice-fab" title="Parler à l'assistant" aria-label="Parler à l'assistant">🎤</button>
 
@@ -1200,6 +1227,7 @@
 
   <div class="essentiel" id="essentiel" style="display:none">
     <div class="ess-hero" id="essHero"></div>
+    <button class="ess-revue-btn" id="revueBtn">📅 Faire la revue de la semaine</button>
     <div class="ess-actions-wrap" id="essActionsWrap" style="display:none">
       <div class="ess-actions-head">🎯 À faire maintenant <span class="ess-ac" id="essActCount"></span></div>
       <div class="ess-actions" id="essActions"></div>
@@ -1291,9 +1319,9 @@
       <div class="tip-body" id="tipBody"></div>
     </div>
     <div class="panel-box" id="ask">
-      <div class="pb-head">🤖 Assistant — demande ou donne un ordre</div>
-      <div class="ask-row"><input id="askInput" placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
-      <div class="ask-ex">Essaie : <a data-q="Ajoute une tâche pour Manon : relancer Prince">＋ tâche à Manon</a> · <a data-q="Qui je dois relancer ?">qui relancer</a> · <a data-q="Combien à payer cette quinzaine ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
+      <div class="pb-head">🤖 Demande à tes chiffres</div>
+      <div class="ask-row"><input id="askInput" placeholder="Ex : pourquoi mon CA a baissé cette semaine ? · qui m'a fait gagner le plus ?" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askGo">Envoyer</button></div>
+      <div class="ask-ex">Essaie : <a data-q="Qui m'a fait gagner le plus ce mois ?">qui gagne le plus</a> · <a data-q="Pourquoi mon CA a baissé cette semaine ?">pourquoi ça baisse</a> · <a data-q="Est-ce que je vais battre mon record ce mois ?">battre mon record</a> · <a data-q="Combien à payer cette quinzaine et il me reste combien après ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
       <div class="ask-ans" id="askAns"></div>
     </div>
   </div>
@@ -1329,6 +1357,10 @@
     <div class="panel-box" id="opportunites" style="display:none">
       <div class="pb-head">🚀 Ça décolle <span class="op-c" id="opCount"></span></div>
       <div id="oppBody"></div>
+    </div>
+    <div class="panel-box" id="anomalies" style="display:none">
+      <div class="pb-head">📊 Anomalies détectées <span class="an-c" id="anCount"></span></div>
+      <div id="anomBody"></div>
     </div>
   </div>
 
@@ -1435,6 +1467,10 @@
     <div class="panel-box" id="sim" style="display:none">
       <div class="pb-head">🔮 Simulateur « et si »</div>
       <div id="simBody"></div>
+    </div>
+    <div class="panel-box" id="realloc" style="display:none">
+      <div class="pb-head">🔀 Et si je réorganise mon équipe</div>
+      <div id="reallocBody"></div>
     </div>
   </div>
 
@@ -2844,6 +2880,15 @@ function renderRenta(){
   const commission=Math.round(netMonth*(1-NET_RATE));
   const profitReel=profitNet-commission;
   const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE));
+  // #6 — record du meilleur mois (max de l'historique brut) + fourchette de prévision
+  const hist=Array.isArray(d.history)?d.history:[];
+  const rec=hist.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0});
+  const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*NET_RATE))}–${money(Math.round(F.net.high*NET_RATE))} net</span>`:"";
+  let recordLine="";
+  if(rec.m && netMonth>0){
+    if(projNet>=rec.net){ recordLine=`<div class="rn-record best">🏆 En route pour un <b>NOUVEAU RECORD</b> ! (meilleur mois jusqu'ici : ${money(Math.round(rec.net*NET_RATE))} net en ${escapeHtml(rec.m)})</div>`; }
+    else { const manque=Math.max(0,Math.round((rec.net-projNet)*NET_RATE)); recordLine=`<div class="rn-record">🏆 Record à battre : <b>${money(Math.round(rec.net*NET_RATE))}</b> net (${escapeHtml(rec.m)}) — il te manque ~${money(manque)} à ce rythme.</div>`; }
+  }
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
@@ -2852,7 +2897,8 @@ function renderRenta(){
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
-    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span> · ~<b>${money(projProfitReel)}</b> de profit net.</div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
+    ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 78 % (20 % OnlyFans + 2 % Skrill), la même règle que ton site finances. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
 }
@@ -2907,7 +2953,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -3944,8 +3990,8 @@ function renderCac(){
 // après quinzaine. Calculé côté front depuis /api/hub/va-quinzaines (subs par
 // quinzaine) + la rentabilité courante d'OM_DATA (un VA EN PERTE relève du
 // détecteur « à couper », pas d'ici).
-let VAQZ_DATA=null, DECROCHE_FLAGS=[], OPP_FLAGS=[];
-async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); renderOpp(); }catch(e){} }
+let VAQZ_DATA=null, DECROCHE_FLAGS=[], OPP_FLAGS=[], ANOM_LIST=[];
+async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); renderOpp(); renderAnomalies(); }catch(e){} }
 function renderDecroche(){
   const panel=$("#decroche"), body=$("#decrocheBody"), cnt=$("#dcCount"); if(!panel||!body) return;
   const d=VAQZ_DATA;
@@ -4014,6 +4060,144 @@ function renderOpp(){
   try{ fixPairs(); }catch(e){}
 }
 
+// 📊 #2 DÉTECTEUR D'ANOMALIES : apprend le « normal » de chaque chiffre et signale
+// ce qui sort de l'ordinaire, SANS seuil réglé à la main (score z = écart à la
+// moyenne en nombre d'écarts-types). Deux sources déjà chargées : le CA quotidien
+// (OM_DATA.dailyNet) et les subs par quinzaine et par VA (VAQZ_DATA).
+function _moy(a){ return a.length?a.reduce((x,y)=>x+y,0)/a.length:0; }
+function _ecart(a,m){ if(a.length<2) return 0; return Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/(a.length-1)); }
+function renderAnomalies(){
+  const panel=$("#anomalies"), body=$("#anomBody"), cnt=$("#anCount"); if(!panel||!body) return;
+  ANOM_LIST=[];
+  if(!TOKEN){ panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
+  const cur=(OM_DATA&&OM_DATA.currency)||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const ko=(typeof revKo==="function")?revKo():false;
+  // 1) CA quotidien : le dernier jour complet est-il anormal vs les ~3 semaines d'avant ?
+  if(!ko && OM_DATA && Array.isArray(OM_DATA.dailyNet) && OM_DATA.dailyNet.length>=10){
+    const dn=OM_DATA.dailyNet.map(x=>Number(x.v)||0);
+    const last=dn[dn.length-1], base=dn.slice(0,-1), m=_moy(base), sd=_ecart(base,m);
+    if(sd>0 && m>0){
+      const z=(last-m)/sd;
+      if(Math.abs(z)>=2.2 && Math.abs(last-m)>=m*0.35){
+        const up=last>m;
+        ANOM_LIST.push({icon:up?"📈":"📉", sev:up?0:2, texte:`CA d'hier ${up?"anormalement HAUT":"anormalement BAS"} : <b>${money(last)}</b> vs habituel ~${money(m)}`, jump:"om"});
+      }
+    }
+  }
+  // 2) Subs par VA et par quinzaine : un VA a-t-il un pic/creux soudain vs son propre historique ?
+  if(VAQZ_DATA && VAQZ_DATA.parVa){
+    const enCours=(typeof VAQZ_DATA.enCours==="number")?VAQZ_DATA.enCours:((VAQZ_DATA.labels||[]).length-1);
+    const unpaid={}; if(OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va&&v.unpaid) unpaid[v.va.toLowerCase()]=1; });
+    Object.keys(VAQZ_DATA.parVa).forEach(va=>{
+      if(unpaid[va.toLowerCase()]) return;
+      const seq=(VAQZ_DATA.parVa[va]||[]).slice(0,enCours); // quinzaines complètes
+      if(seq.length<4) return;
+      const last=seq[seq.length-1], base=seq.slice(0,-1), m=_moy(base), sd=_ecart(base,m);
+      if(sd>0 && m>=5){
+        const z=(last-m)/sd;
+        if(Math.abs(z)>=2.2 && Math.abs(last-m)>=Math.max(6,m*0.4)){
+          const up=last>m;
+          ANOM_LIST.push({icon:up?"⚡":"🔻", sev:1, texte:`${escapeHtml(va)} : ${up?"pic":"chute"} soudain de subs — <b>${last}</b> cette quinzaine vs ~${Math.round(m)} d'habitude`, jump:"decroche"});
+        }
+      }
+    });
+  }
+  ANOM_LIST.sort((a,b)=>b.sev-a.sev);
+  if(typeof renderActions==="function") renderActions();
+  if(cnt) cnt.textContent=ANOM_LIST.length?String(ANOM_LIST.length):"";
+  if(!ANOM_LIST.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="dc-intro">Chiffres qui sortent de l'ordinaire par rapport à leur propre habitude (détecté tout seul, sans seuil réglé).</div>`
+    +ANOM_LIST.slice(0,10).map(a=>`<button class="act-row sev-${a.sev>=2?'high':a.sev===1?'med':'info'}" data-jump="${a.jump}"><span class="act-ico">${a.icon}</span><span class="act-txt">${a.texte}</span><span class="act-go">→</span></button>`).join("");
+  try{ fixPairs(); }catch(e){}
+  { const b=$("#anomBody"); if(b && !b._wired){ b._wired=1; b.addEventListener("click",e=>{ const x=e.target.closest("[data-jump]"); if(x) jumpPanel(x.getAttribute("data-jump")); }); } }
+}
+
+// 🔀 #3 SIMULATEUR DE RÉALLOCATION : « si je coupe X et je booste Y, je gagne
+// combien ? » Estimation à partir de la marge (rentabilité) de chaque VA :
+// couper un VA = retirer sa marge (donc GAIN s'il te faisait perdre) ; booster
+// un VA de +P % = +sa marge × P %.
+let RALLOC={cut:null,boost:null,pct:20};
+function renderRealloc(){
+  const panel=$("#realloc"), body=$("#reallocBody"); if(!panel||!body) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const ko=(typeof revKo==="function")?revKo():false;
+  if(!TOKEN || !d || !Array.isArray(d.vas) || ko){ panel.style.display="none"; return; }
+  const cur=d.currency||"$";
+  const money=v=>{ v=Number(v)||0; return HIDE?"•••":((v>=0?"+":"−")+Math.round(Math.abs(v)).toLocaleString("fr-FR")+" "+cur); };
+  const payes=d.vas.filter(v=>v&&!v.unpaid&&v.marge!=null);
+  if(payes.length<2){ panel.style.display="none"; return; }
+  const tri=payes.slice().sort((a,b)=>(Number(a.marge)||0)-(Number(b.marge)||0));
+  if(!RALLOC.cut || !payes.some(v=>v.va===RALLOC.cut)) RALLOC.cut=tri[0].va;
+  if(!RALLOC.boost || !payes.some(v=>v.va===RALLOC.boost)) RALLOC.boost=tri[tri.length-1].va;
+  const opts=sel=>payes.map(v=>`<option value="${escapeHtml(v.va)}" ${v.va===sel?"selected":""}>${escapeHtml(v.va)} (marge ${money(v.marge)})</option>`).join("");
+  panel.style.display="block";
+  body.innerHTML=`<div class="rl-intro">Teste une décision <b>avant</b> de la prendre. Estimation basée sur la rentabilité cumulée de chaque VA.</div>
+    <div class="rl-row"><label>✂️ Si je coupe</label><select id="rlCut">${opts(RALLOC.cut)}</select></div>
+    <div class="rl-row"><label>🚀 …et je booste</label><select id="rlBoost">${opts(RALLOC.boost)}</select> <span>de <b id="rlPctV">${RALLOC.pct}</b> %</span></div>
+    <input type="range" id="rlPct" min="0" max="100" step="5" value="${RALLOC.pct}" class="rl-slider">
+    <div class="rl-out" id="rlOut"></div>`;
+  const calc=()=>{
+    const cut=payes.find(v=>v.va===RALLOC.cut), boost=payes.find(v=>v.va===RALLOC.boost);
+    const gainCut=cut?-(Number(cut.marge)||0):0, gainBoost=boost?(Number(boost.marge)||0)*(RALLOC.pct/100):0;
+    const total=gainCut+gainBoost, out=$("#rlOut"); if(!out) return;
+    out.innerHTML=`<div class="rl-line"><span>✂️ Couper ${escapeHtml(RALLOC.cut)}${(cut&&Number(cut.marge)<0)?" (il te fait perdre)":""}</span><b class="${gainCut>=0?'pos':'neg'}">${money(gainCut)}</b></div>`
+      +`<div class="rl-line"><span>🚀 ${escapeHtml(RALLOC.boost)} +${RALLOC.pct} %</span><b class="${gainBoost>=0?'pos':'neg'}">${money(gainBoost)}</b></div>`
+      +`<div class="rl-line rl-tot"><span>= Effet sur ton profit</span><b class="${total>=0?'pos':'neg'}">${money(total)} ${total>=0?"🟢":"🔴"}</b></div>`;
+  };
+  { const c=$("#rlCut"); if(c) c.onchange=()=>{ RALLOC.cut=c.value; calc(); }; }
+  { const b=$("#rlBoost"); if(b) b.onchange=()=>{ RALLOC.boost=b.value; calc(); }; }
+  { const s=$("#rlPct"); if(s) s.oninput=()=>{ RALLOC.pct=Number(s.value)||0; const pv=$("#rlPctV"); if(pv)pv.textContent=RALLOC.pct; calc(); }; }
+  calc();
+  try{ fixPairs(); }catch(e){}
+}
+
+// 📅 #12 REVUE DE LA SEMAINE GUIDÉE : un écran qui te fait passer en revue la
+// semaine (chiffres, top VA, ce qui a bougé, incidents, bilan IA) puis planifier.
+// Réutilise l'overlay .morning + le bilan serveur /api/hub/bilan (déjà existant).
+function openRevue(){
+  if(!TOKEN){ openGate("Connecte-toi pour la revue de la semaine."); return; }
+  const ov=$("#revue"), body=$("#revueBody"); if(!ov||!body) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=d.totals||{}, cur=d.currency||"$";
+  const ko=(typeof revKo==="function")?revKo():false;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
+  let caBloc="";
+  const dn=Array.isArray(d.dailyNet)?d.dailyNet.map(x=>Number(x.v)||0):[];
+  if(!ko && dn.length>=8){
+    const s7=dn.slice(-7).reduce((a,b)=>a+b,0), p7=dn.slice(-14,-7).reduce((a,b)=>a+b,0);
+    const diff=s7-p7, up=diff>=0, pct=p7>0?Math.round(diff/p7*100):null;
+    caBloc=`<div class="rv-stat"><div class="rv-l">CA des 7 derniers jours</div><div class="rv-v">${money(Math.round(s7*NET))} net <span style="opacity:.65">(${money(s7)} brut)</span></div><div class="rv-chg ${up?'pos':'neg'}">${up?'▲':'▼'} ${pct!=null?(up?'+':'−')+Math.abs(pct)+' %':''} vs 7 jours d'avant</div></div>`;
+  }
+  const topVa=(d.vas||[]).slice(0,3).map((v,i)=>`${["🥇","🥈","🥉"][i]} ${escapeHtml(v.va)} (${v.subs} subs)`).join(" · ")||"—";
+  const mov=[];
+  if(typeof OPP_FLAGS!=="undefined"&&OPP_FLAGS.length) mov.push(`🚀 En hausse : <b>${OPP_FLAGS.slice(0,3).map(f=>escapeHtml(f.va)).join(", ")}</b>`);
+  if(typeof DECROCHE_FLAGS!=="undefined"&&DECROCHE_FLAGS.length) mov.push(`📉 En baisse : <b>${DECROCHE_FLAGS.slice(0,3).map(f=>escapeHtml(f.va)).join(", ")}</b>`);
+  if(typeof ANOM_LIST!=="undefined"&&ANOM_LIST.length) mov.push(`📊 ${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} repérée${ANOM_LIST.length>1?"s":""}`);
+  const inc=[];
+  if(ko) inc.push("🔌 Revenus illisibles (source OnlyMonster muette)");
+  if(typeof PROXY_DATA!=="undefined"&&PROXY_DATA&&PROXY_DATA.critique) inc.push("🛰️ Proxy résidentiel en panne");
+  body.innerHTML=`
+    <div class="mn-top"><div class="mn-hi">📅 Revue de la semaine</div><button class="mn-close" id="rvClose">✕</button></div>
+    <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
+    <div class="rv-grid">
+      ${caBloc}
+      <div class="rv-stat"><div class="rv-l">Subs de la semaine</div><div class="rv-v">${(tot.subsWeek!=null)?tot.subsWeek:"—"}</div></div>
+    </div>
+    <div class="rv-sec"><div class="rv-h">🏆 Top VA</div><div class="rv-txt">${topVa}</div></div>
+    <div class="rv-sec"><div class="rv-h">📈 Ce qui a bougé</div><div class="rv-txt">${mov.length?mov.join("<br>"):"Rien de notable — semaine stable."}</div></div>
+    ${inc.length?`<div class="rv-sec"><div class="rv-h">⚠️ Incidents</div><div class="rv-txt">${inc.join("<br>")}</div></div>`:""}
+    <div class="rv-sec"><div class="rv-h">🧠 Le bilan de ton bras droit</div><div class="rv-txt" id="rvBilan">✍️ Génération du bilan…</div></div>
+    <div class="rv-sec"><div class="rv-h">✅ Et la semaine qui vient ?</div><div class="rv-txt">Note tes 1-3 priorités dans <b>Tâches</b>, ou demande à l'assistant « qui je dois relancer ? ».</div></div>`;
+  ov.classList.add("show");
+  { const c=$("#rvClose"); if(c) c.onclick=()=>ov.classList.remove("show"); }
+  fetch(HUB_BASE+"/api/hub/bilan",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN}})
+    .then(r=>r.json()).then(j=>{ const el=$("#rvBilan"); if(el) el.textContent=(j&&(j.answer||j.error))||"Bilan indisponible."; })
+    .catch(()=>{ const el=$("#rvBilan"); if(el) el.textContent="Bilan indisponible — réessaie."; });
+}
+{ const b=$("#revueBtn"); if(b) b.onclick=openRevue; }
+
 // 🎯 #1 FILE D'ACTIONS + #3 ÉCRAN D'ACCUEIL « L'ESSENTIEL »
 // Une seule liste priorisée qui rassemble TOUS les signaux déjà chargés (cash,
 // fuites, proxy, décrochage, opportunités, fans endormis, VA fantômes, revenus
@@ -4041,6 +4225,7 @@ function buildActions(){
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
+  if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
   A.sort((x,y)=>y.sev-x.sev);
   return A;
 }
@@ -4755,7 +4940,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -4772,9 +4957,9 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
-  ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
+  ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
