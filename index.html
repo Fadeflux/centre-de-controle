@@ -300,6 +300,7 @@
   .cac-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
   .cac-badge.pos{background:rgba(74,222,128,.15);color:#4ade80} .cac-badge.neg{background:rgba(248,113,113,.15);color:#f87171}
   .cac-badge.unk{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  .co-manque{font-size:12px;font-weight:800;color:#fb923c}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -310,6 +311,16 @@
   .dc-down{color:#f87171;font-weight:700} .dc-up{color:#4ade80;font-weight:700}
   .op-c{font-size:11px;color:#4ade80;font-weight:700}
   .an-c{font-size:11px;color:#fb923c;font-weight:700}
+  /* #8/#9 charge */
+  .ch-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+  .ch-bar-wrap{width:70px;flex-shrink:0;height:10px;background:var(--bg);border-radius:6px;overflow:hidden}
+  .ch-bar{display:block;height:100%;background:linear-gradient(90deg,var(--acc),#7c3aed);border-radius:6px}
+  .ch-info{flex:1;min-width:0} .ch-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap} .ch-meta{font-size:12px;color:var(--muted)}
+  .ch-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .ch-badge.fond{background:rgba(139,124,246,.16);color:#a78bfa} .ch-badge.marge{background:rgba(74,222,128,.15);color:#4ade80} .ch-badge.sat{background:rgba(248,113,113,.16);color:#f87171}
+  .ch-sat{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:11px 13px;margin-bottom:12px}
+  .ch-sat-h{font-size:13px;font-weight:700;color:#f87171;margin-bottom:7px}
+  .ch-sat-row{font-size:12.5px;padding:3px 0} .ch-sat-note{font-size:11px;color:var(--muted);margin-top:6px}
   .dc-spark.up span{background:linear-gradient(180deg,#4ade80,#16a34a)}
   /* 🎯 Écran d'accueil + file d'actions */
   .essentiel{margin:0 0 20px}
@@ -329,7 +340,11 @@
   .act-ico{font-size:16px;flex-shrink:0} .act-txt{flex:1;min-width:0} .act-go{color:var(--muted);font-weight:700}
   .act-row.sev-crit{border-left-color:#f87171} .act-row.sev-high{border-left-color:#fb923c} .act-row.sev-med{border-left-color:#facc15} .act-row.sev-info{border-left-color:#4ade80}
   @media(max-width:620px){ .ess-figs{grid-template-columns:1fr 1fr} .ess-fv{font-size:19px} }
-  .ess-revue-btn{margin-top:10px;width:100%;padding:11px;border-radius:12px;border:1px dashed var(--acc-line,var(--line));background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .ess-reco{margin-bottom:12px;background:linear-gradient(135deg,rgba(139,124,246,.12),var(--surface));border:1px solid var(--acc-line,var(--line));border-radius:14px;padding:13px 15px}
+  .reco-lbl{font-size:11px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+  .reco-body{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:14px;line-height:1.5}
+  .reco-ico{font-size:18px;flex-shrink:0} .reco-txt{flex:1;min-width:0}
+  .ess-revue-btn{margin-top:0;width:100%;padding:11px;border-radius:12px;border:1px dashed var(--acc-line,var(--line));background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
   .ess-revue-btn:hover{border-color:var(--acc);color:var(--acc)}
   /* #12 revue de la semaine */
   .rv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
@@ -354,6 +369,13 @@
   .fresh{font-size:11px;font-weight:600;white-space:nowrap}
   .fresh.fresh-ok{color:#4ade80} .fresh.fresh-mid{color:#facc15} .fresh.fresh-old{color:#f87171}
   .pb-fresh{margin-left:6px}
+  /* #2 fiche modèle */
+  .ml-sec{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+  .ml-h{font-size:13px;font-weight:700;margin-bottom:9px}
+  .ml-va{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:5px 0}
+  .ml-va-n{color:var(--muted)}
+  .ml-spark{display:flex;align-items:flex-end;gap:5px;height:44px;justify-content:center}
+  .ml-spark span{width:22px;background:linear-gradient(180deg,var(--acc),#7c3aed);border-radius:3px;display:block}
   /* #6 record */
   .rn-record{margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13px}
   .rn-record.best{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
@@ -1227,6 +1249,7 @@
 
   <div class="essentiel" id="essentiel" style="display:none">
     <div class="ess-hero" id="essHero"></div>
+    <div class="ess-reco" id="essReco" style="display:none"></div>
     <button class="ess-revue-btn" id="revueBtn">📅 Faire la revue de la semaine</button>
     <div class="ess-actions-wrap" id="essActionsWrap" style="display:none">
       <div class="ess-actions-head">🎯 À faire maintenant <span class="ess-ac" id="essActCount"></span></div>
@@ -1362,6 +1385,10 @@
       <div class="pb-head">📊 Anomalies détectées <span class="an-c" id="anCount"></span></div>
       <div id="anomBody"></div>
     </div>
+    <div class="panel-box" id="charge" style="display:none">
+      <div class="pb-head">💪 Charge de l'équipe</div>
+      <div id="chargeBody"></div>
+    </div>
   </div>
 
   <div class="panel-box" id="cajours" style="display:none">
@@ -1459,6 +1486,10 @@
     <div class="panel-box" id="cac" style="display:none">
       <div class="pb-head">🎯 Ce que te coûte un abonné, par VA</div>
       <div id="cacBody"></div>
+    </div>
+    <div class="panel-box" id="coutopp" style="display:none">
+      <div class="pb-head">💡 Ce que tu laisses sur la table</div>
+      <div id="coutoppBody"></div>
     </div>
     <div class="panel-box" id="hours" style="display:none">
       <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
@@ -1851,7 +1882,7 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
+  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale();
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2955,7 +2986,7 @@ async function loadOM(){
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -3988,6 +4019,28 @@ function renderCac(){
     +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`);
 }
 
+// 💡 #6 COÛT D'OPPORTUNITÉ : si les abonnés de chaque VA valaient autant que ceux
+// de ton MEILLEUR VA, combien tu « laisses sur la table » ce mois. Piste, pas
+// reproche. Source : OM_DATA.vas (monthSubs × écart de LTV × NET_RATE).
+function renderCoutOpp(){
+  const panel=$("#coutopp"), body=$("#coutoppBody"); if(!panel||!body) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  if(!TOKEN||!d||!Array.isArray(d.vas)||revKo()){ panel.style.display="none"; return; }
+  const cur=d.currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const payes=d.vas.filter(v=>v&&!v.unpaid&&v.ltv!=null&&Number(v.ltv)>0&&Number(v.monthSubs)>0);
+  if(payes.length<2){ panel.style.display="none"; return; }
+  const ref=payes.reduce((a,v)=>Number(v.ltv)>Number(a.ltv)?v:a, payes[0]);
+  const rows=payes.filter(v=>v.va!==ref.va && Number(v.ltv)<Number(ref.ltv))
+    .map(v=>({va:v.va, manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*NET_RATE), ltv:Number(v.ltv), subs:Number(v.monthSubs)}))
+    .filter(x=>x.manque>=5).sort((a,b)=>b.manque-a.manque);
+  if(!rows.length){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  body.innerHTML=`<div class="cac-intro">Si les abonnés de chaque VA valaient autant que ceux de <b>${escapeHtml(ref.va)}</b> (ton meilleur, ${fmtLtv(ref.ltv,cur)}/sub), voici ce que tu « laisses sur la table » ce mois. Pas un reproche — une piste : forme-les, change leur accroche, ou déplace l'effort.</div>`
+    +rows.slice(0,10).map(x=>`<div class="cac-row"><div class="cac-name">${escapeHtml(x.va)} <span class="co-manque">~${money(x.manque)}/mois</span></div><div class="cac-cells"><span>${fmtInt(x.subs)} subs ce mois</span><span>valent ${fmtLtv(x.ltv,cur)} vs ${fmtLtv(ref.ltv,cur)}</span></div></div>`).join("");
+  try{ fixPairs(); }catch(e){}
+}
+
 // 📉 #3 DÉCROCHAGE : VA encore rentables mais dont les subs baissent quinzaine
 // après quinzaine. Calculé côté front depuis /api/hub/va-quinzaines (subs par
 // quinzaine) + la rentabilité courante d'OM_DATA (un VA EN PERTE relève du
@@ -4203,6 +4256,40 @@ function openRevue(){
 }
 { const b=$("#revueBtn"); if(b) b.onclick=openRevue; }
 
+// 💪 #8/#9 CHARGE, CAPACITÉ & SATURATION : effort (posts IG 7j) vs résultat
+// (vues/subs). Source serveur /api/hub/va-charge.
+let CHARGE_DATA=null, SAT_FLAGS=[];
+async function loadCharge(force){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-charge"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; CHARGE_DATA=await r.json(); renderCharge(); }catch(e){} }
+function _fmtVues(n){ n=Number(n)||0; return n>=1000?(Math.round(n/100)/10).toLocaleString("fr-FR")+"k":String(n); }
+function renderCharge(){
+  const panel=$("#charge"), body=$("#chargeBody"); if(!panel||!body) return;
+  const d=CHARGE_DATA; SAT_FLAGS=[];
+  if(!TOKEN||!d||!Array.isArray(d.vas)){ panel.style.display="none"; if(typeof renderActions==="function") renderActions(); return; }
+  const vas=d.vas.filter(v=>v&&((v.posts7||0)>0||(v.postsPrev7||0)>0));
+  if(!vas.length){ panel.style.display="none"; if(typeof renderActions==="function") renderActions(); return; }
+  const maxP=Math.max(1,...vas.map(v=>v.posts7||0));
+  const sorted=vas.map(v=>v.posts7||0).slice().sort((a,b)=>a-b);
+  const med=sorted[Math.floor(sorted.length/2)]||0;
+  const sat=vas.filter(v=>(v.postsPrev7||0)>=3 && (v.posts7||0)>(v.postsPrev7||0) && ((v.views7||0)<(v.viewsPrev7||0)*0.9 || (v.subsQ!=null&&v.subsPrevQ!=null&&v.subsQ<v.subsPrevQ)));
+  SAT_FLAGS=sat.map(v=>v.va);
+  if(typeof renderActions==="function") renderActions();
+  panel.style.display="block";
+  let satHtml="";
+  if(sat.length){
+    satHtml=`<div class="ch-sat"><div class="ch-sat-h">🔴 Poste plus mais rapporte moins</div>`
+      +sat.slice(0,5).map(v=>`<div class="ch-sat-row"><b>${escapeHtml(v.va)}</b> : ${v.postsPrev7}→${v.posts7} posts/sem, mais ${_fmtVues(v.viewsPrev7)}→${_fmtVues(v.views7)} vues${(v.subsQ!=null&&v.subsPrevQ!=null)?` · ${v.subsPrevQ}→${v.subsQ} subs`:""}</div>`).join("")
+      +`<div class="ch-sat-note">Rendement en baisse : change l'angle / l'accroche plutôt que le volume.</div></div>`;
+  }
+  const rows=vas.slice(0,20).map(v=>{
+    const p=v.posts7||0;
+    let badge=(p>=med*1.5 && p>=6)?`<span class="ch-badge fond">⚡ à fond</span>`:(p<=Math.max(1,med*0.5))?`<span class="ch-badge marge">🌱 de la marge</span>`:"";
+    if(sat.indexOf(v)>=0) badge=`<span class="ch-badge sat">🔴 saturé</span>`;
+    return `<div class="ch-row"><div class="ch-bar-wrap"><span class="ch-bar" style="width:${Math.max(4,Math.round(p/maxP*100))}%"></span></div><div class="ch-info"><div class="ch-name">${escapeHtml(v.va)} ${badge}</div><div class="ch-meta">${p} post${p>1?"s":""}/sem · ${_fmtVues(v.views7)} vues${(v.subsQ!=null)?` · ${v.subsQ} subs`:""}</div></div></div>`;
+  }).join("");
+  body.innerHTML=`<div class="cac-intro">Effort (posts Instagram, 7 derniers jours) vs résultat (vues, subs). Qui est à fond, qui a de la marge pour produire plus, et qui poste beaucoup pour rien.</div>${satHtml}${rows}`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🎯 #1 FILE D'ACTIONS + #3 ÉCRAN D'ACCUEIL « L'ESSENTIEL »
 // Une seule liste priorisée qui rassemble TOUS les signaux déjà chargés (cash,
 // fuites, proxy, décrochage, opportunités, fans endormis, VA fantômes, revenus
@@ -4231,6 +4318,7 @@ function buildActions(){
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
   if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
+  if(typeof SAT_FLAGS!=="undefined" && SAT_FLAGS.length){ push(1,"🔴",`${SAT_FLAGS.length} VA poste${SAT_FLAGS.length>1?"nt":""} plus mais rapporte${SAT_FLAGS.length>1?"nt":""} moins : ${SAT_FLAGS.slice(0,2).join(", ")}${SAT_FLAGS.length>2?"…":""}`,"charge"); }
   A.sort((x,y)=>y.sev-x.sev);
   return A;
 }
@@ -4275,7 +4363,28 @@ function fraicheur(ts){
   const txt=m<1?"à jour à l'instant":m<60?`à jour il y a ${m} min`:`⚠️ vieux de ${Math.round(m/60)} h`;
   return `<span class="fresh ${c}">● ${txt}</span>`;
 }
-function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
+// 🎯 #7 RECO DE LA SEMAINE : UNE priorité stratégique choisie pour toi (pas la
+// liste des problèmes = ça, c'est la file d'actions). Oriente vers la CROISSANCE.
+function renderReco(){
+  const el=$("#essReco"); if(!el) return;
+  if(!TOKEN){ el.style.display="none"; return; }
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  let reco=null;
+  if(typeof OPP_FLAGS!=="undefined" && OPP_FLAGS.length){ const o=OPP_FLAGS[0]; reco={ico:"🚀", txt:`Pousse <b>${escapeHtml(o.va)}</b> cette semaine : ses subs montent fort (+${o.hausse} % sur 3 quinzaines). Donne-lui plus de budget ou de contenu pendant que ça marche.`, jump:"opportunites"}; }
+  if(!reco && d && Array.isArray(d.vas) && !revKo()){
+    const payes=d.vas.filter(v=>v&&!v.unpaid&&v.ltv!=null&&Number(v.ltv)>0&&Number(v.monthSubs)>0);
+    if(payes.length>=2){ const ref=payes.reduce((a,v)=>Number(v.ltv)>Number(a.ltv)?v:a,payes[0]);
+      const cand=payes.filter(v=>v.va!==ref.va&&Number(v.ltv)<Number(ref.ltv)).map(v=>({va:v.va,manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*NET_RATE)})).filter(x=>x.manque>=20).sort((a,b)=>b.manque-a.manque)[0];
+      if(cand) reco={ico:"💡", txt:`Travaille avec <b>${escapeHtml(cand.va)}</b> : ses abonnés valent moins que ceux de ${escapeHtml(ref.va)}. En l'aidant (accroche, ciblage), tu peux récupérer ~${HIDE?"••• $":Math.round(cand.manque).toLocaleString("fr-FR")+" $"}/mois.`, jump:"coutopp"}; }
+  }
+  if(!reco && typeof DECROCHE_FLAGS!=="undefined" && DECROCHE_FLAGS.length){ const f=DECROCHE_FLAGS[0]; reco={ico:"📉", txt:`Relance <b>${escapeHtml(f.va)}</b> avant qu'il passe en perte : ses subs baissent (−${f.chute} % sur 3 quinzaines) mais il est encore rentable.`, jump:"decroche"}; }
+  if(!reco && d && Array.isArray(d.vas) && d.vas.length){ const top=d.vas.find(v=>v&&!v.unpaid)||d.vas[0]; if(top) reco={ico:"✅", txt:`Semaine stable — continue sur ta lancée. <b>${escapeHtml(top.va)}</b> porte l'équipe en ce moment.`, jump:"om"}; }
+  if(!reco){ el.style.display="none"; return; }
+  el.style.display="block";
+  el.innerHTML=`<div class="reco-lbl">🎯 Ta priorité de la semaine</div><button class="reco-body" data-jump="${reco.jump}"><span class="reco-ico">${reco.ico}</span><span class="reco-txt">${reco.txt}</span><span class="act-go">→</span></button>`;
+  { const b=el.querySelector("[data-jump]"); if(b) b.onclick=()=>jumpPanel(b.getAttribute("data-jump")); }
+}
+function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco(); const gs=$("#gsearch"); if(gs) gs.style.display=TOKEN?"block":"none"; }catch(e){} }
 { const ea=$("#essActions"); if(ea) ea.addEventListener("click", e=>{ const b=e.target.closest("[data-jump]"); if(b) jumpPanel(b.getAttribute("data-jump")); }); }
 
 // 🔎 #2 RECHERCHE GLOBALE : tape un VA → ouvre sa fiche (openVaCard) ; tape un
@@ -4286,6 +4395,7 @@ function gsIndex(){
   const items=[];
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   if(om&&Array.isArray(om.vas)) om.vas.forEach(v=>{ if(v&&v.va) items.push({type:"va", label:v.va, sub:(v.unpaid?"perso":`${v.subs||0} subs`), key:v.va}); });
+  if(om&&om.models) Object.keys(om.models).forEach(mn=>{ const m=om.models[mn]||{}; items.push({type:"model", label:mn, sub:`modèle · ${m.subs||0} subs`, key:mn}); });
   const seen={};
   (typeof PANNEAUX!=="undefined"?PANNEAUX:[]).forEach(a=>{ if(a&&a[0]){ seen[a[0]]=1; items.push({type:"panel", label:String(a[1]||a[0]).replace(/^[^\p{L}]+/u,"").trim()||a[1], sub:"panneau", key:a[0]}); } });
   [["om","Argent (OnlyMonster)"],["cash","Cash à venir"],["paie","Paie"],["antileak","Anti-leak"],["tasks","Tâches d'équipe"],["journal","Journal"],["costs","Dépenses d'outils"],["proxy","État des proxies"]].forEach(p=>{ if(!seen[p[0]]){ seen[p[0]]=1; items.push({type:"panel",label:p[1],sub:"panneau",key:p[0]}); } });
@@ -4297,11 +4407,11 @@ function gsRender(q){
   if(!q){ box.innerHTML=""; box.style.display="none"; return; }
   const hits=gsIndex().filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
   if(!hits.length){ box.innerHTML=`<div class="gs-empty">Aucun résultat</div>`; box.style.display="block"; return; }
-  box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
+  box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":h.type==="model"?"🎭":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
   box.style.display="block";
 }
 { const inp=$("#gsInput"); if(inp){ inp.addEventListener("input",()=>gsRender(inp.value)); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
-{ const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else jumpPanel(k); }); }
+{ const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else jumpPanel(k); }); }
 document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
@@ -4765,6 +4875,42 @@ function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > 
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
 /* ---------- 📇 fiche VA : clique sur un prénom dans le classement ---------- */
+// 🎭 #2 FICHE MODÈLE : miroir de la fiche VA, mais par modèle. Depuis OM_DATA.
+function openModelCard(modelName){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
+  const m=(om.models||{})[modelName]; if(!m) return;
+  const cur=om.currency||"$", ko=revKo();
+  const money=x=>ko?"—":(HIDE?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur);
+  const tot=om.totals||{};
+  const partSubs=(Number(tot.subsMonth)>0 && m.subs!=null)?Math.round(Number(m.subs)/Number(tot.subsMonth)*100):null;
+  const partNet=(Number(tot.netMonth)>0 && m.net!=null)?Math.round(Number(m.net)/Number(tot.netMonth)*100):null;
+  const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
+  const vasM=(Array.isArray(m.vas)?m.vas.slice():[]).sort((a,b)=>(Number(b.subs)||0)-(Number(a.subs)||0)).slice(0,5);
+  const vaRows=vasM.length?vasM.map(v=>`<div class="ml-va"><span>${escapeHtml(v.va)}</span><span class="ml-va-n">${fmtInt(v.subs||0)} subs${(!ko&&v.marge!=null)?` · marge ${money(v.marge)}`:""}</span></div>`).join(""):`<div class="ppick-sub">Pas encore de VA attribué sur ce modèle.</div>`;
+  const tr=(typeof TRES_DATA!=="undefined"&&TRES_DATA&&Array.isArray(TRES_DATA.modeles))?TRES_DATA.modeles.find(x=>x&&x.nom&&String(x.nom).toLowerCase()===String(modelName).toLowerCase()):null;
+  const hist=(om.history||[]).filter(h=>h&&h.byModel&&h.byModel[modelName]);
+  let bars="";
+  if(hist.length>=2){
+    const maxN=Math.max(1,...hist.map(h=>Number(h.byModel[modelName].net)||0));
+    bars=`<div class="ml-spark">${hist.slice(-6).map(h=>{ const n=Number(h.byModel[modelName].net)||0; return `<span title="${escapeHtml(h.month)} : ${money(n)}" style="height:${Math.max(6,Math.round(n/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
+  }
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(modelName)}</h3>
+    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(modelName)}, au même endroit.</div>
+    <div class="vacard-stats">
+      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*NET_RATE), ko?"":"brut : "+money(m.net))}
+      ${stat("Subs du mois", fmtInt(m.subs||0), partSubs!=null?partSubs+" % de tes subs":"")}
+      ${stat("LTV (par abonné)", ko?"—":fmtLtv(m.ltv,cur))}
+      ${stat("Marge du mois", ko?"—":money(m.marge), partNet!=null?partNet+" % de ton CA":"")}
+      ${tr?stat("Sur OnlyFans", money(tr.dispo), "dispo · "+money(tr.attente)+" en attente"):""}
+    </div>
+    ${m.revVentile===false?`<div class="va-verdict vv-wait">⏳ Revenus pas encore ventilés par VA sur ce modèle.</div>`:""}
+    <div class="ml-sec"><div class="ml-h">👥 Top VA sur ${escapeHtml(modelName)}</div>${vaRows}</div>
+    ${bars?`<div class="ml-sec">${bars}</div>`:""}
+    <div class="vacard-btns"><button data-mc="close">Fermer</button></div></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-mc]")) ov.remove(); });
+  document.body.appendChild(ov);
+}
 function openVaCard(vaName){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
   const v=(om.vas||[]).find(x=>x.va===vaName); if(!v) return;
@@ -4945,7 +5091,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["paie","💸 Paie"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -4962,7 +5108,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],
+const PANNEAUX=[["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],
   ["badges","🏅 Badges"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["ghosts","👻 VA fantômes"],
@@ -5084,8 +5230,9 @@ loadTresorerie();
 loadCash();
 loadCac();
 loadDecroche();
+loadCharge();
 loadQuinz();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
 setTimeout(refreshEssentiel, 3500);
 </script>
 </body>
