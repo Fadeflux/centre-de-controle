@@ -4270,7 +4270,10 @@ function renderCharge(){
   const maxP=Math.max(1,...vas.map(v=>v.posts7||0));
   const sorted=vas.map(v=>v.posts7||0).slice().sort((a,b)=>a-b);
   const med=sorted[Math.floor(sorted.length/2)]||0;
-  const sat=vas.filter(v=>(v.postsPrev7||0)>=3 && (v.posts7||0)>(v.postsPrev7||0) && ((v.views7||0)<(v.viewsPrev7||0)*0.9 || (v.subsQ!=null&&v.subsPrevQ!=null&&v.subsQ<v.subsPrevQ)));
+  // ⚠️ Saturation basée sur les VUES (fenêtres 7j vs 7j comparables). PAS sur les
+  // subs : subsQ = quinzaine EN COURS (partielle) vs subsPrevQ = quinzaine COMPLÈTE
+  // → juste après le 1er/16, subsQ<subsPrevQ presque toujours = faux « saturé ».
+  const sat=vas.filter(v=>(v.postsPrev7||0)>=3 && (v.posts7||0)>(v.postsPrev7||0) && (v.viewsPrev7||0)>0 && (v.views7||0)<(v.viewsPrev7||0)*0.9);
   SAT_FLAGS=sat.map(v=>v.va);
   if(typeof renderActions==="function") renderActions();
   panel.style.display="block";
@@ -4378,7 +4381,7 @@ function renderReco(){
       if(cand) reco={ico:"💡", txt:`Travaille avec <b>${escapeHtml(cand.va)}</b> : ses abonnés valent moins que ceux de ${escapeHtml(ref.va)}. En l'aidant (accroche, ciblage), tu peux récupérer ~${HIDE?"••• $":Math.round(cand.manque).toLocaleString("fr-FR")+" $"}/mois.`, jump:"coutopp"}; }
   }
   if(!reco && typeof DECROCHE_FLAGS!=="undefined" && DECROCHE_FLAGS.length){ const f=DECROCHE_FLAGS[0]; reco={ico:"📉", txt:`Relance <b>${escapeHtml(f.va)}</b> avant qu'il passe en perte : ses subs baissent (−${f.chute} % sur 3 quinzaines) mais il est encore rentable.`, jump:"decroche"}; }
-  if(!reco && d && Array.isArray(d.vas) && d.vas.length){ const top=d.vas.find(v=>v&&!v.unpaid)||d.vas[0]; if(top) reco={ico:"✅", txt:`Semaine stable — continue sur ta lancée. <b>${escapeHtml(top.va)}</b> porte l'équipe en ce moment.`, jump:"om"}; }
+  if(!reco && d && Array.isArray(d.vas) && d.vas.length){ const top=d.vas.find(v=>v&&!v.unpaid); if(top) reco={ico:"✅", txt:`Semaine stable — continue sur ta lancée. <b>${escapeHtml(top.va)}</b> porte l'équipe en ce moment.`, jump:"om"}; }
   if(!reco){ el.style.display="none"; return; }
   el.style.display="block";
   el.innerHTML=`<div class="reco-lbl">🎯 Ta priorité de la semaine</div><button class="reco-body" data-jump="${reco.jump}"><span class="reco-ico">${reco.ico}</span><span class="reco-txt">${reco.txt}</span><span class="act-go">→</span></button>`;
@@ -4884,6 +4887,7 @@ function openModelCard(modelName){
   const tot=om.totals||{};
   const partSubs=(Number(tot.subsMonth)>0 && m.subs!=null)?Math.round(Number(m.subs)/Number(tot.subsMonth)*100):null;
   const partNet=(Number(tot.netMonth)>0 && m.net!=null)?Math.round(Number(m.net)/Number(tot.netMonth)*100):null;
+  const partMarge=(Number(tot.margeMonth)>0 && m.marge!=null)?Math.round(Number(m.marge)/Number(tot.margeMonth)*100):null;
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const vasM=(Array.isArray(m.vas)?m.vas.slice():[]).sort((a,b)=>(Number(b.subs)||0)-(Number(a.subs)||0)).slice(0,5);
   const vaRows=vasM.length?vasM.map(v=>`<div class="ml-va"><span>${escapeHtml(v.va)}</span><span class="ml-va-n">${fmtInt(v.subs||0)} subs${(!ko&&v.marge!=null)?` · marge ${money(v.marge)}`:""}</span></div>`).join(""):`<div class="ppick-sub">Pas encore de VA attribué sur ce modèle.</div>`;
@@ -4891,17 +4895,18 @@ function openModelCard(modelName){
   const hist=(om.history||[]).filter(h=>h&&h.byModel&&h.byModel[modelName]);
   let bars="";
   if(hist.length>=2){
-    const maxN=Math.max(1,...hist.map(h=>Number(h.byModel[modelName].net)||0));
-    bars=`<div class="ml-spark">${hist.slice(-6).map(h=>{ const n=Number(h.byModel[modelName].net)||0; return `<span title="${escapeHtml(h.month)} : ${money(n)}" style="height:${Math.max(6,Math.round(n/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
+    const hist6=hist.slice(-6);
+    const maxN=Math.max(1,...hist6.map(h=>Number(h.byModel[modelName].net)||0));
+    bars=`<div class="ml-spark">${hist6.map(h=>{ const n=Number(h.byModel[modelName].net)||0; return `<span title="${escapeHtml(h.month)} : ${money(n)}" style="height:${Math.max(6,Math.round(n/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
   }
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(modelName)}</h3>
     <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(modelName)}, au même endroit.</div>
     <div class="vacard-stats">
-      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*NET_RATE), ko?"":"brut : "+money(m.net))}
+      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*NET_RATE), ko?"":"brut "+money(m.net)+(partNet!=null?" · "+partNet+" % du CA":""))}
       ${stat("Subs du mois", fmtInt(m.subs||0), partSubs!=null?partSubs+" % de tes subs":"")}
       ${stat("LTV (par abonné)", ko?"—":fmtLtv(m.ltv,cur))}
-      ${stat("Marge du mois", ko?"—":money(m.marge), partNet!=null?partNet+" % de ton CA":"")}
+      ${stat("Marge du mois", ko?"—":money(m.marge), partMarge!=null?partMarge+" % de ta marge":"")}
       ${tr?stat("Sur OnlyFans", money(tr.dispo), "dispo · "+money(tr.attente)+" en attente"):""}
     </div>
     ${m.revVentile===false?`<div class="va-verdict vv-wait">⏳ Revenus pas encore ventilés par VA sur ce modèle.</div>`:""}
