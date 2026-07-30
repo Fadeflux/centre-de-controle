@@ -576,6 +576,25 @@
   .pcumul-warn{color:var(--warn,#c88);font-size:11.5px}
   .pcumul-tip{font-size:11.5px;line-height:1.5;color:var(--muted);margin:10px 0 4px}
   .pay-h-n{color:var(--muted);font-size:11.5px;text-align:right}
+  .mt-row{display:flex;align-items:flex-start;gap:11px;padding:9px 0;border-top:1px solid var(--line,#2a2a33)}
+  .mt-row:first-child{border-top:0}
+  .mt-ico{font-size:20px;line-height:1.2;flex:0 0 auto}
+  .mt-when{font-weight:600;font-size:13px}
+  .mt-when .mt-in{color:var(--muted);font-weight:500;font-size:11.5px;margin-left:6px}
+  .mt-why{color:var(--muted);font-size:11.5px;line-height:1.45;margin-top:2px}
+  .mt-today{border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;line-height:1.5;background:var(--card2,rgba(255,255,255,.04))}
+  .cl-row{display:grid;grid-template-columns:26px 1fr 90px auto auto;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line,#2a2a33)}
+  .cl-row:first-child{border-top:0}
+  .cl-medal{font-size:15px;text-align:center}
+  .cl-rank{color:var(--muted);font-size:12px}
+  .cl-va{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cl-bar{height:7px;border-radius:4px;background:var(--card2,rgba(255,255,255,.07));overflow:hidden}
+  .cl-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#8b5cf6,#c084fc)}
+  .cl-subs{font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;text-align:right}
+  .cl-pct{font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}
+  .digest-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--muted);padding:10px 12px;margin-bottom:12px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04));cursor:pointer}
+  .digest-row input{margin-top:2px;flex:0 0 auto}
+  .digest-state{color:var(--faint);font-size:11px}
   .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
   .pb-head .act:hover{background:var(--acc-bg)}
   .pv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -1656,6 +1675,7 @@
     </div>
     <div class="panel-box" id="rules" style="display:none">
       <div class="pb-head">🔔 Mes alertes perso (si… alors préviens-moi)</div>
+      <label class="digest-row"><input type="checkbox" id="digestChk"> <span><b>📋 Résumé groupé</b> — rassemble les alertes de la journée en <b>un seul</b> rappel le matin, au lieu de plein de notifications. <span id="digestState" class="digest-state"></span></span></label>
       <div id="rulesBody"></div>
     </div>
     <div class="panel-box" id="busfactor" style="display:none">
@@ -1718,6 +1738,18 @@
     <div class="pb-head">💸 Paie au cumul <button class="act" id="pcumulCopy">📋 Copier</button> <button class="act" id="pcumulRefresh">🔄</button></div>
     <div class="pb-sub">Ce que tu dois payer <b>depuis ta dernière paie</b> = cumul actuel du lien de tracking − cumul au moment où tu as payé. Le vrai calcul, pas la quinzaine.</div>
     <div id="pcumulBody"></div>
+  </div>
+
+  <div class="panel-box" id="meteo" style="display:none">
+    <div class="pb-head">🌤️ Météo des ventes</div>
+    <div class="pb-sub">Les jours où les fans US dépensent le plus (paies du 1 & 15, fêtes). Prépare tes meilleurs contenus / promos juste avant.</div>
+    <div id="meteoBody"></div>
+  </div>
+
+  <div class="panel-box" id="classement" style="display:none">
+    <div class="pb-head">🏆 Classement des VA (ce mois)</div>
+    <div class="pb-sub">Où se situe chaque VA par rapport à l'équipe, sur les abonnés du mois.</div>
+    <div id="classementBody"></div>
   </div>
 
   <div class="journal folded" id="journal" style="display:none">
@@ -2616,6 +2648,105 @@ $("#pcumulCopy").onclick=()=>{
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{ $("#pcumulCopy").textContent="✓ Copié"; setTimeout(()=>$("#pcumulCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
+/* ---------- 🌤️ #7 météo des ventes (jours de forte dépense US) ----------
+   Déterministe à partir de la date : paies US (1 & 15, ramenées au vendredi si
+   week-end car les dépôts tombent un jour ouvré) + fêtes à forte consommation
+   OF. Aucun backend : c'est un calendrier, pas une prédiction de tes chiffres. */
+function moisNom(m){ return ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"][m]; }
+function nthWeekday(y,m,weekday,n){ // n-ième `weekday` (0=dim) du mois m (0-based)
+  let c=0; for(let day=1;day<=31;day++){ const d=new Date(y,m,day); if(d.getMonth()!==m) break; if(d.getDay()===weekday){ c++; if(c===n) return d; } } return null;
+}
+function renderMeteo(){
+  const box=$("#meteo"); if(!box) return;
+  box.style.display="block";
+  const today=new Date(); today.setHours(0,0,0,0);
+  const jour=86400000;
+  const hot=[];
+  const push=(d,icon,label,why)=>{ if(!d) return; d=new Date(d); d.setHours(0,0,0,0); hot.push({t:d.getTime(),icon,label,why}); };
+  // Paies US du mois courant et des 2 suivants
+  for(let k=0;k<3;k++){
+    const base=new Date(today.getFullYear(),today.getMonth()+k,1);
+    const y=base.getFullYear(), m=base.getMonth();
+    [1,15].forEach(day=>{
+      let d=new Date(y,m,day); const wd=d.getDay();
+      if(wd===0) d=new Date(y,m,day-2); else if(wd===6) d=new Date(y,m,day-1); // dépôt le vendredi
+      push(d,"💵","Jour de paie US (le "+day+")","Beaucoup de fans américains sont payés le 1 et le 15 — le pic de dépenses tombe ce jour-là et les 2-3 jours suivants.");
+    });
+  }
+  // Fêtes fixes à forte conso (mois 0-based)
+  const fetes=[
+    [1,14,"💘","Saint-Valentin","Le plus gros jour de l'année pour l'OF : contenu couple, DM personnalisés, PPV."],
+    [4,-2,"👩","Fête des mères (US)","Pic d'attention et de dépenses affectives."],
+    [5,-3,"🕺","Fête des pères (US)",""],
+    [6,4,"🎆","4 juillet (US)","Week-end férié : plus de temps en ligne."],
+    [9,31,"🎃","Halloween","Costumes sexy — forte demande de contenu à thème."],
+    [10,-1,"🦃","Thanksgiving / Black Friday","Week-end à la maison + promos : très bon pour les ventes."],
+    [11,25,"🎄","Noël","Cadeaux, solitude des fêtes = dépenses en hausse. Pense aux offres."],
+    [11,31,"🎉","Nouvel An","Fin d'année, résolutions, temps libre."],
+  ];
+  const yNow=today.getFullYear();
+  [yNow,yNow+1].forEach(y=>{
+    fetes.forEach(([m,day,icon,label,why])=>{
+      let d;
+      if(m===4 && day===-2) d=nthWeekday(y,4,0,2);      // fête des mères = 2e dimanche de mai
+      else if(m===5 && day===-3) d=nthWeekday(y,5,0,3); // fête des pères = 3e dimanche de juin
+      else if(m===10 && day===-1) d=nthWeekday(y,10,4,4); // Thanksgiving = 4e jeudi de novembre
+      else d=new Date(y,m,day);
+      push(d,icon,label,why);
+    });
+  });
+  // Prochains 35 jours, triés, dédoublonnés par date+label
+  const horizon=today.getTime()+35*jour;
+  const seen={};
+  const proch=hot.filter(h=>h.t>=today.getTime() && h.t<=horizon)
+    .sort((a,b)=>a.t-b.t)
+    .filter(h=>{ const k=h.t+"|"+h.label; if(seen[k]) return false; seen[k]=1; return true; })
+    .slice(0,6);
+  // Météo du jour : sommes-nous DANS une fenêtre chaude (jour chaud ou +1/+2 après une paie) ?
+  const estChaudAuj = hot.some(h=>{ const dd=(today.getTime()-h.t)/jour; return dd>=0 && dd<=2; });
+  const dowFri = today.getDay()===5; // vendredi = jour de sortie/soirée
+  let bandeau;
+  if(estChaudAuj) bandeau=`<div class="mt-today">☀️ <b>Aujourd'hui, c'est un bon jour pour vendre.</b> On est sur (ou juste après) un jour de forte dépense US — pousse tes PPV et relance tes gros fans maintenant.</div>`;
+  else if(dowFri) bandeau=`<div class="mt-today">⛅ <b>Vendredi</b> — les fans sortent du travail et passent la soirée en ligne. Bon moment pour poster.</div>`;
+  else bandeau=`<div class="mt-today">🌥️ Journée calme côté paies US. Garde tes plus gros contenus pour les jours ci-dessous.</div>`;
+  const rows=proch.map(h=>{
+    const d=new Date(h.t), dd=Math.round((h.t-today.getTime())/jour);
+    const quand = dd===0?"aujourd'hui":dd===1?"demain":"dans "+dd+" j";
+    const dateTxt = d.getDate()+" "+moisNom(d.getMonth());
+    return `<div class="mt-row"><span class="mt-ico">${h.icon}</span><div><div class="mt-when">${escapeHtml(h.label)} <span class="mt-in">${dateTxt} · ${quand}</span></div>${h.why?`<div class="mt-why">${escapeHtml(h.why)}</div>`:""}</div></div>`;
+  }).join("") || `<div class="tk-empty">Rien de spécial dans les 35 prochains jours.</div>`;
+  $("#meteoBody").innerHTML = bandeau + rows;
+}
+
+/* ---------- 🏆 #10 classement percentile des VA (ce mois) ----------
+   Où se situe chaque VA vs l'équipe, sur monthSubs (OM_DATA). Exclut le perso. */
+function renderClassement(){
+  const box=$("#classement"); if(!box) return;
+  const d=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  const vas=(d&&Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0);
+  if(vas.length<2){ box.style.display="none"; return; }
+  box.style.display="block";
+  const sorted=vas.slice().sort((a,b)=>Number(b.monthSubs)-Number(a.monthSubs));
+  const n=sorted.length, max=Number(sorted[0].monthSubs)||1;
+  const medal=i=>i===0?"🥇":i===1?"🥈":i===2?"🥉":`<span class="cl-rank">#${i+1}</span>`;
+  const rows=sorted.map((v,i)=>{
+    const subs=Number(v.monthSubs)||0;
+    const below=sorted.filter(x=>Number(x.monthSubs)<subs).length;   // strictement en dessous
+    const pct=Math.round(below/n*100);                                // percentile (0-100)
+    const w=Math.max(4,Math.round(subs/max*100));
+    return `<div class="cl-row">`
+      +`<span class="cl-medal">${medal(i)}</span>`
+      +`<span class="cl-va">${escapeHtml(v.va)}</span>`
+      +`<span class="cl-bar"><span style="width:${w}%"></span></span>`
+      +`<span class="cl-subs">${fmtInt(subs)}</span>`
+      +`<span class="cl-pct" title="Fait mieux que ${pct}% de l'équipe ce mois">devant ${pct}%</span>`
+      +`</div>`;
+  }).join("");
+  const moy=Math.round(sorted.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)/n);
+  $("#classementBody").innerHTML = rows
+    + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois · « devant X% » = part de l'équipe que ce VA dépasse.</div>`;
+}
+
 let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
 let GOAL_CELEBRATED = false;
 // 🎉 Pop-up de félicitations quand un ou plusieurs badges sont débloqués.
@@ -3014,6 +3145,7 @@ function renderOM(){
   renderModeles();
   renderCaJours();
   renderRenta();
+  renderClassement();
   renderHistory();
   renderBadges();
   renderSim();
@@ -5222,6 +5354,28 @@ function checkRules(){
 }
 { const rb=$("#rulesBody"); if(rb) rb.addEventListener("click",e=>{ const d=e.target.closest("[data-ruledel]"); if(d){ RULES=RULES.filter(x=>x.id!==d.getAttribute("data-ruledel")); saveRules(); renderRules(); } }); }
 
+/* ---------- 📋 #11 résumé groupé (digest) : 1 rappel/jour au lieu de plein ---------- */
+async function loadDigest(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/digest",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    const chk=$("#digestChk"); if(chk) chk.checked=!!j.mode;
+    const st=$("#digestState");
+    if(st) st.textContent = j.mode ? ("· activé — envoi vers "+j.hour+"h"+(j.pending?(" · "+j.pending+" en attente"):"")) : "· désactivé (notifs en direct)";
+  }catch(e){}
+}
+{ const chk=$("#digestChk"); if(chk) chk.addEventListener("change",async()=>{
+    if(!TOKEN){ chk.checked=false; return; }
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/digest",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({mode:chk.checked})});
+      const j=await r.json();
+      if(j&&j.ok){ if(typeof toast==="function") toast("📋 Résumé groupé", chk.checked?"Activé — un seul rappel le matin.":"Désactivé — notifs en direct."); loadDigest(); }
+      else { chk.checked=!chk.checked; }
+    }catch(e){ chk.checked=!chk.checked; }
+  }); }
+
 // 🏖️ #9 BUS FACTOR : ce qui tourne sans toi vs ce qui dépend de toi, et quoi
 // déléguer si tu t'absentes. Croise l'état réel (paie, fuites) et les automatismes.
 function renderBusFactor(){
@@ -6166,7 +6320,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -6187,7 +6341,7 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"]];
+  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
   const h=hiddenSet();
@@ -6287,6 +6441,8 @@ loadTip();
 loadTasks();
 loadPayments();
 loadPaieCumul();
+try{ renderMeteo(); }catch(e){}
+try{ loadDigest(); }catch(e){}
 loadReminders();
 loadSms();
 loadVaGoals();
