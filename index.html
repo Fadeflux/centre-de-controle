@@ -1824,7 +1824,7 @@
   </div>
 
   <div class="panel-box" id="classement" style="display:none">
-    <div class="pb-head">🏆 Classement des VA (ce mois)</div>
+    <div class="pb-head">🏆 Classement des VA (ce mois) <button class="act" id="clSuggest">🪄 Objectifs auto</button></div>
     <div class="pb-sub">Où se situe chaque VA par rapport à l'équipe, sur les abonnés du mois.</div>
     <div id="classementBody"></div>
   </div>
@@ -3590,14 +3590,40 @@ function renderOM(){
 let VA_GOALS={};
 async function loadVaGoals(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-goals",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VA_GOALS=j.goals||{}; if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM(); } }catch(e){} }
 async function saveVaGoals(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-goals",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goals:VA_GOALS})}); }catch(e){} }
+// 🪄 #8 objectif SUGGÉRÉ pour un VA : son rythme des 4 dernières semaines
+// (VASANTE.weeks) projeté sur le mois, +10 % d'ambition, arrondi à 5.
+// null si pas assez d'historique (< 10 subs sur 4 semaines).
+function suggestVaGoal(va){
+  const s=((typeof VASANTE!=="undefined"&&VASANTE&&VASANTE.vas)||[]).find(x=>x.va===va);
+  if(!s||!Array.isArray(s.weeks)||s.weeks.length<8) return null;
+  const recent4=(Number(s.weeks[4])||0)+(Number(s.weeks[5])||0)+(Number(s.weeks[6])||0)+(Number(s.weeks[7])||0);
+  if(recent4<10) return null;
+  const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const parMois=recent4/28*dim;
+  return Math.max(5,Math.round(parMois*1.1/5)*5);
+}
 function setVaGoal(va){
   const cur=Number(VA_GOALS[va])||0;
-  const v=prompt(`Objectif de subs DU MOIS pour ${va} :`, cur||"");
+  const sug=suggestVaGoal(va);
+  const v=prompt(`Objectif de subs DU MOIS pour ${va} :${sug?`\n\n💡 Suggestion d'après son rythme récent : ${sug}`:""}`, cur||sug||"");
   if(v===null) return;
   const n=Math.round(Number(String(v).replace(",","."))||0);
   if(n>0) VA_GOALS[va]=n; else delete VA_GOALS[va];
   saveVaGoals(); if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM();
 }
+// 🪄 Appliquer les objectifs suggérés à TOUTE l'équipe (bouton du classement).
+function applySuggestedGoals(){
+  const om=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  const vas=(om&&om.vas?om.vas:[]).filter(v=>v&&!v.unpaid);
+  const props=vas.map(v=>({va:v.va, sug:suggestVaGoal(v.va), cur:Number(VA_GOALS[v.va])||0})).filter(p=>p.sug!=null);
+  if(!props.length){ if(typeof toast==="function") toast("🪄 Objectifs","Pas encore assez d'historique pour suggérer."); return; }
+  const lignes=props.map(p=>`• ${p.va} : ${p.sug}${p.cur?` (actuel ${p.cur})`:""}`).join("\n");
+  if(!confirm(`🪄 Objectifs suggérés d'après le rythme récent de chacun (+10 % d'ambition) :\n\n${lignes}\n\nAppliquer ces objectifs ?`)) return;
+  props.forEach(p=>{ VA_GOALS[p.va]=p.sug; });
+  saveVaGoals(); if(om) renderOM();
+  if(typeof toast==="function") toast("🪄 Objectifs posés",props.length+" VA — visibles sur le classement et leurs fiches.");
+}
+{ const b=$("#clSuggest"); if(b) b.onclick=applySuggestedGoals; }
 // ---------- Radar fans endormis ----------
 let FAN_RADAR=null;
 async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); renderVips(); renderChurn(); if(typeof renderActions==="function") renderActions(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
@@ -5866,8 +5892,18 @@ function renderDecisions(){
     const imp=decisionImpact(d.date);
     let impHtml;
     if(imp){ const up=imp.apres>=imp.avant; impHtml=`<div class="dj-impact ${up?'pos':'neg'}">CA/jour : ${money(imp.avant)} avant → ${money(imp.apres)} après ${up?'▲':'▼'}${imp.pct!=null?` ${up?'+':'−'}${Math.abs(imp.pct)} %`:''}</div>`; }
-    else impHtml=`<div class="dj-impact muted">Effet pas encore mesurable (décision trop récente, ou hors des 4 dernières semaines).</div>`;
-    return `<div class="dj-row"><div class="dj-date">${d.date?escapeHtml((typeof fmtJourFr==="function"?fmtJourFr(d.date):d.date)):"—"}</div><div class="dj-body"><div class="dj-txt">${escapeHtml(d.text)}</div>${impHtml}</div><button class="dj-del" data-djdel="${escapeHtml(d.id)}">✕</button></div>`;
+    else impHtml=d.outcome?"":`<div class="dj-impact muted">Effet pas encore mesurable (décision trop récente, ou hors des 4 dernières semaines).</div>`;
+    // 📌 #7 verdict PERMANENT figé par le serveur 14 j après (subs 14 j avant/après).
+    // Contrairement au CA/jour ci-dessus (fenêtre 28 j), celui-ci ne s'efface jamais.
+    let outHtml="";
+    if(d.outcome){
+      const o=d.outcome;
+      if(o.mesurable){
+        const v=o.verdict==="up"?["pos","✅ ça a marché"]:o.verdict==="down"?["neg","❌ ça n'a pas marché"]:["muted","➖ pas d'effet net"];
+        outHtml=`<div class="dj-impact ${v[0]}">📌 Verdict 14 j : ${v[1]} — subs ${fmtInt(o.avant)} avant → ${fmtInt(o.apres)} après (${o.pct>0?"+":""}${o.pct} %)</div>`;
+      } else outHtml=`<div class="dj-impact muted">📌 Verdict 14 j : pas assez d'historique avant cette décision pour comparer.</div>`;
+    }
+    return `<div class="dj-row"><div class="dj-date">${d.date?escapeHtml((typeof fmtJourFr==="function"?fmtJourFr(d.date):d.date)):"—"}</div><div class="dj-body"><div class="dj-txt">${escapeHtml(d.text)}</div>${impHtml}${outHtml}</div><button class="dj-del" data-djdel="${escapeHtml(d.id)}">✕</button></div>`;
   }).join(""):`<div class="cac-intro">Note tes décisions (« coupé le VA X », « changé l'accroche de Layla »). Le dashboard te montrera ensuite l'effet sur ton CA — pour apprendre de tes choix.</div>`;
   body.innerHTML=`<div class="dj-form"><input type="date" id="djDate" value="${today}"><input id="djText" placeholder="Ex : coupé le VA X, changé l'accroche…"><button class="mn-act-btn" id="djAdd">＋</button></div>${list}`;
   { const b=$("#djAdd"); if(b) b.onclick=addDecision; }
