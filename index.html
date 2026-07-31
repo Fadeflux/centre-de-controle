@@ -405,7 +405,7 @@
   body.assoc-mode #renta, body.assoc-mode #pie, body.assoc-mode #cac, body.assoc-mode #coutopp,
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
   body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
-  body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes,
+  body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes, body.assoc-mode #recos,
   body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #fanradar,
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
@@ -649,6 +649,24 @@
   .co-a{font-variant-numeric:tabular-nums;text-align:right}
   .co-med{color:var(--faint);font-size:11px;text-align:right}
   .co-up{color:#4ade80}.co-dn{color:#f87171}
+  /* recommandations */
+  .rc-row{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line,#2a2a33)}
+  .rc-row:first-child{border-top:0}
+  .rc-ico{font-size:18px;line-height:1.3;flex:0 0 auto}
+  .rc-act{font-size:13px;font-weight:600;line-height:1.4}
+  .rc-why{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:2px}
+  .rc-btn{margin-top:6px;font:inherit;font-size:11.5px;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:4px 10px;cursor:pointer}
+  /* mois record */
+  .mr-chart{width:100%;height:auto;display:block;margin:6px 0 4px}
+  .mr-leg{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .mr-leg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+  .mr-cur-dot{background:#8b5cf6}.mr-best-dot{background:#64748b}
+  .mr-verdict{font-size:12.5px;line-height:1.5;margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04))}
+  .mr-rec{color:#4ade80}
+  /* fiche VA : bloc santé */
+  .vc-sante{margin:10px 0;padding:10px 12px;border-radius:11px;background:var(--card2,rgba(255,255,255,.04))}
+  .vc-sante-h{font-size:12px;font-weight:600;margin-bottom:6px}
+  .vc-sante-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);padding:3px 0;flex-wrap:wrap}
   .co-why{margin-top:12px;padding:11px 12px;border-radius:11px;background:var(--card2,rgba(255,255,255,.04))}
   .co-why-h{font-size:12.5px;font-weight:600;margin-bottom:6px}
   .co-ai{font-size:12.5px;line-height:1.55;margin-bottom:8px}
@@ -1847,6 +1865,18 @@
     <div id="cohortesBody"></div>
   </div>
 
+  <div class="panel-box" id="recos" style="display:none">
+    <div class="pb-head">🧭 À faire maintenant (recommandations)</div>
+    <div class="pb-sub">Tes chiffres transformés en gestes concrets : qui coacher, qui pousser, où mettre le trafic.</div>
+    <div id="recosBody"></div>
+  </div>
+
+  <div class="panel-box" id="moisrecord" style="display:none">
+    <div class="pb-head">🥇 Ce mois vs ton meilleur mois</div>
+    <div class="pb-sub">Ta courbe d'abonnés du mois, superposée à ton record. Es-tu en avance ou en retard sur ta meilleure période ?</div>
+    <div id="moisrecordBody"></div>
+  </div>
+
   <div class="journal folded" id="journal" style="display:none">
     <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
     <div id="jrList"></div>
@@ -2247,7 +2277,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2941,6 +2971,7 @@ async function loadVaSante(){
   if(!TOKEN){ ["vatraj","varisque","changements"].forEach(id=>{const e=$("#"+id); if(e)e.style.display="none";}); return; }
   try{ const r=await fetch(HUB_BASE+"/api/hub/va-sante",{headers:{"x-hub-token":TOKEN}}); if(r.ok) VASANTE=await r.json(); }catch(e){}
   renderVaTraj(); renderVaRisque(); renderChangements();
+  try{ renderRecos(); }catch(e){}
 }
 function sparkWeeks(weeks){
   const max=Math.max(1,...weeks.map(w=>Number(w)||0));
@@ -3041,6 +3072,96 @@ function renderCohortes(){
       +`<div class="cc-hint">Qui t'amène des fans qui dépensent, pas juste beaucoup de fans. ⚠️ = faible dépense, à coacher.</div></div>`;
   }
   $("#cohortesBody").innerHTML=`<div class="co-list">${coh}</div>${why}${qual}`;
+  renderRecos();
+}
+
+/* ---------- 🧭 #4 recommandations concrètes (règles déterministes) ----------
+   Croise OM_DATA (volume/revenu/modèles) + COHORTES.quality (dépense des fans)
+   + VASANTE (risque/trajectoire) et en sort des GESTES : qui coacher, qui
+   pousser, où mettre le trafic. Pas d'IA : des règles claires, toujours vraies. */
+function renderRecos(){
+  const box=$("#recos"); if(!box) return;
+  const om=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  const vas=(om&&Array.isArray(om.vas)?om.vas:[]).filter(v=>v&&!v.unpaid);
+  if(!vas.length){ box.style.display="none"; return; }
+  const cur=(om&&om.currency)||"$";
+  const money=v=>HIDE?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2})+" "+cur;
+  const recos=[];
+  // Qualité des fans (cohortes) : moyenne équipe pondérée.
+  const qual=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).filter(q=>q.va&&q.va!=="(inconnu)");
+  const totF=qual.reduce((a,q)=>a+(Number(q.fans)||0),0);
+  const teamAvg=totF>0?qual.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0;
+  const totMs=vas.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)||1;
+  // Meilleur modèle (LTV) pour orienter le volume.
+  const models=(om&&om.models)||{};
+  const bestModel=Object.keys(models).map(m=>({m,ltv:Number(models[m].ltv)||0,subs:Number(models[m].subs)||0})).filter(x=>x.ltv>0).sort((a,b)=>b.ltv-a.ltv)[0]||null;
+  vas.forEach(v=>{
+    const q=qual.find(x=>x.va===v.va);
+    const share=(Number(v.monthSubs)||0)/totMs;
+    // 1) Gros volume mais fans à faible dépense -> coacher le ciblage.
+    if(q&&teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.4&&share>=0.15){
+      recos.push({p:1,ico:"🎯",act:`Coache ${v.va} sur le ciblage`,why:`Il amène beaucoup de monde (${Math.round(share*100)}% des subs du mois) mais ses fans dépensent ${money(q.avg)} vs ~${money(teamAvg)} en moyenne. Mieux cibler = beaucoup plus d'argent, sans plus de volume.`,va:v.va});
+    }
+    // 2) Fans de grande qualité mais peu de part -> lui donner plus de trafic.
+    if(q&&teamAvg>0&&(Number(q.avg)||0)>=teamAvg*1.5&&share<0.25&&(Number(q.fans)||0)>=10){
+      recos.push({p:1,ico:"🚀",act:`Donne plus de trafic à ${v.va}`,why:`Ses fans dépensent ${money(q.avg)} (${Math.round((q.avg/teamAvg)*100)/100>=2?"plus du double":"bien plus"} que la moyenne ~${money(teamAvg)}) mais il ne fait que ${Math.round(share*100)}% du volume. Chaque sub qu'il amène vaut plus.`,va:v.va});
+    }
+  });
+  // 3) Risque de départ / trajectoire en baisse (VASANTE).
+  ((typeof VASANTE!=="undefined"&&VASANTE&&VASANTE.vas)||[]).forEach(s=>{
+    if(s.risk&&s.risk.level==="high") recos.push({p:0,ico:"🚨",act:`Parle à ${s.va} aujourd'hui`,why:`${s.risk.reason} — c'est le signe classique avant un départ. Un message maintenant coûte moins cher qu'un remplacement.`,va:s.va});
+    else if(s.risk&&s.risk.level==="watch") recos.push({p:2,ico:"👀",act:`Garde un œil sur ${s.va}`,why:`${s.risk.reason}. Pas encore grave — un encouragement peut suffire.`,va:s.va});
+    else if(s.traj&&s.traj.dir==="down"&&(!s.risk||s.risk.level==="none")) recos.push({p:2,ico:"📉",act:`Relance ${s.va}`,why:`Sa production baisse${s.traj.pct!=null?` (${s.traj.pct}% vs le mois d'avant)`:""}. Demande-lui ce qui bloque.`,va:s.va});
+  });
+  // 4) Meilleur modèle sous-alimenté -> y mettre du volume.
+  if(bestModel&&!revKo()){
+    const totModelSubs=Object.keys(models).reduce((a,m)=>a+(Number(models[m].subs)||0),0)||1;
+    const shareM=bestModel.subs/totModelSubs;
+    if(shareM<0.35) recos.push({p:1,ico:"🎭",act:`Pousse plus de trafic vers ${bestModel.m}`,why:`C'est ton modèle le plus rentable (LTV ${money(bestModel.ltv)}/abonné) mais il ne reçoit que ${Math.round(shareM*100)}% des subs. Y orienter tes VA à volume = argent facile.`});
+  }
+  if(!recos.length){ box.style.display="block"; $("#recosBody").innerHTML=`<div class="tk-empty">✅ Rien d'urgent : équipe équilibrée, personne en risque. Continue comme ça.</div>`; return; }
+  box.style.display="block";
+  recos.sort((a,b)=>a.p-b.p);
+  // Dédoublonne par (action) et limite à 6 pour rester actionnable.
+  const seen={}; const list=recos.filter(r=>{ if(seen[r.act]) return false; seen[r.act]=1; return true; }).slice(0,6);
+  $("#recosBody").innerHTML=list.map(r=>`<div class="rc-row"><span class="rc-ico">${r.ico}</span><div><div class="rc-act">${escapeHtml(r.act)}</div><div class="rc-why">${escapeHtml(r.why)}</div>${r.va?`<button class="rc-btn" data-rcva="${escapeHtml(r.va)}">👤 Ouvrir sa fiche</button>`:""}</div></div>`).join("");
+}
+{ const rb=$("#recosBody"); if(rb) rb.addEventListener("click",e=>{ const b=e.target.closest("[data-rcva]"); if(b&&typeof openVaCard==="function") openVaCard(b.getAttribute("data-rcva")); }); }
+
+/* ---------- 🥇 #11 ce mois vs meilleur mois (fetch /api/hub/mois-record) ---------- */
+let MOISREC=null;
+async function loadMoisRecord(){
+  if(!TOKEN){ const e=$("#moisrecord"); if(e)e.style.display="none"; return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/mois-record",{headers:{"x-hub-token":TOKEN}}); if(r.ok) MOISREC=await r.json(); }catch(e){}
+  renderMoisRecord();
+}
+function mrMoisNom(ym){ const p=String(ym||"").split("-"); const m=(+p[1])-1; return (["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"][m]||"?")+" "+(p[0]||""); }
+function renderMoisRecord(){
+  const box=$("#moisrecord"); if(!box) return;
+  const d=MOISREC;
+  if(!d||!Array.isArray(d.cur)||!d.cur.length||!d.best||!Array.isArray(d.best.serie)||!d.best.serie.length){ if(box) box.style.display="none"; return; }
+  box.style.display="block";
+  // SVG : 2 polylignes (cumul par jour du mois). X = jour 1..31, Y = subs cumulés.
+  const W=560,H=150,P=6;
+  const maxY=Math.max(1,d.curTotal,d.best.total);
+  const maxX=Math.max(d.best.serie.length,d.cur.length,28);
+  const pt=(i,v)=>`${P+(i/(maxX-1))*(W-2*P)},${H-P-(v/maxY)*(H-2*P)}`;
+  const lineBest=d.best.serie.map((v,i)=>pt(i,v)).join(" ");
+  const lineCur=d.cur.map((v,i)=>pt(i,v)).join(" ");
+  const enAvance=d.avance!=null&&d.avance>=0;
+  const verdict=d.record
+    ? `<div class="mr-verdict mr-rec">🏆 <b>RECORD BATTU !</b> ${fmtInt(d.curTotal)} subs ce mois — ton meilleur mois (${mrMoisNom(d.best.mois)}, ${fmtInt(d.best.total)}) est dépassé. Nouveau sommet.</div>`
+    : d.avance!=null
+      ? `<div class="mr-verdict">${enAvance?"🔥":"⏳"} Au jour ${d.curDay}, tu as <b>${fmtInt(d.curTotal)} subs</b> vs <b>${fmtInt(d.best.aDate)}</b> au même stade de ton record (${mrMoisNom(d.best.mois)}) : <b>${enAvance?"+":""}${d.avance}%</b> ${enAvance?"— en avance sur ton record 💪":"— en retard sur ton record."} Il faut ${fmtInt(d.best.total)} pour le battre.</div>`
+      : "";
+  $("#moisrecordBody").innerHTML=`
+    <div class="mr-leg"><span><span class="dot mr-cur-dot"></span>${mrMoisNom(d.curMois)} (en cours)</span><span><span class="dot mr-best-dot"></span>record : ${mrMoisNom(d.best.mois)}</span></div>
+    <svg class="mr-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="${lineBest}" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4" opacity="0.8"/>
+      <polyline points="${lineCur}" fill="none" stroke="#8b5cf6" stroke-width="2.5"/>
+      <circle cx="${pt(d.cur.length-1,d.curTotal).split(",")[0]}" cy="${pt(d.cur.length-1,d.curTotal).split(",")[1]}" r="4" fill="#8b5cf6"/>
+    </svg>
+    ${verdict}`;
 }
 
 let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
@@ -3444,6 +3565,7 @@ function renderOM(){
   renderClassement();
   renderConcentration();
   renderObjMois();
+  renderRecos();
   renderHistory();
   renderBadges();
   renderSim();
@@ -6447,6 +6569,32 @@ function openVaCard(vaName){
       }
       return `<div class="va-verdict vv-bad">⚠️ Ses abonnés génèrent <b>${money(rev)}</b> pour ~<b>${money(paie)}</b> versés : il te <b>coûte plus qu'il ne rapporte</b>. À surveiller — regarde ses liens et sa conversion avant de trancher.</div>`;
     })()}
+    ${(function(){
+      // 🩺 #5 SANTÉ : trajectoire + risque de départ + qualité des fans + paie
+      // en attente — tout ce qu'on sait d'autre, croisé sur la même fiche.
+      const rows=[];
+      const s=((typeof VASANTE!=="undefined"&&VASANTE&&VASANTE.vas)||[]).find(x=>x.va===vaName);
+      if(s){
+        const lbl=s.traj.dir==="up"?"📈 progresse":s.traj.dir==="down"?"📉 décline":"➡️ stagne";
+        const pctT=s.traj.pct==null?"":(s.traj.pct>150?" (forte hausse)":s.traj.pct<-90?" (à l'arrêt)":` (${s.traj.pct>0?"+":""}${s.traj.pct}%)`);
+        rows.push(`<div class="vc-sante-row">${typeof sparkWeeks==="function"?sparkWeeks(s.weeks||[]):""}<span>${lbl}${pctT} sur 8 semaines</span></div>`);
+        if(s.risk&&s.risk.level!=="none") rows.push(`<div class="vc-sante-row">${s.risk.level==="high"?"🔴":"🟠"} <b>Signe de départ</b> : ${escapeHtml(s.risk.reason)} — parle-lui.</div>`);
+        else if(s.daysSince!=null) rows.push(`<div class="vc-sante-row">🟢 Actif — dernier sub il y a ${s.daysSince===0?"moins d'un jour":s.daysSince+" j"}.</div>`);
+      }
+      const q=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).find(x=>x.va===vaName);
+      if(q&&!ko){
+        const qs=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).filter(x=>x.va&&x.va!=="(inconnu)");
+        const tf=qs.reduce((a,x)=>a+(Number(x.fans)||0),0);
+        const ta=tf>0?qs.reduce((a,x)=>a+(Number(x.avg)||0)*(Number(x.fans)||0),0)/tf:0;
+        const comp=ta>0?(q.avg>=ta*1.5?" — bien au-dessus de la moyenne 💎":q.avg<ta*0.4?" — sous la moyenne, à coacher ⚠️":" — dans la moyenne"):"";
+        rows.push(`<div class="vc-sante-row">💎 Ses fans dépensent <b>${pcMoney(q.avg)}</b> dans leurs 30 premiers jours${comp}</div>`);
+      }
+      const pc=((typeof PCUMUL!=="undefined"&&PCUMUL&&PCUMUL.vas)||[]).find(x=>x.va===vaName);
+      if(pc&&!v.unpaid&&pc.base!=null&&(Number(pc.nouveaux)||0)>0){
+        rows.push(`<div class="vc-sante-row">💸 <b>${fmtInt(pc.nouveaux)} subs non payés</b> depuis ta dernière paie (~${pcMoney(pc.aPayer)}) — panneau « Paie au cumul ».</div>`);
+      }
+      return rows.length?`<div class="vc-sante"><div class="vc-sante-h">🩺 Santé & suivi</div>${rows.join("")}</div>`:"";
+    })()}
     <div id="vlZone"></div>
     <div id="vqZone"><div class="ppick-sub">📈 Historique des quinzaines… (chargement)</div></div>
     <div class="va-notes"><div class="va-notes-h">🗒️ Mes notes sur ${escapeHtml(vaName)}</div>
@@ -6618,7 +6766,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["objmois","🎯 Objectif"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -6640,7 +6788,8 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
-  ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"]];
+  ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
+  ["recos","🧭 À faire maintenant"],["moisrecord","🥇 Ce mois vs record"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
   const h=hiddenSet();
@@ -6745,6 +6894,7 @@ try{ loadDigest(); }catch(e){}
 try{ loadVaSante(); }catch(e){}
 try{ loadCohortes(); }catch(e){}
 try{ loadObjGoal(); }catch(e){}
+try{ loadMoisRecord(); }catch(e){}
 loadReminders();
 loadSms();
 loadVaGoals();
