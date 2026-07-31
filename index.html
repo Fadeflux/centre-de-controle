@@ -2940,7 +2940,10 @@ function renderObjMois(){
   const base=Math.max(netLast,F);
   const autoGoal=Math.max(Math.round(base*1.1/100)*100, Math.round(base/100)*100+100);
   const manuel=(typeof OBJ_GOAL==="number"&&OBJ_GOAL>0);
-  const goal=manuel?OBJ_GOAL:autoGoal;
+  // Objectif FIGÉ du mois (serveur) : l'auto recalculé en continu suit la
+  // projection (~110 % du réalisé) → 100 % impossible. Le figé, lui, est battable.
+  const figeM=(typeof OBJ_MONTH_GOAL==="number"&&OBJ_MONTH_GOAL>0)?OBJ_MONTH_GOAL:0;
+  const goal=manuel?OBJ_GOAL:(figeM||autoGoal);
   const pct=goal>0?Math.min(100,Math.round(netMonth/goal*100)):0;
   const projPct=goal>0?Math.min(100,Math.round(F/goal*100)):0;
   const reste=Math.max(0,goal-netMonth);
@@ -2975,9 +2978,10 @@ async function loadObjHistory(){
 }
 // Objectif fixé à la main (0 = auto). Chargé du serveur (cross-device) + cache local.
 let OBJ_GOAL=parseInt(localStorage.getItem("ccn_obj_goal")||"0",10)||0;
+let OBJ_MONTH_GOAL=0;
 async function loadObjGoal(){
   if(!TOKEN) return;
-  try{ const r=await fetch(HUB_BASE+"/api/hub/obj-goal",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); OBJ_GOAL=Number(j.goal)||0; localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL)); } }catch(e){}
+  try{ const r=await fetch(HUB_BASE+"/api/hub/obj-goal",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); OBJ_GOAL=Number(j.goal)||0; OBJ_MONTH_GOAL=Number(j.monthGoal)||0; localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL)); } }catch(e){}
   renderObjMois();
 }
 async function saveObjGoal(g){
