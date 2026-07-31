@@ -609,6 +609,7 @@
   .mt-when .mt-in{color:var(--muted);font-weight:500;font-size:11.5px;margin-left:6px}
   .mt-why{color:var(--muted);font-size:11.5px;line-height:1.45;margin-top:2px}
   .mt-today{border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;line-height:1.5;background:var(--card2,rgba(255,255,255,.04))}
+  .jf-box{margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#2a2a33)}
   .cl-row{display:grid;grid-template-columns:26px 1fr 90px auto auto;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line,#2a2a33)}
   .cl-row:first-child{border-top:0}
   .cl-medal{font-size:15px;text-align:center}
@@ -2321,7 +2322,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos, renderMeteo]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2889,7 +2890,37 @@ function renderMeteo(){
     const dateTxt = d.getDate()+" "+moisNom(d.getMonth());
     return `<div class="mt-row"><span class="mt-ico">${h.icon}</span><div><div class="mt-when">${escapeHtml(h.label)} <span class="mt-in">${dateTxt} · ${quand}</span></div>${h.why?`<div class="mt-why">${escapeHtml(h.why)}</div>`:""}</div></div>`;
   }).join("") || `<div class="tk-empty">Rien de spécial dans les 35 prochains jours.</div>`;
-  $("#meteoBody").innerHTML = bandeau + rows;
+  $("#meteoBody").innerHTML = bandeau + rows + jfHtml();
+}
+/* ---------- 📊 #11 tes VRAIS jours forts (transactions réelles, 90 j) ---------- */
+let JOURSFORTS=null;
+async function loadJoursForts(){
+  if(!TOKEN) return;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/jours-forts",{headers:{"x-hub-token":TOKEN}}); if(r.ok) JOURSFORTS=await r.json(); }catch(e){}
+  try{ renderMeteo(); }catch(e){}
+}
+function jfHtml(){
+  const d=JOURSFORTS;
+  if(!d) return "";
+  // Vue associé : le calendrier météo reste, mais la section ARGENT disparaît
+  // (même politique que les panneaux money masqués en assoc-mode).
+  if(document.body.classList.contains("assoc-mode")) return "";
+  const cur=d.currency||"$";
+  const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  if(d.computing) return `<div class="jf-box"><div class="co-why-h">📊 Tes vrais jours forts</div><div class="tk-empty">Analyse de tes ventes en cours… reviens dans quelques minutes.</div></div>`;
+  if(!d.fiable) return `<div class="jf-box"><div class="co-why-h">📊 Tes vrais jours forts</div><div class="tk-empty">Pas encore assez de ventes sur 90 jours pour une analyse fiable — ça viendra tout seul.</div></div>`;
+  const max=Math.max(1,...(d.weekdays||[]).map(w=>Number(w.avg)||0));
+  const bars=(d.weekdays||[]).map(w=>{
+    const best=d.best&&w.jour===d.best.jour;
+    return `<div class="cc-row"><span class="cc-va">${escapeHtml(w.jour)}${best?" 👑":""}</span><span class="cc-bar"><span style="width:${Math.max(4,Math.round((Number(w.avg)||0)/max*100))}%"></span></span><span class="cc-pct">${money(w.avg)}</span></div>`;
+  }).join("");
+  let paieLine="";
+  if(d.paies){
+    const up=d.paies.pct>=0;
+    paieLine=`<div class="cc-hint">💵 Fenêtres de paie US (le 1-3 et le 15-17) : <b>${money(d.paies.avgPaie)}/jour</b> contre ${money(d.paies.avgAutres)} les autres jours → ${up?`<b class="co-up">+${d.paies.pct} %</b> — la théorie se vérifie chez toi, prépare tes pushs ces jours-là.`:`<b class="co-dn">${d.paies.pct} %</b> — chez toi ça ne se vérifie pas : fie-toi plutôt à tes jours forts ci-dessus.`}</div>`;
+  }
+  return `<div class="jf-box"><div class="co-why-h">📊 Tes vrais jours forts <span class="cc-lvl">(tes ventes réelles, ${d.days} j)</span></div>${bars}`
+    +`<div class="cc-hint">Moyenne de ventes par jour de la semaine. 👑 = ton meilleur jour${d.best?` (${escapeHtml(d.best.jour)})`:""}${d.worst?` · le plus calme : ${escapeHtml(d.worst.jour)}`:""}.</div>${paieLine}</div>`;
 }
 
 /* ---------- 🏆 #10 classement percentile des VA (ce mois) ----------
@@ -7052,6 +7083,7 @@ try{ loadObjGoal(); }catch(e){}
 try{ loadObjHistory(); }catch(e){}
 try{ loadMoisRecord(); }catch(e){}
 try{ loadTuning(); }catch(e){}
+try{ loadJoursForts(); }catch(e){}
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
 // Les panneaux se remplissent en différé (fetch) : on RÉESSAIE jusqu'à ce que la
 // cible soit visible (10 s max) — un seul essai à 1,5 s la ratait presque toujours.
