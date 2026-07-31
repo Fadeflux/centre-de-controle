@@ -405,6 +405,7 @@
   body.assoc-mode #renta, body.assoc-mode #pie, body.assoc-mode #cac, body.assoc-mode #coutopp,
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
   body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
+  body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes,
   body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #fanradar,
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
@@ -595,6 +596,64 @@
   .digest-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--muted);padding:10px 12px;margin-bottom:12px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04));cursor:pointer}
   .digest-row input{margin-top:2px;flex:0 0 auto}
   .digest-state{color:var(--faint);font-size:11px}
+  /* concentration + qualité (barres génériques) */
+  .cc-block{margin-bottom:16px}
+  .cc-block:last-child{margin-bottom:0}
+  .cc-title{font-size:12.5px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .cc-lvl{font-size:11px;font-weight:500;color:var(--muted)}
+  .cc-kpi{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px}
+  .cc-row{display:grid;grid-template-columns:1fr 110px auto;align-items:center;gap:10px;padding:3px 0}
+  .cc-va{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-bar{height:8px;border-radius:4px;background:var(--card2,rgba(255,255,255,.07));overflow:hidden}
+  .cc-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#8b5cf6,#c084fc)}
+  .cc-pct{font-size:12px;font-variant-numeric:tabular-nums;text-align:right;min-width:38px}
+  .cc-hint{font-size:11px;color:var(--faint);line-height:1.45;margin-top:6px}
+  /* objectif du mois */
+  .ob-goal{font-size:14px;margin-bottom:8px}
+  .ob-sub{color:var(--muted);font-size:11.5px;font-weight:400}
+  .ob-bar{position:relative;height:12px;border-radius:6px;background:var(--card2,rgba(255,255,255,.07));overflow:visible;margin:8px 0}
+  .ob-bar>span:first-child{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#22c55e,#4ade80)}
+  .ob-proj{position:absolute;top:-3px;width:2px;height:18px;background:#facc15}
+  .ob-line{font-size:12.5px;color:var(--muted);line-height:1.6}
+  .ob-chemin{font-size:12px;margin-top:6px;padding:8px 10px;border-radius:9px;background:var(--card2,rgba(255,255,255,.04))}
+  .ob-verdict{font-size:12.5px;margin-top:8px;padding:8px 10px;border-radius:9px}
+  .ob-ok{color:#4ade80}
+  .ob-warn{color:#fbbf24}
+  .ob-verdict.ob-ok{background:rgba(34,197,94,.1)}
+  .ob-verdict.ob-warn{background:rgba(251,191,36,.1)}
+  /* trajectoire (sparkline) */
+  .tj-row{display:grid;grid-template-columns:1fr 92px 130px;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line,#2a2a33)}
+  .tj-row:first-child{border-top:0}
+  .tj-va{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .spark{display:inline-flex;align-items:flex-end;gap:2px;height:26px}
+  .spk{width:8px;background:linear-gradient(180deg,#8b5cf6,#6d28d9);border-radius:2px 2px 0 0;min-height:3px}
+  .tj-dir{font-size:11.5px;text-align:right}
+  .tj-up{color:#4ade80}.tj-down{color:#f87171}.tj-flat{color:var(--muted)}
+  /* risque de départ */
+  .rk-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line,#2a2a33)}
+  .rk-row:first-child{border-top:0}
+  .rk-dot{font-size:14px}
+  .rk-va{font-size:13px;font-weight:600}
+  .rk-why{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:2px}
+  /* journal changements */
+  .ch-row{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line,#2a2a33)}
+  .ch-row:first-child{border-top:0}
+  .ch-ico{font-size:16px}
+  .ch-h{font-size:12.5px}
+  .ch-x{color:var(--muted);font-size:11px}
+  .ch-d{font-size:11.5px;color:var(--muted);margin-top:1px}
+  /* cohortes */
+  .co-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:5px 0;border-top:1px solid var(--line,#2a2a33);font-size:12.5px}
+  .co-row:first-child{border-top:0}
+  .co-m{font-weight:600}.co-n{color:var(--muted);font-size:11.5px}
+  .co-a{font-variant-numeric:tabular-nums;text-align:right}
+  .co-med{color:var(--faint);font-size:11px;text-align:right}
+  .co-up{color:#4ade80}.co-dn{color:#f87171}
+  .co-why{margin-top:12px;padding:11px 12px;border-radius:11px;background:var(--card2,rgba(255,255,255,.04))}
+  .co-why-h{font-size:12.5px;font-weight:600;margin-bottom:6px}
+  .co-ai{font-size:12.5px;line-height:1.55;margin-bottom:8px}
+  .co-facts{font-size:11.5px;color:var(--muted);line-height:1.6}
+  .co-qual{margin-top:12px}
   .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
   .pb-head .act:hover{background:var(--acc-bg)}
   .pv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
@@ -1752,6 +1811,42 @@
     <div id="classementBody"></div>
   </div>
 
+  <div class="panel-box" id="objmois" style="display:none">
+    <div class="pb-head">🎯 Objectif du mois &amp; le chemin</div>
+    <div class="pb-sub">Un objectif de CA réaliste-ambitieux, où tu en es, et combien de subs il te faut — répartis par VA.</div>
+    <div id="objmoisBody"></div>
+  </div>
+
+  <div class="panel-box" id="concentration" style="display:none">
+    <div class="pb-head">⚠️ Risque de concentration</div>
+    <div class="pb-sub">Quelle part de ton activité tient à un seul VA / modèle. Là où tu es fragile si quelqu'un part.</div>
+    <div id="concentrationBody"></div>
+  </div>
+
+  <div class="panel-box" id="varisque" style="display:none">
+    <div class="pb-head">🚪 VA qui montrent des signes de départ</div>
+    <div class="pb-sub">Un VA qui produisait puis se tait = démotivation. Repère-le avant qu'il parte.</div>
+    <div id="varisqueBody"></div>
+  </div>
+
+  <div class="panel-box" id="vatraj" style="display:none">
+    <div class="pb-head">📈 Trajectoire de chaque VA</div>
+    <div class="pb-sub">Sa courbe d'abonnés sur 8 semaines : il progresse, stagne ou décline ?</div>
+    <div id="vatrajBody"></div>
+  </div>
+
+  <div class="panel-box" id="changements" style="display:none">
+    <div class="pb-head">📓 Journal auto des gros changements</div>
+    <div class="pb-sub">Les jours où l'équipe a nettement bougé — et qui l'a causé.</div>
+    <div id="changementsBody"></div>
+  </div>
+
+  <div class="panel-box" id="cohortes" style="display:none">
+    <div class="pb-head">📊 Cohortes &amp; pourquoi ils dépensent</div>
+    <div class="pb-sub">Les fans arrivés chaque mois dépensent-ils plus ou moins — et surtout <b>pourquoi</b>.</div>
+    <div id="cohortesBody"></div>
+  </div>
+
   <div class="journal folded" id="journal" style="display:none">
     <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
     <div id="jrList"></div>
@@ -2152,7 +2247,7 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche]
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 };
 
@@ -2750,6 +2845,163 @@ function renderClassement(){
     + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois · « devant X% » = part de l'équipe que ce VA dépasse.</div>`;
 }
 
+/* ---------- ⚠️ #3 risque de concentration (front, depuis OM_DATA) ---------- */
+function ccBlock(title, arr, hint){
+  if(!arr || arr.length<2) return "";
+  const tot=arr.reduce((a,x)=>a+x.val,0)||1;
+  const top1=arr[0], top1pct=Math.round(top1.val/tot*100);
+  const top3pct=Math.round(arr.slice(0,3).reduce((a,x)=>a+x.val,0)/tot*100);
+  const hhi=arr.reduce((a,x)=>a+Math.pow(x.val/tot,2),0);
+  const nEff=hhi>0?1/hhi:1;
+  const divScore=arr.length>1?Math.round(Math.max(0,Math.min(100,(nEff-1)/(arr.length-1)*100))):100;
+  const niv = top1pct>=50?["🔴","Très concentré"]:top1pct>=35?["🟠","Concentré"]:["🟢","Bien réparti"];
+  const bars=arr.slice(0,6).map(x=>{ const p=Math.round(x.val/tot*100); return `<div class="cc-row"><span class="cc-va">${escapeHtml(x.va)}</span><span class="cc-bar"><span style="width:${p}%"></span></span><span class="cc-pct">${p}%</span></div>`; }).join("");
+  return `<div class="cc-block"><div class="cc-title">${title} <span class="cc-lvl">${niv[0]} ${niv[1]}</span></div>`
+    +`<div class="cc-kpi">Si <b>${escapeHtml(top1.va)}</b> part, tu perds <b>${top1pct}%</b>. Top 3 = ${top3pct}%. Diversification <b>${divScore}/100</b>.</div>`
+    +bars+`<div class="cc-hint">${hint}</div></div>`;
+}
+function renderConcentration(){
+  const box=$("#concentration"); if(!box) return;
+  const d=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  const vas=(d&&Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid);
+  if(vas.length<2){ box.style.display="none"; return; }
+  box.style.display="block";
+  const bySubs=vas.map(v=>({va:v.va, val:Number(v.monthSubs)||0})).filter(v=>v.val>0).sort((a,b)=>b.val-a.val);
+  const rok=(typeof revKo!=="function")||!revKo();
+  const byRev=rok? vas.map(v=>({va:v.va, val:Number(v.rev)||0})).filter(v=>v.val>0).sort((a,b)=>b.val-a.val) : [];
+  const models=(d&&d.models)||{};
+  const byModel=rok? Object.keys(models).map(m=>({va:m, val:Number(models[m].net)||0})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val) : [];
+  const html = ccBlock("👥 Par VA (abonnés du mois)", bySubs, "Plus c'est réparti, moins un départ te fait mal.")
+    + (rok? ccBlock("💰 Par VA (revenu généré)", byRev, "Qui pèse vraiment dans ton chiffre, pas juste en volume.") : "")
+    + (rok? ccBlock("🎭 Par modèle (revenu du mois)", byModel, "Un modèle qui pèse trop = risque si son contenu s'essouffle.") : "");
+  if(!html.trim()){ box.style.display="none"; return; }
+  $("#concentrationBody").innerHTML=html;
+}
+
+/* ---------- 🎯 #15 objectif du mois + chemin (front, depuis OM_DATA) ---------- */
+function renderObjMois(){
+  const box=$("#objmois"); if(!box) return;
+  const d=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  if(!d || !d.totals || ((typeof revKo==="function")&&revKo())){ box.style.display="none"; return; }
+  box.style.display="block";
+  const cur=d.currency||"$";
+  const money=v=>HIDE?"••• "+cur:Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const t=d.totals;
+  const netMonth=Number(t.netMonth)||0, netLast=Number(t.netLastMonth)||0;
+  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const F=(d.forecast&&d.forecast.net&&Number(d.forecast.net.value))?Number(d.forecast.net.value):(day>0?Math.round(netMonth/day*dim):netMonth);
+  const base=Math.max(netLast,F);
+  const goal=Math.max(Math.round(base*1.1/100)*100, Math.round(base/100)*100+100);
+  const pct=goal>0?Math.min(100,Math.round(netMonth/goal*100)):0;
+  const projPct=goal>0?Math.min(100,Math.round(F/goal*100)):0;
+  const reste=Math.max(0,goal-netMonth);
+  const subsMonth=Number(t.subsMonth)||0;
+  const revPerSub=subsMonth>0?netMonth/subsMonth:(Number(t.ltv)||0);
+  const subsNeeded=revPerSub>0?Math.ceil(reste/revPerSub):null;
+  const vas=(Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0).sort((a,b)=>b.monthSubs-a.monthSubs);
+  const totMs=vas.reduce((a,v)=>a+Number(v.monthSubs),0)||1;
+  const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
+  const onTrack=F>=goal;
+  $("#objmoisBody").innerHTML=`
+    <div class="ob-goal">🎯 Objectif : <b>${money(goal)}</b> <span class="ob-sub">(mois dernier ${money(netLast)} · projection ${money(F)})</span></div>
+    <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
+    <div class="ob-line">${money(netMonth)} atteints · <b>${pct}%</b> · jour ${day}/${dim}</div>
+    ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
+    ${chemin?`<div class="ob-chemin">🧭 Le chemin, par VA : ${chemin}</div>`:""}
+    <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>`;
+}
+
+/* ---------- 🩺 #6/#9/#16 santé des VA (fetch /api/hub/va-sante) ---------- */
+let VASANTE=null;
+async function loadVaSante(){
+  if(!TOKEN){ ["vatraj","varisque","changements"].forEach(id=>{const e=$("#"+id); if(e)e.style.display="none";}); return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/va-sante",{headers:{"x-hub-token":TOKEN}}); if(r.ok) VASANTE=await r.json(); }catch(e){}
+  renderVaTraj(); renderVaRisque(); renderChangements();
+}
+function sparkWeeks(weeks){
+  const max=Math.max(1,...weeks.map(w=>Number(w)||0));
+  return `<span class="spark">${weeks.map(w=>`<span class="spk" style="height:${Math.max(3,Math.round((Number(w)||0)/max*26))}px" title="${Number(w)||0} subs"></span>`).join("")}</span>`;
+}
+function renderVaTraj(){
+  const box=$("#vatraj"); if(!box) return;
+  const vas=(VASANTE&&Array.isArray(VASANTE.vas))?VASANTE.vas:[];
+  if(!vas.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  const arrow=t=>t.dir==="up"?"📈":t.dir==="down"?"📉":"➡️";
+  const lbl=t=>t.dir==="up"?"progresse":t.dir==="down"?"décline":"stagne";
+  // Un VA qui démarre de presque rien donne des % énormes (+4000%) : au-delà de
+  // 150% on dit « forte hausse/baisse » plutôt qu'un nombre absurde.
+  const pctTxt=t=>{ if(t.pct==null) return ""; if(t.pct>150) return " (forte hausse)"; if(t.pct<-90) return " (à l'arrêt)"; return ` ${t.pct>0?"+":""}${t.pct}%`; };
+  const rows=vas.map(v=>`<div class="tj-row"><span class="tj-va">${escapeHtml(v.va)}</span>${sparkWeeks(v.weeks||[])}<span class="tj-dir tj-${v.traj.dir}">${arrow(v.traj)} ${lbl(v.traj)}${pctTxt(v.traj)}</span></div>`).join("");
+  $("#vatrajBody").innerHTML=rows+`<div class="cc-hint">8 dernières semaines d'abonnés par VA. Flèche = 4 dernières semaines vs les 4 d'avant.</div>`;
+}
+function renderVaRisque(){
+  const box=$("#varisque"); if(!box) return;
+  const vas=(VASANTE&&Array.isArray(VASANTE.vas))?VASANTE.vas:[];
+  if(!VASANTE){ box.style.display="none"; return; }
+  const risky=vas.filter(v=>v.risk&&v.risk.level!=="none").sort((a,b)=>(a.risk.level==="high"?0:1)-(b.risk.level==="high"?0:1));
+  box.style.display="block";
+  if(!risky.length){ $("#varisqueBody").innerHTML=`<div class="tk-empty">✅ Personne ne montre de signe de départ. Toute l'équipe produit.</div>`; return; }
+  $("#varisqueBody").innerHTML=risky.map(v=>{ const hi=v.risk.level==="high"; return `<div class="rk-row"><span class="rk-dot">${hi?"🔴":"🟠"}</span><div><div class="rk-va">${escapeHtml(v.va)}</div><div class="rk-why">${escapeHtml(v.risk.reason)} — <b>parle-lui</b> avant qu'il décroche.</div></div></div>`; }).join("");
+}
+function renderChangements(){
+  const box=$("#changements"); if(!box) return;
+  const ch=(VASANTE&&Array.isArray(VASANTE.changements))?VASANTE.changements:[];
+  if(!ch.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  const rows=ch.map(c=>{
+    const dt=new Date(c.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+    const drv=(c.drivers||[]).map(x=>`${escapeHtml(x.va)} +${x.subs}`).join(" · ");
+    return `<div class="ch-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${c.ratio} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
+  }).join("");
+  $("#changementsBody").innerHTML=rows+`<div class="cc-hint">Les jours où l'équipe a nettement dévié de sa moyenne, et qui l'a causé.</div>`;
+}
+
+/* ---------- 📊 #11 cohortes + pourquoi (fetch /api/hub/cohortes) ---------- */
+let COHORTES=null;
+async function loadCohortes(){
+  if(!TOKEN){ const e=$("#cohortes"); if(e)e.style.display="none"; return; }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/cohortes",{headers:{"x-hub-token":TOKEN}}); if(r.ok) COHORTES=await r.json(); }catch(e){}
+  renderCohortes();
+}
+function coMoisNom(ym){ const p=String(ym||"").split("-"); const m=(+p[1])-1; return (["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"][m]||"?")+" "+String(p[0]||"").slice(2); }
+function renderCohortes(){
+  const box=$("#cohortes"); if(!box) return;
+  const d=COHORTES;
+  if(!d || (d.computing)){ if(d&&d.computing){ box.style.display="block"; $("#cohortesBody").innerHTML=`<div class="tk-empty">📊 Première analyse en cours de calcul… reviens dans quelques minutes.</div>`; } else box.style.display="none"; return; }
+  if(!d.cohorts||!d.cohorts.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  const cur=d.currency||"$";
+  const money=v=>HIDE?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2})+" "+cur;
+  const coh=d.cohorts.map((c,i)=>{
+    const prev=d.cohorts[i-1];
+    const arr=prev?(c.avg>prev.avg?`<span class="co-up">▲</span>`:c.avg<prev.avg?`<span class="co-dn">▼</span>`:""):"";
+    return `<div class="co-row"><span class="co-m">${coMoisNom(c.mois)}</span><span class="co-n">${fmtInt(c.fans)} fans</span><span class="co-a">${money(c.avg)} ${arr}</span><span class="co-med">méd. ${money(c.median)}</span></div>`;
+  }).join("");
+  let why="";
+  const dr=d.drivers;
+  if(dr){
+    const mixDom=Math.abs(dr.mixEffect)>=Math.abs(dr.rateEffect);
+    const sens=dr.delta>=0?"plus":"moins";
+    const facteur=mixDom?"surtout <b>d'où viennent</b> les fans (le mix des VA)":"surtout <b>combien chaque VA convertit</b> (le taux)";
+    why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi ils dépensent ${sens} ce mois</div>`
+      +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
+      +`<div class="co-facts">`
+      +`<div>Dépense moy. 30 j : <b>${money(dr.avgRecent)}</b> (${coMoisNom(dr.moisRecent)}) vs ${money(dr.avgPrec)} (${coMoisNom(dr.moisPrec)}) → <b>${dr.delta>=0?"+":""}${money(dr.delta)}</b></div>`
+      +`<div>Cause : ${facteur}. Effet mix ${money(dr.mixEffect)} · effet taux ${money(dr.rateEffect)}.</div>`
+      +`<div>Baleine : le plus gros fan pèse ${dr.whaleRecent}% (vs ${dr.whalePrec}%) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
+      +`</div></div>`;
+  }
+  let qual="";
+  if(d.quality&&d.quality.length){
+    const max=Math.max(1,...d.quality.map(q=>Number(q.avg)||0));
+    qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j)</div>`
+      +d.quality.slice(0,8).map(q=>`<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`).join("")
+      +`<div class="cc-hint">Qui t'amène des fans qui dépensent, pas juste beaucoup de fans.</div></div>`;
+  }
+  $("#cohortesBody").innerHTML=`<div class="co-list">${coh}</div>${why}${qual}`;
+}
+
 let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
 let GOAL_CELEBRATED = false;
 // 🎉 Pop-up de félicitations quand un ou plusieurs badges sont débloqués.
@@ -3149,6 +3401,8 @@ function renderOM(){
   renderCaJours();
   renderRenta();
   renderClassement();
+  renderConcentration();
+  renderObjMois();
   renderHistory();
   renderBadges();
   renderSim();
@@ -6323,7 +6577,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["objmois","🎯 Objectif"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -6344,7 +6598,8 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"]];
+  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
+  ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
   const h=hiddenSet();
@@ -6446,6 +6701,8 @@ loadPayments();
 loadPaieCumul();
 try{ renderMeteo(); }catch(e){}
 try{ loadDigest(); }catch(e){}
+try{ loadVaSante(); }catch(e){}
+try{ loadCohortes(); }catch(e){}
 loadReminders();
 loadSms();
 loadVaGoals();
