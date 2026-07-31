@@ -3013,11 +3013,15 @@ function renderChangements(){
 }
 
 /* ---------- 📊 #11 cohortes + pourquoi (fetch /api/hub/cohortes) ---------- */
-let COHORTES=null;
+let COHORTES=null, COH_RETRY=0;
 async function loadCohortes(){
   if(!TOKEN){ const e=$("#cohortes"); if(e)e.style.display="none"; return; }
   try{ const r=await fetch(HUB_BASE+"/api/hub/cohortes",{headers:{"x-hub-token":TOKEN}}); if(r.ok) COHORTES=await r.json(); }catch(e){}
   renderCohortes();
+  // Le serveur calcule en fond (1re fois / après redéploiement) : sans re-tentative,
+  // la page restait sur « calcul en cours » et les recos tournaient sans la qualité
+  // des fans. On re-essaie toutes les 45 s (10 max).
+  if(COHORTES&&COHORTES.computing&&COH_RETRY<10){ COH_RETRY++; setTimeout(loadCohortes,45000); }
 }
 function coMoisNom(ym){ const p=String(ym||"").split("-"); const m=(+p[1])-1; return (["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"][m]||"?")+" "+String(p[0]||"").slice(2); }
 function renderCohortes(){
