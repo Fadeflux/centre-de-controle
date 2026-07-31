@@ -2991,6 +2991,14 @@ function renderCohortes(){
       +`<div>Cause : ${facteur}. Effet mix ${money(dr.mixEffect)} · effet taux ${money(dr.rateEffect)}.</div>`
       +`<div>Baleine : le plus gros fan pèse ${dr.whaleRecent}% (vs ${dr.whalePrec}%) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
       +`</div></div>`;
+  } else if(d.soloDrivers && d.soloDrivers.perSrc && d.soloDrivers.perSrc.length){
+    // Pas encore 2 mois à comparer : on explique qui tire la moyenne vers le haut/bas.
+    const sd=d.soloDrivers;
+    const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${p.share}%</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("");
+    why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi la dépense moyenne est de ${money(sd.avg)}</div>`
+      +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
+      +`<div class="co-facts">${rows}<div>Médiane ${money(sd.median)} · plus gros fan ${sd.whale}%${sd.whale>=50?" ⚠️ un gros fan tire la moyenne":""}</div></div>`
+      +`<div class="cc-hint">Pas encore 2 mois d'historique pour comparer — dès qu'un mois complet s'ajoute, tu verras l'évolution.</div></div>`;
   }
   let qual="";
   if(d.quality&&d.quality.length){
