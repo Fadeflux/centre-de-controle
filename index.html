@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0a0a0a" />
+<meta name="theme-color" content="#0c0d13" />
 <title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
@@ -17,9 +17,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --bg:#0a0a0a; --surface:#121217; --surface-2:#191921; --line:#22222b; --line-2:#30303c;
+    /* 🌙 Charte NOCTRA (logo agence) : nuit anthracite étoilée, accent lavande
+       pervenche du croissant de lune — plus de violet saturé. */
+    --bg:#0c0d13; --surface:#13141b; --surface-2:#1a1b25; --line:#23242f; --line-2:#313340;
     --text:#f6f5f8; --muted:#9d9ca8; --faint:#63626e;
-    --acc:#a855f7; --acc-hover:#9333ea; --acc-bg:#1b1230; --acc-line:#3a2a63; --acc-ink:#cbadff;
+    --acc:#9aa2d8; --acc-hover:#8891c9; --acc-bg:#181a29; --acc-line:#3a3f60; --acc-ink:#cdd3f2;
     --ok:#4ade80; --down:#f87171; --idle:#33343a; --gold:#e6c84a;
     --radius:14px;
     --card-grad:linear-gradient(180deg,#15151c 0%,#101015 100%);
@@ -34,13 +36,36 @@
     -webkit-font-smoothing:antialiased; line-height:1.5;
     padding:max(16px,env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
   }
-  /* Halo ambiant violet en haut de page (fixe, très subtil) */
+  /* 🌙 Nuit NOCTRA : halo lavande en haut (comme le halo derrière le croissant
+     du logo), très subtil. */
   body::before{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(720px 340px at 18% -60px, color-mix(in srgb,var(--acc) 9%,transparent), transparent 70%),
-      radial-gradient(560px 300px at 88% -80px, color-mix(in srgb,#6366f1 7%,transparent), transparent 70%),
+      radial-gradient(720px 340px at 18% -60px, color-mix(in srgb,var(--acc) 10%,transparent), transparent 70%),
+      radial-gradient(560px 300px at 88% -80px, color-mix(in srgb,#7a82c0 8%,transparent), transparent 70%),
+      radial-gradient(900px 500px at 50% -180px, rgba(150,158,210,.05), transparent 75%),
       var(--bg);
+  }
+  /* ✨ Étoiles + grain du logo : deux calques fixes, quasi imperceptibles mais
+     qui donnent la texture « ciel de nuit » de la marque. */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image:
+      radial-gradient(1.3px 1.3px at 11% 14%, rgba(255,255,255,.55), transparent 100%),
+      radial-gradient(1px 1px at 27% 6%, rgba(255,255,255,.4), transparent 100%),
+      radial-gradient(1.6px 1.6px at 41% 22%, rgba(216,221,245,.5), transparent 100%),
+      radial-gradient(1px 1px at 58% 9%, rgba(255,255,255,.35), transparent 100%),
+      radial-gradient(1.4px 1.4px at 72% 17%, rgba(255,255,255,.45), transparent 100%),
+      radial-gradient(1px 1px at 86% 7%, rgba(216,221,245,.4), transparent 100%),
+      radial-gradient(1.2px 1.2px at 94% 26%, rgba(255,255,255,.35), transparent 100%),
+      radial-gradient(1px 1px at 7% 38%, rgba(255,255,255,.25), transparent 100%),
+      radial-gradient(1.3px 1.3px at 33% 47%, rgba(216,221,245,.28), transparent 100%),
+      radial-gradient(1px 1px at 66% 41%, rgba(255,255,255,.22), transparent 100%),
+      radial-gradient(1.2px 1.2px at 89% 55%, rgba(255,255,255,.2), transparent 100%),
+      radial-gradient(1px 1px at 18% 68%, rgba(216,221,245,.18), transparent 100%),
+      radial-gradient(1.3px 1.3px at 49% 78%, rgba(255,255,255,.16), transparent 100%),
+      radial-gradient(1px 1px at 79% 84%, rgba(255,255,255,.15), transparent 100%),
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.045"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(%23n)"/></svg>');
   }
   .wrap{max-width:980px;margin:0 auto}
   #sidebar:empty{display:none}
@@ -397,7 +422,7 @@
   .co-sug{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px;background:var(--bg);color:var(--text);cursor:pointer;font:inherit;font-size:13px;line-height:1.5}
   .co-sug:hover{border-color:var(--acc)} .co-sug-ico{font-size:16px;flex-shrink:0} .co-sug-txt{flex:1;min-width:0}
   /* #10 vue associé : on masque tout ce qui touche à l'argent, la paie, la config, l'édition */
-  #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7c3aed,#a855f7);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  #assocBanner{position:fixed;top:0;left:0;right:0;z-index:60;background:linear-gradient(90deg,#7a82c0,#9aa2d8);color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   #assocBanner button{margin-left:12px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
   body.assoc-mode{padding-top:38px}
   body.assoc-mode #essentiel, body.assoc-mode #gsearch, body.assoc-mode #om, body.assoc-mode #modeles,
@@ -420,7 +445,7 @@
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
   .dc-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:7px;background:var(--bg)}
   .dc-spark{display:inline-flex;align-items:flex-end;gap:3px;height:24px}
-  .dc-spark span{width:7px;background:linear-gradient(180deg,var(--acc),#7c3aed);border-radius:2px;display:block}
+  .dc-spark span{width:7px;background:linear-gradient(180deg,var(--acc),#7a82c0);border-radius:2px;display:block}
   .dc-body{flex:1;min-width:0} .dc-name{font-size:14px;font-weight:600} .dc-meta{font-size:12px;color:var(--muted)}
   .dc-down{color:#f87171;font-weight:700} .dc-up{color:#4ade80;font-weight:700}
   .op-c{font-size:11px;color:#4ade80;font-weight:700}
@@ -428,7 +453,7 @@
   /* #8/#9 charge */
   .ch-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
   .ch-bar-wrap{width:70px;flex-shrink:0;height:10px;background:var(--bg);border-radius:6px;overflow:hidden}
-  .ch-bar{display:block;height:100%;background:linear-gradient(90deg,var(--acc),#7c3aed);border-radius:6px}
+  .ch-bar{display:block;height:100%;background:linear-gradient(90deg,var(--acc),#7a82c0);border-radius:6px}
   .ch-info{flex:1;min-width:0} .ch-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap} .ch-meta{font-size:12px;color:var(--muted)}
   .ch-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
   .ch-badge.fond{background:rgba(139,124,246,.16);color:#a78bfa} .ch-badge.marge{background:rgba(74,222,128,.15);color:#4ade80} .ch-badge.sat{background:rgba(248,113,113,.16);color:#f87171}
@@ -493,7 +518,7 @@
   .ml-va{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:5px 0}
   .ml-va-n{color:var(--muted)}
   .ml-spark{display:flex;align-items:flex-end;gap:5px;height:44px;justify-content:center}
-  .ml-spark span{width:22px;background:linear-gradient(180deg,var(--acc),#7c3aed);border-radius:3px;display:block}
+  .ml-spark span{width:22px;background:linear-gradient(180deg,var(--acc),#7a82c0);border-radius:3px;display:block}
   /* #6 record */
   .rn-record{margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13px}
   .rn-record.best{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
@@ -590,7 +615,7 @@
   .cl-rank{color:var(--muted);font-size:12px}
   .cl-va{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cl-bar{height:7px;border-radius:4px;background:var(--card2,rgba(255,255,255,.07));overflow:hidden}
-  .cl-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#8b5cf6,#c084fc)}
+  .cl-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#99a1d6,#c9cde8)}
   .cl-subs{font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;text-align:right}
   .cl-pct{font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}
   .digest-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--muted);padding:10px 12px;margin-bottom:12px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04));cursor:pointer}
@@ -612,7 +637,7 @@
   .cc-row{display:grid;grid-template-columns:1fr 110px auto;align-items:center;gap:10px;padding:3px 0}
   .cc-va{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cc-bar{height:8px;border-radius:4px;background:var(--card2,rgba(255,255,255,.07));overflow:hidden}
-  .cc-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#8b5cf6,#c084fc)}
+  .cc-bar>span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#99a1d6,#c9cde8)}
   .cc-pct{font-size:12px;font-variant-numeric:tabular-nums;text-align:right;min-width:38px}
   .cc-hint{font-size:11px;color:var(--faint);line-height:1.45;margin-top:6px}
   /* objectif du mois */
@@ -633,7 +658,7 @@
   .tj-row:first-child{border-top:0}
   .tj-va{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .spark{display:inline-flex;align-items:flex-end;gap:2px;height:26px}
-  .spk{width:8px;background:linear-gradient(180deg,#8b5cf6,#6d28d9);border-radius:2px 2px 0 0;min-height:3px}
+  .spk{width:8px;background:linear-gradient(180deg,#99a1d6,#5d64a0);border-radius:2px 2px 0 0;min-height:3px}
   .tj-dir{font-size:11.5px;text-align:right}
   .tj-up{color:#4ade80}.tj-down{color:#f87171}.tj-flat{color:var(--muted)}
   /* risque de départ */
@@ -667,7 +692,7 @@
   .mr-chart{width:100%;height:auto;display:block;margin:6px 0 4px}
   .mr-leg{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-bottom:6px}
   .mr-leg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-  .mr-cur-dot{background:#8b5cf6}.mr-best-dot{background:#64748b}
+  .mr-cur-dot{background:#99a1d6}.mr-best-dot{background:#64748b}
   .mr-verdict{font-size:12.5px;line-height:1.5;margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04))}
   .mr-rec{color:#4ade80}
   /* fiche VA : bloc santé */
@@ -736,7 +761,7 @@
   .bp-since{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
   .bp-since input{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:12.5px;font-family:inherit;color-scheme:dark}
   .bp-bar{height:8px;background:var(--surface-2);border-radius:20px;overflow:hidden}
-  .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7c3aed);transition:width .5s}
+  .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7a82c0);transition:width .5s}
   .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
   .bdg.on{opacity:1;filter:none;border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 30%,transparent)}
   .bdg-ico{font-size:30px;line-height:1}
@@ -973,7 +998,7 @@
   /* Objectif par VA : petite jauge sous le nom */
   .omv-goal{flex-basis:100%;margin:2px 0 2px 28px;display:flex;align-items:center;gap:8px}
   .omv-goal-bar{flex:1;max-width:180px;height:6px;background:var(--surface-2);border-radius:20px;overflow:hidden}
-  .omv-goal-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7c3aed)}
+  .omv-goal-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7a82c0)}
   .omv-goal-bar i.win{background:linear-gradient(90deg,var(--ok),#22c55e)}
   .omv-goal-txt{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
   .omv-goal-set{background:none;border:0;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px}
@@ -1317,14 +1342,14 @@
   a.open{font-weight:600}
   a.open:hover{box-shadow:0 6px 18px -8px color-mix(in srgb,var(--acc) 55%,transparent)}
   #askGo,.pv-pay-btn,.mn-go,.gate button,.tk-add .act{
-    background:linear-gradient(135deg,var(--acc),#7c3aed);
+    background:linear-gradient(135deg,var(--acc),#7a82c0);
     box-shadow:0 6px 20px -8px color-mix(in srgb,var(--acc) 60%,transparent);
   }
   #askGo:hover,.pv-pay-btn:hover,.mn-go:hover,.gate button:hover,.tk-add .act:hover{filter:brightness(1.1)}
   .mn-go:active,.gate button:active,#askGo:active{transform:scale(.985)}
 
   /* Sélecteur de vue (Tout/…) : pastille pleine au lieu du liseré */
-  .worlds button.won{color:#fff;background:linear-gradient(135deg,var(--acc),#7c3aed);box-shadow:none}
+  .worlds button.won{color:#fff;background:linear-gradient(135deg,var(--acc),#7a82c0);box-shadow:none}
 
   /* Onglets outils : état actif plus net */
   .tab.on{box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 35%,transparent)}
@@ -1354,7 +1379,7 @@
   ::selection{background:color-mix(in srgb,var(--acc) 40%,transparent);color:#fff}
 
   /* Micro flottant : halo respirant */
-  .voice-fab{background:linear-gradient(135deg,var(--acc),#7c3aed);box-shadow:0 10px 28px rgba(0,0,0,.45),0 0 24px -6px color-mix(in srgb,var(--acc) 55%,transparent)}
+  .voice-fab{background:linear-gradient(135deg,var(--acc),#7a82c0);box-shadow:0 10px 28px rgba(0,0,0,.45),0 0 24px -6px color-mix(in srgb,var(--acc) 55%,transparent)}
 
   /* Mobile : marges plus respirantes, tuiles compactes */
   @media (max-width:600px){
@@ -1368,15 +1393,18 @@
      POLISH V3 — raffinement (en-tête, titres, rythme, apparition).
      Additif, ne renomme aucun sélecteur JS.
      ============================================================ */
-  /* En-tête plus premium : logo dégradé + halo, titre plus affirmé */
-  .logo{background:linear-gradient(140deg,var(--acc),#7c3aed);box-shadow:0 6px 20px -6px color-mix(in srgb,var(--acc) 70%,transparent)}
-  h1{font-size:22px;font-weight:800;letter-spacing:-.4px;background:linear-gradient(120deg,var(--text),color-mix(in srgb,var(--acc-ink) 70%,var(--text)));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  /* 🌙 En-tête NOCTRA : croissant sur pastille nuit + halo lavande, titre en
+     capitales espacées comme le logo de l'agence. */
+  .logo{background:radial-gradient(circle at 50% 38%, #262a40 0%, #14151f 72%);border:1px solid var(--acc-line);border-radius:50%;box-shadow:0 0 22px -4px color-mix(in srgb,var(--acc) 45%,transparent), 0 0 60px -18px color-mix(in srgb,var(--acc) 60%,transparent)}
+  .logo svg{width:26px;height:26px}
+  h1{font-size:17px;font-weight:500;letter-spacing:.34em;text-transform:uppercase;padding-left:.1em;background:linear-gradient(120deg,#fff,color-mix(in srgb,var(--acc-ink) 55%,#fff));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .brand-tag{font-size:9.5px;letter-spacing:.42em;text-transform:uppercase;color:var(--acc-ink);opacity:.75;margin-top:3px;padding-top:4px;border-top:1px solid color-mix(in srgb,var(--acc-line) 60%,transparent);display:inline-block}
   .sub{font-size:12px}
 
   /* Titres de panneaux : puce accent + petit filet sous le titre = structure claire */
   .pb-head,.costs-head,.tg-head,.al-head,.todo-head,.jr-head{position:relative}
   .pb-head::before,.costs-head::before,.tg-head::before,.al-head::before,.todo-head::before{
-    content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--acc),#7c3aed);flex:0 0 auto;margin-right:2px
+    content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--acc),#7a82c0);flex:0 0 auto;margin-right:2px
   }
   .tasks-hero .pb-head::before{height:17px}
 
@@ -1413,7 +1441,7 @@
 
 <div class="gate" id="gate">
   <div class="box">
-    <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
+    <div class="logo"><svg viewBox="0 0 100 100" fill="none"><path d="M 64 13 A 39 39 0 1 0 64 87 A 31 31 0 1 1 64 13 Z" stroke="#cdd2ee" stroke-width="4.5" stroke-linejoin="round" fill="rgba(190,197,232,.12)"/></svg></div>
     <h2>Centre de contrôle</h2>
     <p>Connecte-toi pour voir tes chiffres.</p>
     <input id="pwUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Identifiant (andre / manon)" />
@@ -1435,9 +1463,10 @@
   <div id="home">
   <header class="top">
     <div class="brand">
-      <div class="logo"><svg viewBox="0 0 100 100" fill="none"><rect x="20" y="20" width="26" height="26" rx="6" fill="#fff"/><rect x="54" y="20" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="20" y="54" width="26" height="26" rx="6" fill="#fff" opacity=".5"/><rect x="54" y="54" width="26" height="26" rx="6" fill="#fff"/></svg></div>
+      <div class="logo"><svg viewBox="0 0 100 100" fill="none"><path d="M 64 13 A 39 39 0 1 0 64 87 A 31 31 0 1 1 64 13 Z" stroke="#cdd2ee" stroke-width="4.5" stroke-linejoin="round" fill="rgba(190,197,232,.12)"/></svg></div>
       <div>
         <h1>Noctra</h1>
+        <div class="brand-tag">Centre de contrôle</div>
         <div class="sub" id="sub">Chargement…</div>
       </div>
     </div>
@@ -2013,7 +2042,7 @@ let LAST  = DEMO;
 let WORLD = "all";
 let HIDE  = localStorage.getItem("ccn_hide") === "1";
 let IS_LIVE = false;
-const ACCENTS = { all:["#a855f7","#9333ea"], shinra:["#4ade80","#3dc970"], noctra:["#a855f7","#9333ea"] };
+const ACCENTS = { all:["#9aa2d8","#8891c9"], shinra:["#4ade80","#3dc970"], noctra:["#9aa2d8","#8891c9"] };
 function applyAccent(){
   const a = ACCENTS[WORLD] || ACCENTS.all;
   document.documentElement.style.setProperty("--acc", a[0]);
@@ -3201,8 +3230,8 @@ function renderMoisRecord(){
     <div class="mr-leg"><span><span class="dot mr-cur-dot"></span>${mrMoisNom(d.curMois)} (en cours)</span><span><span class="dot mr-best-dot"></span>record : ${mrMoisNom(d.best.mois)}</span></div>
     <svg class="mr-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
       <polyline points="${lineBest}" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4" opacity="0.8"/>
-      <polyline points="${lineCur}" fill="none" stroke="#8b5cf6" stroke-width="2.5"/>
-      <circle cx="${pt(d.cur.length-1,d.curTotal).split(",")[0]}" cy="${pt(d.cur.length-1,d.curTotal).split(",")[1]}" r="4" fill="#8b5cf6"/>
+      <polyline points="${lineCur}" fill="none" stroke="#99a1d6" stroke-width="2.5"/>
+      <circle cx="${pt(d.cur.length-1,d.curTotal).split(",")[0]}" cy="${pt(d.cur.length-1,d.curTotal).split(",")[1]}" r="4" fill="#99a1d6"/>
     </svg>
     ${verdict}`;
 }
@@ -4076,7 +4105,7 @@ $("#push").onclick=enablePush;
 function roundRect(ctx,X,Y,W,H,R){ ctx.beginPath(); ctx.moveTo(X+R,Y); ctx.arcTo(X+W,Y,X+W,Y+H,R); ctx.arcTo(X+W,Y+H,X,Y+H,R); ctx.arcTo(X,Y+H,X,Y,R); ctx.arcTo(X,Y,X+W,Y,R); ctx.closePath(); }
 function makeDayCard(){
   const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
-  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#9aa2d8").trim();
   const brand=(document.querySelector("h1")||{}).textContent||"Noctra";
   x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.35; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
@@ -4114,7 +4143,7 @@ async function shareDayCard(){
 // 📄 #11 RAPPORT DU MOIS : image récap à partager / archiver.
 function makeMonthReport(){
   const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
-  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#9aa2d8").trim();
   const brand=(document.querySelector("h1")||{}).textContent||"Noctra";
   x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.32; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
@@ -4147,7 +4176,7 @@ async function shareMonthReport(){
 { const b=$("#monthReport"); if(b) b.onclick=shareMonthReport; }
 function makeRankCard(){
   const c=document.createElement("canvas"); c.width=1080; c.height=1350; const x=c.getContext("2d");
-  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#a855f7").trim();
+  const acc=(getComputedStyle(document.documentElement).getPropertyValue("--acc")||"#9aa2d8").trim();
   x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.3; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
   x.fillStyle="#fff"; x.font="bold 62px Inter,Arial,sans-serif"; x.fillText("🏆 Classement VA",70,140);
@@ -4868,7 +4897,7 @@ function renderRailway(){
   const rows=actifs.slice(0,8).map(p=>{
     const part=(p.part!=null)?p.part:(d.total>0?Math.round(p.cout/d.total*100):0);
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(p.projet)}</span>
-      <span class="sv-cell" style="flex:1;min-width:90px"><span style="display:block;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--acc),#7c3aed);width:${Math.max(4,Math.round(p.cout/mx*100))}%"></span></span>
+      <span class="sv-cell" style="flex:1;min-width:90px"><span style="display:block;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--acc),#7a82c0);width:${Math.max(4,Math.round(p.cout/mx*100))}%"></span></span>
       <span class="sv-part mid">${part} %</span>
       <span class="sv-sugg sv-cell">${reel?money(p.cout):""}</span></div>`;
   }).join("");
@@ -6286,7 +6315,7 @@ function renderPie(){
   const total=entries.reduce((a,e)=>a+e[1],0);
   if(!entries.length||total<=0){ panel.style.display="none"; return; }
   panel.style.display="block";
-  const colors=["#a855f7","#22d3ee","#f59e0b","#4ade80","#f472b6","#818cf8"];
+  const colors=["#9aa2d8","#22d3ee","#f59e0b","#4ade80","#f472b6","#818cf8"];
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(v).toLocaleString("fr-FR")+" "+cur;
   const R=52, C=2*Math.PI*R; let off=0;
   const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");

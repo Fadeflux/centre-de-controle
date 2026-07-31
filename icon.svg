@@ -1,7 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#a855f7"/>
-  <rect x="122" y="122" width="120" height="120" rx="28" fill="#ffffff"/>
-  <rect x="270" y="122" width="120" height="120" rx="28" fill="#ffffff" opacity="0.5"/>
-  <rect x="122" y="270" width="120" height="120" rx="28" fill="#ffffff" opacity="0.5"/>
-  <rect x="270" y="270" width="120" height="120" rx="28" fill="#ffffff"/>
+  <!-- 🌙 Icône NOCTRA : croissant lavande sur nuit étoilée (charte du logo agence) -->
+  <defs>
+    <radialGradient id="nuit" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#22263a"/>
+      <stop offset="100%" stop-color="#0c0d13"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#nuit)"/>
+  <circle cx="112" cy="98" r="4" fill="#ffffff" opacity="0.55"/>
+  <circle cx="404" cy="132" r="3" fill="#d8ddf5" opacity="0.5"/>
+  <circle cx="356" cy="72" r="2.5" fill="#ffffff" opacity="0.4"/>
+  <circle cx="86" cy="300" r="3" fill="#d8ddf5" opacity="0.35"/>
+  <circle cx="430" cy="368" r="3.5" fill="#ffffff" opacity="0.3"/>
+  <circle cx="170" cy="430" r="2.5" fill="#ffffff" opacity="0.3"/>
+  <path d="M 300 96 A 162 162 0 1 0 300 416 A 130 130 0 1 1 300 96 Z"
+        stroke="#cdd2ee" stroke-width="18" stroke-linejoin="round" fill="rgba(190,197,232,0.14)"/>
 </svg>
