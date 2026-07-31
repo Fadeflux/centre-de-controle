@@ -437,13 +437,32 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
-  body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching, body.assoc-mode #ask{display:none !important}
+  body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
+  body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
      (jours forts) disparaît IMMÉDIATEMENT — le re-rendu seul laissait les
      montants affichés pile au moment où on tend l'écran à l'associée. */
   body.assoc-mode .jf-box{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
-  body.assoc-mode #refresh, body.assoc-mode #diag, body.assoc-mode #monthReport{display:none !important}
+  body.assoc-mode #refresh, body.assoc-mode #diag, body.assoc-mode #monthReport,
+  /* 🔒 En vue associé, ces boutons DOIVENT disparaître aussi :
+     • #hide : un seul tap dessus désactivait le masquage et rendait tous les
+       montants visibles (la vue associé était contournable en un geste) ;
+     • #morn/#eve/#card : écrans et image qui affichent le CA en clair ;
+     • #assocView : le vrai bouton de sortie est « Quitter » dans le bandeau. */
+  body.assoc-mode #hide, body.assoc-mode #morn, body.assoc-mode #eve,
+  body.assoc-mode #card, body.assoc-mode #rank, body.assoc-mode #autobackups,
+  body.assoc-mode #assocView{display:none !important}
+  /* ⚠️ Le menu ⚙️ déplace les boutons dans des rangées : masquer le bouton ne
+     suffisait pas, le libellé restait visible ET cliquable (l'associée pouvait
+     restaurer une sauvegarde ou télécharger la config). On masque la RANGÉE. */
+  body.assoc-mode .settings-row[data-for="hide"], body.assoc-mode .settings-row[data-for="morn"],
+  body.assoc-mode .settings-row[data-for="eve"], body.assoc-mode .settings-row[data-for="card"],
+  body.assoc-mode .settings-row[data-for="rank"], body.assoc-mode .settings-row[data-for="monthReport"],
+  body.assoc-mode .settings-row[data-for="panels"], body.assoc-mode .settings-row[data-for="reorder"],
+  body.assoc-mode .settings-row[data-for="diag"], body.assoc-mode .settings-row[data-for="backup"],
+  body.assoc-mode .settings-row[data-for="autobackups"], body.assoc-mode .settings-row[data-for="restore"],
+  body.assoc-mode .settings-row[data-for="assocView"]{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
   .dc-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5}
@@ -2303,7 +2322,27 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
-  closeGate(); load(); loadCosts(); loadHours(); loadConversion(); loadSources(); loadRailway(); loadProxy(); loadTresorerie(); loadCash(); loadCac(); loadDecroche(); loadCharge(); loadQuinz(); loadTodosFromBrain(); loadJournal(); loadOM(); loadTip(); loadTasks(); loadPayments(); loadReminders(); loadSms(); loadVaGoals(); loadFanRadar(); loadGhosts(); loadLeakwatch(); loadLeaks(); loadIdentity(); loadTgrev(); loadFirstSale(); loadIncidents(true); loadRules(); loadDecisions(); loadVaNotes(); loadInsights();
+  closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadAll();
+}
+/* 🔁 UN SEUL point d'entrée pour TOUT charger — utilisé au DÉMARRAGE comme à la
+   RECONNEXION. Avant, deux listes divergentes :
+   • au démarrage normal, loadRules/loadDecisions/loadVaNotes n'étaient JAMAIS
+     appelés. Or leur sauvegarde renvoie la LISTE ENTIÈRE au serveur : créer une
+     règle ou une décision écrasait alors TOUT l'historique serveur par une liste
+     quasi vide (perte de données silencieuse). Les alertes perso n'étaient pas
+     évaluées non plus.
+   • après une reconnexion, c'était l'inverse : « Paie au cumul », trajectoires,
+     cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
+function loadAll(){
+  [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
+    loadTgrev, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
+    loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
+    loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
+    loadMoisRecord, loadTuning, loadJoursForts, renderMeteo,
+    function(){ loadIncidents(true); }
+  ].forEach(function(f){ try{ f(); }catch(e){} });
 }
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
@@ -2326,9 +2365,17 @@ $("#hide").onclick = ()=>{
   render(LAST); renderCosts();
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
-  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos, renderMeteo]
-    .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
+  rerenderMoney();
 };
+// ⚠️ TOUT panneau qui affiche un montant DOIT figurer ici, sinon il garde ses
+// chiffres en clair jusqu'au prochain rafraîchissement (jusqu'à 1 min) — voire
+// pour toujours s'il n'est pas dans la boucle 60 s (cas de la paie au cumul).
+// Appelée par 🙈 ET par la vue associé (le moment où l'on tend l'écran).
+function rerenderMoney(){
+  [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos, renderMeteo,
+   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, function(){ renderPaie(LAST); }]
+    .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
+}
 
 /* ---------- ma journée (à faire) ---------- */
 let TODOS = JSON.parse(localStorage.getItem("ccn_todos") || "[]");
@@ -3501,7 +3548,10 @@ async function loadTasks(){
 async function syncTasks(){
   if(!TOKEN) return;
   try{
-    const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.status===401){ showReauth(); return; } if(!r.ok) return;
+    // ⚠️ Ce sync tourne toutes les 8 s : sans le garde « gate déjà ouverte », un
+    // token expiré rouvrait l'écran de connexion en boucle et VOLAIT LE FOCUS
+    // pendant qu'on tapait son mot de passe (message d'erreur effacé au passage).
+    const r=await fetch(HUB_BASE+"/api/hub/tasks",{headers:{"x-hub-token":TOKEN}}); if(r.status===401){ const g=$("#gate"); if(!g||!g.classList.contains("show")) showReauth(); return; } if(!r.ok) return;
     const j=await r.json(); if(!j.tasks) return;
     const m=tkMerge(TASKS,j.tasks);
     if(tkBoardSig(m.board)!==tkBoardSig(TASKS)){ TASKS=m.board; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); renderTasks(); }
@@ -4012,7 +4062,12 @@ async function loadOM(){
     const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
     const j=await r.json();
-    if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`; setTimeout(loadOM,25000); return; }
+    // ⚠️ UN SEUL retry en vol : la boucle 60 s rappelle loadOM, et chaque appel
+    // sans données planifiait son propre retry -> les chaînes s'empilaient
+    // (N+1 boucles après N minutes) et matraquaient le serveur.
+    if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
+      if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
+      return; }
     OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); if(typeof renderSaison==="function") renderSaison(); if(typeof renderBurnout==="function") renderBurnout(); if(typeof renderSim3==="function") renderSim3(); if(typeof renderStreak==="function") renderStreak(); if(typeof renderCoaching==="function") renderCoaching(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
@@ -4273,7 +4328,9 @@ function paceVerdict(){
   // Projection en NET (× 0,78), étiquetée — cohérent avec le panneau Rentabilité
   // et la grande carte (qui affichent le net). Avant : brut non étiqueté ici, net
   // ailleurs → confusion net/brut sur la carte la plus consultée.
-  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>Math.round(v*NET_RATE).toLocaleString("fr-FR")+" "+cur+" net";
+  // 🙈 : l'écran du matin/soir s'ouvre TOUT SEUL 1×/jour — sans ce masque, il
+  // affichait les montants en clair même en mode discret (et en vue associé).
+  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>HIDE?("••• "+cur+" net"):(Math.round(v*NET_RATE).toLocaleString("fr-FR")+" "+cur+" net");
   if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmt(proj)} ce mois.`};
   const pct=Math.round((proj-lm)/lm*100);
   if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
@@ -4336,7 +4393,11 @@ function renderMorning(){
 // Revenus indisponibles (API OnlyMonster KO) : on affiche « — », JAMAIS 0 $.
 // Un zéro affiché comme un vrai chiffre a fait dire au coach « on est à zéro
 // dollar aujourd'hui » alors que le mois était à 3 582 $.
-function revKo(){ try{ return !!(typeof OM_DATA!=="undefined" && OM_DATA && OM_DATA.revenusIndisponibles); }catch(e){ return false; } }
+// ⚠️ « Pas de données » compte AUSSI comme revenus indisponibles : quand OM_DATA
+// est absent (source en panne, pas encore chargé), revKo() renvoyait false et
+// l'écran du matin / la carte partageable affichaient un « 0 $ » présenté comme
+// un vrai chiffre — exactement la règle « absent ≠ zéro » qu'on s'impose.
+function revKo(){ try{ return (typeof OM_DATA==="undefined" || !OM_DATA || !!OM_DATA.revenusIndisponibles); }catch(e){ return true; } }
 function moneyOuTiret(v, f){ return revKo() ? "—" : f(v); }
 let COACH_TEXT="", COACH_ACTION="";
 // ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
@@ -5651,7 +5712,8 @@ function renderCharge(){
 function jumpPanel(id){ const el=document.getElementById(id); if(el){ try{ _userScrolled=true; }catch(e){} el.scrollIntoView({behavior:"smooth",block:"start"}); } }
 function buildActions(){
   const A=[], push=(sev,icon,text,panel,quick)=>A.push({sev,icon,text,panel,quick:quick||null});
-  const eur=v=>Math.round(Math.abs(Number(v)||0)).toLocaleString("fr-FR")+" $";
+  // 🙈 doit masquer AUSSI les montants de la file d'actions (« il te manquera X $ »).
+  const eur=v=>HIDE?"••• $":Math.round(Math.abs(Number(v)||0)).toLocaleString("fr-FR")+" $";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   if(cd && !cd.error){
     if(cd.apresPaie!=null && Number(cd.apresPaie)<0) push(3,"🔴",`Cash serré : il te manquera ${eur(cd.apresPaie)} pour tout payer`,"cash");
@@ -5669,7 +5731,7 @@ function buildActions(){
   if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites",{kind:"vacard",va:OPP_FLAGS[0].va,label:"👤 Fiche"}); }
   const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
-  if(fr && Array.isArray(fr.churned) && fr.churned.length) push(2,"💔",`${fr.churned.length} gros fan${fr.churned.length>1?"s":""} vient${fr.churned.length>1?"nent":""} de partir — à récupérer`,"churn");
+  if(fr && Array.isArray(fr.churned) && fr.churned.length) push(2,"💔",`${fr.churned.length} gros fan${fr.churned.length>1?"s":""} vien${fr.churned.length>1?"nent":"t"} de partir — à récupérer`,"churn");
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
   if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
@@ -6572,10 +6634,14 @@ function toggleConvo(){
     ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
-      const row=document.createElement("div"); row.className="settings-row";
+      const row=document.createElement("div"); row.className="settings-row"; row.setAttribute("data-for", id);
       const lbl=document.createElement("span"); lbl.className="settings-lbl"; lbl.textContent=(b.getAttribute("title")||b.textContent||"").trim();
       row.appendChild(b); row.appendChild(lbl);
-      row.onclick=()=>{ b.click(); menu.classList.remove("show"); };
+      // ⚠️ Le bouton est DANS la rangée : un tap sur le bouton lui-même exécutait
+      // son action, remontait jusqu'ici, et `b.click()` la relançait une 2e fois
+      // (👁️ masquer/afficher = aucun effet visible, 📸/💾 = double génération,
+      // 🧩 = deux fenêtres empilées). On ne relaie que les clics HORS bouton.
+      row.onclick=(e)=>{ if(!b.contains(e.target)) b.click(); menu.classList.remove("show"); };
       menu.appendChild(row);
     });
     const positionMenu=()=>{ const br=btn.getBoundingClientRect(), mw=menu.offsetWidth||236; menu.style.top=Math.round(br.bottom+8)+"px"; let left=br.right-mw; left=Math.max(12, Math.min(left, window.innerWidth-mw-12)); menu.style.left=Math.round(left)+"px"; };
@@ -6625,8 +6691,12 @@ function applyAssoc(){
   // 🔒 Défense en profondeur : en vue associé on FORCE le masquage des montants
   // (au cas où un panneau argent ne serait pas dans la liste ci-dessus).
   try{
-    if(on){ if(localStorage.getItem("ccn_assoc_prevhide")===null) localStorage.setItem("ccn_assoc_prevhide", HIDE?"1":"0"); if(!HIDE){ HIDE=true; localStorage.setItem("ccn_hide","1"); if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); if(typeof renderOM==="function") renderOM(); } }
-    else { const prev=localStorage.getItem("ccn_assoc_prevhide"); if(prev!==null){ HIDE=(prev==="1"); localStorage.setItem("ccn_hide",prev); localStorage.removeItem("ccn_assoc_prevhide"); if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); if(typeof renderOM==="function") renderOM(); } }
+    // ⚠️ render()+renderOM() ne suffisaient PAS : une douzaine de panneaux à
+    // montants (file d'actions, paie au cumul, saisonnalité, anomalies…) ne
+    // passent par aucun des deux et restaient en clair au moment précis où on
+    // tend l'écran. On re-rend TOUT ce qui affiche de l'argent.
+    if(on){ if(localStorage.getItem("ccn_assoc_prevhide")===null) localStorage.setItem("ccn_assoc_prevhide", HIDE?"1":"0"); if(!HIDE){ HIDE=true; localStorage.setItem("ccn_hide","1"); } if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); rerenderMoney(); }
+    else { const prev=localStorage.getItem("ccn_assoc_prevhide"); if(prev!==null){ HIDE=(prev==="1"); localStorage.setItem("ccn_hide",prev); localStorage.removeItem("ccn_assoc_prevhide"); if(typeof render==="function"&&typeof LAST!=="undefined") render(LAST); rerenderMoney(); } }
     const hb=$("#hide"); if(hb) hb.textContent=HIDE?"🙈":"👁️";
   }catch(e){}
   let b=$("#assocBanner");
@@ -6975,7 +7045,7 @@ refreshSecnav();
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
 const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["heatmap","🔥 Carte de chaleur"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
-  ["hours","⏰ Heures des abonnés"],["heatmap","🔥 Carte de chaleur"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
+  ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
   ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
   ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
@@ -7074,20 +7144,7 @@ function renderCaJours(){
 { const h=$("#jrHead"); if(h) h.onclick=()=>{ const j=$("#journal"); if(j){ j.classList.toggle("folded"); localStorage.setItem("ccn_jrfold", j.classList.contains("folded")?"1":"0"); } }; if(localStorage.getItem("ccn_jrfold")==="0"){ const j=$("#journal"); if(j) j.classList.remove("folded"); } }
 applyOrder();
 
-loadOM();
-loadTip();
-loadTasks();
-loadPayments();
-loadPaieCumul();
-try{ renderMeteo(); }catch(e){}
-try{ loadDigest(); }catch(e){}
-try{ loadVaSante(); }catch(e){}
-try{ loadCohortes(); }catch(e){}
-try{ loadObjGoal(); }catch(e){}
-try{ loadObjHistory(); }catch(e){}
-try{ loadMoisRecord(); }catch(e){}
-try{ loadTuning(); }catch(e){}
-try{ loadJoursForts(); }catch(e){}
+loadAll();   // même liste qu'après une reconnexion (voir loadAll)
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
 // Les panneaux se remplissent en différé (fetch) : on RÉESSAIE jusqu'à ce que la
 // cible soit visible (10 s max) — un seul essai à 1,5 s la ratait presque toujours.
@@ -7108,28 +7165,7 @@ try{
     },800);
   }
 }catch(e){}
-loadReminders();
-loadSms();
-loadVaGoals();
-loadFanRadar();
-loadGhosts();
-loadLeakwatch();
-loadLeaks();
-loadIdentity();
-loadTgrev();
-loadFirstSale();
-loadCosts();
-loadHours();
-loadConversion();
-loadRailway();
-loadProxy();
-loadTresorerie();
-loadCash();
-loadCac();
-loadDecroche();
-loadCharge();
-loadQuinz();
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); refreshEssentiel(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); refreshEssentiel(); } }, REFRESH_MS);
 setTimeout(refreshEssentiel, 3500);
 </script>
 </body>
