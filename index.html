@@ -3070,7 +3070,7 @@ function renderCohortes(){
     const teamAvg=totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0;
     qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j)</div>`
       +d.quality.slice(0,8).map(q=>{
-        const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.4&&q.va!=="(inconnu)";
+        const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&q.va!=="(inconnu)";
         return `<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}${low?' <span class="cc-low" title="Fans à faible dépense — à coacher sur le ciblage">⚠️</span>':''}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`;
       }).join("")
       +`<div class="cc-hint">Qui t'amène des fans qui dépensent, pas juste beaucoup de fans. ⚠️ = faible dépense, à coacher.</div></div>`;
@@ -3103,11 +3103,15 @@ function renderRecos(){
     const q=qual.find(x=>x.va===v.va);
     const share=(Number(v.monthSubs)||0)/totMs;
     // 1) Gros volume mais fans à faible dépense -> coacher le ciblage.
-    if(q&&teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.4&&share>=0.15){
+    // Seuil 0,5 (pas 0,4) : Yohan à 1,37 $ vs 3,40 $ de moyenne (40 %) ratait le
+    // seuil de 0,01 $ — exactement le cas que ce panneau existe pour montrer.
+    if(q&&teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&share>=0.15){
       recos.push({p:1,ico:"🎯",act:`Coache ${v.va} sur le ciblage`,why:`Il amène beaucoup de monde (${Math.round(share*100)}% des subs du mois) mais ses fans dépensent ${money(q.avg)} vs ~${money(teamAvg)} en moyenne. Mieux cibler = beaucoup plus d'argent, sans plus de volume.`,va:v.va});
     }
     // 2) Fans de grande qualité mais peu de part -> lui donner plus de trafic.
-    if(q&&teamAvg>0&&(Number(q.avg)||0)>=teamAvg*1.5&&share<0.25&&(Number(q.fans)||0)>=10){
+    // 8 fans suffisent quand l'écart est net (Welzy : 22,75 $ vs 3,40 $ = ×6,7)
+    // et 30 % de part : à 26 % on veut ENCORE pousser un VA pareil.
+    if(q&&teamAvg>0&&(Number(q.avg)||0)>=teamAvg*1.5&&share<0.30&&(Number(q.fans)||0)>=8){
       recos.push({p:1,ico:"🚀",act:`Donne plus de trafic à ${v.va}`,why:`Ses fans dépensent ${money(q.avg)} (${Math.round((q.avg/teamAvg)*100)/100>=2?"plus du double":"bien plus"} que la moyenne ~${money(teamAvg)}) mais il ne fait que ${Math.round(share*100)}% du volume. Chaque sub qu'il amène vaut plus.`,va:v.va});
     }
   });
