@@ -1812,7 +1812,7 @@
   </div>
 
   <div class="panel-box" id="objmois" style="display:none">
-    <div class="pb-head">🎯 Objectif du mois &amp; le chemin</div>
+    <div class="pb-head">🎯 Objectif du mois &amp; le chemin <button class="act" id="objEdit">✏️ Mon objectif</button></div>
     <div class="pb-sub">Un objectif de CA réaliste-ambitieux, où tu en es, et combien de subs il te faut — répartis par VA.</div>
     <div id="objmoisBody"></div>
   </div>
@@ -2891,7 +2891,9 @@ function renderObjMois(){
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const F=(d.forecast&&d.forecast.net&&Number(d.forecast.net.value))?Number(d.forecast.net.value):(day>0?Math.round(netMonth/day*dim):netMonth);
   const base=Math.max(netLast,F);
-  const goal=Math.max(Math.round(base*1.1/100)*100, Math.round(base/100)*100+100);
+  const autoGoal=Math.max(Math.round(base*1.1/100)*100, Math.round(base/100)*100+100);
+  const manuel=(typeof OBJ_GOAL==="number"&&OBJ_GOAL>0);
+  const goal=manuel?OBJ_GOAL:autoGoal;
   const pct=goal>0?Math.min(100,Math.round(netMonth/goal*100)):0;
   const projPct=goal>0?Math.min(100,Math.round(F/goal*100)):0;
   const reste=Math.max(0,goal-netMonth);
@@ -2903,13 +2905,35 @@ function renderObjMois(){
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
   const onTrack=F>=goal;
   $("#objmoisBody").innerHTML=`
-    <div class="ob-goal">🎯 Objectif : <b>${money(goal)}</b> <span class="ob-sub">(mois dernier ${money(netLast)} · projection ${money(F)})</span></div>
+    <div class="ob-goal">🎯 Objectif : <b>${money(goal)}</b> <span class="ob-sub">${manuel?"✏️ fixé par toi":"auto"} · mois dernier ${money(netLast)} · projection ${money(F)}</span></div>
     <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
     <div class="ob-line">${money(netMonth)} atteints · <b>${pct}%</b> · jour ${day}/${dim}</div>
     ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
     ${chemin?`<div class="ob-chemin">🧭 Le chemin, par VA : ${chemin}</div>`:""}
     <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>`;
 }
+// Objectif fixé à la main (0 = auto). Chargé du serveur (cross-device) + cache local.
+let OBJ_GOAL=parseInt(localStorage.getItem("ccn_obj_goal")||"0",10)||0;
+async function loadObjGoal(){
+  if(!TOKEN) return;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/obj-goal",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); OBJ_GOAL=Number(j.goal)||0; localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL)); } }catch(e){}
+  renderObjMois();
+}
+async function saveObjGoal(g){
+  OBJ_GOAL=Math.max(0,Math.round(Number(g)||0));
+  localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL));
+  renderObjMois();
+  if(TOKEN){ try{ await fetch(HUB_BASE+"/api/hub/obj-goal",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goal:OBJ_GOAL})}); }catch(e){} }
+}
+{ const b=$("#objEdit"); if(b) b.onclick=()=>{
+    const cur=OBJ_GOAL>0?String(OBJ_GOAL):"";
+    const v=prompt("Ton objectif de CA (brut) pour le mois, en $ ?\n\nLaisse VIDE pour revenir à l'objectif automatique.",cur);
+    if(v===null) return;
+    const s=String(v).replace(/[^0-9]/g,"");
+    if(s===""){ saveObjGoal(0); if(typeof toast==="function") toast("🎯 Objectif","Retour à l'objectif automatique."); return; }
+    const g=parseInt(s,10); if(isNaN(g)){ return; }
+    saveObjGoal(g); if(typeof toast==="function") toast("🎯 Objectif fixé",g.toLocaleString("fr-FR")+" $ ce mois.");
+  }; }
 
 /* ---------- 🩺 #6/#9/#16 santé des VA (fetch /api/hub/va-sante) ---------- */
 let VASANTE=null;
@@ -3003,9 +3027,18 @@ function renderCohortes(){
   let qual="";
   if(d.quality&&d.quality.length){
     const max=Math.max(1,...d.quality.map(q=>Number(q.avg)||0));
+    // Moyenne d'équipe pondérée (hors sources non attribuées) pour repérer les
+    // VA à faible qualité (fans qui dépensent < 40% de la moyenne) — même logique
+    // que l'alerte auto côté serveur.
+    const real=d.quality.filter(q=>q.va&&q.va!=="(inconnu)");
+    const totF=real.reduce((a,q)=>a+(Number(q.fans)||0),0);
+    const teamAvg=totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0;
     qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j)</div>`
-      +d.quality.slice(0,8).map(q=>`<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`).join("")
-      +`<div class="cc-hint">Qui t'amène des fans qui dépensent, pas juste beaucoup de fans.</div></div>`;
+      +d.quality.slice(0,8).map(q=>{
+        const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.4&&q.va!=="(inconnu)";
+        return `<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}${low?' <span class="cc-low" title="Fans à faible dépense — à coacher sur le ciblage">⚠️</span>':''}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`;
+      }).join("")
+      +`<div class="cc-hint">Qui t'amène des fans qui dépensent, pas juste beaucoup de fans. ⚠️ = faible dépense, à coacher.</div></div>`;
   }
   $("#cohortesBody").innerHTML=`<div class="co-list">${coh}</div>${why}${qual}`;
 }
@@ -6711,6 +6744,7 @@ try{ renderMeteo(); }catch(e){}
 try{ loadDigest(); }catch(e){}
 try{ loadVaSante(); }catch(e){}
 try{ loadCohortes(); }catch(e){}
+try{ loadObjGoal(); }catch(e){}
 loadReminders();
 loadSms();
 loadVaGoals();
