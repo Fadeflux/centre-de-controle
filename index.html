@@ -7020,9 +7020,19 @@ try{ loadObjHistory(); }catch(e){}
 try{ loadMoisRecord(); }catch(e){}
 try{ loadTuning(); }catch(e){}
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
+// Les panneaux se remplissent en différé (fetch) : on RÉESSAIE jusqu'à ce que la
+// cible soit visible (10 s max) — un seul essai à 1,5 s la ratait presque toujours.
 try{
   const go=new URLSearchParams(location.search).get("go");
-  if(go&&/^[a-z]+$/.test(go)) setTimeout(()=>{ const el=document.getElementById(go); if(el&&getComputedStyle(el).display!=="none"){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } },1500);
+  if(go&&/^[a-z]+$/.test(go)){
+    let tries=0;
+    const t=setInterval(()=>{
+      tries++;
+      const el=document.getElementById(go);
+      if(el&&getComputedStyle(el).display!=="none"){ clearInterval(t); _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); }
+      else if(tries>14) clearInterval(t);
+    },700);
+  }
 }catch(e){}
 loadReminders();
 loadSms();
