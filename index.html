@@ -438,6 +438,10 @@
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching, body.assoc-mode #ask{display:none !important}
+  /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
+     (jours forts) disparaît IMMÉDIATEMENT — le re-rendu seul laissait les
+     montants affichés pile au moment où on tend l'écran à l'associée. */
+  body.assoc-mode .jf-box{display:none !important}
   body.assoc-mode #reorder, body.assoc-mode #panels, body.assoc-mode #backup, body.assoc-mode #restore,
   body.assoc-mode #refresh, body.assoc-mode #diag, body.assoc-mode #monthReport{display:none !important}
   /* 📉 Décrochage */
