@@ -596,6 +596,13 @@
   .digest-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--muted);padding:10px 12px;margin-bottom:12px;border-radius:10px;background:var(--card2,rgba(255,255,255,.04));cursor:pointer}
   .digest-row input{margin-top:2px;flex:0 0 auto}
   .digest-state{color:var(--faint);font-size:11px}
+  .tuning-row{flex-direction:column;gap:7px;cursor:default}
+  .tuning-opts{display:flex;gap:14px;flex-wrap:wrap}
+  .tuning-opts label{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px}
+  .tuning-opts small{color:var(--faint);font-size:10.5px}
+  .ab-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line,#2a2a33);font-size:12.5px}
+  .ab-row:first-child{border-top:0}
+  .ab-dl{margin-left:auto;font:inherit;font-size:11.5px;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:4px 10px;cursor:pointer}
   /* concentration + qualité (barres génériques) */
   .cc-block{margin-bottom:16px}
   .cc-block:last-child{margin-bottom:0}
@@ -1449,6 +1456,7 @@
       <button class="btn" id="hide" title="Masquer les montants">👁️</button>
       <button class="btn" id="tv" title="Plein écran">⛶</button>
       <button class="btn" id="backup" title="Télécharger ma sauvegarde" style="display:none">💾</button>
+      <button class="btn" id="autobackups" title="Sauvegardes automatiques (chaque semaine)" style="display:none">🗄️</button>
       <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
       <button class="btn" id="assocView" title="Vue associé (lecture seule)" style="display:none">👥</button>
       <button class="btn" id="diag" title="Diagnostic santé complet" style="display:none">🩺</button>
@@ -1753,6 +1761,13 @@
     <div class="panel-box" id="rules" style="display:none">
       <div class="pb-head">🔔 Mes alertes perso (si… alors préviens-moi)</div>
       <label class="digest-row"><input type="checkbox" id="digestChk"> <span><b>📋 Résumé groupé</b> — rassemble les alertes de la journée en <b>un seul</b> rappel le matin, au lieu de plein de notifications. <span id="digestState" class="digest-state"></span></span></label>
+      <div class="digest-row tuning-row"><span>⚙️ <b>Sensibilité des alertes</b> (faux subs, qualité des fans, signe de départ) :</span>
+        <span class="tuning-opts">
+          <label><input type="radio" name="tuneMode" value="strict"> Strict <small>(prévient plus tôt)</small></label>
+          <label><input type="radio" name="tuneMode" value="normal" checked> Normal</label>
+          <label><input type="radio" name="tuneMode" value="tolerant"> Tolérant <small>(que le flagrant)</small></label>
+        </span>
+      </div>
       <div id="rulesBody"></div>
     </div>
     <div class="panel-box" id="busfactor" style="display:none">
@@ -2595,6 +2610,8 @@ async function loadJournal(){
     const items = (await r.json()).items || [];
     $("#journal").style.display="block";
     $("#jrCount").textContent = items.length ? items.length+" évènement"+(items.length>1?"s":"") : "";
+    // 📱 #6 pastille sur l'icône de l'app (PWA installée) = nb d'évènements du journal.
+    try{ if("setAppBadge" in navigator){ if(items.length) navigator.setAppBadge(Math.min(items.length,99)); else if("clearAppBadge" in navigator) navigator.clearAppBadge(); } }catch(e){}
     if(!items.length){ $("#jrList").innerHTML = `<div class="jr-empty">Rien pour l'instant. Les alertes de tes bots et les changements d'état apparaîtront ici.</div>`; return; }
     $("#jrList").innerHTML = items.map(it=>`<div class="jr-row">
       <span class="jr-src">${escapeHtml(it.source||"info")}</span>
@@ -2940,7 +2957,21 @@ function renderObjMois(){
     <div class="ob-line">${money(netMonth)} atteints · <b>${pct}%</b> · jour ${day}/${dim}</div>
     ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
     ${chemin?`<div class="ob-chemin">🧭 Le chemin, par VA : ${chemin}</div>`:""}
-    <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>`;
+    <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>
+    ${(function(){
+      // 📜 #2 historique : les mois clos figés par le serveur (objectif vs réalisé).
+      const h=(typeof OBJ_HIST!=="undefined"&&Array.isArray(OBJ_HIST))?OBJ_HIST:[];
+      if(!h.length) return "";
+      const mois=ym=>{ const p=String(ym||"").split("-"); return (["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"][(+p[1])-1]||"?")+" "+String(p[0]||"").slice(2); };
+      const rows=h.slice(0,12).map(x=>{ const okM=x.pct!=null&&x.pct>=100; return `<div class="pay-h-row"><span>${mois(x.ym)}</span><span class="pay-h-d">objectif ${money(x.goal)}</span><span class="pay-h-n">fait ${money(x.net)}</span><span class="pay-h-a">${x.pct!=null?(okM?"✅ ":"")+x.pct+" %":"—"}</span></div>`; }).join("");
+      return `<details class="pay-hist"><summary>📜 Mes mois passés (objectif vs réalisé)</summary><div class="pay-h-list">${rows}</div></details>`;
+    })()}`;
+}
+// 📜 Historique des objectifs (figé chaque 1er du mois par le serveur).
+let OBJ_HIST=null;
+async function loadObjHistory(){
+  if(!TOKEN) return;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/obj-history",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ OBJ_HIST=((await r.json()).history)||[]; renderObjMois(); } }catch(e){}
 }
 // Objectif fixé à la main (0 = auto). Chargé du serveur (cross-device) + cache local.
 let OBJ_GOAL=parseInt(localStorage.getItem("ccn_obj_goal")||"0",10)||0;
@@ -5830,6 +5861,53 @@ async function loadDigest(){
     }catch(e){ chk.checked=!chk.checked; }
   }); }
 
+/* ---------- ⚙️ #3 sensibilité des détecteurs (strict / normal / tolérant) ---------- */
+async function loadTuning(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tuning",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    const el=document.querySelector(`input[name="tuneMode"][value="${j.mode}"]`);
+    if(el) el.checked=true;
+  }catch(e){}
+}
+document.querySelectorAll('input[name="tuneMode"]').forEach(rb=>rb.addEventListener("change",async()=>{
+  if(!TOKEN||!rb.checked) return;
+  try{
+    const resp=await fetch(HUB_BASE+"/api/hub/tuning",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({mode:rb.value})});
+    const j=await resp.json();
+    if(j&&j.ok&&typeof toast==="function") toast("⚙️ Sensibilité",rb.value==="strict"?"Strict — je te préviens plus tôt.":rb.value==="tolerant"?"Tolérant — seulement les cas flagrants.":"Normal — réglage d'origine.");
+  }catch(e){}
+}));
+
+/* ---------- 🗄️ #5 sauvegardes auto hebdo (liste + téléchargement) ---------- */
+{ const b=$("#autobackups"); if(b) b.onclick=async()=>{
+  if(!TOKEN){ if(typeof openGate==="function") openGate("Connecte-toi d'abord."); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/auto-backup",{headers:{"x-hub-token":TOKEN}});
+    const j=await r.json(); const list=(j&&j.backups)||[];
+    const ov=document.createElement("div"); ov.className="ppick";
+    const rows=list.length?list.map(bk=>`<div class="ab-row"><span>💾 ${new Date(bk.ts).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})} · ${bk.keys} réglages</span><button class="ab-dl" data-abn="${bk.n}">⬇️ Télécharger</button></div>`).join(""):`<div class="tk-empty">Aucune sauvegarde auto encore — la première se fera dimanche matin, tout seul.</div>`;
+    ov.innerHTML=`<div class="ppick-box"><h3>🗄️ Sauvegardes automatiques</h3><div class="ppick-sub">Chaque dimanche, tes réglages (paies, objectifs, décisions…) sont mis en lieu sûr automatiquement — 4 semaines gardées. Télécharge un fichier, puis restaure-le avec le bouton ♻️ si jamais besoin.</div>${rows}<button class="ppick-close">Fermer</button></div>`;
+    ov.addEventListener("click",async e=>{
+      if(e.target===ov||e.target.closest(".ppick-close")){ ov.remove(); return; }
+      const d=e.target.closest("[data-abn]"); if(!d) return;
+      try{
+        const r2=await fetch(HUB_BASE+"/api/hub/auto-backup?n="+encodeURIComponent(d.getAttribute("data-abn")),{headers:{"x-hub-token":TOKEN}});
+        if(!r2.ok) return;
+        const data=await r2.json();
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+        const url=URL.createObjectURL(blob); const a=document.createElement("a");
+        a.href=url; a.download="noctra-sauvegarde-auto-"+String(data.exportedAt||"").slice(0,10)+".json";
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+        if(typeof toast==="function") toast("⬇️ Sauvegarde téléchargée","Restaurable avec le bouton ♻️.");
+      }catch(err){}
+    });
+    document.body.appendChild(ov);
+  }catch(e){}
+}; }
+
 // 🏖️ #9 BUS FACTOR : ce qui tourne sans toi vs ce qui dépend de toi, et quoi
 // déléguer si tu t'absentes. Croise l'état réel (paie, fuites) et les automatismes.
 function renderBusFactor(){
@@ -6423,7 +6501,7 @@ function toggleConvo(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","restore","assocView","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row";
@@ -6938,7 +7016,14 @@ try{ loadDigest(); }catch(e){}
 try{ loadVaSante(); }catch(e){}
 try{ loadCohortes(); }catch(e){}
 try{ loadObjGoal(); }catch(e){}
+try{ loadObjHistory(); }catch(e){}
 try{ loadMoisRecord(); }catch(e){}
+try{ loadTuning(); }catch(e){}
+// 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
+try{
+  const go=new URLSearchParams(location.search).get("go");
+  if(go&&/^[a-z]+$/.test(go)) setTimeout(()=>{ const el=document.getElementById(go); if(el&&getComputedStyle(el).display!=="none"){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } },1500);
+}catch(e){}
 loadReminders();
 loadSms();
 loadVaGoals();

@@ -13,5 +13,10 @@
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "💸 Paie au cumul", "short_name": "Paie", "url": "./index.html?go=paiecumul", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "🧭 À faire maintenant", "short_name": "À faire", "url": "./index.html?go=recos", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "📩 Journal des alertes", "short_name": "Journal", "url": "./index.html?go=journal", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }
