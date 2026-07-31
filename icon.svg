@@ -1,18 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- 🌙 Icône NOCTRA : croissant lavande sur nuit étoilée (charte du logo agence) -->
+  <!-- 🌙 Icône NOCTRA — la MÊME lune que le logo de l'agence : croissant FIN
+       tracé d'un trait lavande, ouverture vers le haut-droite, remplissage
+       à peine visible, halo doux derrière. -->
   <defs>
     <radialGradient id="nuit" cx="50%" cy="42%" r="75%">
-      <stop offset="0%" stop-color="#22263a"/>
+      <stop offset="0%" stop-color="#20233a"/>
       <stop offset="100%" stop-color="#0c0d13"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8d94c9" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#8d94c9" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#8d94c9" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#nuit)"/>
-  <circle cx="112" cy="98" r="4" fill="#ffffff" opacity="0.55"/>
-  <circle cx="404" cy="132" r="3" fill="#d8ddf5" opacity="0.5"/>
-  <circle cx="356" cy="72" r="2.5" fill="#ffffff" opacity="0.4"/>
-  <circle cx="86" cy="300" r="3" fill="#d8ddf5" opacity="0.35"/>
+  <circle cx="112" cy="98" r="4" fill="#ffffff" opacity="0.5"/>
+  <circle cx="404" cy="132" r="3" fill="#d8ddf5" opacity="0.45"/>
+  <circle cx="356" cy="72" r="2.5" fill="#ffffff" opacity="0.35"/>
+  <circle cx="86" cy="300" r="3" fill="#d8ddf5" opacity="0.3"/>
   <circle cx="430" cy="368" r="3.5" fill="#ffffff" opacity="0.3"/>
-  <circle cx="170" cy="430" r="2.5" fill="#ffffff" opacity="0.3"/>
-  <path d="M 300 96 A 162 162 0 1 0 300 416 A 130 130 0 1 1 300 96 Z"
-        stroke="#cdd2ee" stroke-width="18" stroke-linejoin="round" fill="rgba(190,197,232,0.14)"/>
+  <circle cx="170" cy="430" r="2.5" fill="#ffffff" opacity="0.28"/>
+  <circle cx="290" cy="256" r="190" fill="url(#halo)"/>
+  <path d="M 322 106 A 160 160 0 1 0 322 406 A 143 143 0 1 1 322 106 Z"
+        transform="rotate(-15 256 256)"
+        stroke="#b9bfdd" stroke-width="13" stroke-linejoin="round" fill="rgba(170,178,215,0.10)"/>
 </svg>
