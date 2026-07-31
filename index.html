@@ -7025,13 +7025,18 @@ try{ loadTuning(); }catch(e){}
 try{
   const go=new URLSearchParams(location.search).get("go");
   if(go&&/^[a-z]+$/.test(go)){
-    let tries=0;
+    // Re-caler PLUSIEURS fois : les panneaux qui chargent au-dessus poussent la
+    // cible plus bas après le premier saut. On suit la cible ~12 s puis on lâche
+    // (dès que l'utilisateur touche l'écran, on arrête aussi).
+    let tries=0, stop=false;
+    const halt=()=>{ stop=true; };
+    window.addEventListener("touchstart",halt,{once:true}); window.addEventListener("wheel",halt,{once:true});
     const t=setInterval(()=>{
       tries++;
+      if(stop||tries>16){ clearInterval(t); return; }
       const el=document.getElementById(go);
-      if(el&&getComputedStyle(el).display!=="none"){ clearInterval(t); _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); }
-      else if(tries>14) clearInterval(t);
-    },700);
+      if(el&&getComputedStyle(el).display!=="none"){ _userScrolled=true; el.scrollIntoView({block:"start"}); }
+    },800);
   }
 }catch(e){}
 loadReminders();
