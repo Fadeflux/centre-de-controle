@@ -3641,6 +3641,12 @@ const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,per
 // même règle que Noctra Finance. Le NET s'affiche en premier, le brut en petit.
 const NET_RATE=0.78;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
+// Comme tgMoney, mais réutilisable pour tout montant — AVEC les centimes.
+// Sert au "Net du mois" depuis qu'il additionne OnlyFans (arrondi) + Telegram
+// (précis) : l'arrondi masquait l'addition (389 + 55,50 affichait "445", pas
+// le vrai calcul). Reste inutilisé ailleurs dans le panneau OM (marge, LTV,
+// détail par modèle) — ces figures-là ne mélangent pas deux sources.
+function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+(cur||"$"); }
 function fmtLtv(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
   // Même sans données OM, les panneaux qui dépendent de HIDE doivent être
@@ -3680,7 +3686,7 @@ function renderOM(){
     : (d.revenusPartiels
       ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
       : "");
-  const netAvecTg=ko?"—":omMoney((Number(net)||0)*NET_RATE+tgM,cur);
+  const netAvecTg=ko?"—":moneyPrecis((Number(net)||0)*NET_RATE+tgM,cur);
   const tiles=`<div class="om-tiles">
     <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">brut OF : ${mnt(net)}${(!ko&&tgM>0)?` · + Telegram ${tgMoney(tgM)}`:""}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
@@ -4387,7 +4393,7 @@ function renderMorning(){
       const ajArgent=revKo()?"—":(nt!=null?(money(nt*NET_RATE)+" net")+` <span class="t-sub">(${money(nt)} brut)</span>`:"—");
       const ajSubs=(tot.subsDay!=null?tot.subsDay:"—")+" subs";
       return `<div class="lbl">💰 Net du mois (est.)</div>
-        <div class="big" id="mnMoney">${moneyOuTiret(netMois, money)}</div>
+        <div class="big" id="mnMoney">${moneyOuTiret(netMois, v=>moneyPrecis(v,cur))}</div>
         <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
@@ -4403,7 +4409,11 @@ function renderMorning(){
   // grand chiffre avec le brut juste après le rendu (net affiché = brut, bug vu
   // en capture : net = brut = 4142).
   { const _tgAnim=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
-    const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,Math.round(tot.netMonth*NET_RATE+_tgAnim),v=>v.toLocaleString("fr-FR")+" "+cur); }
+    // `to` non arrondi + fmt à 2 décimales : la valeur FINALE de l'animation
+    // doit rester précise (sinon elle réécrivait le rendu ci-dessus avec un
+    // entier juste après coup — le compteur qui défile n'a besoin d'être
+    // qu'approximatif, pas le chiffre où il s'arrête).
+    const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,tot.netMonth*NET_RATE+_tgAnim,v=>moneyPrecis(v,cur)); }
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   // ⚡ EXPRESS : pour les matins pressés, on ne garde que les chiffres + l'action
@@ -5795,7 +5805,9 @@ function renderEssentiel(){
   // 📲 + revenus Telegram (saisis à la main) — sinon le chiffre-phare de
   // l'accueil ne bougeait jamais avec Telegram.
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
-  const netMois=(ko||!om||tot.netMonth==null)?"—":money((Number(tot.netMonth)||0)*NET+tgM);   // absent ≠ 0
+  // moneyPrecis (2 décimales) : la somme OF (arrondi × 0,78) + Telegram (exact)
+  // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
+  const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$");   // absent ≠ 0
   const subsAuj=(tot.subsDay!=null)?String(tot.subsDay):"—";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   const apres=(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—";
