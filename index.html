@@ -1852,10 +1852,6 @@
       <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
       <div id="hoursBody"></div>
     </div>
-    <div class="panel-box" id="heatmap" style="display:none">
-      <div class="pb-head">🔥 Carte de chaleur (jour × heure)</div>
-      <div id="heatmapBody"></div>
-    </div>
     <div class="panel-box" id="saison" style="display:none">
       <div class="pb-head">📅 Saisonnalité &amp; meilleurs moments</div>
       <div id="saisonBody"></div>
@@ -2496,7 +2492,13 @@ let TGREV = JSON.parse(localStorage.getItem("ccn_tgrev")||"[]"); if(!Array.isArr
 function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})}).catch(()=>{}); } }
 async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
-function tgMonthTotal(){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey).reduce((a,x)=>a+(Number(x.amount)||0),0); }
+// `model` optionnel : filtre sur un modèle précis (utilisé par le tuile "Net du
+// mois" quand on regarde un modèle en particulier) ; omis/"all" = tous modèles.
+function tgMonthTotal(model){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey && (!model||model==="all"||(x.model||"")===model)).reduce((a,x)=>a+(Number(x.amount)||0),0); }
+// Montant Telegram AVEC les centimes — fmtCur/toLocaleString arrondissaient à
+// l'entier, ce qui pouvait faire passer un vrai montant (602,00 $) pour un
+// montant approximatif aux yeux de l'opérateur (« si non c'est faux »).
+function tgMoney(v){ if(HIDE) return "•••"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $"; }
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
 function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
 function renderTgrev(){
@@ -2507,14 +2509,14 @@ function renderTgrev(){
   const allSubs=TGREV.reduce((a,x)=>a+(Number(x.subs)||0),0);
   const ltv=allSubs>0?allTot/allSubs:0;
   const ltvTxt=HIDE?"•••":ltv.toFixed(2).replace(".",",")+" $";
-  if(tot) tot.textContent = TGREV.length ? (`${fmtCur(monthTot)} ce mois · ${fmtCur(allTot)} au total`+(allSubs>0?` · ${ltvTxt}/pers.`:"")) : "";
+  if(tot) tot.textContent = TGREV.length ? (`${tgMoney(monthTot)} ce mois · ${tgMoney(allTot)} au total`+(allSubs>0?` · ${ltvTxt}/pers.`:"")) : "";
   // Sous-total par modèle (ce mois) — pour tes analyses
   const mKey=tgMonthKey(Date.now()), perM={};
   TGREV.filter(x=>tgMonthKey(x.ts)===mKey).forEach(x=>{ const m=(x.model||"").trim()||"Général"; perM[m]=(perM[m]||0)+(Number(x.amount)||0); });
   const srcKeys=Object.keys(perM).sort((a,b)=>perM[b]-perM[a]);
-  const srcLine = srcKeys.length>1 ? `<div class="tg-src">Ce mois par modèle : ${srcKeys.map(m=>`${escapeHtml(m)} <b>${fmtCur(perM[m])}</b>`).join(" · ")}</div>` : "";
+  const srcLine = srcKeys.length>1 ? `<div class="tg-src">Ce mois par modèle : ${srcKeys.map(m=>`${escapeHtml(m)} <b>${tgMoney(perM[m])}</b>`).join(" · ")}</div>` : "";
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
-  list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${fmtCur(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+  list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${tgMoney(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); }
 function addTgrev(){
@@ -3663,6 +3665,10 @@ function renderOM(){
   let net,subsMonth;
   if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
   else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
+  // 📲 Les revenus Telegram (saisis à la main, pas d'API) manquaient du "Net du
+  // mois" — le chiffre du haut du dashboard ne bougeait jamais avec Telegram.
+  // Montant déjà net (pas de commission plateforme) : on l'ajoute directement.
+  const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal(OM_MODEL):0;
   // Comparaison HONNÊTE : mois en cours vs mois dernier À LA MÊME DATE (pas le
   // mois entier — comparer 12 jours à 30 ferait toujours paraître en retard).
   const prevTD = d.totals.netLastMonthToDate;
@@ -3674,8 +3680,9 @@ function renderOM(){
     : (d.revenusPartiels
       ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
       : "");
+  const netAvecTg=ko?"—":omMoney((Number(net)||0)*NET_RATE+tgM,cur);
   const tiles=`<div class="om-tiles">
-    <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netE(net)} ${delta}</div><div class="tile-sub">brut : ${mnt(net)}</div></div>
+    <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">brut OF : ${mnt(net)}${(!ko&&tgM>0)?` · + Telegram ${tgMoney(tgM)}`:""}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
     <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
@@ -4372,13 +4379,16 @@ function renderMorning(){
     <div class="mn-money">${(function(){
       // Net d'abord (× 0,78), brut en petit — et surtout le CA D'AUJOURD'HUI en
       // argent (pas juste les subs). `om.netToday` = CA brut du jour EN COURS.
-      const netMois=(tot.netMonth!=null)?tot.netMonth*NET_RATE:null;
+      // 📲 Revenus Telegram (saisis à la main) ajoutés au Net du mois — sinon
+      // ce chiffre, ouvert 1x/jour, ne reflétait jamais Telegram.
+      const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+      const netMois=(tot.netMonth!=null)?tot.netMonth*NET_RATE+tgM:null;
       const nt=(typeof om.netToday==="number")?om.netToday:null;
       const ajArgent=revKo()?"—":(nt!=null?(money(nt*NET_RATE)+" net")+` <span class="t-sub">(${money(nt)} brut)</span>`:"—");
       const ajSubs=(tot.subsDay!=null?tot.subsDay:"—")+" subs";
       return `<div class="lbl">💰 Net du mois (est.)</div>
         <div class="big" id="mnMoney">${moneyOuTiret(netMois, money)}</div>
-        <div class="sub">brut : <b>${moneyOuTiret(tot.netMonth, money)}</b>${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
+        <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
     })()}</div>
@@ -4392,7 +4402,8 @@ function renderMorning(){
   // L'animation vise le NET (× 0,78), pas le brut — sinon elle réécrivait le
   // grand chiffre avec le brut juste après le rendu (net affiché = brut, bug vu
   // en capture : net = brut = 4142).
-  const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,Math.round(tot.netMonth*NET_RATE),v=>v.toLocaleString("fr-FR")+" "+cur);
+  { const _tgAnim=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+    const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,Math.round(tot.netMonth*NET_RATE+_tgAnim),v=>v.toLocaleString("fr-FR")+" "+cur); }
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   // ⚡ EXPRESS : pour les matins pressés, on ne garde que les chiffres + l'action
@@ -5781,7 +5792,10 @@ function renderEssentiel(){
   const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
   const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
   const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
-  const netMois=(ko||!om||tot.netMonth==null)?"—":money((Number(tot.netMonth)||0)*NET);   // absent ≠ 0
+  // 📲 + revenus Telegram (saisis à la main) — sinon le chiffre-phare de
+  // l'accueil ne bougeait jamais avec Telegram.
+  const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+  const netMois=(ko||!om||tot.netMonth==null)?"—":money((Number(tot.netMonth)||0)*NET+tgM);   // absent ≠ 0
   const subsAuj=(tot.subsDay!=null)?String(tot.subsDay):"—";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   const apres=(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—";
@@ -6272,29 +6286,13 @@ async function loadHours(){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/subs-by-hour?days=30",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    HOURS_DATA=await r.json(); renderHours(); if(typeof renderHeatmap==="function") renderHeatmap(); if(typeof renderSaison==="function") renderSaison();
+    HOURS_DATA=await r.json(); renderHours(); if(typeof renderSaison==="function") renderSaison();
   }catch(e){}
 }
-// 🔥 #8 CARTE DE CHALEUR : matrice jour × heure des arrivées d'abonnés (HOURS_DATA.heatmap).
-function renderHeatmap(){
-  const panel=$("#heatmap"), body=$("#heatmapBody"); if(!panel||!body) return;
-  const d=(typeof HOURS_DATA!=="undefined")?HOURS_DATA:null;
-  const heat=(d&&Array.isArray(d.heatmap))?d.heatmap:null;
-  if(!TOKEN||!heat||!d.total||!d.fiable){ panel.style.display="none"; return; }
-  panel.style.display="block";
-  let max=1; heat.forEach(row=>(row||[]).forEach(v=>{ if(v>max)max=v; }));
-  const labels=(d.parJour&&d.parJour.length===heat.length)?d.parJour.map(x=>String(x.jour||"").slice(0,3)):["","","","","","",""];
-  let html=`<div class="cac-intro">Quand tes abonnés arrivent, jour par jour et heure par heure. Plus c'est chaud, plus il y en a — c'est là qu'il faut publier et être présent.</div><div class="hm-wrap"><div class="hm">`;
-  html+=`<div class="hm-cell hm-lbl"></div>`;
-  for(let h=0;h<24;h++) html+=`<div class="hm-cell hm-h">${h%6===0?h+"h":""}</div>`;
-  for(let r=0;r<heat.length;r++){
-    html+=`<div class="hm-cell hm-lbl">${escapeHtml(labels[r]||"")}</div>`;
-    for(let h=0;h<24;h++){ const v=Number((heat[r]||[])[h])||0, a=v/max; html+=`<div class="hm-cell hm-c" title="${escapeHtml(labels[r]||"")} ${h}h : ${v} abonnés" style="background:${a>0?`rgba(139,124,246,${(0.1+a*0.9).toFixed(2)})`:"var(--bg)"}"></div>`; }
-  }
-  html+=`</div></div>`;
-  body.innerHTML=html;
-  try{ fixPairs(); }catch(e){}
-}
+// 🔥 Carte de chaleur (jour × heure) retirée (2026-08) : trop grosse pour trop
+// peu de clarté selon André — l'info existe déjà en plus lisible ailleurs
+// (« Heures des abonnés » = meilleur créneau, « Tes vrais jours forts » =
+// meilleur jour, sur les vraies ventes).
 function renderHours(){
   const panel=$("#hours"); if(!panel) return;
   const d=HOURS_DATA;
@@ -7057,7 +7055,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["heatmap","🔥 Carte de chaleur"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
+const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
