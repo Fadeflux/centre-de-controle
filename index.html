@@ -253,7 +253,7 @@
   .tg-sub{font-size:12px;color:var(--muted);margin:6px 0 10px}
   .tg-add{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .tg-add input,.tg-add select{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  #tgModel{min-width:120px} #tgAmount{width:110px} #tgSubs{width:120px} #tgNote{flex:1;min-width:130px}
+  #tgModel{min-width:120px} #tgAmount{width:110px} #tgSubs{width:120px} #tgDate{width:150px;color-scheme:dark} #tgNote{flex:1;min-width:130px}
   .tg-src{font-size:12px;color:var(--muted);margin:6px 0 4px;display:flex;gap:12px;flex-wrap:wrap}
   .tg-src b{color:var(--text);font-weight:600}
   .tg-mtag{font-size:11px;color:var(--acc);font-weight:600}
@@ -1760,6 +1760,7 @@
         <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
         <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
         <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
+        <input id="tgDate" type="date" title="Date de ce revenu — change-la pour ajouter un mois passé" />
         <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
         <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
       </div>
@@ -2521,11 +2522,24 @@ function addTgrev(){
   const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
   const model=($("#tgModel")&&$("#tgModel").value)||"";
   if(!a || a<=0) return;
-  TGREV.unshift({id:tkId(), amount:a, subs:subs, model:model, note:note, ts:Date.now()}); saveTgrev(); tgRefresh();
+  // 📅 Date choisie (défaut aujourd'hui) — pour ajouter un revenu d'un mois
+  // passé, l'opérateur change juste ce champ. Heure fixée à midi pour éviter
+  // tout glissement de jour selon le fuseau du navigateur.
+  const dInp=$("#tgDate"), dVal=(dInp&&dInp.value)||"";
+  const ts=dVal ? new Date(dVal+"T12:00:00").getTime() : Date.now();
+  TGREV.unshift({id:tkId(), amount:a, subs:subs, model:model, note:note, ts:ts}); saveTgrev(); tgRefresh();
+  const dateChoisie=dVal&&dVal!==((typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10));
   $("#tgAmount").value=""; $("#tgSubs").value=""; $("#tgNote").value=""; $("#tgAmount").focus();
-  if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", (model?model+" · ":"")+fmtMoney(a));
+  // Remet la date sur AUJOURD'HUI après l'ajout — sinon, une fois un mois passé
+  // choisi, le prochain revenu (celui du jour) se glisserait silencieusement
+  // sur cette même date sans que l'opérateur s'en aperçoive.
+  if(dInp) dInp.value=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10);
+  if(typeof toast==="function") toast("📲 Revenu Telegram ajouté", (model?model+" · ":"")+fmtMoney(a)+(dateChoisie?" · "+new Date(ts).toLocaleDateString("fr-FR"):""));
 }
 { const b=$("#tgAdd"); if(b) b.onclick=addTgrev; }
+// Date par défaut = aujourd'hui, posée une seule fois (ne pas écraser une date
+// passée déjà choisie à chaque re-rendu du panneau).
+{ const dInp=$("#tgDate"); if(dInp && !dInp.value) dInp.value=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10); }
 { const n=$("#tgNote"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") addTgrev(); }); }
 { const am=$("#tgAmount"); if(am) am.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
 { const n=$("#tgSubs"); if(n) n.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#tgNote").focus(); }); }
