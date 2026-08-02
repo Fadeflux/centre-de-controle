@@ -3949,13 +3949,19 @@ function renderHistory(){
   if(!h || !h.length){ $("#history").style.display="none"; return; }
   const cur = OM_DATA.currency||"$";
   const useSubs = h.every(m=>!Number(m.net));      // pas de net attribué → on montre les subs
-  const val = m => useSubs ? (Number(m.subs)||0) : ((Number(m.net)||0)+tgHistMonth(m.month));
+  // ⚠️ `m.net` (serveur) est en réalité du BRUT (avant commission plateforme).
+  // Les revenus Telegram, eux, sont déjà NETS (pas de commission). Les ADDITIONNER
+  // tels quels mélangeait net + brut et gonflait le total à tort — on convertit
+  // donc l'OF en net (× NET_RATE) AVANT d'ajouter Telegram, comme partout ailleurs
+  // sur le dashboard (« Net du mois »).
+  const val = m => useSubs ? (Number(m.subs)||0) : ((Number(m.net)||0)*NET_RATE+tgHistMonth(m.month));
   const max = Math.max(1, ...h.map(val));
   const fmtK = v => { v=Number(v)||0; return v>=1000 ? (v/1000).toFixed(1).replace(".",",")+"k" : String(Math.round(v)); };
   const bars = h.map(m=>{
     const v=val(m), pct=Math.round(v/max*100), rec=(v===max && max>1), tgM=useSubs?0:tgHistMonth(m.month);
     const lab = HIDE ? "•••" : (useSubs ? fmtInt(v) : fmtK(v));
-    return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${rec?'rec':''}" style="height:${Math.max(3,pct)}%" title="${m.month} · ${fmtInt(m.subs)} subs${useSubs?'':' · '+omMoney(v,cur)+(tgM>0?' (dont '+omMoney(tgM,cur)+' Telegram)':'')}"></div></div><div class="hb-val">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
+    const detail=useSubs?"":` · ${omMoney(v,cur)} net (brut OF ${omMoney(m.net,cur)}${tgM>0?" · + Telegram "+omMoney(tgM,cur):""})`;
+    return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${rec?'rec':''}" style="height:${Math.max(3,pct)}%" title="${m.month} · ${fmtInt(m.subs)} subs${detail}"></div></div><div class="hb-val">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
   }).join("");
   let trend="";
   if(h.length>=2){
@@ -3965,13 +3971,15 @@ function renderHistory(){
     else if(b>0){ trend=`Ce mois-ci tu démarres avec ${useSubs?fmtInt(b)+" subs":omMoney(b,cur)}.`; }
   }
   const best = h.reduce((mx,m)=>val(m)>val(mx)?m:mx, h[0]);
-  if(best && val(best)>1){ trend += `${trend?" ":""}🏆 Meilleur mois : <b>${best.month}</b> (${useSubs?fmtInt(best.subs)+" subs":omMoney(best.net,cur)}).`; }
+  // best.net (brut) remplacé par val(best) (net + Telegram) : sinon le libellé
+  // « meilleur mois » citait un chiffre différent de celui des barres.
+  if(best && val(best)>1){ trend += `${trend?" ":""}🏆 Meilleur mois : <b>${best.month}</b> (${useSubs?fmtInt(best.subs)+" subs":omMoney(val(best),cur)}).`; }
   // Record : le mois en cours dépasse tous les précédents → bannière + confettis (une seule fois)
   let recordBanner="";
   if(h.length>=2){
     const curM=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(val));
     if(val(curM)>prevMax && prevMax>0){
-      const lab=useSubs?fmtInt(curM.subs)+" subs":omMoney(curM.net,cur);
+      const lab=useSubs?fmtInt(curM.subs)+" subs":omMoney(val(curM),cur);
       recordBanner=`<div class="hb-record">🏆 Nouveau record ! <b>${curM.month}</b> est ton meilleur mois : <b>${lab}</b> 🎉</div>`;
       const rk=`${curM.month}:${val(curM)}`;
       if(localStorage.getItem("ccn_record")!==rk){ localStorage.setItem("ccn_record",rk); setTimeout(confetti,300); }
@@ -3980,9 +3988,13 @@ function renderHistory(){
   const tot=OM_DATA.totals||{};
   // Argent muet -> « — » (le cumul de vie réel ne doit pas devenir 0 $).
   // + tout l'historique Telegram (toutes dates confondues, pas juste ce mois).
+  // tot.netTotal est BRUT (comme m.net ci-dessus) : même conversion × NET_RATE
+  // avant d'ajouter Telegram (net), pour rester cohérent avec les barres.
   const tgAllTime=(typeof TGREV!=="undefined"?TGREV:[]).reduce((a,x)=>a+(Number(x.amount)||0),0);
-  const genereTot=revKo()?"—":(HIDE?"•••":omMoney((tot.netTotal||0)+tgAllTime,cur));
-  const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début</div></div></div>`;
+  const genereNet=(tot.netTotal||0)*NET_RATE+tgAllTime;
+  const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
+  const genereSub=(!revKo()&&!HIDE)?`<div class="tile-sub">brut OF : ${omMoney(tot.netTotal||0,cur)}${tgAllTime>0?" · + Telegram "+omMoney(tgAllTime,cur):""}</div>`:"";
+  const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début (net, est.)</div>${genereSub}</div></div>`;
   $("#history").style.display="block";
   $("#historyBody").innerHTML=`${recordBanner}${cumul}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
 }
