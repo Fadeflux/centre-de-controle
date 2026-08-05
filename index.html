@@ -295,6 +295,20 @@
   .oc-vs-name{min-width:80px}
   .oc-vs-pct{color:var(--acc);font-weight:700}
   .oc-vs-ltv{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .oc-sales{display:flex;flex-direction:column;gap:2px}
+  .oc-sale-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:.5px solid var(--line)}
+  .oc-sale-row:last-child{border-bottom:0}
+  .oc-sale-who{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
+  .oc-sale-model{font-size:11px;color:var(--muted)}
+  .oc-sale-amt{color:var(--acc);font-weight:700}
+  .oc-sale-when{margin-left:auto;font-size:11px;color:var(--muted)}
+  .oc-sales{margin-top:2px}
+  .oc-sale-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--line);font-size:12.5px}
+  .oc-sale-row:last-child{border-bottom:0}
+  .oc-sale-who{font-weight:600;min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
+  .oc-sale-model{font-size:11px;color:var(--muted)}
+  .oc-sale-amt{color:var(--acc);font-weight:700;margin-left:auto}
+  .oc-sale-when{font-size:11px;color:var(--faint);min-width:80px;text-align:right}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -2378,7 +2392,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOnlyChatGoal, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -2565,6 +2579,15 @@ function tgTodayTotal(){
   return row ? (Number(row.total)||0) : null;
 }
 
+// 💰 Abonnements FIXES OnlyChat (donné par André le 2026-08-05) : 70 $/mois
+// par compte OnlyFans connecté (×2) + 20 $/mois par compte Telegram (×2) =
+// 180 $/mois. Distinct de onlychatFee() (la commission % sur les ventes,
+// déjà gérée dans Rentabilité/Partage) — ceci est le coût FIXE affiché dans
+// "Dépenses d'outils", pour que rentabilité en tienne compte automatiquement
+// sans qu'André ait à le ressaisir chaque mois.
+const ONLYCHAT_SUB_OF=70, ONLYCHAT_SUB_OF_N=2, ONLYCHAT_SUB_TG=20, ONLYCHAT_SUB_TG_N=2;
+function onlyChatFixedCost(){ return ONLYCHAT_SUB_OF*ONLYCHAT_SUB_OF_N + ONLYCHAT_SUB_TG*ONLYCHAT_SUB_TG_N; }
+
 /* ---------- Revenus Telegram AUTO (OnlyChat) ---------- */
 // null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
 // « je sais pas > chiffre faux »). Le panneau reste caché dans ce cas.
@@ -2640,6 +2663,45 @@ async function saveOnlyChatGoal(g){
   };
 }
 
+// 🛒 Dernières ventes Telegram (recentSales, ~10 dernières, déjà renvoyées
+// par l'API — aucun appel en plus) — comme le panneau baleines côté OnlyFans.
+function renderOcSales(d){
+  const sales=Array.isArray(d.recentSales)?d.recentSales:[];
+  if(!sales.length) return "";
+  const rows=sales.slice(0,8).map(s=>{
+    const dt=new Date(s.date);
+    const when=isNaN(dt.getTime())?"":dt.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" "+dt.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+    return `<div class="oc-sale-row"><span class="oc-sale-who">${escapeHtml(s.fanUsername||"?")}</span><span class="oc-sale-model">${escapeHtml(s.creator||"")}</span><span class="oc-sale-amt">${tgMoney(s.amount)}</span><span class="oc-sale-when">${when}</span></div>`;
+  }).join("");
+  return `<div class="oc-chart-cap">🛒 Dernières ventes</div><div class="oc-sales">${rows}</div>`;
+}
+
+// 📈 Historique hebdo (unlockRatio/LTV) — pour voir si le script de vente
+// s'améliore ou se dégrade dans le temps, pas juste le mois en cours.
+let ONLYCHAT_HISTORY=[];
+async function loadOnlyChatHistory(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/onlychat-history",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){ const j=await r.json(); ONLYCHAT_HISTORY=Array.isArray(j.history)?j.history:[]; }
+  }catch(e){}
+  renderOnlyChat();
+}
+function renderOcHistory(){
+  const h=ONLYCHAT_HISTORY.filter(x=>x.unlockRatio!=null);
+  if(h.length<2) return "";
+  const max=Math.max(...h.map(x=>x.unlockRatio*100),1);
+  const fr=ts=>{ const dt=new Date(ts); return isNaN(dt.getTime())?"":dt.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}); };
+  const bars=h.map(x=>{
+    const v=x.unlockRatio*100, hgt=Math.max(2,Math.round(v/max*80));
+    return `<div class="cj-bar" style="height:${hgt}px" title="${fr(x.at)} : ${Math.round(v*10)/10} % ouverts${x.ltv!=null?" · LTV "+tgMoney(x.ltv):""}"></div>`;
+  }).join("");
+  const diff=Math.round((h[h.length-1].unlockRatio-h[0].unlockRatio)*1000)/10;
+  const trend=diff===0?"stable":(diff>0?`en hausse (+${diff} pts)`:`en baisse (${diff} pts)`);
+  return `<div class="oc-chart-cap">📈 Évolution du taux d'ouverture (hebdo)</div>
+    <div class="cj-wrap" style="height:80px">${bars}</div>
+    <div class="sv-note">Depuis le premier relevé : <b>${trend}</b>.</div>`;
+}
 function renderOnlyChat(){
   const el=$("#onlychat"); if(!el) return;
   const d=ONLYCHAT_DATA;
@@ -2677,7 +2739,9 @@ function renderOnlyChat(){
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${renderOcVersus(d)}
     ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
+    ${renderOcSales(d)}
     ${renderOcChart(d)}
+    ${renderOcHistory()}
   `;
 }
 
@@ -4266,7 +4330,7 @@ function renderRenta(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
   const coutVA=netMonth-margeMonth;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0)+(typeof onlyChatFixedCost==="function"?onlyChatFixedCost():0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
@@ -4325,7 +4389,7 @@ function renderSplit(){
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const margeMonth=Number(d.totals.margeMonth)||0;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0)+(typeof onlyChatFixedCost==="function"?onlyChatFixedCost():0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
   // (brut × 22 %), comme le panneau Rentabilité. Avant, on partageait la marge
