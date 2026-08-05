@@ -4102,9 +4102,17 @@ function renderVersus(){
 // 📲 Revenus Telegram générés le mois `m.month` (format serveur "MM/YY").
 // Ce panneau est bâti à 100% côté serveur (OM_DATA.history) : sans ce calcul,
 // Telegram n'y apparaissait JAMAIS (barres du mois ET cumul de vie).
+function tgMonthLabel(d){ return String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(-2); }
+// 💬 Pour le mois EN COURS : le vrai chiffre OnlyChat (live), pas les vieilles
+// entrées manuelles — la saisie manuelle est gelée (panneau caché depuis
+// qu'OnlyChat tourne), donc sans ça "Mon année" afficherait 0 $ Telegram pour
+// ce mois et tous les suivants. Les mois PASSÉS (avant qu'OnlyChat existe)
+// restent sur TGREV : c'est la seule vraie donnée qui existe pour eux.
 function tgHistMonth(monthLabel){
-  return TGREV.filter(x=>{ const d=new Date(x.ts||0); const lbl=String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(-2); return lbl===monthLabel; })
-    .reduce((a,x)=>a+(Number(x.amount)||0),0);
+  if(monthLabel===tgMonthLabel(new Date()) && typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
+    return Number(ONLYCHAT_DATA.totalRevenue)||0;
+  }
+  return TGREV.filter(x=>tgMonthLabel(new Date(x.ts||0))===monthLabel).reduce((a,x)=>a+(Number(x.amount)||0),0);
 }
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
@@ -4152,7 +4160,11 @@ function renderHistory(){
   // + tout l'historique Telegram (toutes dates confondues, pas juste ce mois).
   // tot.netTotal est BRUT (comme m.net ci-dessus) : même conversion × NET_RATE
   // avant d'ajouter Telegram (net), pour rester cohérent avec les barres.
-  const tgAllTime=(typeof TGREV!=="undefined"?TGREV:[]).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  // Mois passés (manuel, réel) + mois en cours (OnlyChat, réel) — jamais les
+  // deux comptés en double pour le même mois.
+  const curLbl=tgMonthLabel(new Date());
+  const tgPast=(typeof TGREV!=="undefined"?TGREV:[]).filter(x=>tgMonthLabel(new Date(x.ts||0))!==curLbl).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const tgAllTime=tgPast+tgHistMonth(curLbl);
   const genereNet=(tot.netTotal||0)*NET_RATE+tgAllTime;
   const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
   const genereSub=(!revKo()&&!HIDE)?`<div class="tile-sub">brut OF : ${omMoney(tot.netTotal||0,cur)}${tgAllTime>0?" · + Telegram "+omMoney(tgAllTime,cur):""}</div>`:"";
