@@ -269,6 +269,8 @@
   .tg-empty{font-size:13px;color:var(--faint);padding:6px 0}
   .oc-tot{font-size:24px;font-weight:700;color:var(--acc)}
   .oc-tot-sub{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
+  .oc-today{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .oc-today b{color:var(--text);font-weight:700}
   .oc-stats{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0 6px}
   .oc-stat{display:flex;flex-direction:column;gap:2px}
   .oc-stat b{font-size:16px;color:var(--text)}
@@ -2529,6 +2531,15 @@ function tgMonthTotal(model){
 // l'entier, ce qui pouvait faire passer un vrai montant (602,00 $) pour un
 // montant approximatif aux yeux de l'opérateur (« si non c'est faux »).
 function tgMoney(v){ if(HIDE) return "•••"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $"; }
+// Revenu Telegram DU JOUR (comme om.netToday côté OnlyFans) — lu dans le
+// détail quotidien qu'OnlyChat renvoie déjà (chartTotal). null si OnlyChat
+// n'est pas branché ou si la ligne d'aujourd'hui est absente (jamais un faux 0).
+function tgTodayTotal(){
+  if(typeof ONLYCHAT_DATA==="undefined" || !ONLYCHAT_DATA || !Array.isArray(ONLYCHAT_DATA.chartTotal)) return null;
+  const t=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10);
+  const row=ONLYCHAT_DATA.chartTotal.find(x=>x.date===t);
+  return row ? (Number(row.total)||0) : null;
+}
 
 /* ---------- Revenus Telegram AUTO (OnlyChat) ---------- */
 // null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
@@ -2560,8 +2571,10 @@ function renderOnlyChat(){
       <span class="oc-amt">${tgMoney(m.totalRevenue)}</span>
       <span class="oc-sub">${m.newConversationsCount||0} conv. · LTV ${m.ltv!=null?tgMoney(m.ltv):"—"}</span></div>`;
   }).join("");
+  const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
   $("#onlychatBody").innerHTML = `
     <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
+    ${tgToday!=null?`<div class="oc-today">📅 Aujourd'hui <b>${tgMoney(tgToday)}</b></div>`:""}
     <div class="oc-stats">
       <div class="oc-stat"><b>${pct(d.unlockRatio)}</b><span>PPV ouverts</span></div>
       <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conv.</span></div>
@@ -4490,10 +4503,15 @@ function renderMorning(){
       const nt=(typeof om.netToday==="number")?om.netToday:null;
       const ajArgent=revKo()?"—":(nt!=null?(money(nt*NET_RATE)+" net")+` <span class="t-sub">(${money(nt)} brut)</span>`:"—");
       const ajSubs=(tot.subsDay!=null?tot.subsDay:"—")+" subs";
+      // 💬 Même chose côté Telegram (OnlyChat) : le CA du jour en cours, à côté
+      // de celui d'OnlyFans — demandé pour voir les deux à chaque ouverture.
+      const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
+      const tgTodayLine=tgToday!=null?`<div class="mn-today mn-today-tg">💬 Telegram aujourd'hui <span class="t-big">${tgMoney(tgToday)}</span></div>`:"";
       return `<div class="lbl">💰 Net du mois (est.)</div>
         <div class="big" id="mnMoney">${moneyOuTiret(netMois, v=>moneyPrecis(v,cur))}</div>
         <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
+        ${tgTodayLine}
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
     })()}</div>
     ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
