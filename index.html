@@ -296,13 +296,6 @@
   .oc-vs-name{min-width:80px}
   .oc-vs-pct{color:var(--acc);font-weight:700}
   .oc-vs-ltv{margin-left:auto;font-size:11.5px;color:var(--muted)}
-  .oc-sales{display:flex;flex-direction:column;gap:2px}
-  .oc-sale-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:.5px solid var(--line)}
-  .oc-sale-row:last-child{border-bottom:0}
-  .oc-sale-who{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
-  .oc-sale-model{font-size:11px;color:var(--muted)}
-  .oc-sale-amt{color:var(--acc);font-weight:700}
-  .oc-sale-when{margin-left:auto;font-size:11px;color:var(--muted)}
   .oc-sales{margin-top:2px}
   .oc-sale-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--line);font-size:12.5px}
   .oc-sale-row:last-child{border-bottom:0}
@@ -310,6 +303,12 @@
   .oc-sale-model{font-size:11px;color:var(--muted)}
   .oc-sale-amt{color:var(--acc);font-weight:700;margin-left:auto}
   .oc-sale-when{font-size:11px;color:var(--faint);min-width:80px;text-align:right}
+  .oc-scripts{margin-top:2px}
+  .oc-sc-row{position:relative;display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px;overflow:hidden}
+  .oc-sc-rank{min-width:18px;font-weight:700;color:var(--muted)}
+  .oc-sc-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:1}
+  .oc-sc-amt{font-weight:700;color:var(--acc);z-index:1}
+  .oc-sc-bar{position:absolute;left:0;bottom:0;height:2px;background:var(--acc);opacity:.4}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -2619,6 +2618,19 @@ function renderOcChart(d){
 }
 // 🆚 Layla vs Zoe (ou tout modèle configuré) : qui convertit le mieux sur
 // Telegram, d'après le taux d'ouverture des PPV (unlockRatio par modèle).
+// 🏆 Classement des scripts par revenu (top 5, mois en cours) — la version
+// compacte de "Scripts Analytics" côté OnlyChat : le classement seul, pas le
+// détail des étapes du funnel (reste consultable sur OnlyChat directement).
+function renderOcScripts(d){
+  const list=Array.isArray(d.topScripts)?d.topScripts.filter(s=>s.revenueUsd>0):[];
+  if(!list.length){
+    // Repli tant que le backend n'a pas encore le classement complet.
+    return d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:"";
+  }
+  const max=Math.max(...list.map(s=>s.revenueUsd),1);
+  const rows=list.map((s,i)=>`<div class="oc-sc-row"><span class="oc-sc-rank">${i===0?"🏆":i+1}</span><span class="oc-sc-name">${escapeHtml(s.name)}</span><span class="oc-sc-amt">${tgMoney(s.revenueUsd)}</span><div class="oc-sc-bar" style="width:${Math.round(s.revenueUsd/max*100)}%"></div></div>`).join("");
+  return `<div class="oc-chart-cap">🏆 Tes scripts (par revenu)</div><div class="oc-scripts">${rows}</div>`;
+}
 function renderOcVersus(d){
   const noms=Object.keys(d.parModele||{}).filter(n=>n!=="Autres" && d.parModele[n].unlockRatio!=null);
   if(noms.length<2) return "";
@@ -2733,7 +2745,7 @@ function renderOnlyChat(){
     </div>
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${renderOcVersus(d)}
-    ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
+    ${renderOcScripts(d)}
     ${renderOcSales(d)}
     ${renderOcChart(d)}
     ${renderOcHistory()}
@@ -6778,9 +6790,16 @@ function renderPie(){
   const panel=$("#pie"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, models=om.models||{}, cur=om.currency||"$";
   let entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0);
-  // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans
+  // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans.
+  // ⭐ Préfère ONLYCHAT_DATA (auto, à jour) à la saisie manuelle TGREV — sinon,
+  // depuis que la saisie manuelle est gelée, ce camembert affichait 0 $
+  // Telegram pour le mois en cours (même piège que tgHistMonth()/renderTgrev()).
   let tg=0;
-  if(typeof TGREV!=="undefined" && Array.isArray(TGREV)){
+  if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
+    const pm=ONLYCHAT_DATA.parModele||{};
+    Object.keys(pm).forEach(nom=>{ const v=Number(pm[nom].totalRevenue)||0; if(v>0){ entries.push(["📲 "+nom,v]); tg+=v; } });
+  } else if(typeof TGREV!=="undefined" && Array.isArray(TGREV)){
+    // Repli : OnlyChat pas encore configuré/joignable, ou revenu Telegram hors OnlyChat.
     const mk=tgMonthKey(Date.now()), tgm={};
     TGREV.filter(x=>tgMonthKey(x.ts)===mk).forEach(x=>{ const m=(x.model||"").trim(); const k=m?("📲 "+m):"📲 Telegram"; tgm[k]=(tgm[k]||0)+(Number(x.amount)||0); tg+=(Number(x.amount)||0); });
     Object.keys(tgm).forEach(k=>{ if(tgm[k]>0) entries.push([k,tgm[k]]); });
