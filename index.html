@@ -1796,6 +1796,7 @@
     </div>
   </div>
 
+  <div class="sec-head" id="onlychatSecHead" style="display:none"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
   <div class="pair-row">
     <div class="panel-box" id="onlychat" style="display:none">
       <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
@@ -2712,6 +2713,7 @@ function renderOcHistory(){
 function renderOnlyChat(){
   const el=$("#onlychat"); if(!el) return;
   const d=ONLYCHAT_DATA;
+  const sh=$("#onlychatSecHead"); if(sh) sh.style.display = d ? "" : "none";
   if(!d){ el.style.display="none"; return; }
   el.style.display="";
   const maj = d.maj ? new Date(d.maj).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
