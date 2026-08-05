@@ -2577,7 +2577,11 @@ function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cu
 function renderTgrev(){
   const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
   tgFillModelSelect();
-  const monthTot=tgMonthTotal();
+  // Total propre à CE panneau (saisie manuelle) : tgMonthTotal() bascule sur
+  // OnlyChat dès qu'il est branché, ce qui afficherait ici un chiffre qui ne
+  // vient pas de ce que tu as noté toi-même — on veut le vrai total manuel.
+  const mKeyTot=tgMonthKey(Date.now());
+  const monthTot=TGREV.filter(x=>tgMonthKey(x.ts)===mKeyTot).reduce((a,x)=>a+(Number(x.amount)||0),0);
   const allTot=TGREV.reduce((a,x)=>a+(Number(x.amount)||0),0);
   const allSubs=TGREV.reduce((a,x)=>a+(Number(x.subs)||0),0);
   const ltv=allSubs>0?allTot/allSubs:0;
