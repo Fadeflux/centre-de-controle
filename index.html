@@ -232,6 +232,11 @@
   .ppick-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer}
   .ppick-row input{width:17px;height:17px;accent-color:var(--acc)}
   .ppick-close{margin-top:14px;width:100%;font:inherit;font-size:13.5px;font-weight:600;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:10px;padding:10px;cursor:pointer}
+  .secnav-cat{margin-top:10px}
+  .secnav-cat-h{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;padding:6px 4px 2px}
+  .secnav-row{padding:9px 8px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer;border-radius:8px}
+  .secnav-row:hover{background:var(--acc-bg);color:var(--text)}
+  .sec-chip-all{color:var(--acc-ink);border-color:var(--acc-line);background:var(--acc-bg)}
   /* 🏦 Trésorerie OnlyFans */
   .tr-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   .tr-big{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
@@ -7423,20 +7428,50 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 })();
 
 /* ---------- 🧭 menu de sections ---------- */
-const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
-  ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
+// 🗂️ Navigation groupée par catégorie — avant, 40 chips dans une seule
+// bande qui défile horizontalement (impossible à scanner, "Telegram" perdu
+// au milieu). Maintenant : quelques chips de catégorie + un tiroir "☰ Tout
+// voir" qui liste tout, groupé, comme le sélecteur de panneaux (#panels).
+const SECNAV_CATS=[
+  ["💰 Argent",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"]]],
+  ["💬 Telegram",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"]]],
+  ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"]]],
+  ["📊 Analyse",[["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"]]],
+  ["🧭 À faire",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
+  ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"]]],
+];
+function secnavVisible(id){ const el=document.getElementById(id); return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; }
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
-  const chips=SECNAV.filter(([id])=>{ const el=document.getElementById(id);
-    return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; });
-  const html=chips.map(([id,lbl])=>`<span class="sec-chip" data-sec="${id}">${lbl}</span>`).join("");
+  const cats=SECNAV_CATS.filter(([,items])=>items.some(([id])=>secnavVisible(id)));
+  const html=cats.map(([label])=>`<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label}</span>`).join("")
+    +`<span class="sec-chip sec-chip-all" data-secnav-all="1">☰ Tout voir</span>`;
   if(nav.innerHTML!==html) nav.innerHTML=html;
 }
+function jumpToSection(id){ const el=document.getElementById(id); if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } }
+function openSectionNav(scrollToCat){
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🗂️ Aller à…</h3>
+    <div class="ppick-sub">Tape sur une section pour y sauter directement.</div>
+    ${SECNAV_CATS.map(([label,items])=>{
+      const rows=items.filter(([id])=>secnavVisible(id)).map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}">${lbl}</div>`).join("");
+      return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${label}</div>${rows}</div>`:"";
+    }).join("")}
+    <button class="ppick-close">Fermer</button></div>`;
+  ov.addEventListener("click",e=>{
+    if(e.target===ov||e.target.closest(".ppick-close")){ ov.remove(); return; }
+    const row=e.target.closest("[data-sec]");
+    if(row){ ov.remove(); jumpToSection(row.getAttribute("data-sec")); }
+  });
+  document.body.appendChild(ov);
+  if(scrollToCat){
+    const target=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===scrollToCat);
+    if(target) target.scrollIntoView({block:"start"});
+  }
+}
 $("#secnav").addEventListener("click",e=>{
-  const c=e.target.closest("[data-sec]"); if(!c) return;
-  const el=document.getElementById(c.getAttribute("data-sec"));
-  if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); }
+  const all=e.target.closest("[data-secnav-all]"); if(all){ openSectionNav(); return; }
+  const cat=e.target.closest("[data-secnav-cat]"); if(cat){ openSectionNav(cat.getAttribute("data-secnav-cat")); return; }
 });
 refreshSecnav();
 
