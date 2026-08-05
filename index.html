@@ -290,6 +290,8 @@
   .oc-script{font-size:12px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
   .oc-script b{color:var(--text)}
   .oc-chart-cap{font-size:12px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .oc-chart-hint{font-size:10.5px;color:var(--faint)}
+  #onlychatBody .cj-bar{cursor:pointer}
   .cj-bar.today{opacity:.55;background:repeating-linear-gradient(135deg,var(--acc),var(--acc) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 8px)}
   .occ-text{font-size:13.5px;line-height:1.55;color:var(--text)}
   .occ-text p{margin:0 0 10px}
@@ -1801,7 +1803,7 @@
     </div>
   </div>
 
-  <div class="sec-head" id="onlychatSecHead" style="display:none"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
+  <div class="sec-head" id="onlychatSecHead"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
   <div class="pair-row">
     <div class="panel-box" id="onlychat" style="display:none">
       <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
@@ -1814,33 +1816,35 @@
       <div class="pb-sub">Compare des conversations réelles qui ont mené à un achat et d'autres non, pour dire ce qui vend mieux. Aucun nom de fan n'est utilisé. Rafraîchi une fois par semaine.</div>
       <div id="onlychatcoachBody"></div>
     </div>
-    <!-- Panneau caché : OnlyChat (#onlychat ci-dessus) donne maintenant les vrais
-         chiffres à 100 %, plus besoin de la saisie manuelle. Le JS (TGREV,
-         tgHistMonth) reste actif pour ne pas perdre l'historique déjà noté
-         (juillet et avant, avant qu'OnlyChat existe) dans le panneau "Mon année". -->
-    <div class="tgrev" id="tgrev" style="display:none">
-      <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
-      <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
-      <div class="tg-add">
-        <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
-        <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
-        <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
-        <input id="tgDate" type="date" title="Date de ce revenu — change-la pour ajouter un mois passé" />
-        <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
-        <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
-      </div>
-      <div id="tgList"></div>
+  </div>
+  <!-- Panneau caché : OnlyChat ci-dessus donne maintenant les vrais chiffres à
+       100 %, plus besoin de la saisie manuelle. Le JS (TGREV, tgHistMonth)
+       reste actif pour ne pas perdre l'historique déjà noté (juillet et avant,
+       avant qu'OnlyChat existe) dans le panneau "Mon année". Sorti du pair-row
+       ci-dessus : mélanger panel-box et non-panel-box dans la même grille à 2
+       colonnes laissait une case vide (fixPairs() ne compte que les .panel-box). -->
+  <div class="tgrev" id="tgrev" style="display:none">
+    <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
+    <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
+    <div class="tg-add">
+      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
+      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
+      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
+      <input id="tgDate" type="date" title="Date de ce revenu — change-la pour ajouter un mois passé" />
+      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
+      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
     </div>
-    <div class="costs" id="costs">
-      <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
-      <div class="costs-add">
-        <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
-        <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
-        <input id="costDue" type="date" title="Prochaine échéance (facultatif) — je te préviens 3 jours avant" />
-        <select id="costEvery" title="Récurrence"><option value="mois">tous les mois</option><option value="an">tous les ans</option><option value="semaine">chaque semaine</option></select>
-      </div>
-      <div id="costsList"></div>
+    <div id="tgList"></div>
+  </div>
+  <div class="costs" id="costs">
+    <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
+    <div class="costs-add">
+      <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
+      <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
+      <input id="costDue" type="date" title="Prochaine échéance (facultatif) — je te préviens 3 jours avant" />
+      <select id="costEvery" title="Récurrence"><option value="mois">tous les mois</option><option value="an">tous les ans</option><option value="semaine">chaque semaine</option></select>
     </div>
+    <div id="costsList"></div>
   </div>
 
   <div class="panel-box" id="cash" style="display:none">
@@ -2607,20 +2611,27 @@ async function loadOnlyChat(){
 // lu dans chartTotal, déjà renvoyé par l'API OnlyChat (aucun nouvel appel).
 // L'API renvoie parfois un jour de plus que la date du jour (fuseau) : on
 // coupe tout ce qui dépasse aujourd'hui pour ne jamais montrer un "futur".
+// ⭐ title="" (survol souris) ne montre RIEN sur mobile/tactile — le montant
+// était donc invisible pour André. Chaque barre est maintenant TAPABLE
+// (data-date/data-val + délégation de clic ci-dessous -> toast), et le
+// meilleur jour reste affiché en clair sans interaction, comme le graphique
+// "CA par jour" d'OnlyFans.
 function renderOcChart(d){
   const t=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10);
   const serie=(Array.isArray(d.chartTotal)?d.chartTotal:[]).filter(x=>x.date<=t);
   if(serie.length<2) return "";
   const max=Math.max(...serie.map(x=>Number(x.total)||0),1);
-  const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
+  const fr=(s,long)=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",long?{weekday:"long",day:"numeric",month:"long"}:{weekday:"short",day:"numeric",month:"short"}); };
+  const best=serie.reduce((a,x)=>(Number(x.total)||0)>(Number(a.total)||0)?x:a,serie[0]);
   const bars=serie.map(x=>{
     const v=Number(x.total)||0, h=Math.max(2,Math.round(v/max*128));
-    return `<div class="cj-bar${x.date===t?" today":""}" style="height:${h}px" title="${fr(x.date)}${x.date===t?" (en cours)":""} : ${tgMoney(v)}"></div>`;
+    return `<div class="cj-bar${x.date===t?" today":""}${x.date===best.date&&v>0?" best":""}" style="height:${h}px" data-date="${x.date}" data-val="${v}" title="${fr(x.date)}${x.date===t?" (en cours)":""} : ${tgMoney(v)}"></div>`;
   }).join("");
   const days=serie.map((x,i)=>`<span>${(i%4===0||x.date===t)?parseInt(x.date.slice(8),10):""}</span>`).join("");
-  return `<div class="oc-chart-cap">📅 CA par jour (mois en cours)</div>
+  return `<div class="oc-chart-cap">📅 CA par jour (mois en cours) <span class="oc-chart-hint">— touche une barre pour voir le montant</span></div>
     <div class="cj-wrap">${bars}</div>
-    <div class="cj-days">${days}</div>`;
+    <div class="cj-days">${days}</div>
+    ${best.total>0?`<div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${tgMoney(best.total)}.</div>`:""}`;
 }
 // 🆚 Layla vs Zoe (ou tout modèle configuré) : qui convertit le mieux sur
 // Telegram, d'après le taux d'ouverture des PPV (unlockRatio par modèle).
@@ -2808,6 +2819,17 @@ function renderOnlyChatCoach(){
     }, 15000);
     const safety=setTimeout(done, 10*60000);   // filet : jamais bloqué indéfiniment
   };
+}
+// Barres du "CA par jour" tapables (le survol souris ne marche pas au doigt) —
+// délégué sur le conteneur stable (survit aux re-rendus d'innerHTML) ;
+// [data-val] distingue les barres du graphique Telegram de celles du
+// graphique OnlyFans (mêmes classes .cj-bar, pas le même conteneur).
+{ const c=$("#onlychatBody"); if(c) c.addEventListener("click",e=>{
+    const bar=e.target.closest(".cj-bar[data-val]"); if(!bar) return;
+    const dt=new Date(bar.getAttribute("data-date")+"T12:00:00Z");
+    const lbl=dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+    if(typeof toast==="function") toast("📅 "+lbl, tgMoney(Number(bar.getAttribute("data-val"))));
+  });
 }
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
 function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
@@ -7465,8 +7487,16 @@ function openSectionNav(scrollToCat){
   });
   document.body.appendChild(ov);
   if(scrollToCat){
-    const target=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===scrollToCat);
-    if(target) target.scrollIntoView({block:"start"});
+    // ⭐ Buggé sans requestAnimationFrame : le tiroir vient d'être inséré dans
+    // le DOM, le navigateur n'a pas encore calculé sa mise en page (hauteurs,
+    // position de scroll) — scrollIntoView() appelé immédiatement retombait
+    // systématiquement au même (mauvais) endroit, quelle que soit la
+    // catégorie cliquée. On attend le prochain repaint pour que les mesures
+    // soient justes.
+    requestAnimationFrame(()=>{
+      const target=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===scrollToCat);
+      if(target) target.scrollIntoView({block:"start"});
+    });
   }
 }
 $("#secnav").addEventListener("click",e=>{
