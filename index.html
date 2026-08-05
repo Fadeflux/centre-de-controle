@@ -283,6 +283,8 @@
   .oc-sub{margin-left:auto;font-size:11.5px;color:var(--muted);text-align:right}
   .oc-script{font-size:12px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
   .oc-script b{color:var(--text)}
+  .oc-chart-cap{font-size:12px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .cj-bar.today{opacity:.55;background:repeating-linear-gradient(135deg,var(--acc),var(--acc) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 8px)}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -2562,6 +2564,25 @@ async function loadOnlyChat(){
   }catch(e){}
   renderOnlyChat();
 }
+// 📅 CA Telegram par jour (mois en cours), comme le "CA par jour" d'OnlyFans —
+// lu dans chartTotal, déjà renvoyé par l'API OnlyChat (aucun nouvel appel).
+// L'API renvoie parfois un jour de plus que la date du jour (fuseau) : on
+// coupe tout ce qui dépasse aujourd'hui pour ne jamais montrer un "futur".
+function renderOcChart(d){
+  const t=(typeof todayStr==="function")?todayStr():new Date().toISOString().slice(0,10);
+  const serie=(Array.isArray(d.chartTotal)?d.chartTotal:[]).filter(x=>x.date<=t);
+  if(serie.length<2) return "";
+  const max=Math.max(...serie.map(x=>Number(x.total)||0),1);
+  const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
+  const bars=serie.map(x=>{
+    const v=Number(x.total)||0, h=Math.max(2,Math.round(v/max*128));
+    return `<div class="cj-bar${x.date===t?" today":""}" style="height:${h}px" title="${fr(x.date)}${x.date===t?" (en cours)":""} : ${tgMoney(v)}"></div>`;
+  }).join("");
+  const days=serie.map((x,i)=>`<span>${(i%4===0||x.date===t)?parseInt(x.date.slice(8),10):""}</span>`).join("");
+  return `<div class="oc-chart-cap">📅 CA par jour (mois en cours)</div>
+    <div class="cj-wrap">${bars}</div>
+    <div class="cj-days">${days}</div>`;
+}
 function renderOnlyChat(){
   const el=$("#onlychat"); if(!el) return;
   const d=ONLYCHAT_DATA;
@@ -2589,6 +2610,7 @@ function renderOnlyChat(){
     </div>
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
+    ${renderOcChart(d)}
   `;
 }
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
