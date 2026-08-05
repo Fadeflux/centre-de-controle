@@ -285,6 +285,10 @@
   .oc-script b{color:var(--text)}
   .oc-chart-cap{font-size:12px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
   .cj-bar.today{opacity:.55;background:repeating-linear-gradient(135deg,var(--acc),var(--acc) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 8px)}
+  .occ-text{font-size:13.5px;line-height:1.55;color:var(--text)}
+  .occ-text p{margin:0 0 10px}
+  .occ-text p:last-child{margin-bottom:0}
+  .occ-sample{font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -449,7 +453,7 @@
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
   body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
   body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes, body.assoc-mode #recos,
-  body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #onlychat, body.assoc-mode #fanradar,
+  body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #onlychat, body.assoc-mode #onlychatcoach, body.assoc-mode #fanradar,
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
@@ -1778,6 +1782,12 @@
       <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
       <div id="onlychatBody"></div>
     </div>
+
+    <div class="panel-box" id="onlychatcoach" style="display:none">
+      <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span></div>
+      <div class="pb-sub">Compare des conversations réelles qui ont mené à un achat et d'autres non, pour dire ce qui vend mieux. Aucun nom de fan n'est utilisé. Rafraîchi une fois par semaine.</div>
+      <div id="onlychatcoachBody"></div>
+    </div>
     <!-- Panneau caché : OnlyChat (#onlychat ci-dessus) donne maintenant les vrais
          chiffres à 100 %, plus besoin de la saisie manuelle. Le JS (TGREV,
          tgHistMonth) reste actif pour ne pas perdre l'historique déjà noté
@@ -2362,7 +2372,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -2611,6 +2621,40 @@ function renderOnlyChat(){
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
     ${renderOcChart(d)}
+  `;
+}
+
+/* ---------- Coaching Telegram (IA) — OnlyChat ---------- */
+let ONLYCHAT_COACH = null;
+async function loadOnlyChatCoach(){
+  if(!TOKEN) return;
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/onlychat-coach",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){
+      const j = await r.json();
+      ONLYCHAT_COACH = (j && j.conseil) ? j : null;
+    }
+  }catch(e){}
+  renderOnlyChatCoach();
+}
+// Mise en forme minimale du texte de Gemini : **gras** -> <b>, listes "1. " en
+// début de ligne -> puces, retours à la ligne -> paragraphes. Pas de vraie lib
+// markdown ici, le texte de Gemini reste simple (gras + numéros).
+function ocCoachFormat(txt){
+  const esc = escapeHtml(txt).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  return esc.split(/\n+/).filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join("");
+}
+function renderOnlyChatCoach(){
+  const el=$("#onlychatcoach"); if(!el) return;
+  const d=ONLYCHAT_COACH;
+  if(!d){ el.style.display="none"; return; }
+  el.style.display="";
+  const maj = d.maj ? new Date(d.maj).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "";
+  $("#occState").textContent = maj ? `màj ${maj}` : "";
+  const ech = d.echantillon || {};
+  $("#onlychatcoachBody").innerHTML = `
+    <div class="occ-text">${ocCoachFormat(d.conseil)}</div>
+    <div class="occ-sample">Basé sur ${ech.payeurs||0} conversation${(ech.payeurs||0)>1?"s":""} payeuse${(ech.payeurs||0)>1?"s":""} et ${ech.nonPayeurs||0} non-payeuse${(ech.nonPayeurs||0)>1?"s":""}.</div>
   `;
 }
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
@@ -7201,7 +7245,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["onlychat","💬 Telegram auto"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -7222,7 +7266,7 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
+  ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["onlychatcoach","🎓 Coaching Telegram (IA)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
   ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
   ["recos","🧭 À faire maintenant"],["moisrecord","🥇 Ce mois vs record"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
