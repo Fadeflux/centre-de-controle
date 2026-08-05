@@ -2516,19 +2516,17 @@ async function loadCosts(){
   }catch(e){}
 }
 function renderCosts(){
-  // 💬 OnlyChat (abonnements fixes, 180 $/mois) : auto, pas dans COSTS —
-  // calculé, pas manuel, jamais désynchronisé si les tarifs changent au même
-  // endroit que le reste (onlyChatFixedCost()) ; pas de bouton supprimer.
-  const ocCost=(typeof onlyChatFixedCost==="function")?onlyChatFixedCost():0;
-  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0)+ocCost;
-  $("#costsTotal").textContent = (COSTS.length||ocCost>0) ? `${fmtMoney(tot)} / mois` : "";
-  const ocRow = ocCost>0 ? `<div class="co-row" title="70 $ × 2 comptes OnlyFans + 20 $ × 2 comptes Telegram"><span class="co-name">OnlyChat <span class="co-auto">auto</span></span><span class="co-amt">${fmtMoney(ocCost)}</span></div>` : "";
-  if(!COSTS.length && !ocCost){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
+  // 💬 L'abonnement fixe OnlyChat (180 $/mois) est une entrée NORMALE de COSTS
+  // (ajoutée une fois côté serveur, "OnlyChat (2 OF + 2 Telegram)") — pas un
+  // calcul séparé : sinon il se comptait deux fois (ici + dans coutOutils).
+  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
+  $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
+  if(!COSTS.length){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
   // Compte à rebours : ce qui arrive dans <= 3 jours passe en orange, en retard en rouge.
   const jours=(d)=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(d||"")) return null;
     const a=d.split("-").map(Number), n=new Date();
     return Math.round((Date.UTC(a[0],a[1]-1,a[2])-Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))/86400000); };
-  $("#costsList").innerHTML = ocRow + COSTS.map((c,i)=>{
+  $("#costsList").innerHTML = COSTS.map((c,i)=>{
     let ech="";
     const j=jours(c.due);
     if(j!=null){
@@ -2584,15 +2582,6 @@ function tgTodayTotal(){
   const row=ONLYCHAT_DATA.chartTotal.find(x=>x.date===t);
   return row ? (Number(row.total)||0) : null;
 }
-
-// 💰 Abonnements FIXES OnlyChat (donné par André le 2026-08-05) : 70 $/mois
-// par compte OnlyFans connecté (×2) + 20 $/mois par compte Telegram (×2) =
-// 180 $/mois. Distinct de onlychatFee() (la commission % sur les ventes,
-// déjà gérée dans Rentabilité/Partage) — ceci est le coût FIXE affiché dans
-// "Dépenses d'outils", pour que rentabilité en tienne compte automatiquement
-// sans qu'André ait à le ressaisir chaque mois.
-const ONLYCHAT_SUB_OF=70, ONLYCHAT_SUB_OF_N=2, ONLYCHAT_SUB_TG=20, ONLYCHAT_SUB_TG_N=2;
-function onlyChatFixedCost(){ return ONLYCHAT_SUB_OF*ONLYCHAT_SUB_OF_N + ONLYCHAT_SUB_TG*ONLYCHAT_SUB_TG_N; }
 
 /* ---------- Revenus Telegram AUTO (OnlyChat) ---------- */
 // null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
@@ -4336,7 +4325,7 @@ function renderRenta(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
   const coutVA=netMonth-margeMonth;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0)+(typeof onlyChatFixedCost==="function"?onlyChatFixedCost():0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
@@ -4395,7 +4384,7 @@ function renderSplit(){
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const margeMonth=Number(d.totals.margeMonth)||0;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0)+(typeof onlyChatFixedCost==="function"?onlyChatFixedCost():0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
   // (brut × 22 %), comme le panneau Rentabilité. Avant, on partageait la marge
