@@ -267,6 +267,20 @@
   .tg-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .tg-del:hover{color:var(--down);opacity:1}
   .tg-empty{font-size:13px;color:var(--faint);padding:6px 0}
+  .oc-tot{font-size:24px;font-weight:700;color:var(--acc)}
+  .oc-tot-sub{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
+  .oc-stats{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0 6px}
+  .oc-stat{display:flex;flex-direction:column;gap:2px}
+  .oc-stat b{font-size:16px;color:var(--text)}
+  .oc-stat span{font-size:11px;color:var(--muted)}
+  .oc-models{margin-top:10px;border-top:1px solid var(--line)}
+  .oc-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
+  .oc-row:last-child{border-bottom:0}
+  .oc-name{font-weight:600;min-width:70px}
+  .oc-amt{font-weight:600;color:var(--acc)}
+  .oc-sub{margin-left:auto;font-size:11.5px;color:var(--muted);text-align:right}
+  .oc-script{font-size:12px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+  .oc-script b{color:var(--text)}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -431,7 +445,7 @@
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
   body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
   body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes, body.assoc-mode #recos,
-  body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #fanradar,
+  body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #onlychat, body.assoc-mode #fanradar,
   body.assoc-mode #anomalies, body.assoc-mode #rules, body.assoc-mode #busfactor, body.assoc-mode #incidents,
   body.assoc-mode #proxy, body.assoc-mode #badges, body.assoc-mode #tasks, body.assoc-mode #ask,
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
@@ -1753,9 +1767,14 @@
   </div>
 
   <div class="pair-row">
+    <div class="panel-box" id="onlychat" style="display:none">
+      <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span></div>
+      <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
+      <div id="onlychatBody"></div>
+    </div>
     <div class="tgrev" id="tgrev">
-      <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
-      <div class="tg-sub">Note ici ce que tu génères sur Telegram (pas d'API → à la main). Ça remonte dans le camembert et ton profit.</div>
+      <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
+      <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
       <div class="tg-add">
         <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
         <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
@@ -2333,7 +2352,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadTgrev, loadOnlyChat, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -2370,7 +2389,7 @@ $("#hide").onclick = ()=>{
 // Appelée par 🙈 ET par la vue associé (le moment où l'on tend l'écran).
 function rerenderMoney(){
   [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos, renderMeteo,
-   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, function(){ renderPaie(LAST); }]
+   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, renderOnlyChat, function(){ renderPaie(LAST); }]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 }
 
@@ -2494,11 +2513,65 @@ async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/h
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 // `model` optionnel : filtre sur un modèle précis (utilisé par le tuile "Net du
 // mois" quand on regarde un modèle en particulier) ; omis/"all" = tous modèles.
-function tgMonthTotal(model){ const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey && (!model||model==="all"||(x.model||"")===model)).reduce((a,x)=>a+(Number(x.amount)||0),0); }
+// 💬 Depuis qu'OnlyChat (Telegram) est branché EN AUTOMATIQUE, on préfère son
+// chiffre (live, par l'API) à la saisie manuelle — pour ne pas compter en
+// double. La saisie manuelle reste utilisable en repli (source injoignable,
+// ou revenu Telegram hors OnlyChat).
+function tgMonthTotal(model){
+  if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
+    if(!model || model==="all") return Number(ONLYCHAT_DATA.totalRevenue)||0;
+    const pm=(ONLYCHAT_DATA.parModele||{})[model];
+    if(pm) return Number(pm.totalRevenue)||0;
+  }
+  const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey && (!model||model==="all"||(x.model||"")===model)).reduce((a,x)=>a+(Number(x.amount)||0),0);
+}
 // Montant Telegram AVEC les centimes — fmtCur/toLocaleString arrondissaient à
 // l'entier, ce qui pouvait faire passer un vrai montant (602,00 $) pour un
 // montant approximatif aux yeux de l'opérateur (« si non c'est faux »).
 function tgMoney(v){ if(HIDE) return "•••"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $"; }
+
+/* ---------- Revenus Telegram AUTO (OnlyChat) ---------- */
+// null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
+// « je sais pas > chiffre faux »). Le panneau reste caché dans ce cas.
+let ONLYCHAT_DATA = null;
+async function loadOnlyChat(){
+  if(!TOKEN) return;
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/onlychat",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){
+      const j = await r.json();
+      ONLYCHAT_DATA = (j && j.totalRevenue!=null) ? j : null;
+    }
+  }catch(e){}
+  renderOnlyChat();
+}
+function renderOnlyChat(){
+  const el=$("#onlychat"); if(!el) return;
+  const d=ONLYCHAT_DATA;
+  if(!d){ el.style.display="none"; return; }
+  el.style.display="";
+  const maj = d.maj ? new Date(d.maj).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
+  $("#ocState").textContent = maj ? `màj ${maj}` : "";
+  const pct = v => v==null ? "—" : (Math.round(v*1000)/10) + " %";
+  const noms = Object.keys(d.parModele||{});
+  const rows = noms.map(nom=>{
+    const m=d.parModele[nom];
+    return `<div class="oc-row"><span class="oc-name">${escapeHtml(nom)}</span>
+      <span class="oc-amt">${tgMoney(m.totalRevenue)}</span>
+      <span class="oc-sub">${m.newConversationsCount||0} conv. · LTV ${m.ltv!=null?tgMoney(m.ltv):"—"}</span></div>`;
+  }).join("");
+  $("#onlychatBody").innerHTML = `
+    <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
+    <div class="oc-stats">
+      <div class="oc-stat"><b>${pct(d.unlockRatio)}</b><span>PPV ouverts</span></div>
+      <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conv.</span></div>
+      <div class="oc-stat"><b>${d.ltv!=null?tgMoney(d.ltv):"—"}</b><span>LTV / conv.</span></div>
+      <div class="oc-stat"><b>${d.aiSalesCount??"—"}</b><span>ventes IA</span></div>
+    </div>
+    ${rows?`<div class="oc-models">${rows}</div>`:""}
+    ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
+  `;
+}
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
 function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
 function renderTgrev(){
@@ -7071,7 +7144,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 
 /* ---------- 🧭 menu de sections ---------- */
 const SECNAV=[["sections","🛠 Outils"],["modeles","🎭 Modèles"],["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],
-  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
+  ["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["anomalies","📊 Anomalies"],["charge","💪 Charge"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["onlychat","💬 Telegram auto"],["objmois","🎯 Objectif"],["recos","🧭 À faire"],["moisrecord","🥇 Record"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["changements","📓 Changements"],["costs","🧾 Dépenses"],
   ["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["busfactor","🏖️ Absence"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]];
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
@@ -7092,7 +7165,7 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["tgrev","📲 Revenus Telegram"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
+  ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["tgrev","📲 Revenus Telegram (saisie manuelle)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
   ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
   ["recos","🧭 À faire maintenant"],["moisrecord","🥇 Ce mois vs record"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
