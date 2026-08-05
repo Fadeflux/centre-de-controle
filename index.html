@@ -1776,7 +1776,11 @@
       <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
       <div id="onlychatBody"></div>
     </div>
-    <div class="tgrev" id="tgrev">
+    <!-- Panneau caché : OnlyChat (#onlychat ci-dessus) donne maintenant les vrais
+         chiffres à 100 %, plus besoin de la saisie manuelle. Le JS (TGREV,
+         tgHistMonth) reste actif pour ne pas perdre l'historique déjà noté
+         (juillet et avant, avant qu'OnlyChat existe) dans le panneau "Mon année". -->
+    <div class="tgrev" id="tgrev" style="display:none">
       <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
       <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
       <div class="tg-add">
@@ -7196,7 +7200,7 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
-  ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["tgrev","📲 Revenus Telegram (saisie manuelle)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
+  ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
   ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
   ["recos","🧭 À faire maintenant"],["moisrecord","🥇 Ce mois vs record"]];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
