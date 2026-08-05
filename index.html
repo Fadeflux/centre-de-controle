@@ -151,6 +151,7 @@
   .co-row:last-child{border-bottom:0}
   .co-name{flex:1;word-break:break-word}
   .co-amt{color:var(--text);font-weight:500}
+  .co-auto{font-size:9.5px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:5px;padding:1px 5px;margin-left:5px;vertical-align:middle}
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
@@ -2515,14 +2516,19 @@ async function loadCosts(){
   }catch(e){}
 }
 function renderCosts(){
-  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
-  $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
-  if(!COSTS.length){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
+  // 💬 OnlyChat (abonnements fixes, 180 $/mois) : auto, pas dans COSTS —
+  // calculé, pas manuel, jamais désynchronisé si les tarifs changent au même
+  // endroit que le reste (onlyChatFixedCost()) ; pas de bouton supprimer.
+  const ocCost=(typeof onlyChatFixedCost==="function")?onlyChatFixedCost():0;
+  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0)+ocCost;
+  $("#costsTotal").textContent = (COSTS.length||ocCost>0) ? `${fmtMoney(tot)} / mois` : "";
+  const ocRow = ocCost>0 ? `<div class="co-row" title="70 $ × 2 comptes OnlyFans + 20 $ × 2 comptes Telegram"><span class="co-name">OnlyChat <span class="co-auto">auto</span></span><span class="co-amt">${fmtMoney(ocCost)}</span></div>` : "";
+  if(!COSTS.length && !ocCost){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
   // Compte à rebours : ce qui arrive dans <= 3 jours passe en orange, en retard en rouge.
   const jours=(d)=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(d||"")) return null;
     const a=d.split("-").map(Number), n=new Date();
     return Math.round((Date.UTC(a[0],a[1]-1,a[2])-Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))/86400000); };
-  $("#costsList").innerHTML = COSTS.map((c,i)=>{
+  $("#costsList").innerHTML = ocRow + COSTS.map((c,i)=>{
     let ech="";
     const j=jours(c.due);
     if(j!=null){
