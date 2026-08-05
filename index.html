@@ -4246,6 +4246,10 @@ function renderHistory(){
   $("#history").style.display="block";
   $("#historyBody").innerHTML=`${recordBanner}${cumul}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
 }
+// 🧾 Commission qu'OnlyChat prend SUR LES VENTES (en plus de l'abonnement fixe
+// déjà dans "Dépenses d'outils") : 10 % du net OnlyFans + 15 % du net Telegram.
+// Donné par André le 2026-08-05 — un vrai coût variable, pas une estimation.
+function onlychatFee(ofNet, tgNet){ return (Number(ofNet)||0)*0.10 + (Number(tgNet)||0)*0.15; }
 function renderRenta(){
   if(!OM_DATA){ $("#renta").style.display="none"; return; }
   { const ae=document.activeElement; if(ae && ae.id==="taxRate") return; }   // ne pas effacer le taux d'impôt en cours de saisie
@@ -4273,14 +4277,18 @@ function renderRenta(){
   // Le vrai profit retire la commission plateforme (brut × 22 %) — avant, le
   // panneau la « oubliait » et surestimait le profit d'un quart.
   const commission=Math.round(netMonth*(1-NET_RATE));
-  const profitReel=profitNet-commission;
+  // 💬 Commission OnlyChat SUR LES VENTES (en plus des 180 $/mois
+  // d'abonnements déjà dans "Coûts des outils") : onlychatFee() ci-dessus.
+  const ocFee=Math.round(onlychatFee(netMonth*NET_RATE, tgMonth));
+  const profitReel=profitNet-commission-ocFee;
   // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
   const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
   const provision=Math.round(Math.max(0,profitReel)*TAX/100);
   const vraiment=profitReel-provision;
   const taxLines=(TAX>0)?`<div class="rn-line"><span>− Impôts/charges à mettre de côté (${TAX} %)</span><span class="rn-v neg">−${money(provision)}</span></div>`
     +`<div class="rn-line rn-total"><span>= Vraiment à toi (dépensable)</span><span class="rn-v ${vraiment>=0?'pos':'neg'}">${vraiment>=0?'':'−'}${money(Math.abs(vraiment))}</span></div>`:"";
-  const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE));
+  const projOcFee=Math.round(onlychatFee(projNet*NET_RATE, projTg));
+  const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE))-projOcFee;
   // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
   // l'historique et encore partiel) + fourchette de prévision
   const histAll=Array.isArray(d.history)?d.history:[];
@@ -4299,6 +4307,7 @@ function renderRenta(){
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
+    ${ocFee>0?`<div class="rn-line"><span>− Commission OnlyChat (10 % OF + 15 % Telegram)</span><span class="rn-v neg">−${money(ocFee)}</span></div>`:""}
     <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
     ${taxLines}
     <div class="rn-tax-set">🧾 Mettre de côté pour impôts/charges : <input type="number" id="taxRate" min="0" max="60" step="1" value="${TAX}" inputmode="numeric"> % <button class="mn-act-btn" id="taxSave">OK</button></div>
@@ -4323,7 +4332,11 @@ function renderSplit(){
   // BRUTE -> chaque associé se voyait attribuer ~508 $ que la plateforme prélève
   // et qui n'entre jamais. netMonth = CA brut du mois.
   const commission=Math.round((Number(d.totals.netMonth)||0)*(1-NET_RATE));
-  const profit=margeMonth-commission-coutOutils+tgMonth;
+  // Même commission OnlyChat que le panneau Rentabilité (10 % OF + 15 %
+  // Telegram, sur les VENTES) — sinon on partage un profit qu'OnlyChat va
+  // prélever après coup, comme la commission plateforme oubliée avant.
+  const ocFee=Math.round(onlychatFee((Number(d.totals.netMonth)||0)*NET_RATE, tgMonth));
+  const profit=margeMonth-commission-coutOutils-ocFee+tgMonth;
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
