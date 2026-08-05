@@ -7487,16 +7487,17 @@ function openSectionNav(scrollToCat){
   });
   document.body.appendChild(ov);
   if(scrollToCat){
-    // ⭐ Buggé sans requestAnimationFrame : le tiroir vient d'être inséré dans
-    // le DOM, le navigateur n'a pas encore calculé sa mise en page (hauteurs,
-    // position de scroll) — scrollIntoView() appelé immédiatement retombait
-    // systématiquement au même (mauvais) endroit, quelle que soit la
-    // catégorie cliquée. On attend le prochain repaint pour que les mesures
-    // soient justes.
-    requestAnimationFrame(()=>{
+    // ⭐ Buggé sans délai : le tiroir vient d'être inséré dans le DOM, le
+    // navigateur n'a pas encore calculé sa mise en page (hauteurs, position de
+    // scroll) — scrollIntoView() appelé immédiatement retombait systématiquement
+    // au même (mauvais) endroit, quelle que soit la catégorie cliquée.
+    // requestAnimationFrame() semblait la solution propre mais ne se déclenche
+    // pas de façon fiable ici (onglet pas forcément au premier plan) ; un
+    // setTimeout court, lui, marche à tous les coups — vérifié en vrai.
+    setTimeout(()=>{
       const target=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===scrollToCat);
       if(target) target.scrollIntoView({block:"start"});
-    });
+    }, 50);
   }
 }
 $("#secnav").addEventListener("click",e=>{
