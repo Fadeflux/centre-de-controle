@@ -291,7 +291,7 @@
   .oc-script b{color:var(--text)}
   .oc-chart-cap{font-size:12px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
   .oc-chart-hint{font-size:10.5px;color:var(--faint)}
-  #onlychatBody .cj-bar{cursor:pointer}
+  #onlychatBody .cj-bar,#cjBody .cj-bar{cursor:pointer}
   .cj-bar.today{opacity:.55;background:repeating-linear-gradient(135deg,var(--acc),var(--acc) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 4px,color-mix(in srgb,var(--acc) 45%,transparent) 8px)}
   .occ-text{font-size:13.5px;line-height:1.55;color:var(--text)}
   .occ-text p{margin:0 0 10px}
@@ -2718,11 +2718,12 @@ function renderOcHistory(){
   const fr=ts=>{ const dt=new Date(ts); return isNaN(dt.getTime())?"":dt.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}); };
   const bars=h.map(x=>{
     const v=x.unlockRatio*100, hgt=Math.max(2,Math.round(v/max*80));
-    return `<div class="cj-bar" style="height:${hgt}px" title="${fr(x.at)} : ${Math.round(v*10)/10} % ouverts${x.ltv!=null?" · LTV "+tgMoney(x.ltv):""}"></div>`;
+    const lbl=`${Math.round(v*10)/10} % ouverts${x.ltv!=null?" · LTV "+tgMoney(x.ltv):""}`;
+    return `<div class="cj-bar" style="height:${hgt}px" data-date="${fr(x.at)}" data-lbl="${escapeHtml(lbl)}" title="${fr(x.at)} : ${lbl}"></div>`;
   }).join("");
   const diff=Math.round((h[h.length-1].unlockRatio-h[0].unlockRatio)*1000)/10;
   const trend=diff===0?"stable":(diff>0?`en hausse (+${diff} pts)`:`en baisse (${diff} pts)`);
-  return `<div class="oc-chart-cap">📈 Évolution du taux d'ouverture (hebdo)</div>
+  return `<div class="oc-chart-cap">📈 Évolution du taux d'ouverture (hebdo) <span class="oc-chart-hint">— touche une barre</span></div>
     <div class="cj-wrap" style="height:80px">${bars}</div>
     <div class="sv-note">Depuis le premier relevé : <b>${trend}</b>.</div>`;
 }
@@ -2820,11 +2821,13 @@ function renderOnlyChatCoach(){
     const safety=setTimeout(done, 10*60000);   // filet : jamais bloqué indéfiniment
   };
 }
-// Barres du "CA par jour" tapables (le survol souris ne marche pas au doigt) —
-// délégué sur le conteneur stable (survit aux re-rendus d'innerHTML) ;
-// [data-val] distingue les barres du graphique Telegram de celles du
-// graphique OnlyFans (mêmes classes .cj-bar, pas le même conteneur).
+// Barres tapables (le survol souris ne marche pas au doigt) — délégué sur le
+// conteneur stable (survit aux re-rendus d'innerHTML). Deux graphiques dans
+// ce panneau partagent la classe .cj-bar : [data-val] = CA du jour (date ISO
+// + montant $), [data-lbl] = tendance hebdo (libellé déjà formaté).
 { const c=$("#onlychatBody"); if(c) c.addEventListener("click",e=>{
+    const barLbl=e.target.closest(".cj-bar[data-lbl]");
+    if(barLbl){ if(typeof toast==="function") toast("📅 "+barLbl.getAttribute("data-date"), barLbl.getAttribute("data-lbl")); return; }
     const bar=e.target.closest(".cj-bar[data-val]"); if(!bar) return;
     const dt=new Date(bar.getAttribute("data-date")+"T12:00:00Z");
     const lbl=dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
@@ -7581,7 +7584,7 @@ function renderCaJours(){
   const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
   // Le NET d'abord (comme OnlyFans), le brut entre parenthèses.
   const net=v=>money((Number(v)||0)*NET_RATE);
-  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut)";
+  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut) · touche une barre pour le détail";
   // 🎯 Ligne d'objectif : ce qu'il faut par jour, au rythme restant du mois.
   let goalLine="";
   try{
@@ -7597,10 +7600,15 @@ function renderCaJours(){
   }catch(e){}
   $("#cjBody").innerHTML=`<div class="cj-wrap">`+serie.map(x=>{
       const v=Number(x.v)||0, h=Math.max(2,Math.round(v/max*128));
-      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" title="${fr(x.date)} : ${net(v)} net · ${money(v)} brut"></div>`;
+      const lbl=`${net(v)} net · ${money(v)} brut`;
+      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" data-date="${fr(x.date)}" data-lbl="${escapeHtml(lbl)}" title="${fr(x.date)} : ${lbl}"></div>`;
     }).join("")+goalLine+`</div>
     <div class="cj-days">`+serie.map((x,i)=>`<span>${(i%4===0||x.date===best.date)?parseInt(x.date.slice(8),10):""}</span>`).join("")+`</div>
     <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${net(best.v)} net (${money(best.v)} brut). La journée en cours n'apparaît pas (incomplète par nature).</div>`;
+  { const c=$("#cjBody"); if(c && !c.dataset.tapBound){ c.dataset.tapBound="1"; c.addEventListener("click",e=>{
+    const bar=e.target.closest(".cj-bar[data-lbl]"); if(!bar) return;
+    if(typeof toast==="function") toast("📅 "+bar.getAttribute("data-date"), bar.getAttribute("data-lbl"));
+  }); } }
 }
 
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
