@@ -289,6 +289,12 @@
   .occ-text p{margin:0 0 10px}
   .occ-text p:last-child{margin-bottom:0}
   .occ-sample{font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+  .oc-vs-cap{font-size:12px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .oc-vs-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}
+  .oc-vs-row.best{font-weight:700}
+  .oc-vs-name{min-width:80px}
+  .oc-vs-pct{color:var(--acc);font-weight:700}
+  .oc-vs-ltv{margin-left:auto;font-size:11.5px;color:var(--muted)}
   .antileak{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .al-head{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .al-tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:2px 10px}
@@ -1778,13 +1784,13 @@
 
   <div class="pair-row">
     <div class="panel-box" id="onlychat" style="display:none">
-      <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span></div>
+      <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
       <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
       <div id="onlychatBody"></div>
     </div>
 
     <div class="panel-box" id="onlychatcoach" style="display:none">
-      <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span></div>
+      <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span> <button class="act" id="occRegen">🔄 Régénérer</button></div>
       <div class="pb-sub">Compare des conversations réelles qui ont mené à un achat et d'autres non, pour dire ce qui vend mieux. Aucun nom de fan n'est utilisé. Rafraîchi une fois par semaine.</div>
       <div id="onlychatcoachBody"></div>
     </div>
@@ -2372,7 +2378,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOnlyChatGoal, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -2593,6 +2599,47 @@ function renderOcChart(d){
     <div class="cj-wrap">${bars}</div>
     <div class="cj-days">${days}</div>`;
 }
+// 🆚 Layla vs Zoe (ou tout modèle configuré) : qui convertit le mieux sur
+// Telegram, d'après le taux d'ouverture des PPV (unlockRatio par modèle).
+function renderOcVersus(d){
+  const noms=Object.keys(d.parModele||{}).filter(n=>n!=="Autres" && d.parModele[n].unlockRatio!=null);
+  if(noms.length<2) return "";
+  const sorted=noms.slice().sort((a,b)=>d.parModele[b].unlockRatio-d.parModele[a].unlockRatio);
+  const best=sorted[0];
+  const rows=noms.map(nom=>{
+    const m=d.parModele[nom], pct=Math.round(m.unlockRatio*1000)/10;
+    return `<div class="oc-vs-row${nom===best?" best":""}"><span class="oc-vs-name">${nom===best?"🏆 ":""}${escapeHtml(nom)}</span><span class="oc-vs-pct">${pct} %</span><span class="oc-vs-ltv">LTV ${m.ltv!=null?tgMoney(m.ltv):"—"}</span></div>`;
+  }).join("");
+  return `<div class="oc-vs-cap">🆚 Qui convertit le mieux (PPV ouverts)</div><div class="oc-vs">${rows}</div>`;
+}
+
+// 🎯 Objectif mensuel Telegram — manuel, simple, chargé/sauvé côté serveur
+// (cross-device) comme l'objectif OnlyFans, mais sans auto-calcul/gel.
+let ONLYCHAT_GOAL = parseInt(localStorage.getItem("ccn_onlychat_goal")||"0",10)||0;
+async function loadOnlyChatGoal(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/onlychat-goal",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){ const j=await r.json(); ONLYCHAT_GOAL=Number(j.goal)||0; localStorage.setItem("ccn_onlychat_goal",String(ONLYCHAT_GOAL)); }
+  }catch(e){}
+  renderOnlyChat();
+}
+async function saveOnlyChatGoal(g){
+  ONLYCHAT_GOAL=Math.max(0,Math.round(Number(g)||0));
+  localStorage.setItem("ccn_onlychat_goal",String(ONLYCHAT_GOAL));
+  renderOnlyChat();
+  if(TOKEN){ try{ await fetch(HUB_BASE+"/api/hub/onlychat-goal",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goal:ONLYCHAT_GOAL})}); }catch(e){} }
+}
+{ const b=$("#ocGoalEdit"); if(b) b.onclick=()=>{
+    const cur=ONLYCHAT_GOAL>0?String(ONLYCHAT_GOAL):"";
+    const v=prompt("Ton objectif de revenu Telegram pour le mois, en $ ?\n\nLaisse VIDE pour retirer l'objectif.",cur);
+    if(v===null) return;
+    const s=String(v).replace(/[^0-9]/g,"");
+    saveOnlyChatGoal(s===""?0:parseInt(s,10));
+    if(typeof toast==="function") toast("🎯 Objectif Telegram", s===""?"Objectif retiré.":"Objectif fixé.");
+  };
+}
+
 function renderOnlyChat(){
   const el=$("#onlychat"); if(!el) return;
   const d=ONLYCHAT_DATA;
@@ -2609,9 +2656,18 @@ function renderOnlyChat(){
       <span class="oc-sub">${m.newConversationsCount||0} conv. · LTV ${m.ltv!=null?tgMoney(m.ltv):"—"}</span></div>`;
   }).join("");
   const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
+  // 🎯 Objectif mensuel Telegram — manuel, simple (pas d'auto/gel comme OF,
+  // c'est un flux secondaire). Masqué tant qu'André n'en a pas fixé un.
+  const goalBlock = (typeof ONLYCHAT_GOAL==="number" && ONLYCHAT_GOAL>0) ? (function(){
+    const gPct=Math.min(100,Math.round(d.totalRevenue/ONLYCHAT_GOAL*100));
+    return `<div class="ob-goal" style="margin-top:10px">🎯 Objectif : <b>${tgMoney(ONLYCHAT_GOAL)}</b></div>
+      <div class="ob-bar"><span style="width:${gPct}%"></span></div>
+      <div class="ob-line">${tgMoney(d.totalRevenue)} atteints · <b>${gPct}%</b></div>`;
+  })() : "";
   $("#onlychatBody").innerHTML = `
     <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
     ${tgToday!=null?`<div class="oc-today">📅 Aujourd'hui <b>${tgMoney(tgToday)}</b></div>`:""}
+    ${goalBlock}
     <div class="oc-stats">
       <div class="oc-stat"><b>${pct(d.unlockRatio)}</b><span>PPV ouverts</span></div>
       <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conv.</span></div>
@@ -2619,6 +2675,7 @@ function renderOnlyChat(){
       <div class="oc-stat"><b>${d.aiSalesCount??"—"}</b><span>ventes IA</span></div>
     </div>
     ${rows?`<div class="oc-models">${rows}</div>`:""}
+    ${renderOcVersus(d)}
     ${d.mostProfitableScript?`<div class="oc-script">🏆 Script le plus rentable : <b>${escapeHtml(d.mostProfitableScript.name)}</b> (${tgMoney(d.mostProfitableScript.revenue)})</div>`:""}
     ${renderOcChart(d)}
   `;
@@ -2656,6 +2713,23 @@ function renderOnlyChatCoach(){
     <div class="occ-text">${ocCoachFormat(d.conseil)}</div>
     <div class="occ-sample">Basé sur ${ech.payeurs||0} conversation${(ech.payeurs||0)>1?"s":""} payeuse${(ech.payeurs||0)>1?"s":""} et ${ech.nonPayeurs||0} non-payeuse${(ech.nonPayeurs||0)>1?"s":""}.</div>
   `;
+}
+// 🔄 Relance l'analyse à la demande (ex : après avoir changé un script) au
+// lieu d'attendre le cron hebdo. compute() prend ~4-5 min côté serveur
+// (appels séquentiels OnlyChat + Gemini) : on affiche un état "en cours" et
+// on relit /api/hub/onlychat-coach en boucle jusqu'à ce que `maj` change.
+{ const b=$("#occRegen"); if(b) b.onclick=async ()=>{
+    if(!TOKEN || b.disabled) return;
+    b.disabled=true; const orig=b.textContent; b.textContent="⏳ Analyse (~5 min)...";
+    const prevMaj = ONLYCHAT_COACH ? ONLYCHAT_COACH.maj : 0;
+    try{ await fetch(HUB_BASE+"/api/hub/onlychat-coach/refresh",{method:"POST",headers:{"x-hub-token":TOKEN}}); }catch(e){}
+    const done=()=>{ clearInterval(poll); clearTimeout(safety); b.disabled=false; b.textContent=orig; };
+    const poll=setInterval(async ()=>{
+      await loadOnlyChatCoach();
+      if(ONLYCHAT_COACH && ONLYCHAT_COACH.maj!==prevMaj){ done(); if(typeof toast==="function") toast("🎓 Coaching","Nouvelle analyse prête."); }
+    }, 15000);
+    const safety=setTimeout(done, 10*60000);   // filet : jamais bloqué indéfiniment
+  };
 }
 function tgModels(){ try{ var om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; return Object.keys(om.models||{}); }catch(e){ return []; } }
 function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cur=sel.value; sel.innerHTML=[`<option value="">Général</option>`].concat(tgModels().map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)).join(""); sel.value=cur||""; }
