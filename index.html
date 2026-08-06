@@ -7604,12 +7604,28 @@ function applyHiddenPanels(){
   PANNEAUX.forEach(([id])=>{ const el=document.getElementById(id); if(el) el.classList.toggle("user-hidden", h.has(id)); });
   try{ fixPairs(); }catch(e){}
 }
+// Regroupe PANNEAUX (liste à plat, 60 cases) par les mêmes 8 catégories que
+// la page physique et le tiroir de nav — plus de 3e liste organisée
+// différemment. Dérivé de SECNAV_CATS à l'affichage (pas une 3e copie à
+// maintenir à la main) ; tout id de PANNEAUX absent de SECNAV_CATS tombe
+// dans "🗂️ Autres" plutôt que de disparaître silencieusement du sélecteur.
+function groupedPanneaux(){
+  const byId={}; PANNEAUX.forEach(([id,lbl])=>{ byId[id]=lbl; });
+  const used=new Set();
+  const groups=SECNAV_CATS.map(([label,items])=>{
+    const rows=items.filter(([id])=>byId[id]!=null).map(([id])=>{ used.add(id); return [id,byId[id]]; });
+    return [label,rows];
+  }).filter(([,rows])=>rows.length);
+  const rest=PANNEAUX.filter(([id])=>!used.has(id));
+  if(rest.length) groups.push(["🗂️ Autres",rest]);
+  return groups;
+}
 function openPanelPicker(){
   const h=hiddenSet();
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
     <div class="ppick-sub">Décoche ce que tu ne regardes jamais : la page devient plus courte. Tu peux tout remettre ici quand tu veux.</div>
-    ${PANNEAUX.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl}</label>`).join("")}
+    ${groupedPanneaux().map(([label,rows])=>`<div class="secnav-cat"><div class="secnav-cat-h">${label}</div>${rows.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl}</label>`).join("")}</div>`).join("")}
     <button class="ppick-close">Fermer</button></div>`;
   ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
   ov.addEventListener("change",e=>{
