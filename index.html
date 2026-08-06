@@ -1536,8 +1536,7 @@
   <div class="tabbar" id="tabbar"></div>
   <div id="secnav"></div>
   <div id="home">
-  <header class="top">
-    <div class="brand">
+<div class="brand">
       <div class="logo"><svg viewBox="0 0 100 100" fill="none"><defs><linearGradient id="lunev" x1="0.2" y1="0" x2="0.45" y2="1"><stop offset="0" stop-color="#cfd4e8" stop-opacity=".5"/><stop offset="1" stop-color="#cfd4e8" stop-opacity=".03"/></linearGradient></defs><g transform="rotate(-15 50 50)"><path d="M 66 12 A 39 39 0 1 0 66 88 A 35 35 0 1 1 66 12 Z" fill="url(#lunev)"/><path d="M 66 12 A 39 39 0 1 0 66 88" stroke="#b9bfdd" stroke-width="3" stroke-linecap="round" fill="none"/></g></svg></div>
       <div>
         <h1>Noctra</h1>
@@ -1545,7 +1544,8 @@
         <div class="sub" id="sub">Chargement…</div>
       </div>
     </div>
-    <div class="top-actions">
+
+<div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
@@ -1573,19 +1573,19 @@
       </div>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
-  </header>
 
+<div class="banner" id="banner"></div>
 
-  <div class="banner" id="banner"></div>
-  <div class="alert" id="alert"></div>
-  <div class="daily" id="daily"></div>
+<div class="alert" id="alert"></div>
 
-  <div class="gsearch" id="gsearch" style="display:none">
+<div class="daily" id="daily"></div>
+
+<div class="gsearch" id="gsearch" style="display:none">
     <input id="gsInput" type="search" placeholder="🔎 Chercher un VA ou un panneau…" autocomplete="off" />
     <div class="gs-res" id="gsRes"></div>
   </div>
 
-  <div class="essentiel" id="essentiel" style="display:none">
+<div class="essentiel" id="essentiel" style="display:none">
     <div class="ess-hero" id="essHero"></div>
     <div class="ess-reco" id="essReco" style="display:none"></div>
     <div class="ess-btn-row">
@@ -1600,7 +1600,427 @@
 
   <aside id="sidebar"></aside>
 
-  <div class="panel-box tasks-hero" id="tasks">
+  <div class="sec-head" id="catHead0" data-cat-idx="0"><span class="t">💰 Argent & rentabilité</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box om" id="om" style="display:none">
+    <div class="pb-head">◎ OnlyMonster <span id="omFresh" class="pb-fresh"></span>
+      <div class="om-models" id="omModels"></div>
+      <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
+    </div>
+    <div id="omBody"></div>
+  </div>
+    <div class="panel-box" id="cash" style="display:none">
+    <div class="pb-head">💵 Cash à venir</div>
+    <div id="cashBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="cajours" style="display:none">
+    <div class="pb-head">📅 CA par jour <span class="mn-msg-note" id="cjCap"></span></div>
+    <div id="cjBody"></div>
+  </div>
+    <div class="panel-box" id="quinz" style="display:none">
+    <div class="pb-head">⚖️ Quinzaine vs précédente <span class="mn-msg-note" id="qzCap"></span></div>
+    <div id="qzBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="tres" style="display:none">
+      <div class="pb-head">🏦 Ton argent sur OnlyFans</div>
+      <div id="tresBody"></div>
+    </div>
+    <div class="panel-box" id="renta" style="display:none">
+      <div class="pb-head">💰 Rentabilité du mois</div>
+      <div id="rentaBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="pie" style="display:none">
+      <div class="pb-head">🥧 D'où vient l'argent</div>
+      <div id="pieBody"></div>
+    </div>
+    <div class="panel-box" id="cac" style="display:none">
+      <div class="pb-head">🎯 Ce que te coûte un abonné, par VA</div>
+      <div id="cacBody"></div>
+    </div>
+  </div>
+
+  <div class="panel-box" id="coutopp" style="display:none">
+      <div class="pb-head">💡 Ce que tu laisses sur la table</div>
+      <div id="coutoppBody"></div>
+    </div>
+
+  <div class="costs" id="costs">
+    <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
+    <div class="costs-add">
+      <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
+      <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
+      <input id="costDue" type="date" title="Prochaine échéance (facultatif) — je te préviens 3 jours avant" />
+      <select id="costEvery" title="Récurrence"><option value="mois">tous les mois</option><option value="an">tous les ans</option><option value="semaine">chaque semaine</option></select>
+    </div>
+    <div id="costsList"></div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="objmois" style="display:none">
+    <div class="pb-head">🎯 Objectif du mois &amp; le chemin <button class="act" id="objEdit">✏️ Mon objectif</button></div>
+    <div class="pb-sub">Un objectif de CA réaliste-ambitieux, où tu en es, et combien de subs il te faut — répartis par VA.</div>
+    <div id="objmoisBody"></div>
+  </div>
+    <div class="panel-box" id="moisrecord" style="display:none">
+    <div class="pb-head">🥇 Ce mois vs ton meilleur mois</div>
+    <div class="pb-sub">Ta courbe d'abonnés du mois, superposée à ton record. Es-tu en avance ou en retard sur ta meilleure période ?</div>
+    <div id="moisrecordBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="subval" style="display:none">
+      <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
+      <div id="subvalBody"></div>
+    </div>
+    <div class="panel-box" id="history" style="display:none">
+      <div class="pb-head">📅 Mon année</div>
+      <div id="historyBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="split" style="display:none">
+      <div class="pb-head">🤝 Ma part / Part de l'associé</div>
+      <div id="splitBody"></div>
+    </div>
+    <div class="panel-box" id="rw" style="display:none">
+      <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
+      <div id="rwBody"></div>
+    </div>
+  </div>
+
+  <div class="sec-head" id="catHead1" data-cat-idx="1"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="onlychat" style="display:none">
+      <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
+      <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
+      <div id="onlychatBody"></div>
+    </div>
+    <div class="panel-box" id="onlychatcoach" style="display:none">
+      <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span> <button class="act" id="occRegen">🔄 Régénérer</button></div>
+      <div class="pb-sub">Compare des conversations réelles qui ont mené à un achat et d'autres non, pour dire ce qui vend mieux. Aucun nom de fan n'est utilisé. Rafraîchi une fois par semaine.</div>
+      <div id="onlychatcoachBody"></div>
+    </div>
+  </div>
+
+  <div class="tgrev" id="tgrev" style="display:none">
+    <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
+    <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
+    <div class="tg-add">
+      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
+      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
+      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
+      <input id="tgDate" type="date" title="Date de ce revenu — change-la pour ajouter un mois passé" />
+      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
+      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
+    </div>
+    <div id="tgList"></div>
+  </div>
+
+  <div class="sec-head" id="catHead2" data-cat-idx="2"><span class="t">💎 Fans</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="fanradar" style="display:none">
+      <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
+      <div id="fanradarBody"></div>
+    </div>
+    <div class="panel-box" id="vips" style="display:none">
+      <div class="pb-head">💎 Tes baleines (gros fans actifs)</div>
+      <div id="vipsBody"></div>
+    </div>
+  </div>
+
+  <div class="panel-box" id="churn" style="display:none">
+      <div class="pb-head">💔 Gros fans qui viennent de partir</div>
+      <div id="churnBody"></div>
+    </div>
+
+  <div class="sec-head" id="catHead3" data-cat-idx="3"><span class="t">👥 Équipe (VA)</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="modeles" style="display:none">
+    <div class="pb-head">🎭 Tes modèles en un coup d'œil</div>
+    <div id="modelesBody"></div>
+  </div>
+    <div class="panel-box" id="vamodel" style="display:none">
+    <div class="pb-head">🎯 Meilleure combinaison VA × modèle</div>
+    <div id="vamodelBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="compare" style="display:none">
+    <div class="pb-head">🆚 Comparaison sur mesure</div>
+    <div id="compareBody"></div>
+  </div>
+    <div class="panel-box" id="versus" style="display:none">
+    <div class="pb-head">⚔️ Comparateur de modèles <span class="vs-sel" id="vsSel"></span></div>
+    <div id="versusBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="decroche" style="display:none">
+      <div class="pb-head">📉 VA en décrochage <span class="dc-c" id="dcCount"></span></div>
+      <div id="decrocheBody"></div>
+    </div>
+    <div class="panel-box" id="opportunites" style="display:none">
+      <div class="pb-head">🚀 Ça décolle <span class="op-c" id="opCount"></span></div>
+      <div id="oppBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="charge" style="display:none">
+      <div class="pb-head">💪 Charge de l'équipe</div>
+      <div id="chargeBody"></div>
+    </div>
+    <div class="panel-box" id="paie" style="display:none">
+    <div class="pb-head">🧾 Fiche de paie (par quinzaine) <button class="act" id="paieCopy">📋 Copier</button></div>
+    <div class="pb-sub">Vue par quinzaine 1-15 / 16-fin (calcul historique). Pour payer au plus juste, utilise plutôt <b>💸 Paie au cumul</b> ci-dessous — c'est celle qui colle à tes vrais versements.</div>
+    <div id="paieBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="paiecumul" style="display:none">
+    <div class="pb-head">💸 Paie au cumul <button class="act" id="pcumulCopy">📋 Copier</button> <button class="act" id="pcumulRefresh">🔄</button></div>
+    <div class="pb-sub">Ce que tu dois payer <b>depuis ta dernière paie</b> = cumul actuel du lien de tracking − cumul au moment où tu as payé. Le vrai calcul, pas la quinzaine.</div>
+    <div id="pcumulBody"></div>
+  </div>
+    <div class="panel-box" id="classement" style="display:none">
+    <div class="pb-head">🏆 Classement des VA (ce mois) <button class="act" id="clSuggest">🪄 Objectifs auto</button></div>
+    <div class="pb-sub">Où se situe chaque VA par rapport à l'équipe, sur les abonnés du mois.</div>
+    <div id="classementBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="meteo" style="display:none">
+    <div class="pb-head">🌤️ Météo des ventes</div>
+    <div class="pb-sub">Les jours où les fans US dépensent le plus (paies du 1 & 15, fêtes). Prépare tes meilleurs contenus / promos juste avant.</div>
+    <div id="meteoBody"></div>
+  </div>
+    <div class="panel-box" id="busfactor" style="display:none">
+      <div class="pb-head">🏖️ Que se passe-t-il si tu t'absentes ?</div>
+      <div id="busfactorBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="changements" style="display:none">
+    <div class="pb-head">📓 Journal auto des gros changements</div>
+    <div class="pb-sub">Les jours où l'équipe a nettement bougé — et qui l'a causé.</div>
+    <div id="changementsBody"></div>
+  </div>
+    <div class="panel-box" id="onboarding" style="display:none">
+      <div class="pb-head">🆕 Onboarding des VA</div>
+      <div id="onboardingBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="burnout" style="display:none">
+      <div class="pb-head">😮‍💨 Fatigue / burnout des VA</div>
+      <div id="burnoutBody"></div>
+    </div>
+    <div class="panel-box" id="coaching" style="display:none">
+      <div class="pb-head">🎓 Conseils à donner à tes VA</div>
+      <div id="coachingBody"></div>
+    </div>
+  </div>
+
+  <div class="panel-box" id="ghosts" style="display:none">
+      <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
+      <div id="ghostsBody"></div>
+    </div>
+
+  <div class="sec-head" id="catHead4" data-cat-idx="4"><span class="t">📊 Analyse & tendances</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="insights" style="display:none">
+      <div class="pb-head">🔍 Patterns cachés (l'IA analyse tes chiffres)</div>
+      <div id="insightsBody"></div>
+    </div>
+    <div class="panel-box" id="anomalies" style="display:none">
+      <div class="pb-head">📊 Anomalies détectées <span class="an-c" id="anCount"></span></div>
+      <div id="anomBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="conv" style="display:none">
+      <div class="pb-head">🎯 Conversion : clics → abonnés</div>
+      <div id="convBody"></div>
+    </div>
+    <div class="panel-box" id="sources" style="display:none">
+      <div class="pb-head">🔗 Qualité de tes sources (par lien)</div>
+      <div id="sourcesBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="concentration" style="display:none">
+    <div class="pb-head">⚠️ Risque de concentration</div>
+    <div class="pb-sub">Quelle part de ton activité tient à un seul VA / modèle. Là où tu es fragile si quelqu'un part.</div>
+    <div id="concentrationBody"></div>
+  </div>
+    <div class="panel-box" id="cohortes" style="display:none">
+    <div class="pb-head">📊 Cohortes &amp; pourquoi ils dépensent</div>
+    <div class="pb-sub">Les fans arrivés chaque mois dépensent-ils plus ou moins — et surtout <b>pourquoi</b>.</div>
+    <div id="cohortesBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="vatraj" style="display:none">
+    <div class="pb-head">📈 Trajectoire de chaque VA</div>
+    <div class="pb-sub">Sa courbe d'abonnés sur 8 semaines : il progresse, stagne ou décline ?</div>
+    <div id="vatrajBody"></div>
+  </div>
+    <div class="panel-box" id="varisque" style="display:none">
+    <div class="pb-head">🚪 VA qui montrent des signes de départ</div>
+    <div class="pb-sub">Un VA qui produisait puis se tait = démotivation. Repère-le avant qu'il parte.</div>
+    <div id="varisqueBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="sim" style="display:none">
+      <div class="pb-head">🔮 Simulateur « et si »</div>
+      <div id="simBody"></div>
+    </div>
+    <div class="panel-box" id="sim3" style="display:none">
+      <div class="pb-head">🔮 Simulateur 3 mois</div>
+      <div id="sim3Body"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="realloc" style="display:none">
+      <div class="pb-head">🔀 Et si je réorganise mon équipe</div>
+      <div id="reallocBody"></div>
+    </div>
+    <div class="panel-box" id="hours" style="display:none">
+      <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
+      <div id="hoursBody"></div>
+    </div>
+  </div>
+
+  <div class="panel-box" id="saison" style="display:none">
+      <div class="pb-head">📅 Saisonnalité &amp; meilleurs moments</div>
+      <div id="saisonBody"></div>
+    </div>
+
+  <div class="sec-head" id="catHead5" data-cat-idx="5"><span class="t">🧭 À faire & décisions</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="recos" style="display:none">
+    <div class="pb-head">🧭 À faire maintenant (recommandations)</div>
+    <div class="pb-sub">Tes chiffres transformés en gestes concrets : qui coacher, qui pousser, où mettre le trafic.</div>
+    <div id="recosBody"></div>
+  </div>
+    <div class="panel-box" id="decisions" style="display:none">
+    <div class="pb-head">📓 Journal de mes décisions</div>
+    <div id="decisionsBody"></div>
+  </div>
+  </div>
+
+  <div class="todo" id="todo">
+    <div class="todo-head">📝 Ma journée <span class="c" id="todoCount"></span></div>
+    <input id="todoInput" placeholder="Ajouter une tâche… (Entrée)" autocomplete="off" />
+    <div id="todoList"></div>
+  </div>
+
+  <div class="journal folded" id="journal" style="display:none">
+    <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
+    <div id="jrList"></div>
+  </div>
+
+  <div class="sec-head" id="catHead6" data-cat-idx="6"><span class="t">🏆 Motivation & suivi perso</span><span class="rule"></span></div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="badges" style="display:none">
+      <div class="pb-head">🏅 Badges &amp; progression</div>
+      <div id="badgesBody"></div>
+    </div>
+    <div class="panel-box" id="achievements" style="display:none">
+      <div class="pb-head">🏆 Tes accomplissements</div>
+      <div id="achievementsBody"></div>
+    </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="streak" style="display:none">
+      <div class="pb-head">🔥 Ta série (objectif du jour)</div>
+      <div id="streakBody"></div>
+    </div>
+    <div class="panel-box" id="goal">
+    <div class="pb-head">🎯 Objectif de la quinzaine</div>
+    <div id="goalBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="tip" style="display:none">
+      <div class="pb-head">💡 Conseil du jour <button class="act" id="tipRefresh" title="Nouveau conseil" style="margin-left:auto">🔄</button></div>
+      <div class="tip-body" id="tipBody"></div>
+    </div>
+    <div class="panel-box" id="notepad">
+    <div class="pb-head">📝 Bloc-notes <button class="np-mic" id="npMic" title="Note vocale — parle, ça s'écrit">🎤</button> <span class="np-saved" id="npSaved"></span></div>
+    <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ou clique 🎤 et parle."></textarea>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="duo" style="display:none">
+    <div class="pb-head">🤝 Aujourd'hui, qui fait quoi</div>
+    <div id="duoBody"></div>
+  </div>
+    <div class="panel-box" id="clock">
+    <div class="pb-head">⏰ Rappels &amp; minuteur <span class="clk-now" id="clkNow">--:--</span></div>
+    <div class="clk-add">
+      <input id="rmText" placeholder="Ex : Appeler le client" autocomplete="off" />
+      <input id="rmTime" type="time" class="clk-time" />
+      <select id="rmWho" class="clk-who"></select>
+      <button id="rmAdd" class="act">＋</button>
+    </div>
+    <div id="rmList"></div>
+    <div class="clk-timer">⏱️ Minuteur : <input id="tmMin" type="number" min="1" value="10" class="clk-tm" /> min <button id="tmStart" class="act">Lancer</button> <span id="tmDisp" class="clk-disp"></span></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box" id="dates">
+    <div class="pb-head">📌 Événements & dates</div>
+    <div class="clk-add">
+      <input id="dtText" placeholder="Ex : Appel client, RDV, anniv d'un VA, échéance…" autocomplete="off" />
+      <input id="dtDate" type="date" class="clk-time" />
+      <button id="dtAdd" class="act">＋</button>
+    </div>
+    <label class="dt-yearly"><input type="checkbox" id="dtYearly" /> 🎂 Chaque année (anniversaire) — te le rappelle tous les ans</label>
+    <div id="dtList"></div>
+  </div>
+    <div class="panel-box collapsed" id="cal">
+    <div class="pb-head cal-head-toggle" id="calHead">📅 Calendrier <span class="cal-chev">▸</span></div>
+    <div id="calBody"></div>
+  </div>
+  </div>
+
+  <div class="pair-row">
+    <div class="panel-box tasks-hero" id="tasks">
     <div class="pb-head">✅ Tâches d'équipe
       <div class="tk-me" title="Ton identité (définie par ta connexion)" aria-label="Identité">
         <span class="tk-me-av" id="taskMeAv">🧑‍💻</span>
@@ -1623,256 +2043,23 @@
     <div class="tk-filter" id="taskFilter"></div>
     <div id="taskList"></div>
   </div>
-
-  <div class="panel-box" id="clock">
-    <div class="pb-head">⏰ Rappels &amp; minuteur <span class="clk-now" id="clkNow">--:--</span></div>
-    <div class="clk-add">
-      <input id="rmText" placeholder="Ex : Appeler le client" autocomplete="off" />
-      <input id="rmTime" type="time" class="clk-time" />
-      <select id="rmWho" class="clk-who"></select>
-      <button id="rmAdd" class="act">＋</button>
-    </div>
-    <div id="rmList"></div>
-    <div class="clk-timer">⏱️ Minuteur : <input id="tmMin" type="number" min="1" value="10" class="clk-tm" /> min <button id="tmStart" class="act">Lancer</button> <span id="tmDisp" class="clk-disp"></span></div>
-  </div>
-
-  <div class="panel-box" id="dates">
-    <div class="pb-head">📌 Événements & dates</div>
-    <div class="clk-add">
-      <input id="dtText" placeholder="Ex : Appel client, RDV, anniv d'un VA, échéance…" autocomplete="off" />
-      <input id="dtDate" type="date" class="clk-time" />
-      <button id="dtAdd" class="act">＋</button>
-    </div>
-    <label class="dt-yearly"><input type="checkbox" id="dtYearly" /> 🎂 Chaque année (anniversaire) — te le rappelle tous les ans</label>
-    <div id="dtList"></div>
-  </div>
-
-  <div class="panel-box" id="notepad">
-    <div class="pb-head">📝 Bloc-notes <button class="np-mic" id="npMic" title="Note vocale — parle, ça s'écrit">🎤</button> <span class="np-saved" id="npSaved"></span></div>
-    <textarea id="npText" class="np-area" placeholder="Jette une idée, un numéro, un brouillon de message… ou clique 🎤 et parle."></textarea>
-  </div>
-
-  <div class="panel-box collapsed" id="cal">
-    <div class="pb-head cal-head-toggle" id="calHead">📅 Calendrier <span class="cal-chev">▸</span></div>
-    <div id="calBody"></div>
-  </div>
-
-  <div class="rappels" id="rappels" style="display:none"></div>
-
-  <div class="todo" id="todo">
-    <div class="todo-head">📝 Ma journée <span class="c" id="todoCount"></span></div>
-    <input id="todoInput" placeholder="Ajouter une tâche… (Entrée)" autocomplete="off" />
-    <div id="todoList"></div>
-  </div>
-
-  <div class="summary" id="summary"></div>
-
-  <div class="panel-box" id="duo" style="display:none">
-    <div class="pb-head">🤝 Aujourd'hui, qui fait quoi</div>
-    <div id="duoBody"></div>
-  </div>
-
-  <div class="panel-box" id="goal">
-    <div class="pb-head">🎯 Objectif de la quinzaine</div>
-    <div id="goalBody"></div>
-  </div>
-
-  <div class="pair-row">
-    <div class="panel-box" id="tip" style="display:none">
-      <div class="pb-head">💡 Conseil du jour <button class="act" id="tipRefresh" title="Nouveau conseil" style="margin-left:auto">🔄</button></div>
-      <div class="tip-body" id="tipBody"></div>
-    </div>
     <div class="panel-box" id="ask">
       <div class="pb-head">🤖 Demande à tes chiffres</div>
       <div class="ask-row"><input id="askInput" placeholder="Ex : pourquoi mon CA a baissé cette semaine ? · qui m'a fait gagner le plus ?" autocomplete="off" /><button id="askMic" class="ask-mic" title="Dicter à la voix">🎤</button><button id="askConvo" class="ask-mic" title="Mode conversation vocale (parle, il te répond à voix haute)">🎙️</button><button id="askGo">Envoyer</button></div>
       <div class="ask-ex">Essaie : <a data-q="Qui m'a fait gagner le plus ce mois ?">qui gagne le plus</a> · <a data-q="Pourquoi mon CA a baissé cette semaine ?">pourquoi ça baisse</a> · <a data-q="Est-ce que je vais battre mon record ce mois ?">battre mon record</a> · <a data-q="Combien à payer cette quinzaine et il me reste combien après ?">à payer</a> · <a data-bilan="1">📅 bilan</a></div>
       <div class="ask-ans" id="askAns"></div>
     </div>
-    <div class="panel-box" id="insights" style="display:none">
-      <div class="pb-head">🔍 Patterns cachés (l'IA analyse tes chiffres)</div>
-      <div id="insightsBody"></div>
-    </div>
   </div>
+
+  <div class="rappels" id="rappels" style="display:none"></div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="sec-head" id="catHead7" data-cat-idx="7"><span class="t">🛠 Système</span><span class="rule"></span></div>
 
   <div id="sections"></div>
 
-  <div class="panel-box" id="modeles" style="display:none">
-    <div class="pb-head">🎭 Tes modèles en un coup d'œil</div>
-    <div id="modelesBody"></div>
-  </div>
-
-  <div class="panel-box om" id="om" style="display:none">
-    <div class="pb-head">◎ OnlyMonster <span id="omFresh" class="pb-fresh"></span>
-      <div class="om-models" id="omModels"></div>
-      <a class="act om-launch" id="omLaunch" href="#" title="Ouvrir l'app OnlyMonster sur ton PC">🖥️ Ouvrir l'app</a>
-    </div>
-    <div id="omBody"></div>
-  </div>
-
   <div class="pair-row">
-    <div class="panel-box" id="fanradar" style="display:none">
-      <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
-      <div id="fanradarBody"></div>
-    </div>
-    <div class="panel-box" id="vips" style="display:none">
-      <div class="pb-head">💎 Tes baleines (gros fans actifs)</div>
-      <div id="vipsBody"></div>
-    </div>
-    <div class="panel-box" id="churn" style="display:none">
-      <div class="pb-head">💔 Gros fans qui viennent de partir</div>
-      <div id="churnBody"></div>
-    </div>
-    <div class="panel-box" id="onboarding" style="display:none">
-      <div class="pb-head">🆕 Onboarding des VA</div>
-      <div id="onboardingBody"></div>
-    </div>
-    <div class="panel-box" id="burnout" style="display:none">
-      <div class="pb-head">😮‍💨 Fatigue / burnout des VA</div>
-      <div id="burnoutBody"></div>
-    </div>
-    <div class="panel-box" id="coaching" style="display:none">
-      <div class="pb-head">🎓 Conseils à donner à tes VA</div>
-      <div id="coachingBody"></div>
-    </div>
-    <div class="panel-box" id="ghosts" style="display:none">
-      <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
-      <div id="ghostsBody"></div>
-    </div>
-    <div class="panel-box" id="decroche" style="display:none">
-      <div class="pb-head">📉 VA en décrochage <span class="dc-c" id="dcCount"></span></div>
-      <div id="decrocheBody"></div>
-    </div>
-    <div class="panel-box" id="opportunites" style="display:none">
-      <div class="pb-head">🚀 Ça décolle <span class="op-c" id="opCount"></span></div>
-      <div id="oppBody"></div>
-    </div>
-    <div class="panel-box" id="anomalies" style="display:none">
-      <div class="pb-head">📊 Anomalies détectées <span class="an-c" id="anCount"></span></div>
-      <div id="anomBody"></div>
-    </div>
-    <div class="panel-box" id="charge" style="display:none">
-      <div class="pb-head">💪 Charge de l'équipe</div>
-      <div id="chargeBody"></div>
-    </div>
-  </div>
-
-  <div class="panel-box" id="cajours" style="display:none">
-    <div class="pb-head">📅 CA par jour <span class="mn-msg-note" id="cjCap"></span></div>
-    <div id="cjBody"></div>
-  </div>
-
-  <div class="panel-box" id="quinz" style="display:none">
-    <div class="pb-head">⚖️ Quinzaine vs précédente <span class="mn-msg-note" id="qzCap"></span></div>
-    <div id="qzBody"></div>
-  </div>
-
-  <div class="pair-row">
-    <div class="panel-box" id="renta" style="display:none">
-      <div class="pb-head">💰 Rentabilité du mois</div>
-      <div id="rentaBody"></div>
-    </div>
-    <div class="panel-box" id="pie" style="display:none">
-      <div class="pb-head">🥧 D'où vient l'argent</div>
-      <div id="pieBody"></div>
-    </div>
-  </div>
-
-  <div class="panel-box" id="versus" style="display:none">
-    <div class="pb-head">⚔️ Comparateur de modèles <span class="vs-sel" id="vsSel"></span></div>
-    <div id="versusBody"></div>
-  </div>
-
-  <div class="panel-box" id="vamodel" style="display:none">
-    <div class="pb-head">🎯 Meilleure combinaison VA × modèle</div>
-    <div id="vamodelBody"></div>
-  </div>
-
-  <div class="panel-box" id="compare" style="display:none">
-    <div class="pb-head">🆚 Comparaison sur mesure</div>
-    <div id="compareBody"></div>
-  </div>
-
-  <div class="pair-row">
-    <div class="panel-box" id="history" style="display:none">
-      <div class="pb-head">📅 Mon année</div>
-      <div id="historyBody"></div>
-    </div>
-    <div class="panel-box" id="split" style="display:none">
-      <div class="pb-head">🤝 Ma part / Part de l'associé</div>
-      <div id="splitBody"></div>
-    </div>
-  </div>
-
-  <div class="sec-head" id="onlychatSecHead"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
-  <div class="pair-row">
-    <div class="panel-box" id="onlychat" style="display:none">
-      <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
-      <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
-      <div id="onlychatBody"></div>
-    </div>
-
-    <div class="panel-box" id="onlychatcoach" style="display:none">
-      <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span> <button class="act" id="occRegen">🔄 Régénérer</button></div>
-      <div class="pb-sub">Compare des conversations réelles qui ont mené à un achat et d'autres non, pour dire ce qui vend mieux. Aucun nom de fan n'est utilisé. Rafraîchi une fois par semaine.</div>
-      <div id="onlychatcoachBody"></div>
-    </div>
-  </div>
-  <!-- Panneau caché : OnlyChat ci-dessus donne maintenant les vrais chiffres à
-       100 %, plus besoin de la saisie manuelle. Le JS (TGREV, tgHistMonth)
-       reste actif pour ne pas perdre l'historique déjà noté (juillet et avant,
-       avant qu'OnlyChat existe) dans le panneau "Mon année". Sorti du pair-row
-       ci-dessus : mélanger panel-box et non-panel-box dans la même grille à 2
-       colonnes laissait une case vide (fixPairs() ne compte que les .panel-box). -->
-  <div class="tgrev" id="tgrev" style="display:none">
-    <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
-    <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
-    <div class="tg-add">
-      <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
-      <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
-      <input id="tgSubs" type="text" inputmode="numeric" placeholder="Nb qui ont parlé (option)" title="Nb de personnes qui ont parlé à la modèle — pour la valeur par personne" />
-      <input id="tgDate" type="date" title="Date de ce revenu — change-la pour ajouter un mois passé" />
-      <input id="tgNote" placeholder="Note (ex : promo, VIP…)" autocomplete="off" />
-      <button class="act tg-btn" id="tgAdd">＋ Ajouter</button>
-    </div>
-    <div id="tgList"></div>
-  </div>
-  <div class="costs" id="costs">
-    <div class="costs-head">💸 Dépenses d'outils <span class="tot" id="costsTotal"></span></div>
-    <div class="costs-add">
-      <input id="costName" placeholder="Outil (ex : Railway)" autocomplete="off" />
-      <input id="costAmount" type="number" inputmode="decimal" placeholder="$/mois" />
-      <input id="costDue" type="date" title="Prochaine échéance (facultatif) — je te préviens 3 jours avant" />
-      <select id="costEvery" title="Récurrence"><option value="mois">tous les mois</option><option value="an">tous les ans</option><option value="semaine">chaque semaine</option></select>
-    </div>
-    <div id="costsList"></div>
-  </div>
-
-  <div class="panel-box" id="cash" style="display:none">
-    <div class="pb-head">💵 Cash à venir</div>
-    <div id="cashBody"></div>
-  </div>
-
-  <div class="pair-row">
-    <div class="panel-box" id="tres" style="display:none">
-      <div class="pb-head">🏦 Ton argent sur OnlyFans</div>
-      <div id="tresBody"></div>
-    </div>
-    <div class="panel-box" id="badges" style="display:none">
-      <div class="pb-head">🏅 Badges &amp; progression</div>
-      <div id="badgesBody"></div>
-    </div>
-    <div class="panel-box" id="achievements" style="display:none">
-      <div class="pb-head">🏆 Tes accomplissements</div>
-      <div id="achievementsBody"></div>
-    </div>
-    <div class="panel-box" id="streak" style="display:none">
-      <div class="pb-head">🔥 Ta série (objectif du jour)</div>
-      <div id="streakBody"></div>
-    </div>
-    <div class="panel-box" id="rw" style="display:none">
-      <div class="pb-head">🚂 Ce que ton infra te coûte (Railway)</div>
-      <div id="rwBody"></div>
-    </div>
     <div class="panel-box" id="proxy" style="display:none">
       <div class="pb-head">🛰️ État de tes proxies</div>
       <div id="proxyBody"></div>
@@ -1881,7 +2068,9 @@
       <div class="pb-head">🗂️ Historique des incidents</div>
       <div id="incidentsBody"></div>
     </div>
-    <div class="panel-box" id="rules" style="display:none">
+  </div>
+
+  <div class="panel-box" id="rules" style="display:none">
       <div class="pb-head">🔔 Mes alertes perso (si… alors préviens-moi)</div>
       <label class="digest-row"><input type="checkbox" id="digestChk"> <span><b>📋 Résumé groupé</b> — rassemble les alertes de la journée en <b>un seul</b> rappel le matin, au lieu de plein de notifications. <span id="digestState" class="digest-state"></span></span></label>
       <div class="digest-row tuning-row"><span>⚙️ <b>Sensibilité des alertes</b> (faux subs, qualité des fans, signe de départ) :</span>
@@ -1893,142 +2082,6 @@
       </div>
       <div id="rulesBody"></div>
     </div>
-    <div class="panel-box" id="busfactor" style="display:none">
-      <div class="pb-head">🏖️ Que se passe-t-il si tu t'absentes ?</div>
-      <div id="busfactorBody"></div>
-    </div>
-    <div class="panel-box" id="conv" style="display:none">
-      <div class="pb-head">🎯 Conversion : clics → abonnés</div>
-      <div id="convBody"></div>
-    </div>
-    <div class="panel-box" id="sources" style="display:none">
-      <div class="pb-head">🔗 Qualité de tes sources (par lien)</div>
-      <div id="sourcesBody"></div>
-    </div>
-    <div class="panel-box" id="subval" style="display:none">
-      <div class="pb-head">💳 Ce que vaut vraiment un abonné, par VA</div>
-      <div id="subvalBody"></div>
-    </div>
-    <div class="panel-box" id="cac" style="display:none">
-      <div class="pb-head">🎯 Ce que te coûte un abonné, par VA</div>
-      <div id="cacBody"></div>
-    </div>
-    <div class="panel-box" id="coutopp" style="display:none">
-      <div class="pb-head">💡 Ce que tu laisses sur la table</div>
-      <div id="coutoppBody"></div>
-    </div>
-    <div class="panel-box" id="hours" style="display:none">
-      <div class="pb-head">⏰ À quelle heure tes abonnés arrivent</div>
-      <div id="hoursBody"></div>
-    </div>
-    <div class="panel-box" id="saison" style="display:none">
-      <div class="pb-head">📅 Saisonnalité &amp; meilleurs moments</div>
-      <div id="saisonBody"></div>
-    </div>
-    <div class="panel-box" id="sim3" style="display:none">
-      <div class="pb-head">🔮 Simulateur 3 mois</div>
-      <div id="sim3Body"></div>
-    </div>
-    <div class="panel-box" id="sim" style="display:none">
-      <div class="pb-head">🔮 Simulateur « et si »</div>
-      <div id="simBody"></div>
-    </div>
-    <div class="panel-box" id="realloc" style="display:none">
-      <div class="pb-head">🔀 Et si je réorganise mon équipe</div>
-      <div id="reallocBody"></div>
-    </div>
-  </div>
-
-  <div class="panel-box" id="paie" style="display:none">
-    <div class="pb-head">🧾 Fiche de paie (par quinzaine) <button class="act" id="paieCopy">📋 Copier</button></div>
-    <div class="pb-sub">Vue par quinzaine 1-15 / 16-fin (calcul historique). Pour payer au plus juste, utilise plutôt <b>💸 Paie au cumul</b> ci-dessous — c'est celle qui colle à tes vrais versements.</div>
-    <div id="paieBody"></div>
-  </div>
-
-  <div class="panel-box" id="paiecumul" style="display:none">
-    <div class="pb-head">💸 Paie au cumul <button class="act" id="pcumulCopy">📋 Copier</button> <button class="act" id="pcumulRefresh">🔄</button></div>
-    <div class="pb-sub">Ce que tu dois payer <b>depuis ta dernière paie</b> = cumul actuel du lien de tracking − cumul au moment où tu as payé. Le vrai calcul, pas la quinzaine.</div>
-    <div id="pcumulBody"></div>
-  </div>
-
-  <div class="panel-box" id="meteo" style="display:none">
-    <div class="pb-head">🌤️ Météo des ventes</div>
-    <div class="pb-sub">Les jours où les fans US dépensent le plus (paies du 1 & 15, fêtes). Prépare tes meilleurs contenus / promos juste avant.</div>
-    <div id="meteoBody"></div>
-  </div>
-
-  <div class="panel-box" id="classement" style="display:none">
-    <div class="pb-head">🏆 Classement des VA (ce mois) <button class="act" id="clSuggest">🪄 Objectifs auto</button></div>
-    <div class="pb-sub">Où se situe chaque VA par rapport à l'équipe, sur les abonnés du mois.</div>
-    <div id="classementBody"></div>
-  </div>
-
-  <div class="panel-box" id="objmois" style="display:none">
-    <div class="pb-head">🎯 Objectif du mois &amp; le chemin <button class="act" id="objEdit">✏️ Mon objectif</button></div>
-    <div class="pb-sub">Un objectif de CA réaliste-ambitieux, où tu en es, et combien de subs il te faut — répartis par VA.</div>
-    <div id="objmoisBody"></div>
-  </div>
-
-  <div class="panel-box" id="concentration" style="display:none">
-    <div class="pb-head">⚠️ Risque de concentration</div>
-    <div class="pb-sub">Quelle part de ton activité tient à un seul VA / modèle. Là où tu es fragile si quelqu'un part.</div>
-    <div id="concentrationBody"></div>
-  </div>
-
-  <div class="panel-box" id="varisque" style="display:none">
-    <div class="pb-head">🚪 VA qui montrent des signes de départ</div>
-    <div class="pb-sub">Un VA qui produisait puis se tait = démotivation. Repère-le avant qu'il parte.</div>
-    <div id="varisqueBody"></div>
-  </div>
-
-  <div class="panel-box" id="vatraj" style="display:none">
-    <div class="pb-head">📈 Trajectoire de chaque VA</div>
-    <div class="pb-sub">Sa courbe d'abonnés sur 8 semaines : il progresse, stagne ou décline ?</div>
-    <div id="vatrajBody"></div>
-  </div>
-
-  <div class="panel-box" id="changements" style="display:none">
-    <div class="pb-head">📓 Journal auto des gros changements</div>
-    <div class="pb-sub">Les jours où l'équipe a nettement bougé — et qui l'a causé.</div>
-    <div id="changementsBody"></div>
-  </div>
-
-  <div class="panel-box" id="cohortes" style="display:none">
-    <div class="pb-head">📊 Cohortes &amp; pourquoi ils dépensent</div>
-    <div class="pb-sub">Les fans arrivés chaque mois dépensent-ils plus ou moins — et surtout <b>pourquoi</b>.</div>
-    <div id="cohortesBody"></div>
-  </div>
-
-  <div class="panel-box" id="recos" style="display:none">
-    <div class="pb-head">🧭 À faire maintenant (recommandations)</div>
-    <div class="pb-sub">Tes chiffres transformés en gestes concrets : qui coacher, qui pousser, où mettre le trafic.</div>
-    <div id="recosBody"></div>
-  </div>
-
-  <div class="panel-box" id="moisrecord" style="display:none">
-    <div class="pb-head">🥇 Ce mois vs ton meilleur mois</div>
-    <div class="pb-sub">Ta courbe d'abonnés du mois, superposée à ton record. Es-tu en avance ou en retard sur ta meilleure période ?</div>
-    <div id="moisrecordBody"></div>
-  </div>
-
-  <div class="journal folded" id="journal" style="display:none">
-    <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
-    <div id="jrList"></div>
-  </div>
-
-  <div class="panel-box" id="decisions" style="display:none">
-    <div class="pb-head">📓 Journal de mes décisions</div>
-    <div id="decisionsBody"></div>
-  </div>
-
-  <div class="shortcuts" id="shortcuts">
-    <div class="sc-head"><span class="t">⭐ Mes raccourcis</span><span class="rule"></span><button class="routine" id="scRoutine">🚀 Ouvrir ma routine</button></div>
-    <div class="sc-add">
-      <input id="scName" placeholder="Nom (ex : Railway)" autocomplete="off" />
-      <input id="scUrl" placeholder="https://…" autocomplete="off" />
-    </div>
-    <div class="sc-grid" id="scGrid"></div>
-  </div>
 
   <div class="antileak" id="antileak">
     <div class="al-head">🛡️ Anti-Leak <span class="al-tag">protège le contenu de tes modèles</span></div>
@@ -2057,14 +2110,23 @@
     </details>
   </div>
 
-  <div class="foot">
+  <div class="shortcuts" id="shortcuts">
+    <div class="sc-head"><span class="t">⭐ Mes raccourcis</span><span class="rule"></span><button class="routine" id="scRoutine">🚀 Ouvrir ma routine</button></div>
+    <div class="sc-add">
+      <input id="scName" placeholder="Nom (ex : Railway)" autocomplete="off" />
+      <input id="scUrl" placeholder="https://…" autocomplete="off" />
+    </div>
+    <div class="sc-grid" id="scGrid"></div>
+  </div>
+
+<div class="foot">
     <span class="legend"><i style="background:var(--ok)"></i> En ligne</span>
     <span class="legend"><i style="background:var(--down)"></i> Hors ligne</span>
     <span class="legend"><i style="background:var(--idle)"></i> Local / à venir</span>
     <span style="flex:1"></span>
     <span id="footnote"></span>
   </div>
-  </div>
+</div>
   <div class="frames" id="frames"></div>
 </div>
 
@@ -3875,7 +3937,17 @@ function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice
 // La rangée compte maintenant 4 panneaux : avec un nombre IMPAIR de visibles, le
 // dernier restait orphelin en demi-largeur. On passe le dernier en pleine largeur
 // dès que le compte est impair (et pas seulement quand il n'y en a qu'un).
-function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none" && !c.classList.contains("user-hidden")); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} }
+function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none" && !c.classList.contains("user-hidden")); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} try{ refreshSecHeads(); }catch(e){} }
+// En-têtes de catégorie physiques sur la page (💰 Argent, 💬 Telegram…) —
+// cachés dès qu'AUCUN panneau de la catégorie n'est visible (mode associé,
+// panneaux masqués un par un, source de données indisponible…), pour ne
+// jamais montrer un titre de section suivi de rien.
+function refreshSecHeads(){
+  SECNAV_CATS.forEach(([,items],idx)=>{
+    const h=document.getElementById("catHead"+idx); if(!h) return;
+    h.style.display = items.some(([id])=>secnavVisible(id)) ? "" : "none";
+  });
+}
 function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 function saveTasks(){
@@ -7457,13 +7529,18 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // bande qui défile horizontalement (impossible à scanner, "Telegram" perdu
 // au milieu). Maintenant : quelques chips de catégorie + un tiroir "☰ Tout
 // voir" qui liste tout, groupé, comme le sélecteur de panneaux (#panels).
+// ⭐ Mêmes 8 catégories et le même contenu que l'organisation physique de la
+// page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
+// navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"]]],
-  ["💬 Telegram",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"]]],
-  ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"]]],
-  ["📊 Analyse",[["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"]]],
-  ["🧭 À faire",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
-  ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["rw","🚂 Coût Railway"]]],
+  ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"]]],
+  ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
+  ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
+  ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
+  ["🧭 À faire & décisions",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
+  ["🏆 Motivation & suivi perso",[["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["streak","🔥 Ta série"]]],
+  ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"]]],
 ];
 function secnavVisible(id){ const el=document.getElementById(id); return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; }
 function refreshSecnav(){
@@ -7614,7 +7691,15 @@ function renderCaJours(){
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
 { const sb=$("#sidebar"); if(sb){ ["journal","tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
 { const h=$("#jrHead"); if(h) h.onclick=()=>{ const j=$("#journal"); if(j){ j.classList.toggle("folded"); localStorage.setItem("ccn_jrfold", j.classList.contains("folded")?"1":"0"); } }; if(localStorage.getItem("ccn_jrfold")==="0"){ const j=$("#journal"); if(j) j.classList.remove("folded"); } }
+// ⭐ Migration unique : la page vient d'être réorganisée par catégorie
+// (💰 Argent, 💬 Telegram, 👥 Équipe…) — un ordre perso sauvegardé AVANT ce
+// changement (bouton ⇅) n'aurait plus de sens (positions d'origine toutes
+// différentes) et écraserait silencieusement la nouvelle organisation.
+// Purge une seule fois (repère ccn_order_v2), n'importe pas sur un futur
+// ordre perso posé après cette migration.
+if(localStorage.getItem("ccn_order_v2")!=="1"){ localStorage.removeItem("ccn_order"); localStorage.setItem("ccn_order_v2","1"); }
 applyOrder();
+refreshSecHeads();
 
 loadAll();   // même liste qu'après une reconnexion (voir loadAll)
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
