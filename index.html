@@ -225,10 +225,26 @@
   .qz-row .p{font-variant-numeric:tabular-nums;color:var(--faint);font-size:11.5px}
   .qz-up{color:var(--ok);font-weight:700} .qz-dn{color:var(--down);font-weight:700} .qz-eq{color:var(--muted)}
   /* 👁 Choix des panneaux visibles */
+  /* 🖨️ État des lieux imprimable — caché à l'écran, seul élément visible à
+     l'impression (window.print()). "Exporter en PDF" = imprimer → choisir
+     "Enregistrer en PDF" comme destination, aucune lib nécessaire. */
+  .print-only{display:none}
+  .ps-title{font-size:20px;font-weight:800;margin-bottom:2px}
+  .ps-date{font-size:13px;color:#555;margin-bottom:16px;text-transform:capitalize}
+  .ps-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #ddd;font-size:14px}
+  .ps-section{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#555;margin:18px 0 8px}
+  .ps-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7}
+  .ps-ok{font-size:13.5px;color:#2a2}
+  @media print{
+    body>*:not(#printSummary){display:none!important}
+    #printSummary{display:block!important;color:#000;background:#fff;padding:0;font-family:inherit}
+  }
   .ppick{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:18px}
   .ppick-box{background:var(--surface);border:1px solid var(--line-2);border-radius:16px;padding:20px 20px 16px;width:100%;max-width:420px;max-height:82vh;overflow-y:auto}
   .ppick-box h3{margin:0 0 4px;font-size:15px}
   .ppick-sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .secnav-search{width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
+  .secnav-search:focus{border-color:var(--acc)}
   .ppick-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer}
   .ppick-row input{width:17px;height:17px;accent-color:var(--acc)}
   .ppick-close{margin-top:14px;width:100%;font:inherit;font-size:13.5px;font-weight:600;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:10px;padding:10px;cursor:pointer}
@@ -237,7 +253,9 @@
   .secnav-row{padding:9px 8px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer;border-radius:8px}
   .secnav-row:hover{background:var(--acc-bg);color:var(--text)}
   .sec-chip-all{color:var(--acc-ink);border-color:var(--acc-line);background:var(--acc-bg)}
+  .sec-chip.active{color:var(--text);border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
   .sec-chip-n{opacity:.6;font-weight:500;font-size:11px}
+  .sec-chip-alert{color:#f87171;font-size:8px;margin-right:4px;vertical-align:2px}
   /* 🏦 Trésorerie OnlyFans */
   .tr-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   .tr-big{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
@@ -1538,6 +1556,7 @@
 
 <button id="voiceFab" class="voice-fab" title="Parler à l'assistant" aria-label="Parler à l'assistant">🎤</button>
 
+<div id="printSummary" class="print-only"></div>
 <div class="wrap" id="app">
   <div class="tabbar" id="tabbar"></div>
   <div id="secnav"></div>
@@ -1560,6 +1579,7 @@
       <button class="btn" id="install" title="Installer l'app sur ton téléphone" style="display:none">📲 Installer</button>
       <button class="btn" id="card" title="Carte du jour à partager">📸</button>
       <button class="btn" id="rank" title="Classement VA à partager">🏆</button>
+      <button class="btn" id="printSummaryBtn" title="État des lieux à imprimer/exporter en PDF">🖨️</button>
       <button class="btn" id="fontsize" title="Taille du texte">🔠</button>
       <button class="btn" id="panels" title="Choisir les panneaux affichés">🧩</button>
       <button class="btn" id="reorder" title="Réorganiser les panneaux">⇅</button>
@@ -2193,7 +2213,9 @@ const TOOLS = [
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
   // clients depuis longtemps — la fiche outil n'avait jamais été mise à jour.
-  { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", openUrl:"https://coachos-web-production-6624.up.railway.app" },
+  // ⚠️ L'URL Railway par défaut (coachos-web-production-6624...) est morte —
+  // un domaine perso a été posé depuis (grindperform...), vérifié 200 en vrai.
+  { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", openUrl:"https://grindperform.up.railway.app" },
   { id:"iphone-panel",world:"noctra", cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
   { id:"monloader",   world:"noctra", cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
@@ -4763,6 +4785,38 @@ async function shareDayCard(){
   },"image/png");
 }
 { const cb=$("#card"); if(cb) cb.onclick=shareDayCard; }
+
+// 🖨️ État des lieux imprimable/exportable — réutilise les MÊMES calculs déjà
+// affichés sur l'accueil (Essentiel) plutôt que de les refaire indépendamment
+// (moins de risque d'un résumé qui raconte un chiffre différent du reste de
+// la page). "Exporter en PDF" = imprimer → "Enregistrer en PDF", pas de lib.
+function buildPrintSummary(){
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
+  const ko=(typeof revKo==="function")?revKo():false;
+  const tot=(om&&om.totals)||{};
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const cur=(om&&om.currency)||"$";
+  const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+  const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,cur);
+  const subsMois=(tot.subsMonth!=null)?String(tot.subsMonth):"—";
+  const dateStr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const topVa=(om&&Array.isArray(om.vas)&&om.vas.length)?om.vas.slice().sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0))[0]:null;
+  const alerts=Object.keys(CAT_ALERTS).filter(l=>{ try{ return CAT_ALERTS[l](); }catch(e){ return false; } });
+  return `<div class="ps-title">📊 État des lieux — Noctra</div>
+    <div class="ps-date">${dateStr}</div>
+    <div class="ps-row"><span>💰 Net du mois (est.)</span><b>${netMois}</b></div>
+    <div class="ps-row"><span>👥 Abonnés ce mois</span><b>${subsMois}</b></div>
+    ${(!ko&&tgM>0)?`<div class="ps-row"><span>💬 dont Telegram</span><b>${tgMoney(tgM)}</b></div>`:""}
+    ${topVa?`<div class="ps-row"><span>🏆 Meilleur VA du mois</span><b>${escapeHtml(topVa.va)} (${Number(topVa.monthSubs)||0} subs)</b></div>`:""}
+    <div class="ps-section">🔔 À surveiller</div>
+    ${alerts.length?`<ul class="ps-list">${alerts.map(a=>`<li>${escapeHtml(a)}</li>`).join("")}</ul>`:`<div class="ps-ok">✅ Rien à signaler pour l'instant.</div>`}`;
+}
+function openSummaryPrint(){
+  const el=document.getElementById("printSummary"); if(!el) return;
+  el.innerHTML=buildPrintSummary();
+  window.print();
+}
+{ const b=$("#printSummaryBtn"); if(b) b.onclick=openSummaryPrint; }
 
 // 📄 #11 RAPPORT DU MOIS : image récap à partager / archiver.
 function makeMonthReport(){
@@ -7593,6 +7647,38 @@ const SECNAV_CATS=[
   ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"]]],
 ];
 function secnavVisible(id){ const el=document.getElementById(id); return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; }
+// 🔔 Signaux "à surveiller" par catégorie (point rouge sur le chip). Un sous-
+// ensemble VOLONTAIREMENT restreint : seulement des cas où j'ai vérifié le
+// signal exact dans le code du panneau (pas de détection générique sur les
+// ~76 panneaux, dont les conventions internes varient trop pour un signal
+// honnête partout). decroche/varisque se cachent déjà tout seuls s'il n'y a
+// rien à signaler ; objmois pose .ob-warn quand le rythme est en retard.
+const CAT_ALERTS={
+  "👥 Équipe (VA)": ()=>secnavVisible("decroche")||secnavVisible("varisque"),
+  "💰 Argent & rentabilité": ()=>!!document.querySelector("#objmois .ob-warn"),
+};
+// 📍 "Tu es ici" : surligne dans la barre la catégorie que tu es en train de
+// regarder en scrollant, comme un scrollspy — pas de nouvel élément d'UI,
+// juste le chip déjà là qui s'allume.
+let ACTIVE_CAT_LABEL=null;
+function highlightActiveCat(label){
+  document.querySelectorAll("#secnav .sec-chip[data-secnav-cat]").forEach(c=>{
+    c.classList.toggle("active", c.getAttribute("data-secnav-cat")===label);
+  });
+}
+function initCatSpy(){
+  if(!("IntersectionObserver" in window)) return;
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const idx=Number(entry.target.getAttribute("data-cat-idx"));
+      const cat=SECNAV_CATS[idx]; if(!cat) return;
+      ACTIVE_CAT_LABEL=cat[0];
+      highlightActiveCat(ACTIVE_CAT_LABEL);
+    });
+  }, { rootMargin:"-64px 0px -75% 0px", threshold:0 });
+  document.querySelectorAll(".sec-head[data-cat-idx]").forEach(h=>obs.observe(h));
+}
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
   const cats=SECNAV_CATS.filter(([,items])=>items.some(([id])=>secnavVisible(id)));
@@ -7601,27 +7687,57 @@ function refreshSecnav(){
   // (le seul qui garantit de tout retrouver) demandait un long swipe pour
   // l'atteindre. Vérifié en vrai en viewport mobile (375px).
   const html=`<span class="sec-chip sec-chip-all" data-secnav-all="1">☰ Tout voir</span>`
-    +cats.map(([label,items])=>{ const n=items.filter(([id])=>secnavVisible(id)).length; return `<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label} <span class="sec-chip-n">${n}</span></span>`; }).join("");
+    +cats.map(([label,items])=>{
+      const n=items.filter(([id])=>secnavVisible(id)).length;
+      const alert=CAT_ALERTS[label]&&CAT_ALERTS[label]();
+      return `<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${alert?`<span class="sec-chip-alert" title="Ça mérite un coup d'œil">●</span>`:""}${label} <span class="sec-chip-n">${n}</span></span>`;
+    }).join("");
   if(nav.innerHTML!==html) nav.innerHTML=html;
+  highlightActiveCat(ACTIVE_CAT_LABEL);
 }
 function jumpToSection(id){ const el=document.getElementById(id); if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } }
+// ⭐ Mémorise la dernière catégorie visitée (chip cliqué OU section rejointe
+// depuis le tiroir) — "☰ Tout voir" sans argument rouvre directement dessus
+// au lieu de toujours repartir du haut, pour la catégorie qu'on consulte le
+// plus au quotidien.
+function lastCatKey(){ return localStorage.getItem("ccn_last_cat")||null; }
+function setLastCatKey(label){ if(label) localStorage.setItem("ccn_last_cat",label); }
 function openSectionNav(scrollToCat){
+  const target0=scrollToCat||lastCatKey();
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🗂️ Aller à…</h3>
     <div class="ppick-sub">Tape sur une section pour y sauter directement.</div>
+    <input type="text" class="secnav-search" id="secnavSearch" placeholder="🔍 Chercher (ex: telegram, paie…)" autocomplete="off" />
+    <div id="secnavCatsWrap">
     ${SECNAV_CATS.map(([label,items])=>{
       const vis=items.filter(([id])=>secnavVisible(id));
-      const rows=vis.map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}">${lbl}</div>`).join("");
-      return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${label} <span class="sec-chip-n">${vis.length}</span></div>${rows}</div>`:"";
+      const rows=vis.map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}" data-q="${escapeHtml(lbl.toLowerCase())}">${lbl}</div>`).join("");
+      const alert=CAT_ALERTS[label]&&CAT_ALERTS[label]();
+      return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${alert?`<span class="sec-chip-alert" title="Ça mérite un coup d'œil">●</span>`:""}${label} <span class="sec-chip-n">${vis.length}</span></div>${rows}</div>`:"";
     }).join("")}
+    </div>
     <button class="ppick-close">Fermer</button></div>`;
   ov.addEventListener("click",e=>{
     if(e.target===ov||e.target.closest(".ppick-close")){ ov.remove(); return; }
     const row=e.target.closest("[data-sec]");
-    if(row){ ov.remove(); jumpToSection(row.getAttribute("data-sec")); }
+    if(row){ const cat=row.closest(".secnav-cat"); if(cat) setLastCatKey(cat.getAttribute("data-cat")); ov.remove(); jumpToSection(row.getAttribute("data-sec")); }
+  });
+  const search=ov.querySelector("#secnavSearch");
+  search.addEventListener("input",()=>{
+    const q=search.value.trim().toLowerCase();
+    ov.querySelectorAll(".secnav-cat").forEach(cat=>{
+      let anyVisible=false;
+      cat.querySelectorAll(".secnav-row").forEach(row=>{
+        const match=!q||row.getAttribute("data-q").includes(q);
+        row.style.display=match?"":"none";
+        if(match) anyVisible=true;
+      });
+      cat.style.display=anyVisible?"":"none";
+    });
   });
   document.body.appendChild(ov);
-  if(scrollToCat){
+  search.focus();
+  if(target0){
     // ⭐ Buggé sans délai : le tiroir vient d'être inséré dans le DOM, le
     // navigateur n'a pas encore calculé sa mise en page (hauteurs, position de
     // scroll) — scrollIntoView() appelé immédiatement retombait systématiquement
@@ -7630,14 +7746,14 @@ function openSectionNav(scrollToCat){
     // pas de façon fiable ici (onglet pas forcément au premier plan) ; un
     // setTimeout court, lui, marche à tous les coups — vérifié en vrai.
     setTimeout(()=>{
-      const target=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===scrollToCat);
-      if(target) target.scrollIntoView({block:"start"});
+      const t=[...ov.querySelectorAll(".secnav-cat")].find(c=>c.getAttribute("data-cat")===target0);
+      if(t) t.scrollIntoView({block:"start"});
     }, 50);
   }
 }
 $("#secnav").addEventListener("click",e=>{
   const all=e.target.closest("[data-secnav-all]"); if(all){ openSectionNav(); return; }
-  const cat=e.target.closest("[data-secnav-cat]"); if(cat){ openSectionNav(cat.getAttribute("data-secnav-cat")); return; }
+  const cat=e.target.closest("[data-secnav-cat]"); if(cat){ const lbl=cat.getAttribute("data-secnav-cat"); setLastCatKey(lbl); openSectionNav(lbl); return; }
 });
 refreshSecnav();
 
@@ -7772,6 +7888,7 @@ if(localStorage.getItem("ccn_order_v2")!=="1"){ localStorage.removeItem("ccn_ord
 applyOrder();
 refreshSecHeads();
 applyCatCollapsed();
+try{ initCatSpy(); }catch(e){}
 
 loadAll();   // même liste qu'après une reconnexion (voir loadAll)
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
