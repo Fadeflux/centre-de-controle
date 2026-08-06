@@ -237,6 +237,7 @@
   .secnav-row{padding:9px 8px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer;border-radius:8px}
   .secnav-row:hover{background:var(--acc-bg);color:var(--text)}
   .sec-chip-all{color:var(--acc-ink);border-color:var(--acc-line);background:var(--acc-bg)}
+  .sec-chip-n{opacity:.6;font-weight:500;font-size:11px}
   /* 🏦 Trésorerie OnlyFans */
   .tr-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   .tr-big{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
@@ -1234,6 +1235,11 @@
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .sec-head.pin .t{color:var(--gold)}
   .sec-head .rule{flex:1;height:1px;background:var(--line)}
+  /* Catégories physiques repliables — [data-cat-idx] cible SEULEMENT mes 8
+     en-têtes (pas le catalogue d'outils, qui réutilise .sec-head sans ça). */
+  .sec-head[data-cat-idx]{cursor:pointer;user-select:none}
+  .sec-head[data-cat-idx] .t::after{content:"▾";margin-left:6px;font-size:9px;opacity:.55;display:inline-block;transition:transform .15s}
+  .sec-head[data-cat-idx].cat-collapsed .t::after{transform:rotate(-90deg)}
 
   /* Flex plutôt que grid : en grille, une carte seule sur la dernière ligne
      gardait la largeur d'UNE colonne et laissait un grand vide à côté. En flex,
@@ -1602,7 +1608,8 @@
 
   <div class="sec-head" id="catHead0" data-cat-idx="0"><span class="t">💰 Argent & rentabilité</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody0">
+<div class="pair-row">
     <div class="panel-box om" id="om" style="display:none">
     <div class="pb-head">◎ OnlyMonster <span id="omFresh" class="pb-fresh"></span>
       <div class="om-models" id="omModels"></div>
@@ -1699,10 +1706,12 @@
       <div id="rwBody"></div>
     </div>
   </div>
+  </div>
 
   <div class="sec-head" id="catHead1" data-cat-idx="1"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody1">
+<div class="pair-row">
     <div class="panel-box" id="onlychat" style="display:none">
       <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
       <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
@@ -1728,10 +1737,12 @@
     </div>
     <div id="tgList"></div>
   </div>
+  </div>
 
   <div class="sec-head" id="catHead2" data-cat-idx="2"><span class="t">💎 Fans</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody2">
+<div class="pair-row">
     <div class="panel-box" id="fanradar" style="display:none">
       <div class="pb-head">💤 Fans endormis à relancer <span class="fr-c" id="frCount"></span></div>
       <div id="fanradarBody"></div>
@@ -1746,10 +1757,12 @@
       <div class="pb-head">💔 Gros fans qui viennent de partir</div>
       <div id="churnBody"></div>
     </div>
+  </div>
 
   <div class="sec-head" id="catHead3" data-cat-idx="3"><span class="t">👥 Équipe (VA)</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody3">
+<div class="pair-row">
     <div class="panel-box" id="modeles" style="display:none">
     <div class="pb-head">🎭 Tes modèles en un coup d'œil</div>
     <div id="modelesBody"></div>
@@ -1846,10 +1859,12 @@
       <div class="pb-head">👻 VA fantômes <span class="gh-c" id="ghCount"></span></div>
       <div id="ghostsBody"></div>
     </div>
+  </div>
 
   <div class="sec-head" id="catHead4" data-cat-idx="4"><span class="t">📊 Analyse & tendances</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody4">
+<div class="pair-row">
     <div class="panel-box" id="insights" style="display:none">
       <div class="pb-head">🔍 Patterns cachés (l'IA analyse tes chiffres)</div>
       <div id="insightsBody"></div>
@@ -1923,10 +1938,12 @@
       <div class="pb-head">📅 Saisonnalité &amp; meilleurs moments</div>
       <div id="saisonBody"></div>
     </div>
+  </div>
 
   <div class="sec-head" id="catHead5" data-cat-idx="5"><span class="t">🧭 À faire & décisions</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody5">
+<div class="pair-row">
     <div class="panel-box" id="recos" style="display:none">
     <div class="pb-head">🧭 À faire maintenant (recommandations)</div>
     <div class="pb-sub">Tes chiffres transformés en gestes concrets : qui coacher, qui pousser, où mettre le trafic.</div>
@@ -1948,10 +1965,12 @@
     <div class="jr-head" id="jrHead">📩 Journal <span class="c" id="jrCount"></span> <span class="jr-caret">▸</span></div>
     <div id="jrList"></div>
   </div>
+  </div>
 
   <div class="sec-head" id="catHead6" data-cat-idx="6"><span class="t">🏆 Motivation & suivi perso</span><span class="rule"></span></div>
 
-  <div class="pair-row">
+  <div class="cat-body" id="catBody6">
+<div class="pair-row">
     <div class="panel-box" id="badges" style="display:none">
       <div class="pb-head">🏅 Badges &amp; progression</div>
       <div id="badgesBody"></div>
@@ -2054,10 +2073,12 @@
   <div class="rappels" id="rappels" style="display:none"></div>
 
   <div class="summary" id="summary"></div>
+  </div>
 
   <div class="sec-head" id="catHead7" data-cat-idx="7"><span class="t">🛠 Système</span><span class="rule"></span></div>
 
-  <div id="sections"></div>
+  <div class="cat-body" id="catBody7">
+<div id="sections"></div>
 
   <div class="pair-row">
     <div class="panel-box" id="proxy" style="display:none">
@@ -2126,6 +2147,7 @@
     <span style="flex:1"></span>
     <span id="footnote"></span>
   </div>
+  </div>
 </div>
   <div class="frames" id="frames"></div>
 </div>
@@ -2169,7 +2191,9 @@ const TOOLS = [
     metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
-  { id:"coachos",     world:"noctra", cat:"En construction", name:"CoachOS",      icon:"C", build:true },
+  // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
+  // clients depuis longtemps — la fiche outil n'avait jamais été mise à jour.
+  { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", openUrl:"https://coachos-web-production-6624.up.railway.app" },
   { id:"iphone-panel",world:"noctra", cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
   { id:"monloader",   world:"noctra", cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
@@ -3948,6 +3972,32 @@ function refreshSecHeads(){
     h.style.display = items.some(([id])=>secnavVisible(id)) ? "" : "none";
   });
 }
+// 🗂️ Catégories repliables — tape un en-tête pour cacher tout son contenu
+// d'un coup (catBodyN, un seul conteneur enveloppant toute la catégorie :
+// on ne touche JAMAIS le display de chaque panneau individuel, qui reste sa
+// propre vérité — replier/déplier ne fait qu'ajouter/retirer un display:none
+// sur le PARENT, les enfants retrouvent exactement leur état d'avant).
+function catCollapsedSet(){ try{ return new Set(JSON.parse(localStorage.getItem("ccn_cat_collapsed")||"[]")); }catch(e){ return new Set(); } }
+function applyCatCollapsed(){
+  const s=catCollapsedSet();
+  SECNAV_CATS.forEach((_,idx)=>{
+    const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
+    if(!h||!b) return;
+    const on=s.has(idx);
+    h.classList.toggle("cat-collapsed",on);
+    b.style.display=on?"none":"";
+  });
+}
+function toggleCatCollapsed(idx){
+  const s=catCollapsedSet();
+  s.has(idx)?s.delete(idx):s.add(idx);
+  localStorage.setItem("ccn_cat_collapsed",JSON.stringify([...s]));
+  applyCatCollapsed();
+}
+document.addEventListener("click",e=>{
+  const h=e.target.closest(".sec-head[data-cat-idx]"); if(!h) return;
+  toggleCatCollapsed(Number(h.getAttribute("data-cat-idx")));
+});
 function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 function saveTasks(){
@@ -7551,7 +7601,7 @@ function refreshSecnav(){
   // (le seul qui garantit de tout retrouver) demandait un long swipe pour
   // l'atteindre. Vérifié en vrai en viewport mobile (375px).
   const html=`<span class="sec-chip sec-chip-all" data-secnav-all="1">☰ Tout voir</span>`
-    +cats.map(([label])=>`<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label}</span>`).join("");
+    +cats.map(([label,items])=>{ const n=items.filter(([id])=>secnavVisible(id)).length; return `<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label} <span class="sec-chip-n">${n}</span></span>`; }).join("");
   if(nav.innerHTML!==html) nav.innerHTML=html;
 }
 function jumpToSection(id){ const el=document.getElementById(id); if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } }
@@ -7560,8 +7610,9 @@ function openSectionNav(scrollToCat){
   ov.innerHTML=`<div class="ppick-box"><h3>🗂️ Aller à…</h3>
     <div class="ppick-sub">Tape sur une section pour y sauter directement.</div>
     ${SECNAV_CATS.map(([label,items])=>{
-      const rows=items.filter(([id])=>secnavVisible(id)).map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}">${lbl}</div>`).join("");
-      return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${label}</div>${rows}</div>`:"";
+      const vis=items.filter(([id])=>secnavVisible(id));
+      const rows=vis.map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}">${lbl}</div>`).join("");
+      return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${label} <span class="sec-chip-n">${vis.length}</span></div>${rows}</div>`:"";
     }).join("")}
     <button class="ppick-close">Fermer</button></div>`;
   ov.addEventListener("click",e=>{
@@ -7720,6 +7771,7 @@ function renderCaJours(){
 if(localStorage.getItem("ccn_order_v2")!=="1"){ localStorage.removeItem("ccn_order"); localStorage.setItem("ccn_order_v2","1"); }
 applyOrder();
 refreshSecHeads();
+applyCatCollapsed();
 
 loadAll();   // même liste qu'après une reconnexion (voir loadAll)
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
