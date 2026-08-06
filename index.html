@@ -7546,8 +7546,12 @@ function secnavVisible(id){ const el=document.getElementById(id); return el && !
 function refreshSecnav(){
   const nav=$("#secnav"); if(!nav) return;
   const cats=SECNAV_CATS.filter(([,items])=>items.some(([id])=>secnavVisible(id)));
-  const html=cats.map(([label])=>`<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label}</span>`).join("")
-    +`<span class="sec-chip sec-chip-all" data-secnav-all="1">☰ Tout voir</span>`;
+  // ⭐ "Tout voir" EN PREMIER, pas en dernier : sur mobile la barre défile sur
+  // ~1280px pour ~340px d'écran (9 chips) — en dernière position, ce bouton
+  // (le seul qui garantit de tout retrouver) demandait un long swipe pour
+  // l'atteindre. Vérifié en vrai en viewport mobile (375px).
+  const html=`<span class="sec-chip sec-chip-all" data-secnav-all="1">☰ Tout voir</span>`
+    +cats.map(([label])=>`<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${label}</span>`).join("");
   if(nav.innerHTML!==html) nav.innerHTML=html;
 }
 function jumpToSection(id){ const el=document.getElementById(id); if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } }
