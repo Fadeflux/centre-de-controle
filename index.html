@@ -291,6 +291,13 @@
   .tg-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .tg-tot{margin-left:auto;font-size:12px;color:var(--acc);font-weight:700}
   .tg-sub{font-size:12px;color:var(--muted);margin:6px 0 10px}
+  /* Bandeau « quel chiffre compte » — pour ne plus chercher les revenus
+     Telegram, et ne plus se demander pourquoi une saisie ne change rien. */
+  .tg-src-auto{font-size:13px;line-height:1.5;margin:8px 0 0;padding:9px 12px;border-radius:10px;
+    color:var(--text);background:color-mix(in srgb,#4ade80 12%,transparent);border:1px solid color-mix(in srgb,#4ade80 32%,transparent)}
+  .tg-src-det{font-size:12px;color:var(--muted);margin-top:4px}
+  .tg-src-manu{font-size:13px;line-height:1.5;margin:8px 0 10px;padding:9px 12px;border-radius:10px;
+    color:var(--text);background:color-mix(in srgb,#facc15 12%,transparent);border:1px solid color-mix(in srgb,#facc15 34%,transparent)}
   .tg-add{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .tg-add input,.tg-add select{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   #tgModel{min-width:120px} #tgAmount{width:110px} #tgSubs{width:120px} #tgDate{width:150px;color-scheme:dark} #tgNote{flex:1;min-width:130px}
@@ -1788,9 +1795,14 @@
     </div>
   </div>
 
-  <div class="tgrev" id="tgrev" style="display:none">
-    <div class="tg-head">📲 Revenus Telegram (saisie manuelle) <span class="tg-tot" id="tgTotal"></span></div>
-    <div class="tg-sub">⭐ Depuis qu'OnlyChat est branché ci-dessus, le total de la saisie manuelle n'est plus utilisé dans tes chiffres — garde ce panneau pour un revenu Telegram HORS OnlyChat, ou en repli si la connexion casse.</div>
+  <!-- ⚠️ Ce panneau avait été masqué en dur (display:none, 2026-08-05) quand
+       OnlyChat a pris le relais — mais RIEN ne le ré-affichait jamais, donc les
+       revenus Telegram devenaient introuvables sur la page et on ne pouvait
+       plus saisir un revenu Telegram hors OnlyChat. Réaffiché le 2026-08-07,
+       avec un bandeau qui dit clairement QUEL chiffre compte. -->
+  <div class="tgrev" id="tgrev">
+    <div class="tg-head">📲 Revenus Telegram <span class="tg-tot" id="tgTotal"></span></div>
+    <div id="tgSource"></div>
     <div class="tg-add">
       <select id="tgModel" title="Quel modèle a généré ce revenu Telegram"></select>
       <input id="tgAmount" type="text" inputmode="decimal" placeholder="Montant $" />
@@ -2803,6 +2815,21 @@ async function loadOnlyChat(){
     }
   }catch(e){}
   renderOnlyChat();
+  // ⭐⭐ COURSE D'ARRIVÉE — bug d'ARGENT (corrigé le 2026-08-07).
+  // loadAll() lance tous les chargeurs EN PARALLÈLE. Les panneaux qui comptent
+  // l'argent Telegram (camembert « D'où vient l'argent », rentabilité, partage
+  // Ma part/Manon, « Mon année », tuile « Net du mois ») sont dessinés par
+  // renderOM() — donc par le chargeur OnlyMonster. Quand OnlyChat arrivait
+  // APRÈS OnlyMonster (fréquent), ces panneaux étaient déjà dessinés SANS
+  // Telegram, et renderOnlyChat() ne les rappelait pas : le camembert perdait
+  // « 📲 Layla » / « 📲 Zoe », et surtout le PROFIT et le PARTAGE étaient
+  // calculés en oubliant les revenus Telegram du mois.
+  // On redessine donc tout ce qui dépend de cet argent dès qu'il arrive.
+  try{
+    if(typeof OM_DATA!=="undefined" && OM_DATA) renderOM();   // recalcule renta/pie/split/history/tuile
+    else if(typeof tgRefresh==="function") tgRefresh();
+    if(typeof refreshEssentiel==="function") refreshEssentiel();
+  }catch(e){ console.error("maj argent Telegram:",e); }
 }
 // 📅 CA Telegram par jour (mois en cours), comme le "CA par jour" d'OnlyFans —
 // lu dans chartTotal, déjà renvoyé par l'API OnlyChat (aucun nouvel appel).
@@ -3036,6 +3063,24 @@ function tgFillModelSelect(){ const sel=$("#tgModel"); if(!sel) return; const cu
 function renderTgrev(){
   const list=$("#tgList"), tot=$("#tgTotal"); if(!list) return;
   tgFillModelSelect();
+  // ⭐ DIRE QUEL CHIFFRE COMPTE VRAIMENT. tgMonthTotal() prend le total OnlyChat
+  // dès qu'il est disponible et IGNORE alors la saisie manuelle (pour ne pas
+  // compter deux fois). Sans le dire, on ajoutait un revenu à la main et on se
+  // demandait pourquoi le profit ne bougeait pas d'un centime.
+  const src=$("#tgSource");
+  if(src){
+    const auto=(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null) ? Number(ONLYCHAT_DATA.totalRevenue)||0 : null;
+    if(auto!=null){
+      const pm=ONLYCHAT_DATA.parModele||{};
+      const detail=Object.keys(pm).map(n=>`${escapeHtml(n)} <b>${tgMoney(Number(pm[n].totalRevenue)||0)}</b>`).join(" · ");
+      src.innerHTML=`<div class="tg-src-auto">✅ <b>Compté dans tes chiffres : ${tgMoney(auto)}</b> ce mois — automatique via OnlyChat${detail?`<div class="tg-src-det">${detail}</div>`:""}</div>`
+        +`<div class="tg-sub">Les saisies ci-dessous ne sont <b>pas</b> ajoutées tant qu'OnlyChat répond (sinon l'argent compterait deux fois). Sers-t'en pour un revenu Telegram <b>hors</b> OnlyChat, ou si la connexion casse.</div>`;
+    } else {
+      const mk=tgMonthKey(Date.now());
+      const manuel=TGREV.filter(x=>tgMonthKey(x.ts)===mk).reduce((a,x)=>a+(Number(x.amount)||0),0);
+      src.innerHTML=`<div class="tg-src-manu">⚠️ OnlyChat ne répond pas — c'est <b>ta saisie manuelle</b> qui compte : <b>${tgMoney(manuel)}</b> ce mois.</div>`;
+    }
+  }
   // Total propre à CE panneau (saisie manuelle) : tgMonthTotal() bascule sur
   // OnlyChat dès qu'il est branché, ce qui afficherait ici un chiffre qui ne
   // vient pas de ce que tu as noté toi-même — on veut le vrai total manuel.
@@ -3051,7 +3096,7 @@ function renderTgrev(){
   TGREV.filter(x=>tgMonthKey(x.ts)===mKey).forEach(x=>{ const m=(x.model||"").trim()||"Général"; perM[m]=(perM[m]||0)+(Number(x.amount)||0); });
   const srcKeys=Object.keys(perM).sort((a,b)=>perM[b]-perM[a]);
   const srcLine = srcKeys.length>1 ? `<div class="tg-src">Ce mois par modèle : ${srcKeys.map(m=>`${escapeHtml(m)} <b>${tgMoney(perM[m])}</b>`).join(" · ")}</div>` : "";
-  if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Rien noté. Ajoute ton premier revenu Telegram 👆</div>`; return; }
+  if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Aucune saisie manuelle — normal si tout passe par OnlyChat.</div>`; return; }
   list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${tgMoney(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); }
