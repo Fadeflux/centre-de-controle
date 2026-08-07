@@ -1571,6 +1571,79 @@
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   }
+
+  /* ==========================================================
+     COMPACTAGE (2026-08-07)
+     Demande opérateur : montants coupés en deux lignes, cartes
+     trop hautes, « Cash à venir » étiré pour rien, page
+     interminable. Bloc placé en FIN de <style> à dessein : à
+     spécificité égale, c'est la dernière règle qui gagne — le
+     skin V2 plus haut écrasait déjà les tailles prévues.
+     ========================================================== */
+
+  /* 1. Montants coupés (« 1 417 » / « ,78 $ ») sur les tuiles
+        OnlyMonster : .tile .val (clamp 23→28px du skin V2)
+        écrasait le 20px prévu pour .om-tiles. On redescend la
+        taille ET on interdit la coupure. La tuile « Net du mois »
+        est la plus longue (montant + sous-ligne) : elle prend 2
+        colonnes pour que le montant tienne toujours d'un bloc. */
+  .om-tiles{
+    grid-template-columns:repeat(auto-fit,minmax(104px,1fr));
+    align-items:start;        /* sinon les 5 tuiles sans sous-ligne
+                                 héritaient du vide de la 1re */
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .om-tiles .tile{padding:11px 12px}
+  .om-tiles .tile .lbl{font-size:9.5px;letter-spacing:.04em}
+  .om-tiles .tile .val{
+    font-size:clamp(16px,4vw,19px);
+    white-space:nowrap;
+    letter-spacing:-.3px;
+    font-variant-numeric:tabular-nums;
+    margin-top:4px;
+  }
+  .om-tiles .tile-sub{font-size:10px;line-height:1.35;margin-top:2px}
+  /* Seuil 300px et pas 340 : à 320px (petit iPhone) la grille a DÉJÀ
+     2 colonnes, donc sans le span la tuile « Net du mois » était trop
+     étroite et le montant, en nowrap, débordait hors de la carte
+     (mesuré : scrollWidth > clientWidth). En dessous de 300px on
+     relâche le nowrap : mieux vaut un montant sur 2 lignes que coupé. */
+  @media (min-width:300px){
+    .om-tiles .tile:first-child{grid-column:span 2}
+  }
+  @media (max-width:299px){
+    .om-tiles .tile .val{white-space:normal}
+  }
+
+  /* 2. Même coupure possible sur les tuiles du résumé (mêmes
+        .tile .val, colonnes de 150px) : montants sur une ligne. */
+  .summary .tile .val{
+    font-size:clamp(18px,4.6vw,24px);
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  .summary{gap:10px;margin-bottom:16px}
+
+  /* 3. « Cash à venir » étiré : dans une .pair-row, le panneau
+        court était étiré à la hauteur du long (#om fait ~1200px
+        avec le classement VA) et son contenu centré verticalement
+        -> deux grosses bandes vides haut/bas. Chaque panneau
+        reprend sa hauteur de contenu. */
+  @media (min-width:860px){
+    .pair-row{align-items:start}
+    .pair-row > .panel-box > div:last-child{flex:0 0 auto;justify-content:flex-start}
+  }
+
+  /* 4. Longueur de page : ~60 panneaux × 20px de marge = ~1200px
+        de vide pur. On resserre le rythme vertical. */
+  .panel-box,.costs,.tgrev,.antileak,.journal{margin-top:12px}
+  .pair-row{margin-top:12px}
+  .pb-head{margin-bottom:9px}
+  @media (max-width:600px){
+    .panel-box,.costs,.tgrev,.antileak,.journal{margin-top:10px}
+    .pair-row{margin-top:10px}
+  }
 </style>
 </head>
 <body>
