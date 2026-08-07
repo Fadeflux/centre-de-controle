@@ -1635,6 +1635,15 @@
     .pair-row > .panel-box > div:last-child{flex:0 0 auto;justify-content:flex-start}
   }
 
+  /* 5. Briefing du matin : le gros montant est en 52px FIXE, et les
+        montants sont formatés avec des espaces insécables — donc
+        incassables. Mesuré à 375px de large (290px utiles) : ça passe
+        pile à 1 417,78 $, mais ça DÉBORDE de la carte dès 12 345,67 $.
+        Pas visible aujourd'hui, ça le deviendra quand le CA passera
+        les 5 chiffres. On garde 52px sur grand écran, on laisse la
+        taille redescendre quand la place manque. */
+  .mn-money .big{font-size:clamp(28px,10vw,52px)}
+
   /* 4. Longueur de page : ~60 panneaux × 20px de marge = ~1200px
         de vide pur. On resserre le rythme vertical. */
   .panel-box,.costs,.tgrev,.antileak,.journal{margin-top:12px}
