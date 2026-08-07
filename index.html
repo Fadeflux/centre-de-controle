@@ -2298,9 +2298,25 @@ const DEMO = {
 
 /* ---------- état ---------- */
 const $ = s => document.querySelector(s);
+// ⚠️ TOUTE lecture de localStorage passe par ici. Ces lectures se font au
+// niveau supérieur du script : un seul JSON.parse qui lève (clé corrompue —
+// quota atteint en pleine écriture, deux onglets, extension navigateur…)
+// arrêtait TOUT le script et laissait une page ENTIÈREMENT BLANCHE, sans
+// message, sans moyen de s'en sortir depuis le téléphone. Ici on retombe sur
+// une valeur par défaut ET on supprime la clé fautive : la page se répare
+// toute seule au rechargement suivant.
+function lsJSON(cle, defaut){
+  try{
+    const v = JSON.parse(localStorage.getItem(cle));
+    return (v===null || v===undefined) ? defaut : v;
+  }catch(e){
+    try{ localStorage.removeItem(cle); }catch(_){}
+    return defaut;
+  }
+}
 let TOKEN = localStorage.getItem("ccn_token") || "";
 let CURRENT_USER = localStorage.getItem("ccn_name") || "";
-let PINS  = JSON.parse(localStorage.getItem("ccn_pins") || "[]");
+let PINS  = lsJSON("ccn_pins",[]);
 let LAST  = DEMO;
 let WORLD = "all";
 let HIDE  = localStorage.getItem("ccn_hide") === "1";
@@ -2628,12 +2644,15 @@ $("#hide").onclick = ()=>{
 // Appelée par 🙈 ET par la vue associé (le moment où l'on tend l'écran).
 function rerenderMoney(){
   [renderOM, renderSubValue, renderConversion, renderHours, renderSim, renderPie, renderHistory, renderRenta, renderRailway, renderProxy, renderTresorerie, renderCaJours, renderModeles, renderCash, renderCac, renderDecroche, renderObjMois, renderConcentration, renderCohortes, renderRecos, renderMeteo,
-   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, renderOnlyChat, function(){ renderPaie(LAST); }]
+   // renderTgrev : le panneau 📲 Revenus Telegram affiche des montants (bandeau
+   // + liste). Sans lui ici, il gardait ses chiffres EN CLAIR après un clic sur
+   // 🙈 et en vue associé, quand aucun autre rendu ne le rattrapait.
+   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, renderOnlyChat, renderTgrev, renderSplit, function(){ renderPaie(LAST); }]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 }
 
 /* ---------- ma journée (à faire) ---------- */
-let TODOS = JSON.parse(localStorage.getItem("ccn_todos") || "[]");
+let TODOS = lsJSON("ccn_todos",[]);
 let todoSyncT = null;
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function saveTodos(){
@@ -2691,12 +2710,16 @@ $("#rappels").addEventListener("click",e=>{ const b=e.target.closest("[data-rap]
 renderRappels();
 
 /* ---------- dépenses d'outils ---------- */
-let COSTS = JSON.parse(localStorage.getItem("ccn_costs") || "[]");
+let COSTS = lsJSON("ccn_costs",[]), COSTS_LOADED=false;
 function saveCosts(){
   localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
   // On pousse aussi au cerveau : c'est lui qui tourne 24h/24 et qui pourra te
   // prévenir AVANT l'échéance (le localStorage seul ne prévient personne).
+  // ⚠️ Verrou d'écriture (même motif que RULES/DECISIONS/VANOTES) : tant que la
+  // lecture serveur n'a pas réussi, on garde tout en local et on ne POSTe RIEN,
+  // sinon un ajout fait avant la fin de loadCosts écrase la liste du serveur.
   if(typeof TOKEN!=="undefined" && TOKEN){
+    if(!COSTS_LOADED) return;
     fetch(HUB_BASE+"/api/hub/tool-costs",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({outils:COSTS})}).catch(()=>{});
   }
 }
@@ -2707,14 +2730,18 @@ async function loadCosts(){
     const r=await fetch(HUB_BASE+"/api/hub/tool-costs",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
     const j=await r.json();
-    if(Array.isArray(j.outils) && (j.outils.length || !COSTS.length)){
+    // ⚠️ Le serveur FAIT FOI dès qu'il renvoie un tableau, y compris VIDE.
+    // L'ancienne condition `(j.outils.length || !COSTS.length)` laissait le cas
+    // « serveur vidé + local rempli » sans AUCUNE branche : les dépenses
+    // supprimées depuis le téléphone restaient affichées ET déduites du profit
+    // sur le PC, puis le prochain saveCosts() les renvoyait au serveur —
+    // exactement la résurrection que ce bloc prétendait empêcher.
+    if(Array.isArray(j.outils)){
       COSTS=j.outils; localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
+      COSTS_LOADED=true;
       renderCosts(); if(typeof renderRenta==="function") renderRenta();
     // 1re fois SEULEMENT : le serveur n'a jamais rien stocké (clé absente).
-    // ⚠️ Si le serveur renvoie une liste VIDE, c'est une suppression volontaire —
-    // re-pousser le local ressuscitait des dépenses effacées depuis un autre
-    // appareil, et donc faussait la rentabilité.
-    } else if(j.outils==null && COSTS.length){ saveCosts(); }
+    } else if(j.outils==null){ COSTS_LOADED=true; if(COSTS.length) saveCosts(); }
   }catch(e){}
 }
 // ⚠️ TOUJOURS ramener une dépense au MOIS avant de l'additionner. Le champ
@@ -2761,7 +2788,10 @@ function addCost(){
   // saisi sans échéance retombait silencieusement en mensuel dans les totaux.
   const o={n:n,m:m}; if(every && every!=="mois") o.every=every; if(due) o.due=due;
   COSTS.push(o); saveCosts(); renderCosts(); renderRenta();
-  $("#costName").value=""; $("#costAmount").value=""; if($("#costDue")) $("#costDue").value=""; $("#costName").focus();
+  // ⚠️ Remettre AUSSI la récurrence sur « tous les mois » : sinon, après une
+  // dépense annuelle, la suivante héritait silencieusement de « tous les ans »
+  // et se retrouvait divisée par 12 dans le total sans qu'on s'en aperçoive.
+  $("#costName").value=""; $("#costAmount").value=""; if($("#costDue")) $("#costDue").value=""; if($("#costEvery")) $("#costEvery").value="mois"; $("#costName").focus();
 }
 $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
@@ -2769,7 +2799,7 @@ $("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cd
 renderCosts();
 
 /* ---------- Revenus Telegram (saisie manuelle) ---------- */
-let TGREV = JSON.parse(localStorage.getItem("ccn_tgrev")||"[]"); if(!Array.isArray(TGREV)) TGREV=[];
+let TGREV = lsJSON("ccn_tgrev",[]); if(!Array.isArray(TGREV)) TGREV=[];
 function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})}).catch(()=>{}); } }
 async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
@@ -2804,16 +2834,28 @@ function tgTodayTotal(){
 /* ---------- Revenus Telegram AUTO (OnlyChat) ---------- */
 // null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
 // « je sais pas > chiffre faux »). Le panneau reste caché dans ce cas.
-let ONLYCHAT_DATA = null;
+let ONLYCHAT_DATA = null, ONLYCHAT_FAILS = 0;
 async function loadOnlyChat(){
   if(!TOKEN) return;
+  let ok=false;
   try{
     const r = await fetch(HUB_BASE+"/api/hub/onlychat",{headers:{"x-hub-token":TOKEN}});
     if(r.ok){
       const j = await r.json();
       ONLYCHAT_DATA = (j && j.totalRevenue!=null) ? j : null;
+      ok=true;
     }
   }catch(e){}
+  // ⚠️ Sans ça, une fois la donnée reçue, elle restait figée POUR TOUJOURS si
+  // l'API tombait : le bandeau continuait d'annoncer « ✅ Compté dans tes
+  // chiffres — automatique » avec un montant périmé, et le repli sur la saisie
+  // manuelle qu'on promet juste en dessous ne s'activait jamais (tgMonthTotal
+  // préfère ONLYCHAT_DATA tant qu'il existe). Pire : un simple rechargement
+  // repartait de null et affichait un AUTRE chiffre — deux vérités pour la
+  // même réalité selon qu'on avait rechargé ou non.
+  // 3 échecs d'affilée (≈3 min) = on lâche la donnée et on bascule au manuel.
+  if(ok) ONLYCHAT_FAILS=0;
+  else if(++ONLYCHAT_FAILS>=3 && ONLYCHAT_DATA) ONLYCHAT_DATA=null;
   renderOnlyChat();
   // ⭐⭐ COURSE D'ARRIVÉE — bug d'ARGENT (corrigé le 2026-08-07).
   // loadAll() lance tous les chargeurs EN PARALLÈLE. Les panneaux qui comptent
@@ -3073,8 +3115,12 @@ function renderTgrev(){
     if(auto!=null){
       const pm=ONLYCHAT_DATA.parModele||{};
       const detail=Object.keys(pm).map(n=>`${escapeHtml(n)} <b>${tgMoney(Number(pm[n].totalRevenue)||0)}</b>`).join(" · ");
+      // ⚠️ NE PAS écrire ici « sers-t'en pour un revenu hors OnlyChat » : ce
+      // serait FAUX. tgMonthTotal() prend le total OnlyChat et ignore
+      // ENTIÈREMENT la saisie manuelle tant qu'OnlyChat répond — un revenu
+      // ajouté à la main ne bougerait donc pas ton profit d'un centime.
       src.innerHTML=`<div class="tg-src-auto">✅ <b>Compté dans tes chiffres : ${tgMoney(auto)}</b> ce mois — automatique via OnlyChat${detail?`<div class="tg-src-det">${detail}</div>`:""}</div>`
-        +`<div class="tg-sub">Les saisies ci-dessous ne sont <b>pas</b> ajoutées tant qu'OnlyChat répond (sinon l'argent compterait deux fois). Sers-t'en pour un revenu Telegram <b>hors</b> OnlyChat, ou si la connexion casse.</div>`;
+        +`<div class="tg-sub">Tant qu'OnlyChat répond, c'est <b>uniquement</b> ce chiffre qui compte : les saisies ci-dessous sont <b>gardées mais pas ajoutées</b> (sinon l'argent compterait deux fois). Elles reprennent la main automatiquement si OnlyChat tombe.</div>`;
     } else {
       const mk=tgMonthKey(Date.now());
       const manuel=TGREV.filter(x=>tgMonthKey(x.ts)===mk).reduce((a,x)=>a+(Number(x.amount)||0),0);
@@ -3099,7 +3145,16 @@ function renderTgrev(){
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Aucune saisie manuelle — normal si tout passe par OnlyChat.</div>`; return; }
   list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${tgMoney(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
-function tgRefresh(){ renderTgrev(); if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); }
+// ⚠️ Une saisie manuelle (utile quand OnlyChat est tombé) change l'argent du
+// mois : il faut rafraîchir AUSSI la tuile « Net du mois », « Mon année » et
+// l'écran d'accueil, pas seulement les 3 panneaux voisins — sinon le haut de
+// page et le bas de page affichaient deux totaux différents.
+function tgRefresh(){
+  renderTgrev();
+  if(typeof OM_DATA!=="undefined" && OM_DATA && typeof renderOM==="function"){ try{ renderOM(); }catch(e){} }
+  else { if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); if(typeof renderPie==="function") renderPie(); if(typeof renderHistory==="function") try{ renderHistory(); }catch(e){} }
+  if(typeof refreshEssentiel==="function") try{ refreshEssentiel(); }catch(e){}
+}
 function addTgrev(){
   const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
   const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
@@ -3130,7 +3185,7 @@ function addTgrev(){
 renderTgrev();
 
 /* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
-let LEAKWATCH = JSON.parse(localStorage.getItem("ccn_leakwatch")||"[]"); if(!Array.isArray(LEAKWATCH)) LEAKWATCH=[];
+let LEAKWATCH = lsJSON("ccn_leakwatch",[]); if(!Array.isArray(LEAKWATCH)) LEAKWATCH=[];
 let LEAKS = [];
 function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(LEAKWATCH)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})}).catch(()=>{}); } }
 async function loadLeakwatch(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-watch",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.watch)){ LEAKWATCH=j.watch; localStorage.setItem("ccn_leakwatch",JSON.stringify(LEAKWATCH)); } } }catch(e){} } renderWatch(); }
@@ -3198,7 +3253,7 @@ function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.sta
   const rm=e.target.closest("[data-alremoved]"); if(rm){ setLeakStatus(rm.getAttribute("data-alremoved"),"removed"); return; }
 }); }
 /* ---- infos titulaire DMCA + envoi ---- */
-let IDENTITY = JSON.parse(localStorage.getItem("ccn_dmca_id")||"{}"); if(!IDENTITY||typeof IDENTITY!=="object") IDENTITY={};
+let IDENTITY = lsJSON("ccn_dmca_id",{}); if(!IDENTITY||typeof IDENTITY!=="object") IDENTITY={};
 function idComplete(i){ return !!(i&&i.name&&i.address&&i.email); }
 function renderIdentity(){
   const f={name:"dmName",company:"dmCompany",address:"dmAddress",phone:"dmPhone",email:"dmEmail",signature:"dmSign"};
@@ -3240,7 +3295,7 @@ async function sendLeakDmca(id){
 renderWatch(); renderLeaks(); renderIdentity();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
-let SHORTCUTS = JSON.parse(localStorage.getItem("ccn_shortcuts") || "[]");
+let SHORTCUTS = lsJSON("ccn_shortcuts",[]);
 function saveShortcuts(){ localStorage.setItem("ccn_shortcuts", JSON.stringify(SHORTCUTS)); }
 function normUrl(u){ u=(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return u; }
 function renderShortcuts(){
@@ -3301,7 +3356,7 @@ async function loadJournal(){
 /* ---------- fiche de paie + objectif ---------- */
 function fmtCur(v){ return HIDE ? "••• $" : fmtMoney(v); }
 /* ---------- cahier de paie ---------- */
-let PAYMENTS = JSON.parse(localStorage.getItem("ccn_payments")||"[]"); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
+let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
 function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
 function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
 function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})}).catch(()=>{}); } }
@@ -3932,7 +3987,7 @@ function renderMoisRecord(){
     ${verdict}`;
 }
 
-let GOAL = JSON.parse(localStorage.getItem("ccn_goal")||"null");
+let GOAL = lsJSON("ccn_goal",null);
 let GOAL_CELEBRATED = false;
 // 🎉 Pop-up de félicitations quand un ou plusieurs badges sont débloqués.
 function celebrateBadges(list){
@@ -4102,7 +4157,7 @@ async function loadTip(force){
   if(typeof fixPairs==="function") fixPairs();
   const box=$("#tipBody");
   const key=new Date().toISOString().slice(0,10);
-  const cached=JSON.parse(localStorage.getItem("ccn_tip")||"null");
+  const cached=lsJSON("ccn_tip",null);
   if(!force && cached && cached.d===key && cached.t){ box.className="tip-body"; box.textContent=cached.t; return; }
   box.className="tip-body muted"; box.textContent="L'assistant analyse tes chiffres…";
   try{
@@ -4126,7 +4181,7 @@ function whoFromUser(u){ const ul=String(u||"").toLowerCase().trim(); for(const 
 function fillMe(){ try{ const w=(typeof WHO!=="undefined")?WHO:"moi"; const el=document.getElementById("taskMeName"); if(el) el.textContent=NAMES[w]||"—"; const av=document.getElementById("taskMeAv"); if(av) av.textContent=AVATARS[w]||"🙂"; }catch(e){} }
 const TK_KEYS = ["moi","other","general"];
 let WHO = localStorage.getItem("ccn_who") || "moi";
-let TASKS = JSON.parse(localStorage.getItem("ccn_tasks")||"null") || {moi:[],other:[],general:[]};
+let TASKS = lsJSON("ccn_tasks",null) || {moi:[],other:[],general:[]};
 let TK_VIEW = localStorage.getItem("ccn_tkview") || WHO;
 let TK_TAG = "";
 let TK_SAVE_T = null;
@@ -4156,37 +4211,38 @@ function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const
 // produit avec tip/notepad/duo/ask), l'en-tête disparaissait alors que la
 // catégorie affichait bien des panneaux dessous. Titre et contenu ne peuvent
 // plus diverger.
-function refreshSecHeads(){
+// ⚠️⚠️ UNE SEULE FONCTION décide de l'affichage des catégories.
+// Avant, `refreshSecHeads()` et `applyCatCollapsed()` écrivaient TOUS LES DEUX
+// `catBody.style.display` avec des règles différentes : celle qui passait en
+// dernier gagnait (applyCatCollapsed remettait `""` sur une catégorie vide que
+// refreshSecHeads venait de masquer → le vide fantôme de ~23 px revenait).
+// Les deux noms sont conservés (ils sont appelés à plein d'endroits) mais
+// pointent désormais sur la même logique, donc elles ne peuvent plus diverger.
+function catContenuVisible(idx){
+  const b=document.getElementById("catBody"+idx); if(!b) return false;
+  const enfants=[...b.querySelectorAll("[id]")].filter(e=>e.parentElement===b || (e.parentElement.classList&&e.parentElement.classList.contains("pair-row")));
+  return enfants.some(p=>secnavVisible(p.id));
+}
+function appliqueCategories(){
   const replies=catCollapsedSet();
   SECNAV_CATS.forEach((_,idx)=>{
     const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
     if(!h) return;
     if(!b){ h.style.display="none"; return; }
-    const enfants=[...b.querySelectorAll("[id]")].filter(e=>e.parentElement===b || (e.parentElement.classList&&e.parentElement.classList.contains("pair-row")));
-    const aDuContenu = enfants.some(p=>secnavVisible(p.id));
-    h.style.display = aDuContenu ? "" : "none";
-    // ⚠️ Masquer le seul en-tête ne suffisait pas : le conteneur gardait ses
-    // marges (~23 px de vide fantôme entre deux sections). On le masque aussi —
-    // sans écraser un repli volontaire de l'utilisateur.
-    b.style.display = (!aDuContenu || replies.has(idx)) ? "none" : "";
+    const plein=catContenuVisible(idx), replie=replies.has(idx);
+    h.style.display = plein ? "" : "none";
+    h.classList.toggle("cat-collapsed", replie);
+    b.style.display = (!plein || replie) ? "none" : "";
   });
 }
+function refreshSecHeads(){ appliqueCategories(); }
 // 🗂️ Catégories repliables — tape un en-tête pour cacher tout son contenu
 // d'un coup (catBodyN, un seul conteneur enveloppant toute la catégorie :
 // on ne touche JAMAIS le display de chaque panneau individuel, qui reste sa
 // propre vérité — replier/déplier ne fait qu'ajouter/retirer un display:none
 // sur le PARENT, les enfants retrouvent exactement leur état d'avant).
 function catCollapsedSet(){ try{ return new Set(JSON.parse(localStorage.getItem("ccn_cat_collapsed")||"[]")); }catch(e){ return new Set(); } }
-function applyCatCollapsed(){
-  const s=catCollapsedSet();
-  SECNAV_CATS.forEach((_,idx)=>{
-    const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
-    if(!h||!b) return;
-    const on=s.has(idx);
-    h.classList.toggle("cat-collapsed",on);
-    b.style.display=on?"none":"";
-  });
-}
+function applyCatCollapsed(){ appliqueCategories(); }
 function toggleCatCollapsed(idx){
   const s=catCollapsedSet();
   s.has(idx)?s.delete(idx):s.add(idx);
@@ -4201,12 +4257,23 @@ function toggleCatCollapsed(idx){
 // ⚠️ NE PAS « corriger » ça en rendant secnavVisible() sensible aux ancêtres :
 // refreshSecHeads masquerait alors l'en-tête de la catégorie repliée, or cet
 // en-tête est le SEUL moyen de la déplier → catégorie perdue définitivement.
+// ⚠️⚠️ On se fie à la LISTE DES CATÉGORIES REPLIÉES, jamais à `display:none`.
+// Un catBody peut être masqué pour DEUX raisons très différentes : replié par
+// l'opérateur, ou vide (aucun panneau à montrer). L'ancienne version testait
+// `display==="none"` et appelait `toggleCatCollapsed()` : sur une catégorie
+// masquée-car-VIDE, ce toggle l'AJOUTAIT à la liste des repliées — il
+// enregistrait donc dans localStorage un repli jamais demandé, sans rien
+// déplier, et le clic restait sans effet. Ici on ne fait que DÉPLIER.
 function expandCatOf(el){
   const b = el && el.closest ? el.closest(".cat-body") : null;
-  if(!b || b.style.display!=="none") return false;
+  if(!b) return false;
   const idx = Number(String(b.id).replace("catBody",""));
   if(isNaN(idx)) return false;
-  toggleCatCollapsed(idx);
+  const s = catCollapsedSet();
+  if(!s.has(idx)) return false;            // pas repliée → rien à déplier
+  s.delete(idx);
+  localStorage.setItem("ccn_cat_collapsed",JSON.stringify([...s]));
+  appliqueCategories();
   return true;
 }
 // Saut robuste vers un panneau : déplie si besoin, puis scrolle. Le petit
@@ -4300,7 +4367,7 @@ function renderTasks(){
 { const t=$("#taskText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addTask(); }); }
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
-let ROUTINES = JSON.parse(localStorage.getItem("ccn_routines")||"[]"); if(!Array.isArray(ROUTINES)) ROUTINES=[];
+let ROUTINES = lsJSON("ccn_routines",[]); if(!Array.isArray(ROUTINES)) ROUTINES=[];
 function saveRoutines(){ localStorage.setItem("ccn_routines",JSON.stringify(ROUTINES)); }
 function renderRoutines(){ const sel=$("#rtSel"); if(!sel) return; sel.innerHTML=`<option value="">📁 Charger une routine…</option>`+ROUTINES.map((r,i)=>`<option value="${i}">${escapeHtml(r.name)} (${r.tasks.length})</option>`).join(""); }
 function saveRoutine(){ const items=(TASKS[TK_VIEW]||[]).filter(x=>!x.done).map(x=>({text:x.text,tags:x.tags||[],prio:x.prio||"n"})); if(!items.length){ alert("La liste est vide, rien à enregistrer."); return; } const name=prompt("Nom de la routine (ex : Routine du matin) :"); if(!name) return; ROUTINES.push({name:name.slice(0,40),tasks:items}); saveRoutines(); renderRoutines(); if(typeof toast==="function") toast("📁 Routine enregistrée",name); }
@@ -4746,12 +4813,17 @@ function renderRenta(){
   // l'historique et encore partiel) + fourchette de prévision
   const histAll=Array.isArray(d.history)?d.history:[];
   const hist=histAll.length>1?histAll.slice(0,-1):[];
-  const rec=hist.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0});
+  // ⚠️ MÊME MESURE QUE « Mon année », sinon les deux panneaux annonçaient un
+  // « meilleur mois » différent (et parfois un AUTRE mois) : ici on comparait
+  // du BRUT sans Telegram, là-bas du net AVEC Telegram. On aligne sur net+Telegram.
+  const valMois=h=>(Number(h&&h.net)||0)*NET_RATE + ((typeof tgHistMonth==="function"&&h)?tgHistMonth(h.month):0);
+  const rec=hist.reduce((a,h)=>{ const v=valMois(h); return (h&&v>a.v)?{m:h.month,v:v}:a; },{m:null,v:0});
+  const projAvecTg=Math.round(projNet*NET_RATE+projTg);   // même unité que rec.v
   const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*NET_RATE))}–${money(Math.round(F.net.high*NET_RATE))} net</span>`:"";
   let recordLine="";
   if(rec.m && netMonth>0){
-    if(projNet>=rec.net){ recordLine=`<div class="rn-record best">🏆 En route pour un <b>NOUVEAU RECORD</b> ! (meilleur mois jusqu'ici : ${money(Math.round(rec.net*NET_RATE))} net en ${escapeHtml(rec.m)})</div>`; }
-    else { const manque=Math.max(0,Math.round((rec.net-projNet)*NET_RATE)); recordLine=`<div class="rn-record">🏆 Record à battre : <b>${money(Math.round(rec.net*NET_RATE))}</b> net (${escapeHtml(rec.m)}) — il te manque ~${money(manque)} à ce rythme.</div>`; }
+    if(projAvecTg>=rec.v){ recordLine=`<div class="rn-record best">🏆 En route pour un <b>NOUVEAU RECORD</b> ! (meilleur mois jusqu'ici : ${money(Math.round(rec.v))} net en ${escapeHtml(rec.m)})</div>`; }
+    else { const manque=Math.max(0,Math.round(rec.v-projAvecTg)); recordLine=`<div class="rn-record">🏆 Record à battre : <b>${money(Math.round(rec.v))}</b> net (${escapeHtml(rec.m)}) — il te manque ~${money(manque)} à ce rythme.</div>`; }
   }
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
@@ -4885,7 +4957,7 @@ function openTab(id,name,url){
 // l'intérieur d'un autre site), mais l'onglet est là, comme laissé.
 (function restoreTabs(){
   try{
-    const saved=JSON.parse(localStorage.getItem("ccn_tabs")||"[]");
+    const saved=lsJSON("ccn_tabs",[]);
     if(!Array.isArray(saved)||!saved.length) return;
     saved.forEach(t=>{ if(!t||!t.id||!t.url||TABS.find(x=>x.id===t.id)) return;
       TABS.push({id:t.id,name:t.name||t.id,url:t.url});
@@ -5717,7 +5789,7 @@ const BADGES=[
   {id:"record", icon:"🏆", label:"Meilleur mois", cond:c=>c.isRecord},
   {id:"goal", icon:"🎯", label:"Objectif atteint", cond:c=>c.goalMet},
 ];
-let BADGES_OWNED=JSON.parse(localStorage.getItem("ccn_badges")||"[]"); if(!Array.isArray(BADGES_OWNED)) BADGES_OWNED=[];
+let BADGES_OWNED=lsJSON("ccn_badges",[]); if(!Array.isArray(BADGES_OWNED)) BADGES_OWNED=[];
 function renderBadges(){
   const panel=$("#badges"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
@@ -6736,7 +6808,11 @@ function gsIndex(){
   // simplement vides à l'instant de la frappe, qui eux sont légitimes.)
   const _masques=(typeof hiddenSet==="function")?hiddenSet():new Set();
   (typeof PANNEAUX!=="undefined"?PANNEAUX:[]).forEach(a=>{ if(a&&a[0]&&!_masques.has(a[0])){ seen[a[0]]=1; items.push({type:"panel", label:String(a[1]||a[0]).replace(/^[^\p{L}]+/u,"").trim()||a[1], sub:"panneau", key:a[0]}); } });
-  [["om","Argent (OnlyMonster)"],["cash","Cash à venir"],["paie","Paie"],["antileak","Anti-leak"],["tasks","Tâches d'équipe"],["journal","Journal"],["costs","Dépenses d'outils"],["proxy","État des proxies"]].forEach(p=>{ if(!seen[p[0]]){ seen[p[0]]=1; items.push({type:"panel",label:p[1],sub:"panneau",key:p[0]}); } });
+  // ⚠️ Cette liste de secours (pour les panneaux absents de PANNEAUX) doit
+  // respecter le MÊME filtre : sans le test `_masques`, elle réinjectait
+  // cash/costs/proxy/antileak dans la recherche alors qu'ils étaient décochés,
+  // et le clic sur le résultat ne faisait rien.
+  [["om","Argent (OnlyMonster)"],["cash","Cash à venir"],["paie","Paie"],["antileak","Anti-leak"],["tasks","Tâches d'équipe"],["journal","Journal"],["costs","Dépenses d'outils"],["proxy","État des proxies"]].forEach(p=>{ if(!seen[p[0]] && !_masques.has(p[0])){ seen[p[0]]=1; items.push({type:"panel",label:p[1],sub:"panneau",key:p[0]}); } });
   return items;
 }
 function gsRender(q){
@@ -6788,16 +6864,21 @@ const RULE_METRICS=[
 ];
 // Même verrou d'écriture que DECISIONS ci-dessous : pas de POST tant que le
 // chargement serveur n'a pas réussi, sinon une liste vide écrase les alertes.
-let RULES=[], RULE_SEEN={}, RULES_LOADED=false;
+let RULES=[], RULE_SEEN={}, RULES_LOADED=false, RULES_DIRTY=false;
 async function loadRules(){
   if(!TOKEN){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e){ RULES=[]; } renderRules(); return; }
   try{ const r=await fetch(HUB_BASE+"/api/hub/rules",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) throw new Error("HTTP "+r.status);
-    const j=await r.json(); RULES=Array.isArray(j.rules)?j.rules:[]; localStorage.setItem("ccn_rules",JSON.stringify(RULES)); RULES_LOADED=true; }
+    const j=await r.json();
+    const srv=Array.isArray(j.rules)?j.rules:[];
+    // Récupère les alertes créées pendant que le serveur était injoignable.
+    if(RULES_DIRTY){ const vus=new Set(srv.map(x=>x&&x.id)); RULES.forEach(x=>{ if(x&&!vus.has(x.id)) srv.unshift(x); }); }
+    RULES=srv; localStorage.setItem("ccn_rules",JSON.stringify(RULES)); RULES_LOADED=true;
+    if(RULES_DIRTY){ RULES_DIRTY=false; saveRules(); } }
   catch(e){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e2){ RULES=[]; } }
   renderRules();
 }
-function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN && !RULES_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
+function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN && !RULES_LOADED){ RULES_DIRTY=true; return; } if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
 function ruleMetricVal(k){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null, ko=(typeof revKo==="function")?revKo():false, t=(om&&om.totals)||{};
   if(k==="revenus_muets") return ko?1:0;
@@ -6960,16 +7041,31 @@ function renderBusFactor(){
 // modification faisait un POST de cette liste vide → les décisions du serveur
 // étaient EFFACÉES. On n'autorise le POST qu'après un chargement serveur
 // réussi ; sinon on garde tout en local et on ne touche pas au serveur.
-let DECISIONS=[], DECISIONS_LOADED=false;
+// ⚠️⚠️ COMPLÉMENT INDISPENSABLE AU VERROU (sinon il PERD des données) :
+// le verrou seul transformait un simple 401/500 au démarrage en session
+// entièrement bloquée — tout ce qui était saisi ensuite restait local, puis le
+// chargement réussi SUIVANT écrasait DECISIONS par la liste serveur et
+// effaçait ces saisies pour de bon. Il faut donc (1) RÉESSAYER de charger tant
+// que ça n'a pas marché (fait dans la boucle 60 s), et (2) FUSIONNER ce qui a
+// été saisi pendant le blocage au lieu de l'écraser (drapeau *_DIRTY).
+let DECISIONS=[], DECISIONS_LOADED=false, DECISIONS_DIRTY=false;
 async function loadDecisions(){
   if(!TOKEN){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e){ DECISIONS=[]; } renderDecisions(); return; }
   try{ const r=await fetch(HUB_BASE+"/api/hub/decisions",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) throw new Error("HTTP "+r.status);
-    const j=await r.json(); DECISIONS=Array.isArray(j.decisions)?j.decisions:[]; localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); DECISIONS_LOADED=true; }
+    const j=await r.json();
+    const srv=Array.isArray(j.decisions)?j.decisions:[];
+    // Récupère les décisions saisies pendant que le serveur était injoignable.
+    if(DECISIONS_DIRTY){
+      const vus=new Set(srv.map(d=>d&&d.id));
+      DECISIONS.forEach(d=>{ if(d&&!vus.has(d.id)) srv.unshift(d); });
+    }
+    DECISIONS=srv; localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); DECISIONS_LOADED=true;
+    if(DECISIONS_DIRTY){ DECISIONS_DIRTY=false; saveDecisions(); } }
   catch(e){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e2){ DECISIONS=[]; } }
   renderDecisions();
 }
-function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN && !DECISIONS_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
+function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN && !DECISIONS_LOADED){ DECISIONS_DIRTY=true; return; } if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
 function decisionImpact(dateStr){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!Array.isArray(om.dailyNet)||revKo()) return null;
   const dn=om.dailyNet, idx=dn.findIndex(x=>x.date===dateStr); if(idx<0) return null;
@@ -7320,8 +7416,8 @@ load();
 loadTodosFromBrain();
 loadJournal();
 /* ---------- chrono, horloge & rappels ---------- */
-let REMINDERS = JSON.parse(localStorage.getItem("ccn_reminders")||"[]"); if(!Array.isArray(REMINDERS)) REMINDERS=[];
-let DATES = JSON.parse(localStorage.getItem("ccn_dates")||"[]"); if(!Array.isArray(DATES)) DATES=[];
+let REMINDERS = lsJSON("ccn_reminders",[]); if(!Array.isArray(REMINDERS)) REMINDERS=[];
+let DATES = lsJSON("ccn_dates",[]); if(!Array.isArray(DATES)) DATES=[];
 let RM_SAVE_T=null, AUDIO_CTX=null, TM_INT=null, TM_END=0;
 function audioCtx(){ if(!AUDIO_CTX){ try{ AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AUDIO_CTX; }
 document.addEventListener("click",()=>{ const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); },{once:true});
@@ -7605,9 +7701,12 @@ function applyAssoc(){
   } else if(b){ b.remove(); }
   try{ if(typeof refreshSecnav==="function") refreshSecnav(); }catch(e){}
   // Recale la mise en page tout de suite (demi-colonnes vides sinon jusqu'au
-  // prochain rendu), et vide l'état des lieux imprimable généré AVANT bascule.
+  // prochain rendu). L'état des lieux imprimable est RECONSTRUIT (et non juste
+  // vidé) : en vue associé buildPrintSummary() renvoie "" donc rien ne fuite,
+  // et en sortant de la vue associé la page redevient imprimable — la vider
+  // seulement laissait une feuille BLANCHE jusqu'au prochain rechargement.
   try{ if(typeof fixPairs==="function") fixPairs(); }catch(e){}
-  try{ const ps=document.getElementById("printSummary"); if(ps) ps.innerHTML=""; }catch(e){}
+  try{ if(typeof refreshPrintSummary==="function") refreshPrintSummary(); }catch(e){}
 }
 { const b=$("#assocView"); if(b) b.onclick=()=>{ const on=localStorage.getItem("ccn_assoc")==="1"; localStorage.setItem("ccn_assoc", on?"0":"1"); applyAssoc(); if(!on && typeof toast==="function") toast("👥 Vue associé activée","Chiffres sensibles masqués. Clique « Quitter » pour revenir."); }; }
 applyAssoc();
@@ -7641,7 +7740,7 @@ async function runDiagnostic(){
 // qu'entre ses frères directs, donc il ne peut jamais changer de catégorie.
 const REORD_SEL = "#home .cat-body > .panel-box[id], #home .cat-body > .pair-row > .panel-box[id]";
 function applyOrder(){
-  const saved=JSON.parse(localStorage.getItem("ccn_order")||"[]"); if(!saved.length) return;
+  const saved=lsJSON("ccn_order",[]); if(!saved.length) return;
   const panels=[...document.querySelectorAll(REORD_SEL)]; if(!panels.length) return;
   // Regroupe par parent : chaque conteneur est réordonné indépendamment.
   const parents=new Map();
@@ -7677,16 +7776,27 @@ document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]");
 // 🗒️ #9 NOTES PAR VA : un carnet par VA, stocké serveur, affiché dans sa fiche.
 // Même verrou d'écriture que RULES/DECISIONS : un échec de lecture ne doit
 // jamais permettre d'écraser le carnet de notes du serveur par du vide.
-let VANOTES={}, VANOTES_LOADED=false;
+let VANOTES={}, VANOTES_LOADED=false, VANOTES_DIRTY=new Set();
 async function loadVaNotes(){
   if(!TOKEN){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e){ VANOTES={}; } return; }
   try{ const r=await fetch(HUB_BASE+"/api/hub/va-notes",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) throw new Error("HTTP "+r.status);
-    const j=await r.json(); VANOTES=(j.notes&&typeof j.notes==="object")?j.notes:{}; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); VANOTES_LOADED=true; }
+    const j=await r.json();
+    const srv=(j.notes&&typeof j.notes==="object")?j.notes:{};
+    // Récupère les notes écrites pendant que le serveur était injoignable
+    // (clé par clé : une note vidée pendant le blocage reste vidée).
+    if(VANOTES_DIRTY.size){ VANOTES_DIRTY.forEach(k=>{ if(VANOTES[k]!=null) srv[k]=VANOTES[k]; else delete srv[k]; }); }
+    VANOTES=srv; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); VANOTES_LOADED=true;
+    if(VANOTES_DIRTY.size){ VANOTES_DIRTY.clear(); vaNotesPush(); } }
   catch(e){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e2){ VANOTES={}; } }
 }
 function vaNoteGet(va){ return VANOTES[String(va||"").toLowerCase()]||""; }
-function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN && !VANOTES_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
+function vaNotesPush(){ if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
+function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN && !VANOTES_LOADED){ VANOTES_DIRTY.add(k); return; } vaNotesPush(); }
+// Dit la vérité sur l'état de la synchro au lieu d'un « ✓ enregistré » qui
+// laisserait croire que la note est partie sur le serveur alors qu'elle n'est
+// que sur cet appareil (elle partira toute seule dès que le cerveau répond).
+function vaNoteEtat(){ return (TOKEN && !VANOTES_LOADED) ? "✓ sur cet appareil — synchro en attente" : "✓ enregistré"; }
 
 // 🎭 #2 FICHE MODÈLE : miroir de la fiche VA, mais par modèle. Depuis OM_DATA.
 function openModelCard(modelName){
@@ -7843,7 +7953,7 @@ function openVaCard(vaName){
   });
   document.body.appendChild(ov);
   // 🗒️ #9 notes : sauvegarde auto (debounce) quand on tape.
-  { const box=ov.querySelector("#vaNoteBox"), saved=ov.querySelector("#vaNoteSaved"); if(box){ let nt=null; box.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ if(typeof vaNoteSet==="function") vaNoteSet(vaName, box.value); if(saved){ saved.textContent="✓ enregistré"; setTimeout(()=>{ saved.textContent=""; },1500); } },500); }); } }
+  { const box=ov.querySelector("#vaNoteBox"), saved=ov.querySelector("#vaNoteSaved"); if(box){ let nt=null; box.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ if(typeof vaNoteSet==="function") vaNoteSet(vaName, box.value); if(saved){ saved.textContent=(typeof vaNoteEtat==="function")?vaNoteEtat():"✓ enregistré"; setTimeout(()=>{ saved.textContent=""; },1500); } },500); }); } }
   // 📎 Les liens cumulés (une requête pour tous les VA, cachée). Rend visible
   // que les 3 (bientôt 50) liens de Yohan comptent tous sur un seul « Yohan ».
   chargeVaLiens().then(L=>{
@@ -8271,8 +8381,25 @@ try{
 // restait figée sur les chiffres du chargement initial, SOUS un badge « à jour
 // à l'instant » rafraîchi par les autres appels — donc un chiffre périmé
 // présenté comme frais. Ajouté à la boucle comme loadCash/loadCharge.
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel(); } }, REFRESH_MS);
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel();
+  // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
+  // échec — un redéploiement du cerveau au mauvais moment — verrouillait
+  // l'écriture pour TOUTE la session, pendant que le reste de la page se
+  // rafraîchissait normalement et paraissait sain. On réessaie tant que la
+  // lecture n'a pas réussi ; le verrou se lève alors tout seul et les saisies
+  // faites entre-temps sont fusionnées puis poussées (drapeaux *_DIRTY).
+  if(TOKEN){
+    if(typeof RULES_LOADED!=="undefined" && !RULES_LOADED) loadRules();
+    if(typeof DECISIONS_LOADED!=="undefined" && !DECISIONS_LOADED) loadDecisions();
+    if(typeof VANOTES_LOADED!=="undefined" && !VANOTES_LOADED) loadVaNotes();
+    if(typeof COSTS_LOADED!=="undefined" && !COSTS_LOADED) loadCosts();
+  }
+} }, REFRESH_MS);
 setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
+// ⚠️ Safari iOS n'émet PAS `beforeprint` : sans ce rafraîchissement régulier,
+// « Partager → Imprimer » sortait toujours l'état des lieux figé à t+3,5 s
+// (chiffres du démarrage, souvent encore vides). On le retient à jour.
+setInterval(()=>{ try{ refreshPrintSummary(); }catch(e){} }, REFRESH_MS);
 </script>
 </body>
 </html>
