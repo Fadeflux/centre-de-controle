@@ -139,10 +139,16 @@
   .costs{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:26px 0 0}
   .costs-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .costs-head .tot{margin-left:auto;font-size:13px;color:var(--acc);font-weight:700}
-  .costs-add{display:flex;gap:8px;margin-bottom:6px}
+  /* ⚠️ Sans flex-wrap, les 4 champs (nom, montant, échéance, récurrence)
+     débordaient de l'écran sur iPhone et « Outil » était écrasé à ~24 px de
+     large (intapable). Ils passent sur 2 lignes en mobile, restent sur 1 ligne
+     en desktop où la place ne manque pas. */
+  .costs-add{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
   .costs-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .costs-add input:focus{border-color:var(--acc)}
-  #costName{flex:1;min-width:0} #costAmount{width:96px}
+  #costName{flex:1 1 160px;min-width:0} #costAmount{width:96px}
+  #costDue,#costEvery{flex:1 1 140px;min-width:0}
+  .co-eq{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
   .co-due{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;margin-left:auto}
   .co-due.co-ok{color:var(--muted);background:var(--surface-2)}
   .co-due.co-soon{color:#facc15;background:color-mix(in srgb,#facc15 14%,transparent)}
@@ -165,11 +171,20 @@
   #secnav::-webkit-scrollbar{height:0}
   #secnav:empty{display:none}
   body.framing #secnav{display:none}
+  /* ⚠️ Dès qu'un outil est ouvert, .tabbar (collante, top:safe-area) occupe la
+     même bande que #secnav : les deux se superposaient et la barre de sections
+     passait INTÉGRALEMENT sous les onglets — puces invisibles et intapables.
+     On décale #secnav de la hauteur de la barre d'onglets quand elle existe. */
+  body.has-tabs #secnav{top:calc(env(safe-area-inset-top,0px) + 54px)}
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
   .sec-chip:hover{color:var(--text);border-color:var(--acc-line);background:var(--acc-bg)}
   /* les panneaux s'arrêtent SOUS les barres collantes quand on saute vers eux */
   .panel-box[id],.costs,.tgrev,.todo,.journal,.antileak,#sections,#om{scroll-margin-top:64px}
+  /* deux barres empilées = il faut s'arrêter plus bas, sinon le saut atterrit
+     derrière elles et on croit que le clic n'a rien fait */
+  body.has-tabs .panel-box[id],body.has-tabs .costs,body.has-tabs .tgrev,body.has-tabs .todo,
+  body.has-tabs .journal,body.has-tabs .antileak,body.has-tabs #sections,body.has-tabs #om{scroll-margin-top:118px}
   /* 📅 CA brut par jour */
   .cj-wrap{display:flex;align-items:flex-end;gap:3px;height:132px;margin-top:10px}
   .cj-bar{flex:1;min-width:0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));
@@ -521,6 +536,13 @@
   body.assoc-mode #hide, body.assoc-mode #morn, body.assoc-mode #eve,
   body.assoc-mode #card, body.assoc-mode #rank, body.assoc-mode #autobackups,
   body.assoc-mode #assocView{display:none !important}
+  /* ⚠️ Ajouts audit 2026-08-07 — trois fuites qui restaient ouvertes en vue
+     associé : #widget affichait le JETON MAÎTRE en clair (accès total au
+     cerveau), #morning/#widgetHelp s'ouvraient PAR-DESSUS la vue associé avec
+     le CA en clair, et le micro flottant laissait interroger l'assistant sur
+     les montants. */
+  body.assoc-mode #widget, body.assoc-mode #morning,
+  body.assoc-mode #widgetHelp, body.assoc-mode #voiceFab{display:none !important}
   /* ⚠️ Le menu ⚙️ déplace les boutons dans des rangées : masquer le bouton ne
      suffisait pas, le libellé restait visible ET cliquable (l'associée pouvait
      restaurer une sauvegarde ou télécharger la config). On masque la RANGÉE. */
@@ -530,6 +552,7 @@
   body.assoc-mode .settings-row[data-for="panels"], body.assoc-mode .settings-row[data-for="reorder"],
   body.assoc-mode .settings-row[data-for="diag"], body.assoc-mode .settings-row[data-for="backup"],
   body.assoc-mode .settings-row[data-for="autobackups"], body.assoc-mode .settings-row[data-for="restore"],
+  body.assoc-mode .settings-row[data-for="widget"],
   body.assoc-mode .settings-row[data-for="assocView"]{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
@@ -937,8 +960,11 @@
   .tk-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .tk-fchip{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
   .tk-fchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  /* le sélecteur ne rétrécissait pas sous sa taille intrinsèque (min-width auto
+     par défaut en flex) → 2 px de débordement horizontal de toute la page sur
+     iPhone. min-width:0 l'autorise à se compresser. */
   .tk-routines{display:flex;gap:8px;margin-bottom:12px}
-  .tk-rsel{flex:1;font:inherit;font-size:13px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .tk-rsel{flex:1 1 0;min-width:0;font:inherit;font-size:13px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .tk-rbtn{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap}
   .clk-now{margin-left:auto;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
   .clk-add{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
@@ -1043,7 +1069,11 @@
   .cc-toast-actions{display:flex;gap:8px;margin-top:10px}
   .cc-toast-actions button{font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:9px;border:0;background:rgba(0,0,0,.22);color:#0a0a0a;cursor:pointer}
   .voice-fab{position:fixed;bottom:22px;right:22px;width:60px;height:60px;border-radius:50%;background:var(--acc);border:0;font-size:26px;color:#fff;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.45);z-index:45;display:flex;align-items:center;justify-content:center}
-  #morning.show ~ #voiceFab{display:none}
+  /* ⚠️ La règle ne visait que #morning : les DEUX autres écrans plein écran
+     (« Widget iPhone », « Revue de la semaine ») partagent la classe .morning
+     mais pas l'id → le micro flottant restait par-dessus et volait le tap sur
+     leur bouton de fermeture. On cible la CLASSE, pas l'id. */
+  .morning.show ~ #voiceFab{display:none}
   .voice-fab.listening{background:var(--down);animation:micpulse 1s infinite}
   .settings-wrap{position:relative}
   .settings-menu{position:fixed;background:var(--surface-2,#17181b);border:1px solid var(--line-2);border-radius:14px;padding:6px;min-width:220px;max-width:calc(100vw - 24px);box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:55;display:none;flex-direction:column;gap:2px}
@@ -1561,8 +1591,13 @@
   <div class="tabbar" id="tabbar"></div>
   <div id="secnav"></div>
   <div id="home">
+<!-- ⚠️ Ce <header class="top"> avait été perdu pendant la réorganisation en
+     catégories (le script ne suivait que les <div>) : les règles CSS ligne 79
+     et 105 ne s'appliquaient plus → plus de barre d'en-tête alignée ni de
+     trait de séparation sous le titre. Ne pas le retirer. -->
+  <header class="top">
 <div class="brand">
-      <div class="logo"><svg viewBox="0 0 100 100" fill="none"><defs><linearGradient id="lunev" x1="0.2" y1="0" x2="0.45" y2="1"><stop offset="0" stop-color="#cfd4e8" stop-opacity=".5"/><stop offset="1" stop-color="#cfd4e8" stop-opacity=".03"/></linearGradient></defs><g transform="rotate(-15 50 50)"><path d="M 66 12 A 39 39 0 1 0 66 88 A 35 35 0 1 1 66 12 Z" fill="url(#lunev)"/><path d="M 66 12 A 39 39 0 1 0 66 88" stroke="#b9bfdd" stroke-width="3" stroke-linecap="round" fill="none"/></g></svg></div>
+      <div class="logo"><svg viewBox="0 0 100 100" fill="none"><defs><linearGradient id="lunev2" x1="0.2" y1="0" x2="0.45" y2="1"><stop offset="0" stop-color="#cfd4e8" stop-opacity=".5"/><stop offset="1" stop-color="#cfd4e8" stop-opacity=".03"/></linearGradient></defs><g transform="rotate(-15 50 50)"><path d="M 66 12 A 39 39 0 1 0 66 88 A 35 35 0 1 1 66 12 Z" fill="url(#lunev2)"/><path d="M 66 12 A 39 39 0 1 0 66 88" stroke="#b9bfdd" stroke-width="3" stroke-linecap="round" fill="none"/></g></svg></div>
       <div>
         <h1>Noctra</h1>
         <div class="brand-tag">Centre de contrôle</div>
@@ -1599,12 +1634,21 @@
       </div>
       <button class="btn" id="refresh"><span id="rico">↻</span> Rafraîchir</button>
     </div>
+  </header>
 
 <div class="banner" id="banner"></div>
 
 <div class="alert" id="alert"></div>
 
 <div class="daily" id="daily"></div>
+
+<!-- ⚠️ Ces deux blocs sont des blocs D'EN-TÊTE, pas des panneaux de catégorie.
+     La réorganisation les avait enfermés dans la catégorie « 🏆 Motivation » :
+     replier cette catégorie faisait donc disparaître les TUILES D'ARGENT du
+     haut de page (net du mois, à payer, subs…) et les rappels du jour, sans
+     aucun rapport avec « Motivation ». Ils restent enfants directs de #home. -->
+<div class="rappels" id="rappels" style="display:none"></div>
+<div class="summary" id="summary"></div>
 
 <div class="gsearch" id="gsearch" style="display:none">
     <input id="gsInput" type="search" placeholder="🔎 Chercher un VA ou un panneau…" autocomplete="off" />
@@ -2090,9 +2134,6 @@
     </div>
   </div>
 
-  <div class="rappels" id="rappels" style="display:none"></div>
-
-  <div class="summary" id="summary"></div>
   </div>
 
   <div class="sec-head" id="catHead7" data-cat-idx="7"><span class="t">🛠 Système</span><span class="rule"></span></div>
@@ -2181,6 +2222,13 @@ const HUB_BASE = HUB_URL.replace(/\/api\/hub$/, "");
 const REFRESH_MS = 60000;
 
 const fmtMoney = v => HIDE ? "••• $" : (Math.round(v)).toLocaleString("fr-FR") + " $";
+// ⚠️ Le mode discret 🙈 sert à cacher les montants AUX YEUX DES AUTRES, à
+// l'écran. Il ne doit JAMAIS masquer un montant qu'on doit LIRE pour agir :
+// le texte de paie copié pour un VA sortait « ••• $ » (envoyé tel quel !) et
+// la confirmation « Payer X ? » masquait le montant qu'on s'apprête à verser
+// (= payer à l'aveugle). Ces deux cas utilisent les formats « en clair ».
+const moneyClair = v => (Math.round(Number(v)||0)).toLocaleString("fr-FR") + " $";
+const pcMoneyClair = v => { const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; };
 const fmtInt   = v => Math.round(v).toLocaleString("fr-FR");
 const fmtBig   = v => {
   v = Number(v)||0;
@@ -2215,7 +2263,12 @@ const TOOLS = [
   // clients depuis longtemps — la fiche outil n'avait jamais été mise à jour.
   // ⚠️ L'URL Railway par défaut (coachos-web-production-6624...) est morte —
   // un domaine perso a été posé depuis (grindperform...), vérifié 200 en vrai.
-  { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", openUrl:"https://grindperform.up.railway.app" },
+  // ⚠️ `voyantOnly` OBLIGATOIRE ici : le cerveau n'expose aucune métrique pour
+  // Grind. Sans `metrics`, `build` ni `voyantOnly`, la fiche tombait dans la
+  // branche `t.metrics.map(...)` → TypeError → render() mourait ENTIÈREMENT :
+  // plus aucune tuile d'argent, plus de brief, plus de catalogue. (Cassé le
+  // 2026-08-06 en corrigeant juste l'URL, retrouvé par l'audit du 08-07.)
+  { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", voyantOnly:true, openUrl:"https://grindperform.up.railway.app" },
   { id:"iphone-panel",world:"noctra", cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
   { id:"monloader",   world:"noctra", cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
@@ -2281,7 +2334,9 @@ function cardHTML(t, data){
   } else if (t.voyantOnly){
     body = `<div class="note">${st==="online"?"En ligne":st==="offline"?"Hors ligne":"—"} · voyant seul</div>`;
   } else {
-    const m = t.metrics.map(mt=>{
+    // Filet : une fiche outil mal remplie (metrics oublié) ne doit JAMAIS
+    // pouvoir tuer tout le rendu de la page — cf. l'incident Grind ci-dessus.
+    const m = (Array.isArray(t.metrics)?t.metrics:[]).map(mt=>{
       const raw = d.metrics ? d.metrics[mt.k] : undefined;
       const val = (raw==null) ? "—" : mt.f(raw);
       const delta = (raw!=null && d.prev) ? deltaHTML(raw, d.prev[mt.k]) : "";
@@ -2325,12 +2380,17 @@ function groups(){
 function render(data){
   LAST = data;
   if(typeof SMS_DATA!=="undefined" && SMS_DATA){ const dd=SMS_DATA.diddysms, gt=SMS_DATA.getatext; if((dd&&dd.balance!=null)||(gt&&gt.balance!=null)){ data["sms"]=data["sms"]||{}; data["sms"].status="online"; data["sms"].metrics=Object.assign({},(data["sms"]||{}).metrics,{ diddysms:(dd&&dd.balance!=null)?dd.balance:null, getatext:(gt&&gt.balance!=null)?gt.balance:null }); } }
-  $("#sections").innerHTML = groups().map(g=>{
-    const cards = g.tools.map(t=>cardHTML(t,data)).join("");
-    return `<div class="section ${g.build?"build":""}">
-      <div class="sec-head ${g.pin?"pin":""}"><span class="t">${g.cat}</span><span class="rule"></span></div>
-      <div class="grid">${cards}</div></div>`;
-  }).join("");
+  // Le catalogue d'outils est isolé : s'il explose, les TUILES D'ARGENT qui
+  // suivent doivent quand même s'afficher (c'est ce qui manquait le plus à
+  // l'opérateur quand la carte Grind faisait planter tout render()).
+  try{
+    $("#sections").innerHTML = groups().map(g=>{
+      const cards = g.tools.map(t=>cardHTML(t,data)).join("");
+      return `<div class="section ${g.build?"build":""}">
+        <div class="sec-head ${g.pin?"pin":""}"><span class="t">${g.cat}</span><span class="rule"></span></div>
+        <div class="grid">${cards}</div></div>`;
+    }).join("");
+  }catch(e){ console.error("catalogue outils:",e); }
 
   const live = TOOLS.filter(t=>!t.build && inWorld(t));
   const onCount = live.filter(t=>(data[t.id]||{}).status==="online").length;
@@ -2402,9 +2462,13 @@ function renderBrief(data, live, onCount, stInW){
 
 /* ---------- données ---------- */
 function setBanner(html){ const b=$("#banner"); if(html){ b.innerHTML=html; b.classList.add("show"); } else { b.classList.remove("show"); } }
+// ⚠️ Les render() des CHEMINS D'ERREUR ne sont protégés par rien : si un rendu
+// lève (cf. l'incident de la carte Grind), l'exception remonte et supprime le
+// message qui devait suivre — l'utilisateur se retrouvait devant une page
+// muette au lieu de « Mode démo » ou de l'écran de reconnexion.
 function demoFallback(msg){
   IS_LIVE = false;
-  render(DEMO);
+  try{ render(DEMO); }catch(e){ console.error(e); }
   $("#sub").textContent = "Mode démo";
   setBanner(msg);
 }
@@ -2431,8 +2495,10 @@ async function load(){
       if(authFail){
         // Jeton expiré/invalide : ce n'est PAS un souci réseau -> reconnexion.
         let c=null; try{ c=JSON.parse(localStorage.getItem("ccn_lastdata")||"null"); }catch(_){}
-        if(c) render(c);
+        // showReauth() AVANT le rendu : sinon une exception de rendu empêchait
+        // l'écran de reconnexion de s'ouvrir (session expirée = page bloquée).
         showReauth();
+        try{ if(c) render(c); }catch(_){}
         return;
       }
       throw (lastErr||new Error("offline"));
@@ -2449,7 +2515,7 @@ async function load(){
     OFFLINE_FAILS++;
     let cached=null; try{ cached = TOKEN ? JSON.parse(localStorage.getItem("ccn_lastdata")||"null") : null; }catch(_){}
     if(cached){
-      IS_LIVE=true; render(cached);
+      IS_LIVE=true; try{ render(cached); }catch(_){}
       // Un blip isolé passe inaperçu ; on n'alerte qu'après 2 échecs d'affilée.
       if(OFFLINE_FAILS>=2){ $("#sub").textContent="Reconnexion…"; setBanner("📶 Reconnexion en cours… tes chiffres restent affichés."); }
       // Retente vite tant que c'est coupé (sans empiler les timers).
@@ -2540,6 +2606,9 @@ $("#hide").onclick = ()=>{
   // Les panneaux OnlyMonster ne passent PAS par render() : sans ces appels ils
   // gardaient tous leurs montants affichés en clair après un clic sur 🙈.
   rerenderMoney();
+  // L'état des lieux imprimable garde une copie figée des montants : sans ça,
+  // un Ctrl+P après activation du masquage réimprimait les vrais chiffres.
+  try{ if(typeof refreshPrintSummary==="function") refreshPrintSummary(); }catch(e){}
 };
 // ⚠️ TOUT panneau qui affiche un montant DOIT figurer ici, sinon il garde ses
 // chiffres en clair jusqu'au prochain rafraîchissement (jusqu'à 1 min) — voire
@@ -2629,14 +2698,29 @@ async function loadCosts(){
     if(Array.isArray(j.outils) && (j.outils.length || !COSTS.length)){
       COSTS=j.outils; localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
       renderCosts(); if(typeof renderRenta==="function") renderRenta();
-    } else if(COSTS.length){ saveCosts(); }   // 1re fois : on envoie ce qu'on a en local
+    // 1re fois SEULEMENT : le serveur n'a jamais rien stocké (clé absente).
+    // ⚠️ Si le serveur renvoie une liste VIDE, c'est une suppression volontaire —
+    // re-pousser le local ressuscitait des dépenses effacées depuis un autre
+    // appareil, et donc faussait la rentabilité.
+    } else if(j.outils==null && COSTS.length){ saveCosts(); }
   }catch(e){}
+}
+// ⚠️ TOUJOURS ramener une dépense au MOIS avant de l'additionner. Le champ
+// `every` (mois/semaine/an) était enregistré mais jamais relu : un abonnement
+// annuel de 600 $ comptait comme 600 $/MOIS dans le total, dans la rentabilité
+// et dans la prévision — soit 12× trop cher. Un seul helper, utilisé partout.
+function coutMensuel(c){
+  const m=Number(c&&c.m)||0;
+  if(!c) return m;
+  if(c.every==="an") return m/12;
+  if(c.every==="semaine") return m*52/12;
+  return m;
 }
 function renderCosts(){
   // 💬 L'abonnement fixe OnlyChat (180 $/mois) est une entrée NORMALE de COSTS
   // (ajoutée une fois côté serveur, "OnlyChat (2 OF + 2 Telegram)") — pas un
   // calcul séparé : sinon il se comptait deux fois (ici + dans coutOutils).
-  const tot = COSTS.reduce((a,c)=>a+(Number(c.m)||0),0);
+  const tot = COSTS.reduce((a,c)=>a+coutMensuel(c),0);
   $("#costsTotal").textContent = COSTS.length ? `${fmtMoney(tot)} / mois` : "";
   if(!COSTS.length){ $("#costsList").innerHTML = `<div class="costs-empty">Ajoute ce que tu paies (Railway, OnlyMonster, proxies…) pour suivre tes coûts.</div>`; return; }
   // Compte à rebours : ce qui arrive dans <= 3 jours passe en orange, en retard en rouge.
@@ -2651,14 +2735,19 @@ function renderCosts(){
       const txt = j<0 ? `en retard de ${Math.abs(j)} j` : (j===0 ? "aujourd'hui" : `dans ${j} j`);
       ech=`<span class="co-due ${cls}">${escapeHtml(txt)}</span>`;
     }
-    return `<div class="co-row"><span class="co-name">${escapeHtml(c.n)}</span>${ech}<span class="co-amt">${fmtMoney(Number(c.m)||0)}</span><button class="co-del" data-cdel="${i}" aria-label="Supprimer">✕</button></div>`;
+    // Une dépense pas mensuelle affiche son équivalent /mois, sinon le total en
+    // bas ne colle pas visuellement avec la somme des lignes.
+    const eq = (c.every && c.every!=="mois") ? `<span class="co-eq">/${escapeHtml(c.every)} → ${fmtMoney(coutMensuel(c))}/mois</span>` : "";
+    return `<div class="co-row"><span class="co-name">${escapeHtml(c.n)}</span>${ech}<span class="co-amt">${fmtMoney(Number(c.m)||0)}${eq}</span><button class="co-del" data-cdel="${i}" aria-label="Supprimer">✕</button></div>`;
   }).join("");
 }
 function addCost(){
   const n=$("#costName").value.trim(), m=parseFloat(String($("#costAmount").value).replace(",","."));
   if(!n || isNaN(m)) return;
   const due=($("#costDue")||{}).value||"", every=(($("#costEvery")||{}).value)||"mois";
-  const o={n:n,m:m}; if(due){ o.due=due; o.every=every; }
+  // `every` doit être enregistré MÊME sans date d'échéance : sinon un « par an »
+  // saisi sans échéance retombait silencieusement en mensuel dans les totaux.
+  const o={n:n,m:m}; if(every && every!=="mois") o.every=every; if(due) o.due=due;
   COSTS.push(o); saveCosts(); renderCosts(); renderRenta();
   $("#costName").value=""; $("#costAmount").value=""; if($("#costDue")) $("#costDue").value=""; $("#costName").focus();
 }
@@ -3174,7 +3263,18 @@ function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYM
 async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
 function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST);
   // Prévient le bot : il postera "ta paie a été envoyée" dans le ticket du VA (montant > 0 uniquement → exclut le perso à 0)
-  if(TOKEN && (Number(amount)||0)>0){ fetch(HUB_BASE+"/api/hub/pay-notify",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, amount:Number(amount)||0, period:curPeriod()})}).then(()=>{ if(typeof toast==="function") toast("💸 Paie marquée",va+" — le bot prévient le VA dans son ticket"); }).catch(()=>{}); }
+  // ⚠️ Le message de succès partait AVANT de savoir si la requête avait marché
+  // (`.then()` sans tester `r.ok`) : sur 401/500, l'opérateur lisait « le bot
+  // prévient le VA » alors que le VA n'était PAS prévenu, et croyait la paie
+  // annoncée. On dit la vérité dans les deux sens.
+  if(TOKEN && (Number(amount)||0)>0){
+    fetch(HUB_BASE+"/api/hub/pay-notify",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:va, amount:Number(amount)||0, period:curPeriod()})})
+      .then(r=>{ if(typeof toast!=="function") return;
+        if(r.ok) toast("💸 Paie marquée",va+" — le bot prévient le VA dans son ticket");
+        else toast("⚠️ VA NON prévenu",va+" n'a pas reçu le message (erreur "+r.status+"). Reconnecte-toi puis refais « Payer ».");
+      })
+      .catch(()=>{ if(typeof toast==="function") toast("⚠️ VA NON prévenu",va+" n'a pas reçu le message (pas de réseau). Refais « Payer » une fois reconnecté."); });
+  }
 }
 // ⚠️ Annuler ici ne suffisait pas : le VA avait déjà reçu « ta paie vient d'être
 // envoyée ✅ » avec le montant. Il n'a rien réclamé et a attendu un virement qui
@@ -3194,6 +3294,10 @@ function unpayVa(va){
     }).catch(()=>{});
 }
 function renderPaie(data){
+  // ⚠️ En repli DÉMO, cette fiche affichait des montants inventés à côté de
+  // VRAIS prénoms de VA, avec des boutons « Payer » actifs : on pouvait marquer
+  // une paie (et déclencher le message au VA) sur des chiffres fictifs.
+  if(typeof IS_LIVE!=="undefined" && !IS_LIVE){ $("#paie").style.display="none"; return; }
   const vas = ((data["stats-tracker"]||{}).vas)||[];
   if(!vas.length){ $("#paie").style.display="none"; return; }
   $("#paie").style.display="block";
@@ -3233,7 +3337,8 @@ $("#paieBody").addEventListener("click",e=>{
 });
 $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
-  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${fmtMoney(v.pay)}`).join("\n") + `\nTOTAL : ${fmtMoney(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
+  // Texte destiné à être COLLÉ (à un VA, dans un message) → jamais masqué.
+  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
@@ -3300,7 +3405,8 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${pcMoney(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    // Confirmation d'un VERSEMENT réel → montant toujours lisible.
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${pcMoneyClair(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va})});
@@ -3332,8 +3438,8 @@ $("#pcumulRefresh").onclick=()=>loadPaieCumul();
 $("#pcumulCopy").onclick=()=>{
   const d=PCUMUL, vas=(d&&d.vas)||[]; if(!vas.length) return;
   const lignes=vas.filter(v=>!v.unpaid&&v.base!=null&&(Number(v.nouveaux)||0)>0)
-    .map(v=>`${v.va} : +${v.nouveaux} subs → ${pcMoney(Number(v.aPayer)||0)}`);
-  const txt="💸 Paie au cumul (depuis la dernière paie)\n"+lignes.join("\n")+`\nTOTAL : ${pcMoney(Number(d.total)||0)}`;
+    .map(v=>`${v.va} : +${v.nouveaux} subs → ${pcMoneyClair(Number(v.aPayer)||0)}`);
+  const txt="💸 Paie au cumul (depuis la dernière paie)\n"+lignes.join("\n")+`\nTOTAL : ${pcMoneyClair(Number(d.total)||0)}`;
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{ $("#pcumulCopy").textContent="✓ Copié"; setTimeout(()=>$("#pcumulCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 
@@ -3847,6 +3953,12 @@ function renderGoal(data){
     return;
   }
   const isRev = GOAL.type==="rev";
+  // ⚠️ Objectif en REVENUS + revenus illisibles = jauge à 0 % et « 0 $ » affiché,
+  // ce qui se lit comme « tu n'as rien gagné ce mois-ci ». Absent ≠ zéro.
+  if(isRev && typeof revKo==="function" && revKo()){
+    $("#goalBody").innerHTML=`<div class="sv-note">⚠️ Revenus illisibles en ce moment — je ne peux pas dire où tu en es sur ton objectif. Ce n'est <b>pas</b> zéro.</div>`;
+    return;
+  }
   const current = isRev ? (OM_DATA?Number(OM_DATA.totals.netMonth)||0:0) : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
   const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
   const unit = isRev ? "" : "subs";
@@ -3983,15 +4095,35 @@ function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice
 // La rangée compte maintenant 4 panneaux : avec un nombre IMPAIR de visibles, le
 // dernier restait orphelin en demi-largeur. On passe le dernier en pleine largeur
 // dès que le compte est impair (et pas seulement quand il n'y en a qu'un).
-function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>c.style.display!=="none" && !c.classList.contains("user-hidden")); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} try{ refreshSecHeads(); }catch(e){} }
+// ⚠️ La visibilité se juge sur le RENDU RÉEL (getComputedStyle), pas sur les
+// deux voies connues (style inline + .user-hidden) : en vue associé, les
+// panneaux sont masqués par une RÈGLE CSS `!important`, invisible des deux
+// tests → fixPairs croyait la case pleine et laissait des demi-colonnes vides.
+// (NE PAS utiliser getClientRects ici : dans une catégorie repliée tous les
+// enfants font 0 pixel et on effacerait les .solo à tort.)
+function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>getComputedStyle(c).display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} try{ refreshSecHeads(); }catch(e){} }
 // En-têtes de catégorie physiques sur la page (💰 Argent, 💬 Telegram…) —
 // cachés dès qu'AUCUN panneau de la catégorie n'est visible (mode associé,
 // panneaux masqués un par un, source de données indisponible…), pour ne
 // jamais montrer un titre de section suivi de rien.
+// ⚠️ On juge sur le CONTENU RÉEL du catBody, pas sur la table SECNAV_CATS :
+// si un panneau existe sur la page sans être listé dans la table (ça s'était
+// produit avec tip/notepad/duo/ask), l'en-tête disparaissait alors que la
+// catégorie affichait bien des panneaux dessous. Titre et contenu ne peuvent
+// plus diverger.
 function refreshSecHeads(){
-  SECNAV_CATS.forEach(([,items],idx)=>{
-    const h=document.getElementById("catHead"+idx); if(!h) return;
-    h.style.display = items.some(([id])=>secnavVisible(id)) ? "" : "none";
+  const replies=catCollapsedSet();
+  SECNAV_CATS.forEach((_,idx)=>{
+    const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
+    if(!h) return;
+    if(!b){ h.style.display="none"; return; }
+    const enfants=[...b.querySelectorAll("[id]")].filter(e=>e.parentElement===b || (e.parentElement.classList&&e.parentElement.classList.contains("pair-row")));
+    const aDuContenu = enfants.some(p=>secnavVisible(p.id));
+    h.style.display = aDuContenu ? "" : "none";
+    // ⚠️ Masquer le seul en-tête ne suffisait pas : le conteneur gardait ses
+    // marges (~23 px de vide fantôme entre deux sections). On le masque aussi —
+    // sans écraser un repli volontaire de l'utilisateur.
+    b.style.display = (!aDuContenu || replies.has(idx)) ? "none" : "";
   });
 }
 // 🗂️ Catégories repliables — tape un en-tête pour cacher tout son contenu
@@ -4015,6 +4147,30 @@ function toggleCatCollapsed(idx){
   s.has(idx)?s.delete(idx):s.add(idx);
   localStorage.setItem("ccn_cat_collapsed",JSON.stringify([...s]));
   applyCatCollapsed();
+}
+// ⭐ Une catégorie REPLIÉE avalait silencieusement tous les sauts de navigation
+// (puces, tiroir « Tout voir », recherche, file d'actions, raccourci ?go=) :
+// le panneau ciblé existe et son display calculé reste "block", mais son
+// PARENT est en display:none → scrollIntoView ne bouge pas d'un pixel et le
+// clic ne fait visiblement RIEN. On déplie donc la catégorie avant de sauter.
+// ⚠️ NE PAS « corriger » ça en rendant secnavVisible() sensible aux ancêtres :
+// refreshSecHeads masquerait alors l'en-tête de la catégorie repliée, or cet
+// en-tête est le SEUL moyen de la déplier → catégorie perdue définitivement.
+function expandCatOf(el){
+  const b = el && el.closest ? el.closest(".cat-body") : null;
+  if(!b || b.style.display!=="none") return false;
+  const idx = Number(String(b.id).replace("catBody",""));
+  if(isNaN(idx)) return false;
+  toggleCatCollapsed(idx);
+  return true;
+}
+// Saut robuste vers un panneau : déplie si besoin, puis scrolle. Le petit
+// setTimeout est nécessaire après un dépliage (même piège de mise en page
+// différée que celui déjà documenté plus bas — rAF ne suffit pas ici).
+function scrollToPanel(el){
+  const deplie = expandCatOf(el);
+  const go = ()=>el.scrollIntoView({behavior:"smooth",block:"start"});
+  deplie ? setTimeout(go,50) : go();
 }
 document.addEventListener("click",e=>{
   const h=e.target.closest(".sec-head[data-cat-idx]"); if(!h) return;
@@ -4513,14 +4669,19 @@ function renderRenta(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
   const coutVA=netMonth-margeMonth;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
   const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const F=(d.forecast&&d.forecast.net&&d.forecast.net.method==="smart")?d.forecast:null;
   const projTg=day>0?Math.round(tgMonth/day*dim):tgMonth;
   const projNet=F?F.net.value:(day>0?Math.round(netMonth/day*dim):netMonth);
-  const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):(day>0?Math.round(profitNet/day*dim):profitNet);
+  // ⚠️ On projette la MARGE, pas le profit. `profitNet` a déjà les coûts d'outils
+  // retirés : le projeter au prorata des jours multipliait ces charges FIXES par
+  // dim/day (au 3 du mois, ×10) — la prévision de profit partait très négative.
+  // On projette donc la marge, puis on retire les coûts d'outils UNE fois.
+  const projMarge=(day>0?Math.round(margeMonth/day*dim):margeMonth);
+  const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):Math.round(projMarge-coutOutils+projTg);
   // Le vrai profit retire la commission plateforme (brut × 22 %) — avant, le
   // panneau la « oubliait » et surestimait le profit d'un quart.
   const commission=Math.round(netMonth*(1-NET_RATE));
@@ -4572,7 +4733,7 @@ function renderSplit(){
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const margeMonth=Number(d.totals.margeMonth)||0;
-  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+(Number(c.m)||0),0);
+  const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
   // (brut × 22 %), comme le panneau Rentabilité. Avant, on partageait la marge
@@ -4614,6 +4775,15 @@ function omIndispo(msg){
 }
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
+  // ⚠️ `OM_DATA` sert de sentinelle « j'ai de vraies données » (`if(!OM_DATA)
+  // omIndispo(...)`), mais il contient les chiffres de DÉMO tant qu'on n'est pas
+  // connecté. Une fois le jeton posé, si le cerveau ne répond pas, la sentinelle
+  // restait vraie → aucun avertissement, et les chiffres de DÉMONSTRATION
+  // s'affichaient comme si c'était son vrai argent. On efface donc la démo.
+  if(typeof DEMO_OM!=="undefined" && OM_DATA===DEMO_OM){
+    OM_DATA=null; renderOM();
+    try{ renderSplit(); refreshEssentiel(); }catch(e){}
+  }
   try{
     const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
     if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
@@ -4640,6 +4810,8 @@ let TABS = [], ACTIVE = "home";
 function renderTabStrip(){
   // Pas d'outil ouvert = pas de barre (l'onglet « Accueil » seul ne servait à rien).
   $("#tabbar").style.display = TABS.length ? "flex" : "none";
+  // Sert au CSS à décaler #secnav sous la barre d'onglets (sinon superposition).
+  document.body.classList.toggle("has-tabs", TABS.length>0);
   const home = `<div class="tab ${ACTIVE==='home'?'on':''}" data-tab="home">🏠 Accueil</div>`;
   $("#tabbar").innerHTML = home + TABS.map(t=>`<div class="tab ${ACTIVE===t.id?'on':''}" data-tab="${t.id}">${escapeHtml(t.name)} <span class="x" data-close="${t.id}">✕</span></div>`).join("");
 }
@@ -4791,6 +4963,8 @@ async function shareDayCard(){
 // (moins de risque d'un résumé qui raconte un chiffre différent du reste de
 // la page). "Exporter en PDF" = imprimer → "Enregistrer en PDF", pas de lib.
 function buildPrintSummary(){
+  // 🔒 Jamais d'état des lieux chiffré en vue associé.
+  if(document.body.classList.contains("assoc-mode")) return "";
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
@@ -4801,7 +4975,11 @@ function buildPrintSummary(){
   const subsMois=(tot.subsMonth!=null)?String(tot.subsMonth):"—";
   const dateStr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const topVa=(om&&Array.isArray(om.vas)&&om.vas.length)?om.vas.slice().sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0))[0]:null;
-  const alerts=Object.keys(CAT_ALERTS).filter(l=>{ try{ return CAT_ALERTS[l](); }catch(e){ return false; } });
+  // ⚠️ On réutilise la VRAIE file d'actions (déjà agrégée et triée par gravité)
+  // au lieu des 2 signaux de CAT_ALERTS : l'imprimé listait des NOMS DE
+  // CATÉGORIES (« 👥 Équipe (VA) ») au lieu de problèmes, et pouvait annoncer
+  // « ✅ Rien à signaler » alors que la file d'actions à l'écran était rouge.
+  const alerts=(()=>{ try{ return buildActions().map(a=>a.icon+" "+a.text); }catch(e){ return []; } })();
   return `<div class="ps-title">📊 État des lieux — Noctra</div>
     <div class="ps-date">${dateStr}</div>
     <div class="ps-row"><span>💰 Net du mois (est.)</span><b>${netMois}</b></div>
@@ -4817,6 +4995,17 @@ function openSummaryPrint(){
   window.print();
 }
 { const b=$("#printSummaryBtn"); if(b) b.onclick=openSummaryPrint; }
+// ⚠️ Le CSS @media print masque TOUT sauf #printSummary. Or #printSummary
+// n'était rempli QUE par le bouton 🖨️ → un Ctrl+P (ou « Partager → Imprimer »
+// sur iPhone) sortait une feuille TOTALEMENT BLANCHE. On le tient donc à jour :
+// - `beforeprint` couvre desktop (Chrome/Firefox/Edge/Safari macOS) ;
+// - un pré-remplissage couvre Safari iOS, qui n'émet PAS `beforeprint`.
+// Le contenu est TOUJOURS reconstruit, donc il respecte le mode discret 🙈 et
+// la vue associé au moment de l'impression (et pas au moment du remplissage).
+function refreshPrintSummary(){
+  try{ const el=document.getElementById("printSummary"); if(el) el.innerHTML=buildPrintSummary(); }catch(e){}
+}
+window.addEventListener("beforeprint",refreshPrintSummary);
 
 // 📄 #11 RAPPORT DU MOIS : image récap à partager / archiver.
 function makeMonthReport(){
@@ -4861,13 +5050,18 @@ function makeRankCard(){
   x.fillStyle=acc; x.font="600 32px Inter,Arial,sans-serif"; x.fillText(new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}),70,196);
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; const vas=(om.vas||[]).slice(0,8);
   const cur=om.currency||"$"; const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  // ⚠️ Cette carte est PARTAGÉE (image envoyée aux VA). Graver « 0 $ » à côté
+  // d'un VA parce que la source de revenus ne répond pas, c'est publier un
+  // chiffre faux et démotivant. Absent ≠ zéro → on grave « — ».
+  const ko=(typeof revKo==="function")?revKo():false;
+  const argent=v=>(ko||v==null)?"—":money(v);
   const medals=["🥇","🥈","🥉"]; let y=270;
   vas.forEach((v,i)=>{
     const rowH=124; x.fillStyle=i<3?"#17171b":"#121214"; roundRect(x,70,y,940,rowH-16,20); x.fill();
     if(i<3){ x.textAlign="center"; x.font="54px Inter,Arial,sans-serif"; x.fillText(medals[i],120,y+70); } else { x.fillStyle="#8a8a92"; x.font="bold 40px Inter,Arial,sans-serif"; x.textAlign="center"; x.fillText(String(i+1),120,y+68); }
     x.textAlign="left"; x.fillStyle="#fff"; x.font="600 40px Inter,Arial,sans-serif"; x.fillText(String(v.va),195,y+56);
     x.fillStyle="#8a8a92"; x.font="500 28px Inter,Arial,sans-serif"; x.fillText(v.subs+" subs",195,y+92);
-    x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(money(v.rev),980,y+72); x.textAlign="left";
+    x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(argent(v.rev),980,y+72); x.textAlign="left";
     y+=rowH;
   });
   if(!vas.length){ x.fillStyle="#8a8a92"; x.font="500 34px Inter,Arial,sans-serif"; x.fillText("Pas encore de données VA.",70,320); }
@@ -5376,7 +5570,9 @@ async function loadBriefHistory(){
 function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
 function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
 function closeMorning(){ stopSpeaking(); $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
-function showMorningIfNew(){ if(!TOKEN) return;
+// 🔒 L'écran du matin/soir affiche le CA en clair et s'ouvrait PAR-DESSUS la
+// vue associé (z-index supérieur) → Manon voyait les chiffres au chargement.
+function showMorningIfNew(){ if(!TOKEN || document.body.classList.contains("assoc-mode")) return;
   // Le soir (≥ 20h local), on propose le coach du soir 1×/jour ; sinon le matin.
   if(new Date().getHours()>=20){ if(!EVENING_SHOWN){ EVENING_SHOWN=true; if(localStorage.getItem("ccn_evening")!==todayStr()) showEvening(); } return; }
   if(MORNING_SHOWN) return; MORNING_SHOWN=true; if(localStorage.getItem("ccn_morning")!==todayStr()) showMorning(); }
@@ -5384,6 +5580,9 @@ function showMorningIfNew(){ if(!TOKEN) return;
 { const eb=$("#eve"); if(eb) eb.onclick=showEvening; }
 // ---------- Widget iPhone : écran d'aide (URL + token + étapes) ----------
 function showWidgetHelp(){
+  // 🔒 Cet écran affiche le JETON MAÎTRE en clair (accès total au cerveau).
+  // Jamais en vue associé, même si un chemin d'appel oubliait le masquage CSS.
+  if(document.body.classList.contains("assoc-mode")) return;
   const url=HUB_BASE+"/api/hub/widget";
   const tok=TOKEN||"(connecte-toi d'abord)";
   const scriptable=`// Widget Scriptable — colle dans un widget Scriptable\nconst r=await new Request("${url}");\nr.headers={"x-hub-token":"${tok}"};\nconst d=await r.loadJSON();\nconst w=new ListWidget();\nw.addText("Noctra");\nlet a=w.addText((d.netMonth??"—")+" $");\na.font=Font.boldSystemFont(26);\nw.addText(d.line||"");\nScript.setWidget(w);\nScript.complete();`;
@@ -5608,7 +5807,7 @@ function renderRailway(){
   // Rapport coût / revenus : la seule façon de savoir si l'infra est chère.
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
   const net=Number((om.totals||{}).netMonth)||0;
-  const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+(Number(c.m)||0),0):0;   // la cle est `m` (pas `amount`) : avec `amount` le total valait toujours 0
+  const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+coutMensuel(c),0):0;   // la cle est `m` (pas `amount`) : avec `amount` le total valait toujours 0
   const totalOutils=d.total+outils;
   const pourCent = net>0 ? (totalOutils/net*100) : null;
   const gros=actifs[0];
@@ -6256,12 +6455,16 @@ function audioSummary(){
   if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals){ if(typeof toast==="function") toast("🔊","Chiffres pas encore prêts."); return; }
   const ko=(typeof revKo==="function")?revKo():false;
+  // 🙈 Mode discret : le résumé est LU À VOIX HAUTE et affiché en clair — il
+  // contournait complètement le masquage (quelqu'un à côté entend le CA).
+  const masque=(typeof HIDE!=="undefined"&&HIDE);
+  const mm=v=>masque?"un montant masqué":v.toLocaleString("fr-FR")+" dollars";
   const arr=Math.round((Number(om.totals.netMonth)||0)*NET_RATE/100)*100;
   const parts=["Salut, voici ton résumé du "+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+"."];
-  if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+arr.toLocaleString("fr-FR")+" dollars net.");
+  if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+mm(arr)+" net.");
   if(om.totals.subsDay!=null) parts.push(om.totals.subsDay+" nouveaux abonnés aujourd'hui, "+(om.totals.subsMonth||0)+" ce mois.");
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
-  if(cd&&!cd.error&&cd.apresPaie!=null){ const a=Math.round((Number(cd.apresPaie)||0)/100)*100; parts.push("Après la prochaine paie, il te resterait environ "+a.toLocaleString("fr-FR")+" dollars."); }
+  if(cd&&!cd.error&&cd.apresPaie!=null){ const a=Math.round((Number(cd.apresPaie)||0)/100)*100; parts.push("Après la prochaine paie, il te resterait environ "+mm(a)+"."); }
   if(!ko&&Array.isArray(om.vas)){ const t=om.vas.find(v=>v&&!v.unpaid); if(t) parts.push(t.va+" porte l'équipe en ce moment."); }
   if(typeof DECROCHE_FLAGS!=="undefined"&&DECROCHE_FLAGS.length) parts.push("Pense à relancer "+DECROCHE_FLAGS[0].va+", il ralentit.");
   parts.push("Bonne journée !");
@@ -6317,7 +6520,20 @@ function renderCharge(){
 // Une seule liste priorisée qui rassemble TOUS les signaux déjà chargés (cash,
 // fuites, proxy, décrochage, opportunités, fans endormis, VA fantômes, revenus
 // muets) et les classe par gravité. On ne recalcule rien : on agrège.
-function jumpPanel(id){ const el=document.getElementById(id); if(el){ try{ _userScrolled=true; }catch(e){} el.scrollIntoView({behavior:"smooth",block:"start"}); } }
+function jumpPanel(id){
+  const el=document.getElementById(id); if(!el) return;
+  try{ _userScrolled=true; }catch(e){}
+  // Déplie la catégorie si le panneau y est enfermé (sinon le clic ne fait rien).
+  const deplie = (typeof expandCatOf==="function") ? expandCatOf(el) : false;
+  // Toujours invisible après dépliage = panneau masqué par l'opérateur (⚙️ 🧩)
+  // ou vide. On le DIT au lieu de laisser croire à un bouton cassé.
+  if(!deplie && el.getClientRects().length===0){
+    if(typeof toast==="function") toast("👀 Panneau masqué","Il n'a pas de données pour l'instant, ou tu l'as décoché dans ⚙️ → 🧩.");
+    return;
+  }
+  const go=()=>el.scrollIntoView({behavior:"smooth",block:"start"});
+  deplie ? setTimeout(go,50) : go();
+}
 function buildActions(){
   const A=[], push=(sev,icon,text,panel,quick)=>A.push({sev,icon,text,panel,quick:quick||null});
   // 🙈 doit masquer AUSSI les montants de la file d'actions (« il te manquera X $ »).
@@ -6469,7 +6685,12 @@ function gsIndex(){
   if(om&&Array.isArray(om.vas)) om.vas.forEach(v=>{ if(v&&v.va) items.push({type:"va", label:v.va, sub:(v.unpaid?"perso":`${v.subs||0} subs`), key:v.va}); });
   if(om&&om.models) Object.keys(om.models).forEach(mn=>{ const m=om.models[mn]||{}; items.push({type:"model", label:mn, sub:`modèle · ${m.subs||0} subs`, key:mn}); });
   const seen={};
-  (typeof PANNEAUX!=="undefined"?PANNEAUX:[]).forEach(a=>{ if(a&&a[0]){ seen[a[0]]=1; items.push({type:"panel", label:String(a[1]||a[0]).replace(/^[^\p{L}]+/u,"").trim()||a[1], sub:"panneau", key:a[0]}); } });
+  // ⚠️ Ne pas proposer un panneau que l'opérateur a lui-même décoché (⚙️ → 🧩) :
+  // il apparaissait dans les résultats et le clic ne faisait rien.
+  // (On ne filtre PAS sur secnavVisible : ça retirerait aussi les panneaux
+  // simplement vides à l'instant de la frappe, qui eux sont légitimes.)
+  const _masques=(typeof hiddenSet==="function")?hiddenSet():new Set();
+  (typeof PANNEAUX!=="undefined"?PANNEAUX:[]).forEach(a=>{ if(a&&a[0]&&!_masques.has(a[0])){ seen[a[0]]=1; items.push({type:"panel", label:String(a[1]||a[0]).replace(/^[^\p{L}]+/u,"").trim()||a[1], sub:"panneau", key:a[0]}); } });
   [["om","Argent (OnlyMonster)"],["cash","Cash à venir"],["paie","Paie"],["antileak","Anti-leak"],["tasks","Tâches d'équipe"],["journal","Journal"],["costs","Dépenses d'outils"],["proxy","État des proxies"]].forEach(p=>{ if(!seen[p[0]]){ seen[p[0]]=1; items.push({type:"panel",label:p[1],sub:"panneau",key:p[0]}); } });
   return items;
 }
@@ -6520,14 +6741,18 @@ const RULE_METRICS=[
   {k:"proxy_mort",label:"Proxy en panne",bool:true},
   {k:"revenus_muets",label:"Revenus illisibles",bool:true}
 ];
-let RULES=[], RULE_SEEN={};
+// Même verrou d'écriture que DECISIONS ci-dessous : pas de POST tant que le
+// chargement serveur n'a pas réussi, sinon une liste vide écrase les alertes.
+let RULES=[], RULE_SEEN={}, RULES_LOADED=false;
 async function loadRules(){
   if(!TOKEN){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e){ RULES=[]; } renderRules(); return; }
-  try{ const r=await fetch(HUB_BASE+"/api/hub/rules",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); RULES=Array.isArray(j.rules)?j.rules:[]; localStorage.setItem("ccn_rules",JSON.stringify(RULES)); } }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/rules",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json(); RULES=Array.isArray(j.rules)?j.rules:[]; localStorage.setItem("ccn_rules",JSON.stringify(RULES)); RULES_LOADED=true; }
   catch(e){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e2){ RULES=[]; } }
   renderRules();
 }
-function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
+function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN && !RULES_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
 function ruleMetricVal(k){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null, ko=(typeof revKo==="function")?revKo():false, t=(om&&om.totals)||{};
   if(k==="revenus_muets") return ko?1:0;
@@ -6685,14 +6910,21 @@ function renderBusFactor(){
 
 // 📓 #8 JOURNAL DES DÉCISIONS : note une décision, vois son effet sur le CA
 // (7 jours avant vs 7 jours après, depuis OM_DATA.dailyNet). Stocké serveur.
-let DECISIONS=[];
+// ⚠️ VERROU D'ÉCRITURE (même motif pour RULES et VANOTES plus bas).
+// Un 401/500 au chargement laissait la liste VIDE en mémoire, puis la première
+// modification faisait un POST de cette liste vide → les décisions du serveur
+// étaient EFFACÉES. On n'autorise le POST qu'après un chargement serveur
+// réussi ; sinon on garde tout en local et on ne touche pas au serveur.
+let DECISIONS=[], DECISIONS_LOADED=false;
 async function loadDecisions(){
   if(!TOKEN){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e){ DECISIONS=[]; } renderDecisions(); return; }
-  try{ const r=await fetch(HUB_BASE+"/api/hub/decisions",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); DECISIONS=Array.isArray(j.decisions)?j.decisions:[]; localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); } }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/decisions",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json(); DECISIONS=Array.isArray(j.decisions)?j.decisions:[]; localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); DECISIONS_LOADED=true; }
   catch(e){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e2){ DECISIONS=[]; } }
   renderDecisions();
 }
-function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
+function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN && !DECISIONS_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
 function decisionImpact(dateStr){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!Array.isArray(om.dailyNet)||revKo()) return null;
   const dn=om.dailyNet, idx=dn.findIndex(x=>x.date===dateStr); if(idx<0) return null;
@@ -6997,7 +7229,11 @@ function renderSim(){
 function renderPie(){
   const panel=$("#pie"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, models=om.models||{}, cur=om.currency||"$";
-  let entries=Object.keys(models).map(m=>[m,Number(models[m].net)||0]).filter(e=>e[1]>0);
+  // ⚠️ `models[].net` est du BRUT OnlyFans, alors que Telegram est déjà du NET.
+  // Les additionner tels quels gonflait la part OnlyFans et écrasait Telegram
+  // dans le camembert ET dans le « Total généré ce mois ». On convertit l'OF en
+  // net (× NET_RATE) comme le font déjà renderHistory et la tuile du haut.
+  let entries=Object.keys(models).map(m=>[m,(Number(models[m].net)||0)*NET_RATE]).filter(e=>e[1]>0);
   // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans.
   // ⭐ Préfère ONLYCHAT_DATA (auto, à jour) à la saisie manuelle TGREV — sinon,
   // depuis que la saisie manuelle est gelée, ce camembert affichait 0 $
@@ -7015,6 +7251,13 @@ function renderPie(){
   entries.sort((a,b)=>b[1]-a[1]);
   const total=entries.reduce((a,e)=>a+e[1],0);
   if(!entries.length||total<=0){ panel.style.display="none"; return; }
+  // Revenus OnlyFans illisibles : ne PAS présenter Telegram comme « 100 % du
+  // total généré » — ce serait un chiffre faux, pas une info manquante.
+  if(typeof revKo==="function" && revKo()){
+    panel.style.display="block";
+    $("#pieBody").innerHTML=`<div class="sv-note">⚠️ Revenus OnlyFans illisibles pour l'instant — je ne peux pas te dire d'où vient l'argent. Ce n'est <b>pas</b> zéro.</div>`;
+    return;
+  }
   panel.style.display="block";
   const colors=["#9aa2d8","#22d3ee","#f59e0b","#4ade80","#f472b6","#818cf8"];
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(v).toLocaleString("fr-FR")+" "+cur;
@@ -7022,7 +7265,7 @@ function renderPie(){
   const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");
   const legend=entries.map((e,i)=>`<div class="pie-lg"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-nm">${escapeHtml(e[0])}</span><span class="pie-v">${money(e[1])} · ${Math.round(e[1]/total*100)}%</span></div>`).join("");
   const head=`<div class="pie-total"><span>💰 Total généré ce mois</span><b>${money(total)}</b></div>`;
-  $("#pieBody").innerHTML=head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+(tg>0?`<div class="pie-note">OnlyFans (net) + Telegram réunis. Le détail par modèle reste au-dessus.</div>`:"");
+  $("#pieBody").innerHTML=head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+`<div class="pie-note">OnlyFans en <b>net</b>${tg>0?" + Telegram réunis":""}. Le détail par modèle reste au-dessus.</div>`;
 }
 
 /* ---------- démarrage ---------- */
@@ -7146,6 +7389,11 @@ function speakShort(txt){ try{ if(!window.speechSynthesis||!txt) return; const u
 // prefixe = contexte optionnel ajouté devant ce que tu dictes (utilisé par le
 // coach pour que l'assistant sache de quelle action tu parles).
 function voiceAsk(prefixe, opts){
+  // 🔒 L'assistant répond (et LIT À VOIX HAUTE) les montants : pas en vue associé.
+  if(document.body.classList.contains("assoc-mode")){
+    if(typeof toast==="function") toast("👥 Vue associé","L'assistant est désactivé dans ce mode.");
+    return;
+  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ alert("La dictée vocale n'est pas dispo sur ce navigateur (essaie Safari ou Chrome)."); return; }
   if(!TOKEN){ openGate("Reconnecte-toi (identifiant + mot de passe)."); return; }
@@ -7224,6 +7472,8 @@ function toggleConvo(){
   const b=$("#askConvo");
   if(CONVO_ON){ CONVO_ON=false; if(b) b.classList.remove("listening","on"); try{ window.speechSynthesis.cancel(); }catch(e){} if(typeof toast==="function") toast("🎙️ Conversation terminée",""); return; }
   if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  // 🔒 Même garde qu'au-dessus : le mode conversation lit les montants à voix haute.
+  if(document.body.classList.contains("assoc-mode")){ if(typeof toast==="function") toast("👥 Vue associé","L'assistant est désactivé dans ce mode."); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ alert("La voix n'est pas dispo sur ce navigateur (essaie Chrome ou Safari)."); return; }
   try{ primeVoices(); }catch(e){}
   CONVO_ON=true; CONVO_ERR=0; if(b) b.classList.add("on"); if(typeof toast==="function") toast("🎙️ Mode conversation","Parle, je te réponds à voix haute. Re-clique 🎙️ pour arrêter.");
@@ -7309,6 +7559,10 @@ function applyAssoc(){
       const ex=b.querySelector("#assocExit"); if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_assoc","0"); applyAssoc(); }; }
   } else if(b){ b.remove(); }
   try{ if(typeof refreshSecnav==="function") refreshSecnav(); }catch(e){}
+  // Recale la mise en page tout de suite (demi-colonnes vides sinon jusqu'au
+  // prochain rendu), et vide l'état des lieux imprimable généré AVANT bascule.
+  try{ if(typeof fixPairs==="function") fixPairs(); }catch(e){}
+  try{ const ps=document.getElementById("printSummary"); if(ps) ps.innerHTML=""; }catch(e){}
 }
 { const b=$("#assocView"); if(b) b.onclick=()=>{ const on=localStorage.getItem("ccn_assoc")==="1"; localStorage.setItem("ccn_assoc", on?"0":"1"); applyAssoc(); if(!on && typeof toast==="function") toast("👥 Vue associé activée","Chiffres sensibles masqués. Clique « Quitter » pour revenir."); }; }
 applyAssoc();
@@ -7333,32 +7587,61 @@ async function runDiagnostic(){
 { const b=$("#diag"); if(b) b.onclick=runDiagnostic; }
 
 /* ---------- réorganiser les panneaux ---------- */
+// ⚠️ Depuis la réorganisation en catégories, PLUS AUCUN panneau n'est enfant
+// direct de #home (ils vivent dans .cat-body, souvent dans une .pair-row) :
+// le sélecteur "#home > .panel-box[id]" ne matchait plus rien et TOUTE la
+// fonction « Réorganiser » était morte en silence (bouton actif, pointillés
+// autour des panneaux, mais aucune flèche et aucun déplacement possible).
+// On réordonne désormais CONTENEUR PAR CONTENEUR : un panneau ne peut bouger
+// qu'entre ses frères directs, donc il ne peut jamais changer de catégorie.
+const REORD_SEL = "#home .cat-body > .panel-box[id], #home .cat-body > .pair-row > .panel-box[id]";
 function applyOrder(){
   const saved=JSON.parse(localStorage.getItem("ccn_order")||"[]"); if(!saved.length) return;
-  const panels=[...document.querySelectorAll("#home > .panel-box[id]")]; if(!panels.length) return;
-  const slots=panels.map(p=>{ const ph=document.createComment("o"); p.parentNode.insertBefore(ph,p); return ph; });
-  const byId={}; panels.forEach(p=>byId[p.id]=p);
-  const ordered=saved.map(id=>byId[id]).filter(Boolean);
-  panels.forEach(p=>{ if(saved.indexOf(p.id)<0) ordered.push(p); });
-  ordered.forEach((p,i)=>{ if(slots[i]) slots[i].parentNode.insertBefore(p,slots[i]); });
-  slots.forEach(s=>s.remove());
+  const panels=[...document.querySelectorAll(REORD_SEL)]; if(!panels.length) return;
+  // Regroupe par parent : chaque conteneur est réordonné indépendamment.
+  const parents=new Map();
+  panels.forEach(p=>{ if(!parents.has(p.parentNode)) parents.set(p.parentNode,[]); parents.get(p.parentNode).push(p); });
+  parents.forEach(list=>{
+    const slots=list.map(p=>{ const ph=document.createComment("o"); p.parentNode.insertBefore(ph,p); return ph; });
+    const rang=p=>{ const i=saved.indexOf(p.id); return i<0 ? Infinity : i; };
+    const ordered=list.slice().sort((a,b)=>rang(a)-rang(b));
+    ordered.forEach((p,i)=>{ if(slots[i]) slots[i].parentNode.insertBefore(p,slots[i]); });
+    slots.forEach(s=>s.remove());
+  });
+  try{ fixPairs(); }catch(e){}
 }
-function reorderCtrls(on){ document.querySelectorAll("#home > .panel-box[id]").forEach(p=>{ let c=p.querySelector(":scope > .reord-ctrl"); if(on){ if(!c){ c=document.createElement("div"); c.className="reord-ctrl"; c.innerHTML=`<button data-reord="-1">▲</button><button data-reord="1">▼</button>`; p.appendChild(c); } } else if(c){ c.remove(); } }); }
+function reorderCtrls(on){ document.querySelectorAll(REORD_SEL).forEach(p=>{ let c=p.querySelector(":scope > .reord-ctrl"); if(on){ if(!c){ c=document.createElement("div"); c.className="reord-ctrl"; c.innerHTML=`<button data-reord="-1">▲</button><button data-reord="1">▼</button>`; p.appendChild(c); } } else if(c){ c.remove(); } }); }
 let REORDERING=false;
 function toggleReorder(){ REORDERING=!REORDERING; document.body.classList.toggle("reordering",REORDERING); reorderCtrls(REORDERING); const b=$("#reorder"); if(b){ b.textContent=REORDERING?"✓":"⇅"; } }
-function movePanel(panel,dir){ const ids=[...document.querySelectorAll("#home > .panel-box[id]")].map(p=>p.id); const i=ids.indexOf(panel.id), j=i+dir; if(i<0||j<0||j>=ids.length) return; const t=ids[i]; ids[i]=ids[j]; ids[j]=t; localStorage.setItem("ccn_order",JSON.stringify(ids)); applyOrder(); reorderCtrls(true); }
+// Ne permute qu'entre FRÈRES du même conteneur (donc jamais d'une catégorie à
+// une autre), puis réenregistre l'ordre global tel qu'il est réellement affiché.
+function movePanel(panel,dir){
+  const freres=[...panel.parentNode.children].filter(c=>c.classList&&c.classList.contains("panel-box")&&c.id);
+  const i=freres.indexOf(panel), j=i+dir;
+  if(i<0||j<0||j>=freres.length) return;
+  if(dir<0) panel.parentNode.insertBefore(panel,freres[j]);
+  else panel.parentNode.insertBefore(freres[j],panel);
+  const ids=[...document.querySelectorAll(REORD_SEL)].map(p=>p.id);
+  localStorage.setItem("ccn_order",JSON.stringify(ids));
+  try{ fixPairs(); }catch(e){}
+  reorderCtrls(true);
+}
 { const b=$("#reorder"); if(b) b.onclick=toggleReorder; }
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-reord]"); if(r){ const p=r.closest(".panel-box[id]"); if(p) movePanel(p, parseInt(r.getAttribute("data-reord"),10)); } });
 /* ---------- 📇 fiche VA : clique sur un prénom dans le classement ---------- */
 // 🗒️ #9 NOTES PAR VA : un carnet par VA, stocké serveur, affiché dans sa fiche.
-let VANOTES={};
+// Même verrou d'écriture que RULES/DECISIONS : un échec de lecture ne doit
+// jamais permettre d'écraser le carnet de notes du serveur par du vide.
+let VANOTES={}, VANOTES_LOADED=false;
 async function loadVaNotes(){
   if(!TOKEN){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e){ VANOTES={}; } return; }
-  try{ const r=await fetch(HUB_BASE+"/api/hub/va-notes",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VANOTES=(j.notes&&typeof j.notes==="object")?j.notes:{}; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); } }
+  try{ const r=await fetch(HUB_BASE+"/api/hub/va-notes",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json(); VANOTES=(j.notes&&typeof j.notes==="object")?j.notes:{}; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); VANOTES_LOADED=true; }
   catch(e){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e2){ VANOTES={}; } }
 }
 function vaNoteGet(va){ return VANOTES[String(va||"").toLowerCase()]||""; }
-function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
+function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN && !VANOTES_LOADED) return; if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
 
 // 🎭 #2 FICHE MODÈLE : miroir de la fiche VA, mais par modèle. Depuis OM_DATA.
 function openModelCard(modelName){
@@ -7638,12 +7921,15 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
   ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["rw","🚂 Coût Railway"]]],
-  ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"]]],
+  ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
   ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
   ["🧭 À faire & décisions",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
-  ["🏆 Motivation & suivi perso",[["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["streak","🔥 Ta série"]]],
+  // ⚠️ tip/notepad/duo/ask VIVENT dans cette catégorie sur la page mais n'étaient
+  // pas listés ici : injoignables depuis « Tout voir » et la recherche, et
+  // l'en-tête de la catégorie disparaissait quand seuls eux étaient visibles.
+  ["🏆 Motivation & suivi perso",[["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["streak","🔥 Ta série"],["tip","💡 Conseil du jour"],["notepad","📝 Bloc-notes"],["duo","🤝 Qui fait quoi"],["ask","🤖 Demande à tes chiffres"]]],
   ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"]]],
 ];
 function secnavVisible(id){ const el=document.getElementById(id); return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; }
@@ -7655,7 +7941,10 @@ function secnavVisible(id){ const el=document.getElementById(id); return el && !
 // rien à signaler ; objmois pose .ob-warn quand le rythme est en retard.
 const CAT_ALERTS={
   "👥 Équipe (VA)": ()=>secnavVisible("decroche")||secnavVisible("varisque"),
-  "💰 Argent & rentabilité": ()=>!!document.querySelector("#objmois .ob-warn"),
+  // ⚠️ `.ob-warn` reste dans le DOM même quand le panneau #objmois est masqué
+  // (décoché par l'opérateur) ou replié → point rouge sur la puce « Argent »
+  // pointant vers une alerte invisible. On exige que la source soit visible.
+  "💰 Argent & rentabilité": ()=>secnavVisible("objmois") && !!document.querySelector("#objmois .ob-warn"),
 };
 // 📍 "Tu es ici" : surligne dans la barre la catégorie que tu es en train de
 // regarder en scrollant, comme un scrollspy — pas de nouvel élément d'UI,
@@ -7695,7 +7984,7 @@ function refreshSecnav(){
   if(nav.innerHTML!==html) nav.innerHTML=html;
   highlightActiveCat(ACTIVE_CAT_LABEL);
 }
-function jumpToSection(id){ const el=document.getElementById(id); if(el){ _userScrolled=true; el.scrollIntoView({behavior:"smooth",block:"start"}); } }
+function jumpToSection(id){ const el=document.getElementById(id); if(!el) return; _userScrolled=true; scrollToPanel(el); }
 // ⭐ Mémorise la dernière catégorie visitée (chip cliqué OU section rejointe
 // depuis le tiroir) — "☰ Tout voir" sans argument rouvre directement dessus
 // au lieu de toujours repartir du haut, pour la catégorie qu'on consulte le
@@ -7711,7 +8000,10 @@ function openSectionNav(scrollToCat){
     <div id="secnavCatsWrap">
     ${SECNAV_CATS.map(([label,items])=>{
       const vis=items.filter(([id])=>secnavVisible(id));
-      const rows=vis.map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}" data-q="${escapeHtml(lbl.toLowerCase())}">${lbl}</div>`).join("");
+      // ⚠️ Recherche SANS ACCENTS des deux côtés (gsNorm) : « equipe » ne
+      // trouvait pas « Équipe », « telegram » ratait « Télégram ». Le libellé de
+      // catégorie est indexé aussi, pour qu'un mot de section remonte ses items.
+      const rows=vis.map(([id,lbl])=>`<div class="secnav-row" data-sec="${id}" data-q="${escapeHtml(gsNorm(lbl)+" "+gsNorm(label))}">${lbl}</div>`).join("");
       const alert=CAT_ALERTS[label]&&CAT_ALERTS[label]();
       return rows?`<div class="secnav-cat" data-cat="${escapeHtml(label)}"><div class="secnav-cat-h">${alert?`<span class="sec-chip-alert" title="Ça mérite un coup d'œil">●</span>`:""}${label} <span class="sec-chip-n">${vis.length}</span></div>${rows}</div>`:"";
     }).join("")}
@@ -7724,7 +8016,7 @@ function openSectionNav(scrollToCat){
   });
   const search=ov.querySelector("#secnavSearch");
   search.addEventListener("input",()=>{
-    const q=search.value.trim().toLowerCase();
+    const q=gsNorm(search.value).trim();
     ov.querySelectorAll(".secnav-cat").forEach(cat=>{
       let anyVisible=false;
       cat.querySelectorAll(".secnav-row").forEach(row=>{
@@ -7734,6 +8026,15 @@ function openSectionNav(scrollToCat){
       });
       cat.style.display=anyVisible?"":"none";
     });
+    // Sans ça, une recherche sans résultat vidait le tiroir en silence : on
+    // croyait le tiroir cassé au lieu de comprendre qu'il n'y a rien.
+    const wrap=ov.querySelector("#secnavCatsWrap");
+    if(wrap){
+      const aucun=![...wrap.querySelectorAll(".secnav-cat")].some(c=>c.style.display!=="none");
+      let vide=wrap.querySelector(".secnav-empty");
+      if(aucun&&!vide){ vide=document.createElement("div"); vide.className="secnav-empty"; vide.style.cssText="padding:14px 4px;color:var(--muted);font-size:13px;text-align:center"; vide.textContent="Aucun résultat pour « "+search.value.trim()+" »"; wrap.appendChild(vide); }
+      else if(!aucun&&vide){ vide.remove(); }
+    }
   });
   document.body.appendChild(ov);
   search.focus();
@@ -7876,7 +8177,12 @@ function renderCaJours(){
 }
 
 /* colonne latérale collante (desktop) : horloge/minuteur + tâches */
-{ const sb=$("#sidebar"); if(sb){ ["journal","tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); }); } }
+// ⚠️ Après avoir déménagé ces panneaux dans la colonne latérale, certaines
+// .pair-row se retrouvent VIDES (leurs deux panneaux sont partis) et laissent
+// une rangée fantôme dans la page. On nettoie les rangées vides — ça protège
+// aussi les futurs déplacements de panneaux.
+{ const sb=$("#sidebar"); if(sb){ ["journal","tasks","clock","goal","dates","cal"].forEach(id=>{ const el=document.getElementById(id); if(el) sb.appendChild(el); });
+  document.querySelectorAll("#home .pair-row").forEach(r=>{ if(!r.children.length) r.remove(); }); } }
 { const h=$("#jrHead"); if(h) h.onclick=()=>{ const j=$("#journal"); if(j){ j.classList.toggle("folded"); localStorage.setItem("ccn_jrfold", j.classList.contains("folded")?"1":"0"); } }; if(localStorage.getItem("ccn_jrfold")==="0"){ const j=$("#journal"); if(j) j.classList.remove("folded"); } }
 // ⭐ Migration unique : la page vient d'être réorganisée par catégorie
 // (💰 Argent, 💬 Telegram, 👥 Équipe…) — un ordre perso sauvegardé AVANT ce
@@ -7907,12 +8213,21 @@ try{
       tries++;
       if(stop||tries>16){ clearInterval(t); return; }
       const el=document.getElementById(go);
-      if(el&&getComputedStyle(el).display!=="none"){ _userScrolled=true; el.scrollIntoView({block:"start"}); }
+      if(!el) return;
+      // Déplier d'abord : sinon la boucle tournait 16 fois pour rien sur un
+      // panneau enfermé dans une catégorie repliée (display calculé "block"
+      // mais 0 pixel à l'écran → aucun saut, aucun message).
+      if(typeof expandCatOf==="function") expandCatOf(el);
+      if(el.getClientRects().length){ _userScrolled=true; el.scrollIntoView({block:"start"}); }
     },800);
   }
 }catch(e){}
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); refreshEssentiel(); } }, REFRESH_MS);
-setTimeout(refreshEssentiel, 3500);
+// ⚠️ loadOnlyChat manquait ici : toute la moitié Telegram (revenus, coaching)
+// restait figée sur les chiffres du chargement initial, SOUS un badge « à jour
+// à l'instant » rafraîchi par les autres appels — donc un chiffre périmé
+// présenté comme frais. Ajouté à la boucle comme loadCash/loadCharge.
+setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel(); } }, REFRESH_MS);
+setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
 </script>
 </body>
 </html>
