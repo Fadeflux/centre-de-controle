@@ -2812,8 +2812,14 @@ function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+Str
 function tgMonthTotal(model){
   if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
     if(!model || model==="all") return Number(ONLYCHAT_DATA.totalRevenue)||0;
-    const pm=(ONLYCHAT_DATA.parModele||{})[model];
-    if(pm) return Number(pm.totalRevenue)||0;
+    // ⚠️ `return 0` et NON un repli sur la saisie manuelle : quand OnlyChat
+    // répond, il est la SEULE source (règle du « Tout » juste au-dessus).
+    // Avec un `if(pm)`, un modèle inconnu d'OnlyChat retombait sur la saisie
+    // manuelle : la vue par modèle comptait ces montants alors que « Tout »,
+    // la rentabilité, le partage et le camembert les ignoraient — la somme des
+    // modèles ne tombait plus juste (ex. 600+300+200 = 1 100 pour un total
+    // annoncé à 900). Une seule règle pour tout le monde.
+    return Number(((ONLYCHAT_DATA.parModele||{})[model]||{}).totalRevenue)||0;
   }
   const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey && (!model||model==="all"||(x.model||"")===model)).reduce((a,x)=>a+(Number(x.amount)||0),0);
 }
