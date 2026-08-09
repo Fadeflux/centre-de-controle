@@ -6253,13 +6253,21 @@ function renderRailway(){
 // présentes ? Ton scraping de vues Instagram passe par eux : à sec, les chiffres
 // arrêtent de remonter en silence. Le serveur les ping activement.
 let PROXY_DATA=null;
+let PROXY_DATA_GB=null;
 async function loadProxy(force){
   if(!TOKEN) return;
   try{
     const r=await fetch(HUB_BASE+"/api/hub/proxy"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    PROXY_DATA=await r.json(); renderProxy(); if(typeof renderActions==="function") renderActions();
+    PROXY_DATA=await r.json();
   }catch(e){}
+  // Solde de data du forfait — appel séparé : s'il échoue, le panneau doit
+  // quand même afficher l'état des proxies (et inversement).
+  try{
+    const r2=await fetch(HUB_BASE+"/api/hub/proxy-data",{headers:{"x-hub-token":TOKEN}});
+    if(r2.ok) PROXY_DATA_GB=await r2.json();
+  }catch(e){}
+  renderProxy(); if(typeof renderActions==="function") renderActions();
 }
 function renderProxy(){
   const panel=$("#proxy"), body=$("#proxyBody"); if(!panel||!body) return;
@@ -6280,7 +6288,30 @@ function renderProxy(){
     : has4gMort
       ? `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent par le résidentiel. Le 4G (secours) est à sec, mais ce n'est pas bloquant.</div>`
       : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
-  body.innerHTML=items.map(ligne).join("")+alerte+
+  // Jauge de data restante (forfait prépayé au Go) : à zéro, plus de proxy et
+  // les vues se figent. L'opérateur doit pouvoir recharger AVANT la panne sèche.
+  let jauge="";
+  if(PROXY_DATA_GB && PROXY_DATA_GB.configured && PROXY_DATA_GB.gbTotal>0){
+    const g=PROXY_DATA_GB, reste=Number(g.gbRemaining)||0, tot=Number(g.gbTotal)||0;
+    const pct=Math.max(0,Math.min(100,Math.round(reste/tot*100)));
+    const coul = reste<=2 ? "#f87171" : (reste<=6 ? "#fbbf24" : "#4ade80");
+    const urgence = reste<=2
+      ? `<div class="sv-note" style="margin-top:6px;color:#f87171">🚨 <b>Recharge maintenant</b> — à zéro, tes vues Instagram se figent.</div>`
+      : (reste<=6 ? `<div class="sv-note" style="margin-top:6px;color:#fbbf24">⚠️ Pense à recharger bientôt.</div>` : "");
+    jauge=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <div style="display:flex;align-items:baseline;gap:8px;font-size:13px">
+        <span>⛽ Data proxy</span>
+        <b style="color:${coul};font-size:15px">${reste.toFixed(2)} Go</b>
+        <span style="color:var(--faint)">restants sur ${tot}</span>
+      </div>
+      <div style="margin-top:6px;height:8px;border-radius:99px;background:var(--line);overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${coul};border-radius:99px"></div>
+      </div>${urgence}
+      <div style="margin-top:6px"><a href="https://flameproxies.com/dashboard" target="_blank" rel="noopener"
+        style="font-size:12px;color:var(--acc-ink)">Recharger sur FlameProxies →</a></div>
+    </div>`;
+  }
+  body.innerHTML=items.map(ligne).join("")+alerte+jauge+
     `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${d.maj?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   try{ fixPairs(); }catch(e){}
   const rb=$("#proxyRefresh");
