@@ -1402,6 +1402,20 @@
   .cm-chip i{font-style:normal;color:var(--faint);font-size:10.5px}
   .cm-chip b{cursor:pointer;color:var(--faint);font-weight:600;padding:0 2px}
   .cm-chip b:hover{color:var(--down)}
+  /* note qui va bientôt expirer : visible AVANT que le coach ne l'oublie */
+  .cm-chip.cm-court{border-color:color-mix(in srgb,#facc15 45%,transparent);background:color-mix(in srgb,#facc15 10%,transparent)}
+  .cm-chip.cm-court i{color:#facc15;font-weight:700}
+  /* 🧹 bandeau de ménage des tâches dormantes */
+  .tk-menage{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;line-height:1.5;
+    margin:0 0 10px;padding:9px 12px;border-radius:10px;color:var(--text);
+    background:color-mix(in srgb,var(--acc) 9%,transparent);border:1px solid color-mix(in srgb,var(--acc) 30%,transparent)}
+  .tk-menage-btn{margin-left:auto;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
+    padding:6px 12px;border-radius:9px;border:1px solid var(--acc-line);background:var(--acc-bg);color:var(--acc)}
+  .tk-menage-btn:hover{background:var(--acc);color:#0a0a0a}
+  .cm-chip.cm-perm{border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+  .cm-chip.cm-perm i{color:var(--acc);font-weight:700}
+  .cm-chip b[data-cmprol]:hover,.cm-chip b[data-cmperm]:hover{color:var(--acc)}
+  #cmDur{font:inherit;font-size:12px;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;flex:0 0 auto}
   .cm-add{display:flex;gap:7px}
   .cm-add input{flex:1;min-width:0;font:inherit;font-size:12.5px;color:var(--text);background:var(--surface-2);
     border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none}
@@ -4279,6 +4293,13 @@ function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===
 const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaque jour",week:"chaque semaine",quinzaine:"chaque quinzaine"};
 function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && !x.del && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; x.upd=now; ch=true; } }); }); return ch; }
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
+// 🧹 Seuil du « ménage » des tâches dormantes — UNE SEULE définition, utilisée
+// par l'affichage du bandeau ET par le bouton : deux seuils séparés finiraient
+// par diverger (« 6 tâches » annoncées, 0 supprimée). Calé sur 21 jours après
+// mesure du parc réel : 11 tâches ouvertes, la plus vieille à 28 jours, 6
+// au-delà de 21 — un seuil à 30 jours n'aurait JAMAIS rien attrapé.
+const TK_DORT_J = 21;
+function tkDort(x){ return !!(x && !x.done && !x.del && x.ts && (Date.now()-x.ts > TK_DORT_J*24*3600*1000)); }
 function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 // La rangée compte maintenant 4 panneaux : avec un nombre IMPAIR de visibles, le
 // dernier restait orphelin en demi-largeur. On passe le dernier en pleine largeur
@@ -4442,7 +4463,16 @@ function renderTasks(){
   list.sort((a,b)=>((a.done?1:0)-(b.done?1:0)) || ((TK_PRIO_RANK[a.prio||"n"])-(TK_PRIO_RANK[b.prio||"n"])));
   const lateCount=items.filter(isLate).length;
   const lateSum=lateCount?`<div class="tk-latesum">⏰ ${lateCount} tâche${lateCount>1?"s":""} en retard (plus de 3 jours)</div>`:"";
-  $("#taskList").innerHTML = list.length ? (lateSum+list.map(x=>{
+  // 🧹 MÉNAGE. Une liste où presque tout est périmé, on arrête de la regarder :
+  // 17 tâches ouvertes de plus de 10 jours ont été mesurées en vrai. On propose
+  // de solder d'un coup TOUT ce qui dort depuis plus de 30 jours — au-delà, soit
+  // c'est fait, soit ce n'est plus d'actualité. Le bandeau n'apparaît qu'à
+  // partir de 3 dormantes, pour ne pas râler pour une seule.
+  const dormantes=items.filter(tkDort);
+  const menage=dormantes.length>=3
+    ? `<div class="tk-menage">🧹 <b>${dormantes.length} tâches</b> dorment depuis plus de ${TK_DORT_J} jours dans « ${escapeHtml(tkName(TK_VIEW))} ».<button class="tk-menage-btn" id="tkMenage">Faire le ménage</button></div>`
+    : "";
+  $("#taskList").innerHTML = list.length ? (menage+lateSum+list.map(x=>{
     const tags=(x.tags||[]).map(g=>`<span class="tk-tag">#${escapeHtml(g)}</span>`).join("");
     const opts=TK_KEYS.map(k=>`<option value="${k}" ${k===TK_VIEW?"selected":""}>${escapeHtml(tkName(k))}</option>`).join("");
     const late=isLate(x), days=late?Math.max(1,Math.floor((now-x.ts)/(24*3600*1000))):0;
@@ -4467,6 +4497,23 @@ renderRoutines();
   list.addEventListener("click",e=>{
     const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ if(it.repeat) it.doneTs=Date.now(); it.doneBy=(typeof WHO!=="undefined"?WHO:"moi"); it.doneAt=Date.now(); tkPop(); } else { it.doneTs=0; it.doneBy=""; it.doneAt=0; } it.upd=Date.now(); saveTasks(); renderTasks(); if(typeof renderDuo==="function") renderDuo(); } return; }
     const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
+    // 🧹 Ménage : solde d'un coup les tâches qui dorment depuis plus de 30 jours.
+    // Même mécanisme que le ✕ (tombstone `del` + `upd`), donc la suppression se
+    // propage aux autres appareils au lieu de revenir à la synchro suivante.
+    const mn=e.target.closest("#tkMenage");
+    if(mn){
+      const now2=Date.now();
+      const vieilles=(TASKS[TK_VIEW]||[]).filter(tkDort);   // MÊME critère que le bandeau
+      if(!vieilles.length) return;
+      if(!confirm("Supprimer "+vieilles.length+" tâche(s) qui dorment depuis plus de "+TK_DORT_J+" jours ?\n\n"
+        +vieilles.slice(0,6).map(x=>"• "+String(x.text||"").slice(0,60)).join("\n")
+        +(vieilles.length>6?"\n… et "+(vieilles.length-6)+" autre(s)":"")
+        +"\n\nElles n'ont jamais été cochées. Celles qui comptent encore, tu pourras les réécrire.")) return;
+      vieilles.forEach(x=>{ x.del=true; x.upd=now2; });
+      saveTasks(); renderTasks();
+      if(typeof toast==="function") toast("🧹 Ménage fait",vieilles.length+" tâche(s) dormante(s) retirée(s).");
+      return;
+    }
   });
   list.addEventListener("change",e=>{
     const mv=e.target.closest("[data-tkmove]"); if(mv){ const id=mv.getAttribute("data-tkmove"), to=mv.value; if(to!==TK_VIEW){ const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ TASKS[to].unshift({id:tkId(),text:it.text,tags:it.tags||[],prio:it.prio||"n",repeat:it.repeat||"",done:!!it.done,doneTs:it.doneTs||0,ts:it.ts||Date.now(),upd:Date.now()}); it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } } }
@@ -5527,20 +5574,46 @@ function renderCoachMem(){
   const z=$("#mnCoachMem"); if(!z) return;
   const notes=COACH_MEM||[];
   const jr=exp=>{ try{ const d=Math.round((new Date(exp+"T00:00:00Z")-new Date(new Date().toISOString().slice(0,10)+"T00:00:00Z"))/86400000); return d>0?d:0; }catch(e){ return "?"; } };
-  z.innerHTML=`<div class="cm-list">${notes.map(n=>`<span class="cm-chip" title="dit le ${escapeHtml(n.d||"?")} — le coach s'en souvient encore ${jr(n.exp)} j">🧠 ${escapeHtml(n.texte)} <i>${jr(n.exp)} j</i><b data-cmdel="${escapeHtml(n.id)}" title="Oublier">✕</b></span>`).join("")}</div>
-    <div class="cm-add"><input id="cmTxt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)"><button class="mn-act-btn" id="cmAdd">Retenir</button></div>`;
+  // ⏳ Une note SANS `exp` est permanente. Les autres affichent leur compte à
+  // rebours, et passent en ORANGE sous 3 jours avec un bouton « prolonger » :
+  // avant, une note expirait en silence et le coach se remettait à réclamer ce
+  // qu'André lui avait déjà répondu, sans qu'il comprenne pourquoi.
+  const puce=n=>{
+    if(!n.exp) return `<span class="cm-chip cm-perm" title="dit le ${escapeHtml(n.d||"?")} — retenu pour toujours">🧠 ${escapeHtml(n.texte)} <i>toujours</i><b data-cmdel="${escapeHtml(n.id)}" title="Oublier">✕</b></span>`;
+    const j=jr(n.exp), court=(typeof j==="number"&&j<=3);
+    return `<span class="cm-chip${court?" cm-court":""}" title="dit le ${escapeHtml(n.d||"?")} — le coach s'en souvient encore ${j} j">🧠 ${escapeHtml(n.texte)} <i>${j} j</i>`
+      +`<b data-cmprol="${escapeHtml(n.id)}" title="Prolonger de 30 jours">⏳</b>`
+      +`<b data-cmperm="${escapeHtml(n.id)}" title="Retenir pour toujours">📌</b>`
+      +`<b data-cmdel="${escapeHtml(n.id)}" title="Oublier">✕</b></span>`;
+  };
+  z.innerHTML=`<div class="cm-list">${notes.map(puce).join("")}</div>
+    <div class="cm-add"><input id="cmTxt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)">
+      <select id="cmDur" title="Combien de temps le coach doit s'en souvenir"><option value="7">7 jours</option><option value="30">1 mois</option><option value="0">Toujours</option></select>
+      <button class="mn-act-btn" id="cmAdd">Retenir</button></div>`;
   const envoyer=async()=>{
     const inp=$("#cmTxt"); const t=(inp&&inp.value||"").trim(); if(t.length<3||!TOKEN) return;
+    const jours=Number(($("#cmDur")||{}).value ?? 7);
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/coach-memoire",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:t})});
+      const r=await fetch(HUB_BASE+"/api/hub/coach-memoire",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:t,jours:jours})});
       const j=await r.json().catch(()=>({}));
-      if(r.ok&&j.ok){ if(typeof toast==="function") toast("🧠 Retenu 7 jours","Le coach en tiendra compte dès son prochain briefing."); COACH_MEM=null; loadCoachMem(); }
+      if(r.ok&&j.ok){ if(typeof toast==="function") toast(jours===0?"🧠 Retenu pour toujours":("🧠 Retenu "+jours+" jours"),"Le coach en tiendra compte dès son prochain briefing."); COACH_MEM=null; loadCoachMem(); }
     }catch(e){}
   };
   const b=$("#cmAdd"); if(b) b.onclick=envoyer;
   const i=$("#cmTxt"); if(i) i.addEventListener("keydown",e=>{ if(e.key==="Enter") envoyer(); });
   z.onclick=async e=>{
-    const d=e.target.closest("[data-cmdel]"); if(!d||!TOKEN) return;
+    if(!TOKEN) return;
+    // ⏳ Prolonger (30 j) ou rendre permanent, sans retaper la note.
+    const p=e.target.closest("[data-cmprol]"), pm=e.target.closest("[data-cmperm]");
+    if(p||pm){
+      const id=(p||pm).getAttribute(p?"data-cmprol":"data-cmperm");
+      try{
+        const r=await fetch(HUB_BASE+"/api/hub/coach-memoire/prolonger",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id,jours:p?30:0})});
+        if(r.ok){ COACH_MEM=null; loadCoachMem(); if(typeof toast==="function") toast(p?"⏳ Prolongé de 30 jours":"📌 Retenu pour toujours","Le coach continuera d'en tenir compte."); }
+      }catch(e2){}
+      return;
+    }
+    const d=e.target.closest("[data-cmdel]"); if(!d) return;
     try{
       await fetch(HUB_BASE+"/api/hub/coach-memoire?id="+encodeURIComponent(d.getAttribute("data-cmdel")),{method:"DELETE",headers:{"x-hub-token":TOKEN}});
       COACH_MEM=null; loadCoachMem();
