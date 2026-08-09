@@ -332,6 +332,13 @@
   .oc-solde b{color:var(--text)}
   .oc-solde.bas{color:#facc15;border-color:color-mix(in srgb,#facc15 45%,transparent);background:color-mix(in srgb,#facc15 10%,transparent)}
   .oc-solde.bas b{color:#facc15}
+  .oc-solde-j{color:var(--faint);font-size:11.5px}
+  .oc-solde-j.urgent{color:#f87171;font-weight:700}
+  /* 🗓️ historique des briefings */
+  .bh-item{padding:10px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--surface-2)}
+  .bh-d{font-size:12px;font-weight:700;color:var(--acc);margin-bottom:5px;text-transform:capitalize}
+  .bh-t{font-size:12.5px;line-height:1.55;color:var(--text);white-space:pre-wrap}
+  .bh-a{font-size:12px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
   .oc-today{font-size:12.5px;color:var(--muted);margin-top:4px}
   .oc-today b{color:var(--text);font-weight:700}
   .oc-stats{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0 6px}
@@ -2030,7 +2037,7 @@
       <div id="chargeBody"></div>
     </div>
     <div class="panel-box" id="paie" style="display:none">
-    <div class="pb-head">🧾 Fiche de paie (par quinzaine) <button class="act" id="paieCopy">📋 Copier</button></div>
+    <div class="pb-head">🧾 Fiche de paie (par quinzaine) <button class="act" id="paieCopy">📋 Copier</button><button class="act" id="paieCsv" title="Exporter l'historique des paiements pour la compta (fichier Excel)">📤 Excel</button></div>
     <div class="pb-sub">Vue par quinzaine 1-15 / 16-fin (calcul historique). Pour payer au plus juste, utilise plutôt <b>💸 Paie au cumul</b> ci-dessous — c'est celle qui colle à tes vrais versements.</div>
     <div id="paieBody"></div>
   </div>
@@ -2426,7 +2433,7 @@ const TOOLS = [
   // Alimentée dans render() depuis ONLYCHAT_DATA (comme la carte SMS depuis
   // SMS_DATA) — solde inconnu = « — », jamais un 0 inventé.
   { id:"onlychat-solde",   world:"noctra", cat:"Noctra", name:"Solde OnlyChat", icon:"💬", openUrl:"https://app.only-chat.ai", external:true,
-    metrics:[{k:"solde",l:"Balance",f:fmtMoney}] },
+    metrics:[{k:"solde",l:"Balance",f:fmtMoney},{k:"jours",l:"Autonomie",f:v=>"~"+v+" j"}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
@@ -2569,7 +2576,7 @@ function render(data){
   // 💳 Carte « Solde OnlyChat » — même mécanique que la carte SMS ci-dessus.
   // Sous le seuil réglé dans OnlyChat, la carte porte une note d'alerte.
   if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.solde!=null){
-    data["onlychat-solde"]={status:"online",metrics:{solde:ONLYCHAT_DATA.solde}};
+    data["onlychat-solde"]={status:"online",metrics:{solde:ONLYCHAT_DATA.solde,jours:ONLYCHAT_DATA.soldeJoursRestants}};
     const seuilOc=(ONLYCHAT_DATA.soldeSeuil!=null&&ONLYCHAT_DATA.soldeSeuil>0)?ONLYCHAT_DATA.soldeSeuil:50;
     if(Number(ONLYCHAT_DATA.solde)<seuilOc) data["onlychat-solde"].note="Solde bas — recharge avant que l'IA de vente s'arrête";
   } else {
@@ -3055,6 +3062,35 @@ async function loadOnlyChat(){
   // (chargements en parallèle) : on remplit/actualise sa bannière solde ici.
   try{ if(typeof majMornSolde==="function") majMornSolde(); }catch(e){}
 }
+// 🗓️ Relire les briefings passés — le serveur les garde déjà (setting
+// hub_brief_history, ~30 entrées, endpoint /api/hub/brief-history) : il ne
+// manquait qu'une fenêtre pour retrouver « ce que le coach m'a dit mardi ».
+async function openBriefHistory(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🗓️ Tes briefings passés</h3>
+    <div class="ppick-sub">Ce que le coach t'a dit chaque jour (matin ☀️ / soir 🌙), du plus récent au plus ancien.</div>
+    <div id="briefHistBody" style="max-height:56vh;overflow-y:auto;margin:8px 0"><div class="tg-empty">Chargement…</div></div>
+    <button class="ppick-close">Fermer</button></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
+  document.body.appendChild(ov);
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/brief-history",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const hist=((await r.json()).history||[]).filter(h=>h&&h.text);
+    const zone=ov.querySelector("#briefHistBody"); if(!zone) return;
+    if(!hist.length){ zone.innerHTML=`<div class="tg-empty">Pas encore de briefing enregistré.</div>`; return; }
+    hist.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    zone.innerHTML=hist.slice(0,30).map(h=>{
+      const d=h.date?new Date(h.date+"T12:00:00Z").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}):"?";
+      const ic=(h.mode==="evening"||h.mode==="soir")?"🌙":"☀️";
+      return `<div class="bh-item"><div class="bh-d">${ic} ${escapeHtml(d)}</div><div class="bh-t">${escapeHtml(h.text)}</div>${h.action?`<div class="bh-a">🎯 ${escapeHtml(h.action)}</div>`:""}</div>`;
+    }).join("");
+  }catch(e){
+    const zone=ov.querySelector("#briefHistBody");
+    if(zone) zone.innerHTML=`<div class="tg-empty">Impossible de charger l'historique — réessaie dans une minute.</div>`;
+  }
+}
 // 💳 Bannière « il te reste peu d'argent sur OnlyChat » de l'écran du matin
 // (demande explicite d'André : « quand j'arrive le matin, écrit en alerte,
 // avec le montant »). Seuil du matin = 100 $ (plus prudent que les 50 $
@@ -3219,8 +3255,12 @@ function renderOnlyChat(){
   // (null) = « je sais pas » → on n'affiche RIEN, jamais un 0 inventé.
   const seuilSolde=(d.soldeSeuil!=null&&d.soldeSeuil>0)?d.soldeSeuil:50;
   const soldeBas=(d.solde!=null&&Number(d.solde)<seuilSolde);
+  // « ~X j » = au rythme réel de consommation des 7 derniers jours (calculé
+  // par le cerveau sur les transactions). Absent si inconnu — jamais inventé.
+  const jrs=d.soldeJoursRestants;
+  const jrsTxt=(jrs!=null)?` <span class="oc-solde-j${jrs<=7?" urgent":""}" title="Au rythme actuel (~${d.soldeConsoJour!=null?tgMoney(d.soldeConsoJour):"?"}/jour de commissions)">· ~${jrs} j</span>`:"";
   const soldeLigne=(d.solde!=null)
-    ? `<div class="oc-solde${soldeBas?" bas":""}" title="Solde prépayé qui finance l'IA de vente — à zéro elle s'arrête (seuil d'alerte : ${seuilSolde} $)">💳 Solde : <b>${tgMoney(d.solde)}</b>${soldeBas?" ⚠️ recharge bientôt":""}</div>`
+    ? `<div class="oc-solde${soldeBas?" bas":""}" title="Solde prépayé qui finance l'IA de vente — à zéro elle s'arrête (seuil d'alerte : ${seuilSolde} $)">💳 Solde : <b>${tgMoney(d.solde)}</b>${jrsTxt}${soldeBas?" ⚠️ recharge bientôt":""}</div>`
     : "";
   $("#onlychatBody").innerHTML = `
     <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
@@ -3645,6 +3685,35 @@ $("#paieCopy").onclick = ()=>{
   // Texte destiné à être COLLÉ (à un VA, dans un message) → jamais masqué.
   const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
+};
+// 📤 Export compta : l'HISTORIQUE des paiements versés (PAYMENTS, la même
+// source que « Historique de paie » juste en dessous) en CSV lisible par
+// Excel FR : BOM UTF-8 (sinon les accents cassent) + point-virgule (l'Excel
+// français ignore les virgules) + montants à virgule décimale. Montants
+// TOUJOURS en clair : un export comptable masqué ne sert à rien.
+$("#paieCsv").onclick = ()=>{
+  const liste=(typeof PAYMENTS!=="undefined"&&Array.isArray(PAYMENTS))?PAYMENTS.slice():[];
+  if(!liste.length){ if(typeof toast==="function") toast("📤 Rien à exporter","Aucun paiement enregistré pour l'instant."); return; }
+  liste.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const lignes=[["Date","VA","Montant ($)","Quinzaine"].map(esc).join(";")];
+  liste.forEach(p=>{
+    lignes.push([
+      p.ts?new Date(p.ts).toLocaleDateString("fr-FR"):"",
+      p.va||"",
+      String(Math.round((Number(p.amount)||0)*100)/100).replace(".",","),
+      p.period||""
+    ].map(esc).join(";"));
+  });
+  const total=liste.reduce((a,p)=>a+(Number(p.amount)||0),0);
+  lignes.push(["","TOTAL",String(Math.round(total*100)/100).replace(".",","),""].map(esc).join(";"));
+  const blob=new Blob(["﻿"+lignes.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="paiements-noctra-"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  if(typeof toast==="function") toast("📤 Export prêt",liste.length+" paiement(s) — ouvre le fichier dans Excel ou Numbers.");
 };
 
 /* ---------- 💸 paie au cumul (repère exact, la source de vérité pour payer) ----------
@@ -5584,7 +5653,7 @@ function renderMorning(){
         ${ajSplit}
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
     })()}</div>
-    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div id="mnSolde"></div><div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
+    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div id="mnSolde"></div><div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button><button class="mn-coach-play" id="mnCoachHist" title="Relire les briefings des jours passés">🗓️</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
@@ -5609,6 +5678,7 @@ function renderMorning(){
   applyExpress();
   majMornSolde();
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
+  { const ch=$("#mnCoachHist"); if(ch) ch.onclick=openBriefHistory; }
   const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
   renderCoachAction();   // le modal vient d'être reconstruit : on repeint l'action du jour
 }
@@ -8559,7 +8629,11 @@ function refreshSecnav(){
       const n=items.filter(([id])=>secnavVisible(id)).length;
       const alert=CAT_ALERTS[label]&&CAT_ALERTS[label]();
       return `<span class="sec-chip" data-secnav-cat="${escapeHtml(label)}">${alert?`<span class="sec-chip-alert" title="Ça mérite un coup d'œil">●</span>`:""}${label} <span class="sec-chip-n">${n}</span></span>`;
-    }).join("");
+    }).join("")
+    // ⌃/⌄ replie ou déplie les 8 catégories d'un geste : une fois la page
+    // entière déroulée, la seule façon de la « refermer » était de replier
+    // les catégories UNE PAR UNE (8 taps) ou de recharger.
+    +`<span class="sec-chip sec-chip-all" data-secnav-fold="1">${catCollapsedSet().size>=cats.length&&cats.length?"⌄ Tout déplier":"⌃ Tout replier"}</span>`;
   if(nav.innerHTML!==html) nav.innerHTML=html;
   highlightActiveCat(ACTIVE_CAT_LABEL);
 }
@@ -8633,6 +8707,16 @@ function openSectionNav(scrollToCat){
 }
 $("#secnav").addEventListener("click",e=>{
   const all=e.target.closest("[data-secnav-all]"); if(all){ openSectionNav(); return; }
+  // ⌃/⌄ tout replier / tout déplier (bascule selon l'état courant)
+  const fold=e.target.closest("[data-secnav-fold]");
+  if(fold){
+    const nb=SECNAV_CATS.length;
+    const tousReplies=catCollapsedSet().size>=nb;
+    localStorage.setItem("ccn_cat_collapsed", tousReplies?"[]":JSON.stringify([...Array(nb).keys()]));
+    appliqueCategories(); refreshSecnav();
+    if(typeof toast==="function") toast(tousReplies?"⌄ Tout déplié":"⌃ Tout replié", tousReplies?"":"Tape un titre de catégorie (ou une puce) pour rouvrir ce qu'il te faut.");
+    return;
+  }
   const cat=e.target.closest("[data-secnav-cat]"); if(cat){ const lbl=cat.getAttribute("data-secnav-cat"); setLastCatKey(lbl); openSectionNav(lbl); return; }
 });
 refreshSecnav();
