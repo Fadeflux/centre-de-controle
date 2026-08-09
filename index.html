@@ -1711,6 +1711,7 @@
 <div class="top-actions">
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
+      <button class="btn" id="pushtest" title="Tester mes alertes (envoie une vraie notification)" style="display:none">📳</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
       <button class="btn" id="eve" title="Coach du soir">🌙</button>
       <button class="btn" id="widget" title="Widget iPhone">📱</button>
@@ -5170,6 +5171,27 @@ async function enablePush(){
   }catch(e){ btn.textContent="🔔 Erreur"; }
 }
 $("#push").onclick=enablePush;
+// 📳 TEST DE BOUT EN BOUT : envoie une VRAIE notification par le même canal que
+// les alertes serveur (SMS bas, proxy mort…). Vu dans le journal : ces alertes
+// partaient (06/08, 09/08) mais rien ne prouvait qu'un téléphone les recevait —
+// un abonnement push expire en silence. Ici, verdict immédiat et honnête.
+if(("PushManager" in window) && ("Notification" in window)){ const b=$("#pushtest"); if(b) b.style.display="inline-flex"; }
+async function testPush(){
+  const btn=$("#pushtest");
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  if(btn){ btn.disabled=true; btn.textContent="⏳"; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/push-test",{method:"POST",headers:{"x-hub-token":TOKEN}});
+    const j=await r.json().catch(()=>({}));
+    const b=(j&&j.bilan)||{};
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    if(!b.abonnes){ if(typeof toast==="function") toast("📳 Aucun appareil abonné","Active d'abord 🔔 Alertes (menu ⚙️) sur le téléphone qui doit recevoir les notifs."+(b.raison?" ("+b.raison+")":"")); }
+    else if(b.envoyes>0){ if(typeof toast==="function") toast("📳 Notification envoyée à "+b.envoyes+" appareil"+(b.envoyes>1?"s":""),"Tu dois la voir MAINTENANT. Rien reçu sur ce téléphone ? Réactive 🔔 Alertes dessus."+(b.morts?" ("+b.morts+" abonnement mort nettoyé)":"")); }
+    else { if(typeof toast==="function") toast("📳 Envoi impossible",(b.raison||"abonnements expirés")+" — réactive 🔔 Alertes."); }
+  }catch(e){ if(typeof toast==="function") toast("📳 Test impossible","Le cerveau n'a pas répondu — réessaie dans une minute."); }
+  if(btn){ btn.disabled=false; btn.textContent="📳"; }
+}
+{ const b=$("#pushtest"); if(b) b.onclick=testPush; }
 
 /* ---------- carte du jour à partager (image) ---------- */
 function roundRect(ctx,X,Y,W,H,R){ ctx.beginPath(); ctx.moveTo(X+R,Y); ctx.arcTo(X+W,Y,X+W,Y+H,R); ctx.arcTo(X+W,Y+H,X,Y+H,R); ctx.arcTo(X,Y+H,X,Y,R); ctx.arcTo(X,Y,X+W,Y,R); ctx.closePath(); }
@@ -6824,6 +6846,17 @@ function buildActions(){
   if(typeof revKo==="function" && revKo()) push(3,"🔌","Revenus illisibles — vérifie OnlyMonster","om",{kind:"reload",label:"🔄 Recharger"});
   const pd=(typeof PROXY_DATA!=="undefined")?PROXY_DATA:null;
   if(pd && pd.critique) push(3,"🛰️","Proxy résidentiel mort — ton scraping de vues est figé","proxy",{kind:"retest",label:"🔄 Re-tester"});
+  // 📱 Solde SMS bas : le serveur pousse déjà une notif (hubSante, seuil
+  // SMS_SOLDE_SEUIL=10), mais la file d'actions du site l'ignorait — on voyait
+  // « 51 $ / 7 $ » sur la carte sans que rien ne dise que 7 $, c'est le seuil
+  // critique. Même seuil que le serveur pour raconter la même histoire.
+  const SMS_SEUIL=10;
+  if(typeof SMS_DATA!=="undefined"&&SMS_DATA){
+    [["diddysms","DiddySMS"],["getatext","Getatext"]].forEach(([k,nom])=>{
+      const solde=SMS_DATA[k]&&SMS_DATA[k].balance;
+      if(solde!=null&&Number(solde)<SMS_SEUIL) push(2,"📱",`Solde ${nom} bas : ${eur(solde)} — recharge avant que les codes IG ne passent plus`,"sections");
+    });
+  }
   if(typeof LEAKS!=="undefined" && Array.isArray(LEAKS)){
     const nouv=LEAKS.filter(l=>l&&(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l&&l.status==="repost").length;
     if(nouv) push(2,"🚨",`${nouv} fuite${nouv>1?"s":""} à traiter (DMCA)`,"antileak");
@@ -7787,7 +7820,7 @@ function toggleConvo(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix"].forEach(id=>{
+    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row"; row.setAttribute("data-for", id);
