@@ -1169,6 +1169,32 @@
     .pair-row > .panel-box > div:last-child{flex:1;display:flex;flex-direction:column;justify-content:center}
     .pair-row > .panel-box > .pb-head{flex:0 0 auto}
   }
+  /* 🧱 MAÇONNERIE (signalé par André, captures à l'appui : « corrige le vide »).
+     Les rangées à 2 colonnes créaient de GRANDS TROUS : deux panneaux appariés
+     n'ont presque jamais la même hauteur. `stretch` étirait le court (bandes
+     vides DANS la carte, corrigé par le « compactage » en align-items:start),
+     et `start` laissait le trou SOUS la carte courte — les deux réglages ne
+     faisaient que déplacer le vide. Ici, chaque catégorie devient 2 colonnes
+     ÉQUILIBRÉES (CSS columns) : les panneaux gardent leur hauteur naturelle et
+     s'empilent sans trou ; `display:contents` fait des .pair-row de simples
+     passe-plats, donc AUCUN changement de DOM (réorganiser/masquer/replier
+     continuent de marcher pareil). Les blocs LARGES (#om avec le classement
+     VA, #sections le catalogue d'outils) gardent toute la largeur via
+     column-span. Mobile (<860px) : inchangé, une seule colonne. */
+  @media (min-width:860px){
+    #home .cat-body{columns:2;column-gap:14px}
+    #home .cat-body>.pair-row{display:contents}
+    #home .cat-body>*,#home .cat-body>.pair-row>*{break-inside:avoid;margin:0 0 14px}
+    /* plus d'étirement ni de centrage : hauteur naturelle en colonnes */
+    #home .cat-body>.pair-row>.panel-box{display:block}
+    #home .cat-body>#om,#home .cat-body>.pair-row>#om,
+    #home .cat-body>#onlychat,#home .cat-body>.pair-row>#onlychat,
+    #home .cat-body>#sections,#home .cat-body>.pair-row>#sections{column-span:all}
+    /* ⚠️ 1 ou 2 panneaux visibles : deux colonnes garantissent un trou (les
+       hauteurs ne matchent jamais). La classe .cat-mono (posée par
+       appliqueCategories) repasse la catégorie en pleine largeur. */
+    #home .cat-body.cat-mono{columns:1}
+  }
   .pie-total{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px;padding-bottom:10px;border-bottom:.5px solid var(--line)}
   .pie-total b{color:var(--text);font-size:18px;font-weight:800}
   .pie-note{font-size:11px;color:var(--muted);margin-top:10px}
@@ -4360,10 +4386,15 @@ function appliqueCategories(){
     const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
     if(!h) return;
     if(!b){ h.style.display="none"; return; }
-    const plein=catContenuVisible(idx), replie=replies.has(idx);
-    h.style.display = plein ? "" : "none";
+    const enfants=[...b.querySelectorAll("[id]")].filter(e=>e.parentElement===b || (e.parentElement.classList&&e.parentElement.classList.contains("pair-row")));
+    const visibles=enfants.filter(p=>secnavVisible(p.id)).length;
+    const replie=replies.has(idx);
+    h.style.display = visibles ? "" : "none";
     h.classList.toggle("cat-collapsed", replie);
-    b.style.display = (!plein || replie) ? "none" : "";
+    b.style.display = (!visibles || replie) ? "none" : "";
+    // 🧱 1-2 panneaux visibles : la maçonnerie 2 colonnes garantirait un trou
+    // (mesuré : 720 px de vide sur Telegram avec 2 panneaux) → pleine largeur.
+    b.classList.toggle("cat-mono", visibles<=2);
   });
 }
 function refreshSecHeads(){ appliqueCategories(); }
