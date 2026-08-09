@@ -610,7 +610,7 @@
   /* 🎯 Écran d'accueil + file d'actions */
   .essentiel{margin:0 0 20px}
   .ess-hero{background:linear-gradient(135deg,var(--surface),var(--bg));border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:12px}
-  .ess-greet{font-size:15px;font-weight:700;margin-bottom:12px}
+  .ess-greet{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .ess-date{font-weight:500;color:var(--muted);font-size:13px}
   .ess-figs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .ess-fig{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
@@ -1167,6 +1167,14 @@
   .fr-va{font-size:11px;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:6px;padding:1px 7px;white-space:nowrap}
   .fr-total{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
   .fr-days{font-size:11px;color:var(--down);font-weight:600;white-space:nowrap;min-width:56px;text-align:right}
+  .fr-msg{font:inherit;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted)}
+  .fr-msg:hover{color:var(--acc);border-color:var(--acc-line)}
+  /* 🎛️ tuiles de l'accueil au choix */
+  .ess-cfg{font:inherit;font-size:12px;cursor:pointer;margin-left:auto;padding:2px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--faint)}
+  .ess-cfg:hover{color:var(--acc);border-color:var(--acc-line)}
+  .ess-cfg-apercu{margin-left:auto;font-size:11.5px;color:var(--faint)}
+  /* 📁 « Ranger dans… » du sélecteur de panneaux */
+  .pp-cat{font:inherit;font-size:11.5px;margin-left:auto;max-width:150px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--muted);outline:none}
   .fr-empty{font-size:13px;color:var(--muted);padding:6px 0}
   .pair-row{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0 0}
   .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
@@ -4907,10 +4915,33 @@ function renderFanRadar(){
     ${f.va?`<span class="fr-va">👤 ${escapeHtml(f.va)}</span>`:""}
     <span class="fr-total">${HIDE?"•••":Math.round(f.total).toLocaleString("fr-FR")+" "+cur}</span>
     <span class="fr-days">${f.days} j 💤</span>
+    <button class="fr-msg" data-frmsg="${escapeHtml(f.id)}" data-frdays="${Number(f.days)||0}" title="Copier un message de relance prêt à coller (côté modèle, en anglais)">📋</button>
   </div>`).join("");
-  $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené).</div>${rows}`;
+  $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené). 📋 = message prêt à coller.</div>${rows}`;
   if(typeof fixPairs==="function") fixPairs();
 }
+// 📋 Message de relance PRÊT À COLLER, écrit côté MODÈLE, en ANGLAIS (les fans
+// sont US). Les pseudos sont anonymisés dans nos données (« Fan #42433 ») donc
+// pas de prénom — les messages OnlyFans n'en ont pas besoin. 3 tons différents
+// choisis par l'id du fan (STABLE : re-copier redonne le même, pas de loterie),
+// pour que deux fans relancés le même jour ne reçoivent pas le même texte.
+function frMessagePour(id,jours){
+  const t=[
+    `Heyy stranger 👀 it's been a while and I actually noticed... I've been posting some of my favorite stuff lately and kept thinking you'd love it. Come say hi? 💕`,
+    `Okay I have to ask... did I do something? 🥺 You disappeared on me! I miss our chats. I saved something special and you're one of the few I actually want to show it to 🙈`,
+    `You crossed my mind today 💭 I don't usually chase but you're not just anyone here... I have new content I'm really proud of — want a peek? 😘`,
+  ];
+  let h=0; const s=String(id||""); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return t[h%t.length];
+}
+{ const fb=$("#fanradarBody"); if(fb) fb.addEventListener("click",e=>{
+  const b=e.target.closest("[data-frmsg]"); if(!b) return;
+  const msg=frMessagePour(b.getAttribute("data-frmsg"),Number(b.getAttribute("data-frdays"))||0);
+  (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.reject()).then(()=>{
+    b.textContent="✓"; setTimeout(()=>{ b.textContent="📋"; },1500);
+    if(typeof toast==="function") toast("📋 Message copié","Colle-le dans la conversation OnlyFans de ce fan (retrouve-le par son montant/modèle dans OnlyMonster).");
+  }).catch(()=>{ if(typeof toast==="function") toast("📋 Copie impossible","Ton navigateur a bloqué le presse-papier — réessaie."); });
+}); }
 // ---------- VA fantômes (rien produit depuis longtemps) ----------
 let GHOSTS=null;
 async function loadGhosts(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/ghosts",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); GHOSTS=j.data||null; renderGhosts(); if(typeof renderActions==="function") renderActions(); if(!GHOSTS && (retry||0)<2) setTimeout(()=>loadGhosts((retry||0)+1),9000); } }catch(e){} }
@@ -7193,31 +7224,69 @@ function renderActions(){
   LAST_ACTIONS=A;
   box.innerHTML=A.map((a,i)=>`<div class="act-wrap"><button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>${a.quick?`<button class="act-quick" data-qk="${i}">${a.quick.label}</button>`:""}</div>`).join("");
 }
-function renderEssentiel(){
-  const wrap=$("#essentiel"), hero=$("#essHero"); if(!wrap||!hero) return;
-  if(!TOKEN){ wrap.style.display="none"; return; }
+// 🎛️ TUILES DE L'ESSENTIEL AU CHOIX. Le catalogue ci-dessous liste tout ce
+// qu'on SAIT afficher ; André coche celles qu'il veut (✎, 2 à 4) et l'ordre
+// du catalogue fait l'ordre d'affichage. Chaque valeur respecte les règles de
+// la maison : « absent ≠ 0 » (— si la source est muette) et le mode discret.
+function essTuilesCatalogue(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
   const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
   const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
-  const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
-  // 📲 + revenus Telegram (saisis à la main) — sinon le chiffre-phare de
-  // l'accueil ne bougeait jamais avec Telegram.
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
-  // moneyPrecis (2 décimales) : la somme OF (arrondi × 0,78) + Telegram (exact)
-  // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
-  const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$");   // absent ≠ 0
-  const subsAuj=(tot.subsDay!=null)?String(tot.subsDay):"—";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
-  const apres=(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—";
-  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(OM_FETCHED_AT)}</div>`
+  const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
+  const oc=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)||null;
+  return [
+    // moneyPrecis (2 décimales) : la somme OF (arrondi × 0,78) + Telegram (exact)
+    // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
+    {k:"netmois", l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
+    {k:"subsauj", l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
+    {k:"apres",   l:"Après la paie",      v:(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—"},
+    {k:"tg",      l:"Telegram ce mois",   v:(oc&&oc.totalRevenue!=null)?tgMoney(oc.totalRevenue):(tgM>0?tgMoney(tgM):"—")},
+    {k:"ocsolde", l:"Solde OnlyChat",     v:(oc&&oc.solde!=null)?(tgMoney(oc.solde)+(oc.soldeJoursRestants!=null?" · ~"+oc.soldeJoursRestants+" j":"")):"—"},
+    {k:"apayer",  l:"À payer (quinzaine)",v:(st.aPayer!=null)?money(st.aPayer):"—"},
+    {k:"subsq",   l:"Subs quinzaine",     v:(st.subsQuinzaine!=null)?String(st.subsQuinzaine):"—"},
+  ];
+}
+const ESS_TUILES_DEFAUT=["netmois","subsauj","apres"];
+function essTuilesChoisies(){
+  const v=lsJSON("ccn_ess_tiles",null);
+  return (Array.isArray(v)&&v.length>=2&&v.length<=4)?v:ESS_TUILES_DEFAUT;
+}
+function renderEssentiel(){
+  const wrap=$("#essentiel"), hero=$("#essHero"); if(!wrap||!hero) return;
+  if(!TOKEN){ wrap.style.display="none"; return; }
+  const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+  const cat=essTuilesCatalogue(), choix=essTuilesChoisies();
+  const tuiles=cat.filter(t=>choix.includes(t.k));
+  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(OM_FETCHED_AT)}<button class="ess-cfg" id="essCfg" title="Choisir les chiffres affichés ici">✎</button></div>`
     +`<div class="ess-figs">`
-    +`<div class="ess-fig"><div class="ess-fl">Net du mois (est.)</div><div class="ess-fv">${netMois}</div></div>`
-    +`<div class="ess-fig"><div class="ess-fl">Subs aujourd'hui</div><div class="ess-fv">${subsAuj}</div></div>`
-    +`<div class="ess-fig"><div class="ess-fl">Après la paie</div><div class="ess-fv">${apres}</div></div>`
+    +tuiles.map(t=>`<div class="ess-fig"><div class="ess-fl">${t.l}</div><div class="ess-fv">${t.v}</div></div>`).join("")
     +`</div>`;
+  { const b=$("#essCfg"); if(b) b.onclick=openEssCfg; }
   wrap.style.display="block";
+}
+// ✎ Choix des tuiles — 2 minimum (sinon l'accueil ne dit plus rien),
+// 4 maximum (au-delà ça déborde sur téléphone).
+function openEssCfg(){
+  const ov=document.createElement("div"); ov.className="ppick";
+  const choix=new Set(essTuilesChoisies());
+  ov.innerHTML=`<div class="ppick-box"><h3>🎛️ Les chiffres de ton accueil</h3>
+    <div class="ppick-sub">Coche 2 à 4 chiffres — ce sont eux que tu verras en premier chaque matin.</div>
+    ${essTuilesCatalogue().map(t=>`<label class="ppick-row"><input type="checkbox" data-esst="${t.k}" ${choix.has(t.k)?"checked":""}> ${escapeHtml(t.l)} <span class="ess-cfg-apercu">${t.v}</span></label>`).join("")}
+    <button class="ppick-close">Fermer</button></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
+  ov.addEventListener("change",e=>{
+    const cb=e.target.closest("[data-esst]"); if(!cb) return;
+    const s=new Set(essTuilesChoisies());
+    if(cb.checked){ if(s.size>=4){ cb.checked=false; if(typeof toast==="function") toast("🎛️ 4 maximum","Décoche un chiffre avant d'en ajouter un autre."); return; } s.add(cb.getAttribute("data-esst")); }
+    else { if(s.size<=2){ cb.checked=true; if(typeof toast==="function") toast("🎛️ 2 minimum","Garde au moins deux chiffres sur ton accueil."); return; } s.delete(cb.getAttribute("data-esst")); }
+    localStorage.setItem("ccn_ess_tiles",JSON.stringify(essTuilesCatalogue().map(t=>t.k).filter(k=>s.has(k))));
+    renderEssentiel();
+  });
+  document.body.appendChild(ov);
 }
 // 🕒 #9 FRAÎCHEUR : « est-ce que je regarde du frais ? » Vert < 10 min, orange
 // < 1 h, rouge au-delà (chiffres peut-être périmés).
@@ -8581,6 +8650,51 @@ const SECNAV_CATS=[
   ["🏆 Motivation & suivi perso",[["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["streak","🔥 Ta série"],["tip","💡 Conseil du jour"],["notepad","📝 Bloc-notes"],["duo","🤝 Qui fait quoi"],["ask","🤖 Demande à tes chiffres"]]],
   ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"]]],
 ];
+// 📁 « RANGER DANS… » : André choisit lui-même la catégorie de chaque panneau
+// (menu 📁 dans ⚙️ → 🧩). Une seule vérité : SECNAV_CATS est REPATCHÉE puis le
+// DOM est RÉCONCILIÉ dessus — nav, tiroir, compteurs, en-têtes et page disent
+// donc toujours la même chose. Rangements dans ccn_rangements {id: catIdx}.
+const SECNAV_CATS_DEFAUT = SECNAV_CATS.map(([l,items])=>[l,items.map(x=>x.slice())]);
+// ⚠️ Ces panneaux vivent dans la colonne latérale (déplacés au boot) — les
+// ranger dans une catégorie les arracherait de la sidebar : pas de menu 📁.
+const RANGEMENT_EXCLUS = new Set(["journal","tasks","clock","goal","dates","cal"]);
+function rangements(){ const v=lsJSON("ccn_rangements",{}); return (v&&typeof v==="object"&&!Array.isArray(v))?v:{}; }
+function catActuelleDe(id){
+  for(let i=0;i<SECNAV_CATS.length;i++) if(SECNAV_CATS[i][1].some(x=>x[0]===id)) return i;
+  return -1;
+}
+function appliquerRangements(){
+  const rg=rangements();
+  // 1) table : repartir du défaut puis déplacer les entrées rangées ailleurs.
+  SECNAV_CATS.forEach((c,i)=>{ c[1]=SECNAV_CATS_DEFAUT[i][1].map(x=>x.slice()); });
+  Object.keys(rg).forEach(id=>{
+    const cible=Number(rg[id]);
+    if(isNaN(cible)||cible<0||cible>=SECNAV_CATS.length||RANGEMENT_EXCLUS.has(id)) return;
+    const src=catActuelleDe(id); if(src<0||src===cible) return;
+    const idx=SECNAV_CATS[src][1].findIndex(x=>x[0]===id);
+    const entree=SECNAV_CATS[src][1].splice(idx,1)[0];
+    SECNAV_CATS[cible][1].push(entree);
+  });
+  // 2) DOM : chaque panneau listé doit être dans le catBody que la table
+  //    annonce. Réconciliation idempotente ; on ne touche JAMAIS un panneau
+  //    hors des catégories (sidebar…) sauf s'il est explicitement rangé.
+  SECNAV_CATS.forEach(([,items],i)=>{
+    const corps=document.getElementById("catBody"+i); if(!corps) return;
+    items.forEach(([id])=>{
+      if(RANGEMENT_EXCLUS.has(id)) return;
+      const el=document.getElementById(id); if(!el) return;
+      const dedans=el.closest(".cat-body");
+      if(dedans===corps) return;
+      if(!dedans && !(id in rg)) return;   // pas dans une catégorie (sidebar…) et pas rangé → on laisse
+      corps.appendChild(el);
+    });
+  });
+  // 3) rangées appariées devenues vides → on les retire (rangée fantôme sinon).
+  document.querySelectorAll("#home .pair-row").forEach(r=>{ if(!r.children.length) r.remove(); });
+  try{ appliqueCategories(); }catch(e){}
+  try{ fixPairs(); }catch(e){}
+  try{ refreshSecnav(); }catch(e){}
+}
 function secnavVisible(id){ const el=document.getElementById(id); return el && !el.classList.contains("user-hidden") && getComputedStyle(el).display!=="none"; }
 // 🔔 Signaux "à surveiller" par catégorie (point rouge sur le chip). Un sous-
 // ensemble VOLONTAIREMENT restreint : seulement des cas où j'ai vérifié le
@@ -8752,18 +8866,44 @@ function groupedPanneaux(){
   return groups;
 }
 function openPanelPicker(){
-  const h=hiddenSet();
   const ov=document.createElement("div"); ov.className="ppick";
-  ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
-    <div class="ppick-sub">Décoche ce que tu ne regardes jamais : la page devient plus courte. Tu peux tout remettre ici quand tu veux.</div>
-    ${groupedPanneaux().map(([label,rows])=>`<div class="secnav-cat"><div class="secnav-cat-h">${label}</div>${rows.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl}</label>`).join("")}</div>`).join("")}
-    <button class="ppick-close">Fermer</button></div>`;
+  // 📁 chaque rangée porte aussi un menu « Ranger dans… » (sauf les panneaux
+  // de la colonne latérale). Le contenu est REPEINT après chaque rangement
+  // pour que la rangée déménage sous son nouveau titre, sous tes yeux.
+  const peindre=()=>{
+    const h=hiddenSet();
+    const catsOpts=id=>{
+      if(RANGEMENT_EXCLUS.has(id)) return "";
+      const cur=catActuelleDe(id);
+      return `<select class="pp-cat" data-ppcat="${id}" title="Ranger ce panneau dans…">${SECNAV_CATS.map(([l],i)=>`<option value="${i}" ${i===cur?"selected":""}>${escapeHtml(l)}</option>`).join("")}</select>`;
+    };
+    ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
+      <div class="ppick-sub">Décoche ce que tu ne regardes jamais. Le menu 📁 range un panneau dans la catégorie de TON choix (mémorisé sur cet appareil).</div>
+      ${groupedPanneaux().map(([label,rows])=>`<div class="secnav-cat"><div class="secnav-cat-h">${label}</div>${rows.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl} ${catsOpts(id)}</label>`).join("")}</div>`).join("")}
+      <button class="ppick-close">Fermer</button></div>`;
+  };
+  peindre();
   ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
   ov.addEventListener("change",e=>{
-    const cb=e.target.closest("[data-pp]"); if(!cb) return;
-    const s=hiddenSet(); cb.checked?s.delete(cb.getAttribute("data-pp")):s.add(cb.getAttribute("data-pp"));
-    localStorage.setItem("ccn_hidden_panels", JSON.stringify([...s]));
-    applyHiddenPanels();
+    const cb=e.target.closest("[data-pp]");
+    if(cb){
+      const s=hiddenSet(); cb.checked?s.delete(cb.getAttribute("data-pp")):s.add(cb.getAttribute("data-pp"));
+      localStorage.setItem("ccn_hidden_panels", JSON.stringify([...s]));
+      applyHiddenPanels();
+      return;
+    }
+    const sel=e.target.closest("[data-ppcat]");
+    if(sel){
+      const id=sel.getAttribute("data-ppcat"), cible=Number(sel.value);
+      const rg=rangements();
+      // choisir la catégorie PAR DÉFAUT du panneau = retirer le rangement.
+      const defaut=(()=>{ for(let i=0;i<SECNAV_CATS_DEFAUT.length;i++) if(SECNAV_CATS_DEFAUT[i][1].some(x=>x[0]===id)) return i; return -1; })();
+      if(cible===defaut) delete rg[id]; else rg[id]=cible;
+      localStorage.setItem("ccn_rangements",JSON.stringify(rg));
+      appliquerRangements();
+      peindre();
+      if(typeof toast==="function") toast("📁 Rangé",`Le panneau vit maintenant dans « ${SECNAV_CATS[cible][0]} ».`);
+    }
   });
   document.body.appendChild(ov);
 }
@@ -8862,6 +9002,9 @@ if(localStorage.getItem("ccn_accueil")!=="0"){
   { const w=document.getElementById("toutVoirWrap"); if(w) w.style.display="block"; }
 }
 { const b=document.getElementById("toutVoirBtn"); if(b) b.onclick=toutVoir; }
+// 📁 Applique les rangements choisis par André (APRÈS le déménagement sidebar,
+// AVANT l'ordre manuel — l'ordre s'applique dans le conteneur final).
+try{ appliquerRangements(); }catch(e){ console.error("rangements:",e); }
 applyOrder();
 refreshSecHeads();
 applyCatCollapsed();
