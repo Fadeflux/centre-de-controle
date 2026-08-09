@@ -2404,6 +2404,11 @@ const TOOLS = [
   { id:"sms",              world:"noctra", cat:"Noctra", name:"Numéros SMS", icon:"📱", openUrl:"https://diddysms.com", external:true,
     links:[{n:"DiddySMS",u:"https://diddysms.com",ext:true},{n:"Getatext",u:"https://getatext.com",ext:true}],
     metrics:[{k:"diddysms",l:"DiddySMS",f:fmtMoney},{k:"getatext",l:"Getatext",f:fmtMoney}] },
+  // 💳 Solde prépayé OnlyChat (demande André : « à côté du truc des numéros »).
+  // Alimentée dans render() depuis ONLYCHAT_DATA (comme la carte SMS depuis
+  // SMS_DATA) — solde inconnu = « — », jamais un 0 inventé.
+  { id:"onlychat-solde",   world:"noctra", cat:"Noctra", name:"Solde OnlyChat", icon:"💬", openUrl:"https://app.only-chat.ai", external:true,
+    metrics:[{k:"solde",l:"Balance",f:fmtMoney}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
@@ -2543,6 +2548,18 @@ function groups(){
 function render(data){
   LAST = data;
   if(typeof SMS_DATA!=="undefined" && SMS_DATA){ const dd=SMS_DATA.diddysms, gt=SMS_DATA.getatext; if((dd&&dd.balance!=null)||(gt&&gt.balance!=null)){ data["sms"]=data["sms"]||{}; data["sms"].status="online"; data["sms"].metrics=Object.assign({},(data["sms"]||{}).metrics,{ diddysms:(dd&&dd.balance!=null)?dd.balance:null, getatext:(gt&&gt.balance!=null)?gt.balance:null }); } }
+  // 💳 Carte « Solde OnlyChat » — même mécanique que la carte SMS ci-dessus.
+  // Sous le seuil réglé dans OnlyChat, la carte porte une note d'alerte.
+  if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.solde!=null){
+    data["onlychat-solde"]={status:"online",metrics:{solde:ONLYCHAT_DATA.solde}};
+    const seuilOc=(ONLYCHAT_DATA.soldeSeuil!=null&&ONLYCHAT_DATA.soldeSeuil>0)?ONLYCHAT_DATA.soldeSeuil:50;
+    if(Number(ONLYCHAT_DATA.solde)<seuilOc) data["onlychat-solde"].note="Solde bas — recharge avant que l'IA de vente s'arrête";
+  } else {
+    // ⚠️ `data` est LAST, un objet qui SURVIT entre deux rendus : sans ce
+    // nettoyage, un solde devenu inconnu laissait l'ANCIENNE valeur affichée
+    // comme si elle était fraîche. Inconnu = carte à « — », pas un vieux chiffre.
+    delete data["onlychat-solde"];
+  }
   // Le catalogue d'outils est isolé : s'il explose, les TUILES D'ARGENT qui
   // suivent doivent quand même s'afficher (c'est ce qui manquait le plus à
   // l'opérateur quand la carte Grind faisait planter tout render()).
@@ -3013,6 +3030,9 @@ async function loadOnlyChat(){
     else if(typeof tgRefresh==="function") tgRefresh();
     if(typeof refreshEssentiel==="function") refreshEssentiel();
   }catch(e){ console.error("maj argent Telegram:",e); }
+  // La carte « Solde OnlyChat » du catalogue lit ONLYCHAT_DATA dans render() :
+  // sans ce rappel, elle restait sur « — » jusqu'au prochain tour de boucle.
+  try{ if(typeof LAST!=="undefined"&&LAST&&typeof render==="function") render(LAST); }catch(e){}
 }
 // 📅 CA Telegram par jour (mois en cours), comme le "CA par jour" d'OnlyFans —
 // lu dans chartTotal, déjà renvoyé par l'API OnlyChat (aucun nouvel appel).
