@@ -549,7 +549,8 @@
      le CA en clair, et le micro flottant laissait interroger l'assistant sur
      les montants. */
   body.assoc-mode #widget, body.assoc-mode #morning,
-  body.assoc-mode #widgetHelp, body.assoc-mode #voiceFab{display:none !important}
+  body.assoc-mode #widgetHelp, body.assoc-mode #voiceFab,
+  body.assoc-mode #coachmem{display:none !important}
   /* ⚠️ Le menu ⚙️ déplace les boutons dans des rangées : masquer le bouton ne
      suffisait pas, le libellé restait visible ET cliquable (l'associée pouvait
      restaurer une sauvegarde ou télécharger la config). On masque la RANGÉE. */
@@ -560,6 +561,7 @@
   body.assoc-mode .settings-row[data-for="diag"], body.assoc-mode .settings-row[data-for="backup"],
   body.assoc-mode .settings-row[data-for="autobackups"], body.assoc-mode .settings-row[data-for="restore"],
   body.assoc-mode .settings-row[data-for="widget"],
+  body.assoc-mode .settings-row[data-for="coachmem"],
   body.assoc-mode .settings-row[data-for="assocView"]{display:none !important}
   /* 📉 Décrochage */
   .dc-c{font-size:11px;color:#f87171;font-weight:700}
@@ -1415,7 +1417,10 @@
   .cm-chip.cm-perm{border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
   .cm-chip.cm-perm i{color:var(--acc);font-weight:700}
   .cm-chip b[data-cmprol]:hover,.cm-chip b[data-cmperm]:hover{color:var(--acc)}
-  #cmDur{font:inherit;font-size:12px;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;flex:0 0 auto}
+  .cm-dur{font:inherit;font-size:12px;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;flex:0 0 auto}
+  /* overlay « Mémoire du coach » depuis le menu ⚙️ (le style des puces et du
+     champ vient des classes .cm-* partagées avec l'écran du matin) */
+  #coachMemOvlBody{max-height:56vh;overflow-y:auto;margin:8px 0}
   .cm-add{display:flex;gap:7px}
   .cm-add input{flex:1;min-width:0;font:inherit;font-size:12.5px;color:var(--text);background:var(--surface-2);
     border:1px solid var(--line);border-radius:9px;padding:7px 10px;outline:none}
@@ -1712,6 +1717,7 @@
       <button class="btn" id="unlock" style="display:none">🔒 Mes chiffres</button>
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="pushtest" title="Tester mes alertes (envoie une vraie notification)" style="display:none">📳</button>
+      <button class="btn" id="coachmem" title="Mémoire du coach (voir, prolonger ou ajouter une note)">🧠</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
       <button class="btn" id="eve" title="Coach du soir">🌙</button>
       <button class="btn" id="widget" title="Widget iPhone">📱</button>
@@ -5199,6 +5205,21 @@ async function testPush(){
   if(btn){ btn.disabled=false; btn.textContent="📳"; }
 }
 { const b=$("#pushtest"); if(b) b.onclick=testPush; }
+// 🧠 Mémoire du coach depuis le menu ⚙️ — avant, voir/prolonger/ajouter une
+// note obligeait à rouvrir l'écran du matin (qui réaffiche tout le briefing).
+function openCoachMem(){
+  if(!TOKEN){ openGate("Connecte-toi d'abord."); return; }
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🧠 Mémoire du coach</h3>
+    <div class="ppick-sub">Ce que le coach sait et retient. Ajoute une note à n'importe quelle heure — il en tiendra compte dès son prochain briefing.</div>
+    <div id="coachMemOvlBody"></div>
+    <button class="ppick-close">Fermer</button></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
+  document.body.appendChild(ov);
+  renderCoachMemInto(document.getElementById("coachMemOvlBody"));
+  if(COACH_MEM===null) loadCoachMem();   // pas encore chargée cette session
+}
+{ const b=$("#coachmem"); if(b) b.onclick=openCoachMem; }
 
 /* ---------- carte du jour à partager (image) ---------- */
 function roundRect(ctx,X,Y,W,H,R){ ctx.beginPath(); ctx.moveTo(X+R,Y); ctx.arcTo(X+W,Y,X+W,Y+H,R); ctx.arcTo(X+W,Y+H,X,Y+H,R); ctx.arcTo(X,Y+H,X,Y,R); ctx.arcTo(X,Y,X+W,Y,R); ctx.closePath(); }
@@ -5599,8 +5620,14 @@ async function loadCoachMem(){
     if(r.ok){ COACH_MEM=(await r.json()).notes||[]; renderCoachMem(); }
   }catch(e){}
 }
-function renderCoachMem(){
-  const z=$("#mnCoachMem"); if(!z) return;
+// ⚙️ La mémoire s'affiche à DEUX endroits : l'écran du matin (#mnCoachMem) et
+// l'overlay du menu ⚙️ (#coachMemOvlBody) — avant, on ne pouvait voir/prolonger
+// ses notes QU'EN rouvrant l'écran du matin. Une seule implémentation, SCOPÉE
+// au conteneur (querySelector local, jamais $ global : les deux vues peuvent
+// coexister dans le DOM, un id global pointerait toujours sur la première).
+function renderCoachMem(){ renderCoachMemInto($("#mnCoachMem")); renderCoachMemInto(document.getElementById("coachMemOvlBody")); }
+function renderCoachMemInto(z){
+  if(!z) return;
   const notes=COACH_MEM||[];
   const jr=exp=>{ try{ const d=Math.round((new Date(exp+"T00:00:00Z")-new Date(new Date().toISOString().slice(0,10)+"T00:00:00Z"))/86400000); return d>0?d:0; }catch(e){ return "?"; } };
   // ⏳ Une note SANS `exp` est permanente. Les autres affichent leur compte à
@@ -5615,21 +5642,23 @@ function renderCoachMem(){
       +`<b data-cmperm="${escapeHtml(n.id)}" title="Retenir pour toujours">📌</b>`
       +`<b data-cmdel="${escapeHtml(n.id)}" title="Oublier">✕</b></span>`;
   };
+  // Classes (pas d'ids) : les deux vues coexistent dans le DOM, des ids
+  // dupliqués rendraient getElementById imprévisible. CSS mis à jour en face.
   z.innerHTML=`<div class="cm-list">${notes.map(puce).join("")}</div>
-    <div class="cm-add"><input id="cmTxt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)">
-      <select id="cmDur" title="Combien de temps le coach doit s'en souvenir"><option value="7">7 jours</option><option value="30">1 mois</option><option value="0">Toujours</option></select>
-      <button class="mn-act-btn" id="cmAdd">Retenir</button></div>`;
+    <div class="cm-add"><input class="cm-txt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)">
+      <select class="cm-dur" title="Combien de temps le coach doit s'en souvenir"><option value="7">7 jours</option><option value="30">1 mois</option><option value="0">Toujours</option></select>
+      <button class="mn-act-btn cm-go">Retenir</button></div>`;
   const envoyer=async()=>{
-    const inp=$("#cmTxt"); const t=(inp&&inp.value||"").trim(); if(t.length<3||!TOKEN) return;
-    const jours=Number(($("#cmDur")||{}).value ?? 7);
+    const inp=z.querySelector(".cm-txt"); const t=(inp&&inp.value||"").trim(); if(t.length<3||!TOKEN) return;
+    const jours=Number((z.querySelector(".cm-dur")||{}).value ?? 7);
     try{
       const r=await fetch(HUB_BASE+"/api/hub/coach-memoire",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:t,jours:jours})});
       const j=await r.json().catch(()=>({}));
       if(r.ok&&j.ok){ if(typeof toast==="function") toast(jours===0?"🧠 Retenu pour toujours":("🧠 Retenu "+jours+" jours"),"Le coach en tiendra compte dès son prochain briefing."); COACH_MEM=null; loadCoachMem(); }
     }catch(e){}
   };
-  const b=$("#cmAdd"); if(b) b.onclick=envoyer;
-  const i=$("#cmTxt"); if(i) i.addEventListener("keydown",e=>{ if(e.key==="Enter") envoyer(); });
+  const b=z.querySelector(".cm-go"); if(b) b.onclick=envoyer;
+  const i=z.querySelector(".cm-txt"); if(i) i.addEventListener("keydown",e=>{ if(e.key==="Enter") envoyer(); });
   z.onclick=async e=>{
     if(!TOKEN) return;
     // ⏳ Prolonger (30 j) ou rendre permanent, sans retaper la note.
@@ -5654,6 +5683,29 @@ function addCoachAction(btn){
   if(!COACH_ACTION || typeof TASKS==="undefined") return;
   try{
     tkNorm();
+    // 🔁 ANTI-DOUBLON. Le coach propose souvent des variantes de la même action
+    // (« Écris à Welzy pour… » / « Envoie un message à Welzy pour… ») : un tap
+    // chaque matin empilait des quasi-doublons qui bouchaient la liste (c'est
+    // comme ça que la tâche Welzy a dormi 21 jours à côté de ses clones).
+    // Doublon = une tâche coach OUVERTE qui cite la MÊME personne, ou un texte
+    // quasi identique. On préfère le dire plutôt qu'empiler.
+    const norm=s=>(typeof gsNorm==="function"?gsNorm(s):String(s||"").toLowerCase());
+    const nouvelle=norm(COACH_ACTION);
+    const noms=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).map(v=>v&&v.va).filter(Boolean);
+    const persNouvelle=noms.filter(n=>nouvelle.includes(norm(n)));
+    const ouvertes=[].concat(TASKS.moi||[],TASKS.other||[],TASKS.general||[]).filter(x=>x&&!x.done&&!x.del&&x.text);
+    const doublon=ouvertes.find(x=>{
+      const t=norm(x.text);
+      if(t===nouvelle) return true;
+      const memePersonne=(x.tags||[]).includes("coach") && persNouvelle.some(n=>t.includes(norm(n)));
+      return memePersonne;
+    });
+    if(doublon){
+      const jours=doublon.ts?Math.max(0,Math.round((Date.now()-doublon.ts)/86400000)):null;
+      if(typeof toast==="function") toast("🔁 Déjà dans tes tâches","« "+String(doublon.text).slice(0,60)+" »"+(jours!=null?" (ajoutée il y a "+(jours===0?"aujourd'hui":jours+" j")+")":"")+" — coche-la ou supprime-la plutôt que d'empiler.");
+      if(btn){ btn.textContent="🔁 Déjà là"; btn.disabled=true; }
+      return;
+    }
     TASKS.moi.unshift({id:tkId(),text:COACH_ACTION,tags:["coach"],done:false,ts:Date.now(),repeat:"",prio:"h",upd:Date.now()});
     saveTasks(); renderTasks();
     if(btn){ btn.textContent="✔ Ajoutée"; btn.disabled=true; }
@@ -6864,6 +6916,16 @@ function buildActions(){
       if(solde!=null&&Number(solde)<SMS_SEUIL) push(2,"📱",`Solde ${nom} bas : ${eur(solde)} — recharge avant que les codes IG ne passent plus`,"sections");
     });
   }
+  // 🎬 Acquisition à l'arrêt : AUCUN drive ClipFusion sur 24 h. Jugé seulement
+  // en FIN DE JOURNÉE (un zéro le matin est normal) et seulement si le chiffre
+  // EXISTE (absent ≠ zéro : ClipFusion muet est couvert par « source muette »).
+  // Le serveur pousse la même alerte à 19h15 (hubSante) — même histoire partout.
+  try{
+    const cf=(LAST&&LAST["clipfusion-perso"]&&LAST["clipfusion-perso"].metrics)||{};
+    if(cf.drives24h!=null && Number(cf.drives24h)===0 && new Date().getHours()>=18){
+      push(3,"🎬","Aucun drive envoyé aujourd'hui — tes VA n'ont rien publié","sections");
+    }
+  }catch(e){}
   if(typeof LEAKS!=="undefined" && Array.isArray(LEAKS)){
     const nouv=LEAKS.filter(l=>l&&(l.status||"new")==="new").length, rep=LEAKS.filter(l=>l&&l.status==="repost").length;
     if(nouv) push(2,"🚨",`${nouv} fuite${nouv>1?"s":""} à traiter (DMCA)`,"antileak");
@@ -7827,7 +7889,7 @@ function toggleConvo(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
+    ["morn","eve","coachmem","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row"; row.setAttribute("data-for", id);
