@@ -1413,7 +1413,9 @@
   .mn-money .big{font-size:52px;font-weight:800;line-height:1.1;margin-top:4px}
   .mn-money .sub{font-size:14px;color:var(--muted);margin-top:8px}
   .mn-today{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:15px;font-weight:600}
-  .mn-today .t-big{font-size:20px;font-weight:800;color:var(--acc-ink)}
+  /* ⭐ Demande André (capture) : le NET du jour EN GROS, le brut à côté en plus
+     petit — même hiérarchie que le chiffre du mois juste au-dessus. */
+  .mn-today .t-big{font-size:30px;font-weight:800;color:var(--acc-ink);letter-spacing:-.02em}
   .mn-today .t-sub{font-size:12.5px;color:var(--muted);font-weight:500}
   .mn-today-split{margin-top:4px;font-size:12px;color:var(--muted);font-weight:500}
   .mn-today-split b{color:var(--text);font-weight:700}
@@ -5675,8 +5677,13 @@ function renderMorning(){
       const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
       const comboKnown=(ofTodayNet!=null && tgToday!=null);
       const totalToday=comboKnown?(ofTodayNet+tgToday):null;
-      const ajArgent=totalToday!=null?moneyPrecis(totalToday,cur):(revKo()?"—":(nt!=null?(money(nt*NET_RATE)+" net")+` <span class="t-sub">(${money(nt)} brut)</span>`:"—"));
-      const ajSplit=comboKnown?`<div class="mn-today-split">sur OnlyFans : <b>${money(ofTodayNet)}</b> <span class="t-sub">(${money(nt)} brut)</span> · sur Telegram : <b>${tgMoney(tgToday)}</b></div>`:"";
+      // ⭐ Demande André (capture du 09/08) : le NET du jour EN GROS et le brut
+      // À CÔTÉ en plus petit — même hiérarchie que le chiffre du mois. Le brut
+      // remonte donc de la ligne « par source » vers le chiffre principal, et
+      // la ligne du dessous ne garde que la répartition OnlyFans/Telegram.
+      const ajBrut=(!revKo()&&nt!=null)?` <span class="t-sub">(${money(nt)} brut OF)</span>`:"";
+      const ajArgent=totalToday!=null?(moneyPrecis(totalToday,cur)+ajBrut):(revKo()?"—":(nt!=null?(money(nt*NET_RATE))+ajBrut:"—"));
+      const ajSplit=comboKnown?`<div class="mn-today-split">sur OnlyFans : <b>${money(ofTodayNet)}</b> net · sur Telegram : <b>${tgMoney(tgToday)}</b></div>`:"";
       return `<div class="lbl">💰 Net du mois (est.)</div>
         <div class="big" id="mnMoney">${moneyOuTiret(netMois, v=>moneyPrecis(v,cur))}</div>
         <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
