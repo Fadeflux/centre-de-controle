@@ -5581,7 +5581,7 @@ async function sendVaMessage(btn, va, message){
       // automatiques d'abonnés ; un message personnel du boss y était noyé, alors
       // que le bouton promet « dans son ticket ». Dans le ticket, le bot mentionne
       // en plus le propriétaire — le VA est donc notifié pour de bon.
-      body:JSON.stringify({va:va, title:"💬 Message de ton boss", body:message, reason:"coach", thread:false})});
+      body:JSON.stringify({va:va, title:"🎯 Objectif du jour", body:message, reason:"coach", thread:false})});
     const j=await r.json().catch(()=>({}));
     // ⚠️ « Envoyé » était un MENSONGE : le message est mis en FILE, et le bot
     // Discord ne la relève que toutes les VA_RELANCE_POLL_SEC secondes. Le bouton
@@ -8189,7 +8189,7 @@ function openVaCard(vaName){
         const finalMsg=prompt("Brouillon (modifie si besoin, OK = envoyer dans son ticket, Annuler = ne rien envoyer) :", j.message);
         if(finalMsg===null||!finalMsg.trim()){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; return; }
         b.textContent="📨…";
-        const r2=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:vaName,title:"💬 Message de ton boss",body:finalMsg.trim().slice(0,900),reason:"coach",thread:false})});
+        const r2=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va:vaName,title:"🎯 Objectif du jour",body:finalMsg.trim().slice(0,900),reason:"coach",thread:false})});
         const j2=await r2.json().catch(()=>({}));
         if(r2.ok&&j2.ok&&j2.added>0){ b.textContent="📬 Envoyé"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."); }
         else if(j2&&j2.refuses&&j2.refuses.length){ b.disabled=false; b.textContent="✍️ Rédige-le (IA)"; if(typeof toast==="function") toast("⛔ Bloqué","Le message contenait une info interdite pour un VA — reformule."); }
@@ -8205,7 +8205,7 @@ function openVaCard(vaName){
       b.disabled=true; b.textContent="⏳";
       try{
         const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
-          body:JSON.stringify({va:vaName,title:"💬 Message de ton boss",body:msg.trim().slice(0,900),reason:"coach",thread:false})});
+          body:JSON.stringify({va:vaName,title:"🎯 Objectif du jour",body:msg.trim().slice(0,900),reason:"coach",thread:false})});
         const j=await r.json().catch(()=>({}));
         if(r.ok&&j.ok&&j.added>0){ b.textContent="📬 En file"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."); }
         else if(j&&j.refuses&&j.refuses.length){ b.disabled=false; b.textContent="⛔ Bloqué"; if(typeof toast==="function") toast("⛔ Non envoyé","Le message contenait une info interdite pour un VA (argent…). Reformule."); }
