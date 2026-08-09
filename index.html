@@ -316,6 +316,16 @@
   .tg-empty{font-size:13px;color:var(--faint);padding:6px 0}
   .oc-tot{font-size:24px;font-weight:700;color:var(--acc)}
   .oc-tot-sub{font-size:12px;font-weight:500;color:var(--muted);margin-left:6px}
+  /* 🌅 Accueil léger : le matin on veut 3 chiffres et la file d'actions, pas
+     76 panneaux. La classe masque les 8 catégories + la barre de puces ;
+     !important pour battre les display inline posés par appliqueCategories. */
+  body.accueil-leger #home>.sec-head, body.accueil-leger #home>.cat-body,
+  body.accueil-leger #secnav{display:none !important}
+  #toutVoirWrap{margin:16px 0 4px}
+  #toutVoirBtn{width:100%;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;
+    padding:14px 16px;border-radius:12px;border:1px dashed var(--acc-line);
+    background:var(--acc-bg);color:var(--acc);transition:.15s}
+  #toutVoirBtn:hover{background:var(--acc);color:#0a0a0a;border-style:solid}
   /* 💳 solde prépayé OnlyChat — orange quand il approche du seuil d'alerte */
   .oc-solde{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);
     margin:4px 0 2px;padding:4px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
@@ -1750,6 +1760,7 @@
       <button class="btn" id="push" title="Recevoir les alertes" style="display:none">🔔 Alertes</button>
       <button class="btn" id="pushtest" title="Tester mes alertes (envoie une vraie notification)" style="display:none">📳</button>
       <button class="btn" id="coachmem" title="Mémoire du coach (voir, prolonger ou ajouter une note)">🧠</button>
+      <button class="btn" id="accueil" title="Accueil léger au chargement (l'essentiel d'abord, les panneaux à un tap)">🌅</button>
       <button class="btn" id="morn" title="Écran du matin">☀️</button>
       <button class="btn" id="eve" title="Coach du soir">🌙</button>
       <button class="btn" id="widget" title="Widget iPhone">📱</button>
@@ -1808,6 +1819,13 @@
       <div class="ess-actions-head">🎯 À faire maintenant <span class="ess-ac" id="essActCount"></span></div>
       <div class="ess-actions" id="essActions"></div>
     </div>
+  </div>
+
+  <!-- 🌅 Accueil léger : au chargement, seuls l'Essentiel, les tuiles et les
+       tâches sont visibles — ce bouton déroule les 8 catégories de panneaux.
+       (Toute navigation — puce, recherche, ?go= — déroule aussi toute seule.) -->
+  <div id="toutVoirWrap" style="display:none">
+    <button id="toutVoirBtn">🗂️ Tout voir — dérouler tous les panneaux</button>
   </div>
 
   <aside id="sidebar"></aside>
@@ -3033,6 +3051,23 @@ async function loadOnlyChat(){
   // La carte « Solde OnlyChat » du catalogue lit ONLYCHAT_DATA dans render() :
   // sans ce rappel, elle restait sur « — » jusqu'au prochain tour de boucle.
   try{ if(typeof LAST!=="undefined"&&LAST&&typeof render==="function") render(LAST); }catch(e){}
+  // L'écran du matin s'ouvre souvent AVANT que la donnée OnlyChat n'arrive
+  // (chargements en parallèle) : on remplit/actualise sa bannière solde ici.
+  try{ if(typeof majMornSolde==="function") majMornSolde(); }catch(e){}
+}
+// 💳 Bannière « il te reste peu d'argent sur OnlyChat » de l'écran du matin
+// (demande explicite d'André : « quand j'arrive le matin, écrit en alerte,
+// avec le montant »). Seuil du matin = 100 $ (plus prudent que les 50 $
+// d'OnlyChat) OU à sec dans ≤ 7 jours au rythme réel de consommation.
+// Solde inconnu -> bannière VIDE, jamais un chiffre inventé.
+function majMornSolde(){
+  const z=document.getElementById("mnSolde"); if(!z) return;
+  const d=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)||null;
+  if(!d||d.solde==null){ z.innerHTML=""; return; }
+  const jrs=d.soldeJoursRestants;
+  if(Number(d.solde)>=100 && !(jrs!=null&&jrs<=7)){ z.innerHTML=""; return; }
+  const rythme=(d.soldeConsoJour!=null&&jrs!=null)?` Au rythme actuel (~${tgMoney(d.soldeConsoJour)}/jour), à sec dans ~${jrs} jour${jrs>1?"s":""}.`:"";
+  z.innerHTML=`<div class="mn-coach" style="border-left-color:#facc15"><div class="mn-coach-hd" style="color:#facc15">💳 Il te reste peu d'argent sur OnlyChat</div><div class="mn-coach-txt">Il reste <b>${tgMoney(d.solde)}</b> sur ton solde.${rythme} À zéro, l'IA de vente Telegram s'arrête — recharge aujourd'hui.</div></div>`;
 }
 // 📅 CA Telegram par jour (mois en cours), comme le "CA par jour" d'OnlyFans —
 // lu dans chartTotal, déjà renvoyé par l'API OnlyChat (aucun nouvel appel).
@@ -4461,8 +4496,17 @@ function expandCatOf(el){
 // Saut robuste vers un panneau : déplie si besoin, puis scrolle. Le petit
 // setTimeout est nécessaire après un dépliage (même piège de mise en page
 // différée que celui déjà documenté plus bas — rAF ne suffit pas ici).
+// 🌅 Accueil léger — état + sortie. `toutVoir()` déroule les 8 catégories ;
+// TOUTE navigation vers un panneau l'appelle d'abord (sinon le saut viserait
+// un panneau masqué et le clic semblerait mort — même piège que le repli).
+function accueilLegerActif(){ return document.body.classList.contains("accueil-leger"); }
+function toutVoir(){
+  document.body.classList.remove("accueil-leger");
+  const w=document.getElementById("toutVoirWrap"); if(w) w.style.display="none";
+}
 function scrollToPanel(el){
-  const deplie = expandCatOf(el);
+  const leger=accueilLegerActif(); if(leger) toutVoir();
+  const deplie = expandCatOf(el) || leger;
   const go = ()=>el.scrollIntoView({behavior:"smooth",block:"start"});
   deplie ? setTimeout(go,50) : go();
 }
@@ -5286,6 +5330,13 @@ function openCoachMem(){
   if(COACH_MEM===null) loadCoachMem();   // pas encore chargée cette session
 }
 { const b=$("#coachmem"); if(b) b.onclick=openCoachMem; }
+// 🌅 Interrupteur de l'accueil léger — le réglage survit aux rechargements.
+{ const b=$("#accueil"); if(b) b.onclick=()=>{
+  const actif=localStorage.getItem("ccn_accueil")!=="0";
+  localStorage.setItem("ccn_accueil", actif?"0":"1");
+  if(actif){ toutVoir(); if(typeof toast==="function") toast("🌅 Accueil léger désactivé","La page s'ouvrira complète au prochain chargement."); }
+  else { document.body.classList.add("accueil-leger"); const w=$("#toutVoirWrap"); if(w) w.style.display="block"; if(typeof toast==="function") toast("🌅 Accueil léger activé","Au chargement : l'essentiel d'abord, le reste à un tap."); }
+}; }
 
 /* ---------- carte du jour à partager (image) ---------- */
 function roundRect(ctx,X,Y,W,H,R){ ctx.beginPath(); ctx.moveTo(X+R,Y); ctx.arcTo(X+W,Y,X+W,Y+H,R); ctx.arcTo(X+W,Y+H,X,Y+H,R); ctx.arcTo(X,Y+H,X,Y,R); ctx.arcTo(X,Y,X+W,Y,R); ctx.closePath(); }
@@ -5533,7 +5584,7 @@ function renderMorning(){
         ${ajSplit}
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
     })()}</div>
-    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
+    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div id="mnSolde"></div><div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
     ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
@@ -5556,6 +5607,7 @@ function renderMorning(){
   const applyExpress=()=>{ const on=localStorage.getItem("ccn_express")==="1"; document.body.classList.toggle("mn-express",on); const b=$("#mnExpress"); if(b) b.style.opacity=on?"1":".55"; };
   { const ex=$("#mnExpress"); if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_express", localStorage.getItem("ccn_express")==="1"?"0":"1"); applyExpress(); if(typeof toast==="function") toast(localStorage.getItem("ccn_express")==="1"?"⚡ Mode express":"📄 Mode complet", localStorage.getItem("ccn_express")==="1"?"Chiffres + action seulement.":"Briefing complet."); }; }
   applyExpress();
+  majMornSolde();
   const cp=$("#mnCoachPlay"); if(cp) cp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, cp); };
   const cn=$("#mnCoachNew"); if(cn) cn.onclick=()=>{ stopSpeaking(); loadBrief(true); };
   renderCoachAction();   // le modal vient d'être reconstruit : on repeint l'action du jour
@@ -6979,8 +7031,10 @@ function renderCharge(){
 function jumpPanel(id){
   const el=document.getElementById(id); if(!el) return;
   try{ _userScrolled=true; }catch(e){}
-  // Déplie la catégorie si le panneau y est enfermé (sinon le clic ne fait rien).
-  const deplie = (typeof expandCatOf==="function") ? expandCatOf(el) : false;
+  // Sort de l'accueil léger puis déplie la catégorie si besoin (sinon le clic
+  // viserait un panneau masqué et semblerait mort).
+  const leger=(typeof accueilLegerActif==="function")&&accueilLegerActif(); if(leger) toutVoir();
+  const deplie = ((typeof expandCatOf==="function") ? expandCatOf(el) : false) || leger;
   // Toujours invisible après dépliage = panneau masqué par l'opérateur (⚙️ 🧩)
   // ou vide. On le DIT au lieu de laisser croire à un bouton cassé.
   if(!deplie && el.getClientRects().length===0){
@@ -7996,7 +8050,7 @@ function toggleConvo(){
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","coachmem","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
+    ["morn","eve","coachmem","accueil","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row"; row.setAttribute("data-for", id);
@@ -8716,6 +8770,14 @@ function renderCaJours(){
 // Purge une seule fois (repère ccn_order_v2), n'importe pas sur un futur
 // ordre perso posé après cette migration.
 if(localStorage.getItem("ccn_order_v2")!=="1"){ localStorage.removeItem("ccn_order"); localStorage.setItem("ccn_order_v2","1"); }
+// 🌅 Accueil léger au chargement (interrupteur ⚙️ → 🌅, actif par défaut) :
+// le matin on veut l'Essentiel, la file d'actions et les tâches — pas les 76
+// panneaux. Tout est là, à UN tap (bouton « Tout voir » ou n'importe quel saut).
+if(localStorage.getItem("ccn_accueil")!=="0"){
+  document.body.classList.add("accueil-leger");
+  { const w=document.getElementById("toutVoirWrap"); if(w) w.style.display="block"; }
+}
+{ const b=document.getElementById("toutVoirBtn"); if(b) b.onclick=toutVoir; }
 applyOrder();
 refreshSecHeads();
 applyCatCollapsed();
@@ -8742,6 +8804,7 @@ try{
       // Déplier d'abord : sinon la boucle tournait 16 fois pour rien sur un
       // panneau enfermé dans une catégorie repliée (display calculé "block"
       // mais 0 pixel à l'écran → aucun saut, aucun message).
+      if(typeof toutVoir==="function" && typeof accueilLegerActif==="function" && accueilLegerActif()) toutVoir();
       if(typeof expandCatOf==="function") expandCatOf(el);
       if(el.getClientRects().length){ _userScrolled=true; el.scrollIntoView({block:"start"}); }
     },800);
