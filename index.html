@@ -5164,6 +5164,13 @@ async function enablePush(){
     const vr=await fetch(HUB_BASE+"/api/hub/vapid").then(r=>r.json()).catch(()=>({}));
     if(!vr.publicKey){ btn.textContent="🔔 Bientôt"; btn.title="Alertes pas encore activées côté serveur (clés VAPID à poser)"; return; }
     const reg=await navigator.serviceWorker.ready;
+    // 🔑 Se désabonner d'abord si un abonnement existe déjà : s'il a été créé
+    // avec une ANCIENNE clé serveur (clés VAPID tournées depuis), re-souscrire
+    // par-dessus lève InvalidStateError → le bouton affichait « 🔔 Erreur »
+    // sans issue. Vécu en prod : l'abonnement du téléphone datait d'une
+    // ancienne clé, TOUTES les alertes étaient refusées en 403 depuis des
+    // jours. Repartir d'un abonnement neuf règle les deux cas.
+    try{ const ancien=await reg.pushManager.getSubscription(); if(ancien) await ancien.unsubscribe(); }catch(e){}
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64ToU8(vr.publicKey)});
     const r=await fetch(HUB_BASE+"/api/hub/subscribe",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(sub)});
     if(r.ok){ btn.textContent="🔔 Activées ✓"; btn.title="Tu recevras une notif si un outil tombe."; }
