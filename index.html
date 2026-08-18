@@ -1339,6 +1339,7 @@
   .tile:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.7)}
   .tile.hero{border-top-color:var(--acc)}
   .tile .lbl{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .lbl-info{text-transform:none;letter-spacing:0;cursor:help;opacity:.75}
   .tile .val{font-size:27px;font-weight:700;letter-spacing:-.6px;margin-top:7px}
   .tile.hero .val{color:var(--acc)}
   .tile .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
@@ -4775,7 +4776,20 @@ function renderOM(){
     <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
     <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
     <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div>
-    <div class="tile"><div class="lbl">LTV ${OM_MODEL!=="all"?"("+escapeHtml(OM_MODEL)+")":"moyenne"}</div><div class="val">${ltvT((OM_MODEL!=="all"&&d.models[OM_MODEL])?d.models[OM_MODEL].ltv:d.totals.ltv)}</div></div></div>`;
+    ${(()=>{
+      // ⭐ Demande André : « je veux la LTV totale de TOUT, que ce soit les
+      // liens des VA ou pas ». Sur la vue « Tout », `d.totals.ltv` (revenu
+      // ATTRIBUÉ / subs attribués) ignore les fans sans lien de tracking
+      // identifié — mesuré : 262 fans et 2 541 $ de revenu réel manquants
+      // (~13 % des fans, ~23 % du revenu). `ltvGlobale` (nouveau) compte TOUS
+      // les fans. Repli sur `ltv` si absent (source non-API, ou vue par
+      // modèle — la LTV par modèle reste sur son propre calcul, inchangé).
+      const surTout=(OM_MODEL==="all");
+      const ltvVal=surTout?(d.totals.ltvGlobale!=null?d.totals.ltvGlobale:d.totals.ltv):((d.models[OM_MODEL]||{}).ltv);
+      const label=surTout?"LTV moyenne":"LTV ("+escapeHtml(OM_MODEL)+")";
+      const info=(surTout&&d.totals.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total ÷ tous les fans (${fmtInt(d.totals.subsTotalReel)}), qu'ils soient venus par un lien de VA ou non — pas juste ${fmtInt(d.totals.subsTotal)} fans attribués.">ⓘ</span>`:"";
+      return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
+    })()}</div>`;
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${ko?'':((d.models[m].marge||0)>=0?'pos':'neg')}">Marge ${ko?"—":((d.models[m].marge||0)>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
   // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
