@@ -22,10 +22,19 @@ self.addEventListener('fetch', function (e) {
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== self.location.origin) return; // laisser passer les appels API (cross-origin)
   // HTML : network-first (évite les vieilles versions), repli cache si hors-ligne.
+  // ⚠️ BUG TROUVÉ le 2026-08-19 : `fetch(req)` tout seul respecte l'en-tête
+  // `Cache-Control` envoyé par GitHub Pages (max-age=600, vérifié en réel) —
+  // le navigateur répond alors depuis SON PROPRE cache disque sans repasser
+  // par le réseau, malgré le "network-first" : un correctif tout juste déployé
+  // restait invisible jusqu'à 10 MINUTES après un rechargement normal, PWA
+  // installée sur iPhone comprise. `cache:'no-store'` force une vraie requête
+  // réseau à chaque fois, en ignorant cet en-tête — c'est NOTRE cache (via
+  // caches.open/c.put juste en dessous) qui sert de secours hors-ligne, pas
+  // celui du navigateur.
   if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
     e.respondWith((async function () {
       try {
-        const net = await fetch(req);
+        const net = await fetch(req, { cache: 'no-store' });
         const c = await caches.open(CACHE); c.put('./index.html', net.clone()).catch(function () {});
         return net;
       } catch (err) {
