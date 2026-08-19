@@ -202,6 +202,8 @@
   /* 📇 nom de VA cliquable -> fiche */
   .omv-va{cursor:pointer;text-decoration:underline dotted transparent;transition:.15s}
   .omv-va:hover{color:var(--acc-ink);text-decoration-color:var(--acc-line)}
+  .he-va{cursor:pointer;text-decoration:underline dotted transparent;transition:.15s}
+  .he-va:hover{color:var(--acc-ink);text-decoration-color:var(--acc-line)}
   .vacard-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
   .va-verdict{border-radius:12px;padding:11px 13px;margin:2px 0 12px;font-size:13px;line-height:1.5}
   .va-verdict.vv-ok{background:color-mix(in srgb,var(--ok) 13%,transparent);color:var(--text)}
@@ -3959,22 +3961,57 @@ function renderClassement(){
 }
 
 // 🎭 Bot & Chloé n'apparaissent JAMAIS dans le classement ci-dessus (archivées
-// exprès — voir vaArchives) : cette ligne répond quand même à "combien elles
-// ont rapporté", sans les faire réapparaître dans le tri/percentile de l'équipe.
+// exprès — voir vaArchives) : ce mini-panneau répond quand même à "combien
+// elles ont rapporté", en lignes cliquables comme les VA (fiche détaillée),
+// sans les faire réapparaître dans le tri/percentile de l'équipe.
 function horsEquipeLigne(){
   const d=(typeof HORS_EQUIPE_DATA!=="undefined")?HORS_EQUIPE_DATA:null;
   const ents=(d&&Array.isArray(d.entites))?d.entites:[];
   if(!ents.length) return "";
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
-  const bits=ents.map(e=>{
-    if(e.subsTotal==null && e.revTotal==null) return `${escapeHtml(e.nom)} : —`;
+  const rows=ents.map(e=>{
     const subs=e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—";
     const rev=e.revTotal!=null?money(e.revTotal)+" brut":"—";
-    return `<b>${escapeHtml(e.nom)}</b> : ${subs} · ${rev} <span style="opacity:.6">(depuis toujours)</span>`;
-  }).join(" &nbsp;·&nbsp; ");
-  return `<div class="pcumul-tip">🎭 Hors classement (archivées, pas payées) : ${bits}</div>`;
+    return `<div class="cl-row">
+      <span class="cl-medal">🎭</span>
+      <span class="cl-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir le détail">${escapeHtml(e.nom)}</span>
+      <span class="cl-bar"></span>
+      <span class="cl-subs">${subs}</span>
+      <span class="cl-pct">${rev}</span>
+    </div>`;
+  }).join("");
+  return `<div class="pcumul-tip" style="margin-top:8px">🎭 Hors classement (archivées, pas payées) — clique un nom pour le détail :</div>${rows}`;
 }
+// 📇 fiche Bot/Chloé : miroir de openVaCard, mais depuis HORS_EQUIPE_DATA (pas
+// OM_DATA — elles n'y figurent jamais, exprès). Peu de champs dispo (pas de
+// LTV/conversion/marge : elles ne sont pas dans le circuit de paie).
+function openHorsEquipeCard(nom){
+  const d=(typeof HORS_EQUIPE_DATA!=="undefined")?HORS_EQUIPE_DATA:null;
+  const ents=(d&&Array.isArray(d.entites))?d.entites:[];
+  const v=ents.find(x=>x.nom===nom); if(!v) return;
+  const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
+  const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
+  const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
+  const ov=document.createElement("div"); ov.className="ppick";
+  ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(v.nom)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
+    <div class="ppick-sub">Archivée du classement et de la paie — ce panneau existe juste pour que tu voies ce qu'elle rapporte.</div>
+    <div class="vacard-stats">
+      ${stat("Abonnés (depuis toujours)", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
+      ${stat("CA généré (depuis toujours)", v.revTotal!=null?money(v.revTotal)+" brut":"—")}
+      ${stat("Abonnés ce mois", fmtInt(v.subsMois||0))}
+      ${stat("CA ce mois", money(v.revMois||0)+" brut")}
+    </div>
+    <div class="va-verdict vv-wait">👁️ Visible seulement ici et dans le salon Discord privé « CEO » — jamais dans le classement ni les salons que tes VA voient.</div>
+    <div class="vacard-btns"><button data-mc="close">Fermer</button></div></div>`;
+  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-mc]")) ov.remove(); });
+  document.body.appendChild(ov);
+}
+document.addEventListener("click",e=>{
+  const hc=e.target.closest(".he-va"); if(!hc) return;
+  const nom=hc.getAttribute("data-he")||(hc.textContent||"").trim();
+  if(nom) openHorsEquipeCard(nom);
+});
 
 /* ---------- ⚠️ #3 risque de concentration (front, depuis OM_DATA) ---------- */
 function ccBlock(title, arr, hint){
