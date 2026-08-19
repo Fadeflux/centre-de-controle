@@ -5207,6 +5207,17 @@ function renderRenta(){
     <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
+    ${(()=>{
+      // ⭐ Demande explicite d'André : « combien j'ai fait le mois dernier avec
+      // OF et Telegram en brut, sachant que le Telegram vient déjà avec le net
+      // pas le brut ». Vérifié en réel : les ventes Telegram passent par un
+      // circuit de paiement SÉPARÉ d'OnlyFans (Telegram Stars) — pas la même
+      // base que le brut OF. On les affiche donc CÔTE À CÔTE, jamais additionnés
+      // en un faux « total brut » commun (choix confirmé avec André).
+      const lmOF=d.totals.netLastMonth, lmTg=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)?ONLYCHAT_DATA.totalRevenueLastMonth:null;
+      if(lmOF==null && lmTg==null) return "";
+      return `<div class="rn-proj" style="margin-top:8px;font-size:12px">📅 <b>Mois dernier</b> : OF (brut) ${lmOF!=null?money(lmOF):"—"}${lmTg!=null?` · Telegram ${money(lmTg)}`:""}${(lmOF!=null&&lmTg!=null)?` <span style="opacity:.6">(pas la même base, ne pas additionner)</span>`:""}</div>`;
+    })()}
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 78 % (20 % OnlyFans + 2 % Skrill), la même règle que ton site finances. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
   { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
 }
