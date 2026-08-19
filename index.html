@@ -2792,7 +2792,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -3954,7 +3954,26 @@ function renderClassement(){
   }).join("");
   const moy=Math.round(sorted.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)/n);
   $("#classementBody").innerHTML = rows
-    + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois · « devant X% » = part de l'équipe que ce VA dépasse.</div>`;
+    + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois · « devant X% » = part de l'équipe que ce VA dépasse.</div>`
+    + horsEquipeLigne();
+}
+
+// 🎭 Bot & Chloé n'apparaissent JAMAIS dans le classement ci-dessus (archivées
+// exprès — voir vaArchives) : cette ligne répond quand même à "combien elles
+// ont rapporté", sans les faire réapparaître dans le tri/percentile de l'équipe.
+function horsEquipeLigne(){
+  const d=(typeof HORS_EQUIPE_DATA!=="undefined")?HORS_EQUIPE_DATA:null;
+  const ents=(d&&Array.isArray(d.entites))?d.entites:[];
+  if(!ents.length) return "";
+  const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
+  const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
+  const bits=ents.map(e=>{
+    if(e.subsTotal==null && e.revTotal==null) return `${escapeHtml(e.nom)} : —`;
+    const subs=e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—";
+    const rev=e.revTotal!=null?money(e.revTotal)+" brut":"—";
+    return `<b>${escapeHtml(e.nom)}</b> : ${subs} · ${rev} <span style="opacity:.6">(depuis toujours)</span>`;
+  }).join(" &nbsp;·&nbsp; ");
+  return `<div class="pcumul-tip">🎭 Hors classement (archivées, pas payées) : ${bits}</div>`;
 }
 
 /* ---------- ⚠️ #3 risque de concentration (front, depuis OM_DATA) ---------- */
@@ -7723,6 +7742,15 @@ function tarifVaReel(){
     if(!taux.length) return 0.5;
     return taux.reduce((a,b)=>a+b,0)/taux.length;
   }catch(e){ return 0.5; }
+}
+let HORS_EQUIPE_DATA=null;
+async function loadHorsEquipe(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/hors-equipe",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    HORS_EQUIPE_DATA=await r.json(); renderClassement();
+  }catch(e){}
 }
 let CONV_DATA=null;
 async function loadConversion(){
