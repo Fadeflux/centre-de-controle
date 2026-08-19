@@ -7452,6 +7452,11 @@ function gsIndex(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   if(om&&Array.isArray(om.vas)) om.vas.forEach(v=>{ if(v&&v.va) items.push({type:"va", label:v.va, sub:(v.unpaid?"perso":`${v.subs||0} subs`), key:v.va}); });
   if(om&&om.models) Object.keys(om.models).forEach(mn=>{ const m=om.models[mn]||{}; items.push({type:"model", label:mn, sub:`modèle · ${m.subs||0} subs`, key:mn}); });
+  // 🎭 Bot/Chloé : jamais dans om.vas (archivées, exprès) — sans cette ligne,
+  // taper leur nom ici donnait "Aucun résultat" alors que leur fiche existe
+  // bel et bien (panneau Classement). Même source que ce panneau.
+  const he=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
+  he.forEach(e=>{ if(e&&e.nom) items.push({type:"horsequipe", label:e.nom, sub:"hors classement", key:e.nom}); });
   const seen={};
   // ⚠️ Ne pas proposer un panneau que l'opérateur a lui-même décoché (⚙️ → 🧩) :
   // il apparaissait dans les résultats et le clic ne faisait rien.
@@ -7472,11 +7477,11 @@ function gsRender(q){
   if(!q){ box.innerHTML=""; box.style.display="none"; return; }
   const hits=gsIndex().filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
   if(!hits.length){ box.innerHTML=`<div class="gs-empty">Aucun résultat</div>`; box.style.display="block"; return; }
-  box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":h.type==="model"?"🎭":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
+  box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":h.type==="model"?"🎭":h.type==="horsequipe"?"🔒":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
   box.style.display="block";
 }
 { const inp=$("#gsInput"); if(inp){ inp.addEventListener("input",()=>gsRender(inp.value)); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
-{ const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else jumpPanel(k); }); }
+{ const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else if(t==="horsequipe"){ if(typeof openHorsEquipeCard==="function") openHorsEquipeCard(k); } else jumpPanel(k); }); }
 document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
 
 // 🗂️ #11 HISTORIQUE DES INCIDENTS : pannes passées + en cours (durée, récurrences).
