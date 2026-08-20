@@ -2769,13 +2769,19 @@ async function doLogin(){
   const user=($("#pwUser")?$("#pwUser").value.trim().toLowerCase():""), input=$("#pw").value.trim();
   if(!input){ $("#pwErr").textContent="Entre ton mot de passe."; return; }
   const go=$("#pwGo"); go.disabled=true; go.textContent="…"; $("#pwErr").textContent="";
-  let tok="", who=null, name="";
+  let tok="", who=null, name="", motif="";
   try{
     const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:user, password:input})});
     if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; if(!who){ who=whoFromUser(j.username||user); } } }
-  }catch(e){}
+    // ⚠️ Dire la VÉRITÉ sur la cause. Avant, toute panne (trop de tentatives,
+    // cerveau injoignable, coupure réseau) s'affichait « mot de passe
+    // incorrect » : on cherchait un problème de mot de passe qui n'existait pas,
+    // alors qu'il fallait juste attendre quelques minutes.
+    else if(r.status===429){ const s=Number(r.headers.get("retry-after")||0); motif="⏳ Trop de tentatives — réessaie dans "+(s>60?Math.ceil(s/60)+" min":(s>0?s+" s":"quelques minutes"))+"."; }
+    else if(r.status>=500){ motif="🧠 Le cerveau ne répond pas — réessaie dans un instant."; }
+  }catch(e){ motif="📶 Impossible de joindre le cerveau (réseau, ou trop de tentatives). Réessaie dans quelques minutes."; }
   go.disabled=false; go.textContent="Entrer";
-  if(!tok){ $("#pwErr").textContent="Identifiant ou mot de passe incorrect."; return; }
+  if(!tok){ $("#pwErr").textContent = motif || "Identifiant ou mot de passe incorrect."; return; }
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
