@@ -1150,6 +1150,11 @@
   .omv-l.lo{color:var(--down)}
   .omv-roi{font-weight:600;white-space:nowrap;min-width:74px;text-align:right;font-size:12px}
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
+  /* 🔒 lignes hors équipe (Bot/Chloé) : même gabarit que les VA, teinte à part
+     pour qu'on ne les confonde JAMAIS avec quelqu'un à payer. */
+  .om-hors-head{margin-top:12px;padding-top:9px;border-top:1px dashed var(--line);font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+  .omv-hors{opacity:.86}
+  .omv-hors .omv-va{color:var(--acc-ink,#c9cde8)}
   .omv-perso{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-2,#17181b);border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
   /* Objectif par VA : petite jauge sous le nom */
   .omv-goal{flex-basis:100%;margin:2px 0 2px 28px;display:flex;align-items:center;gap:8px}
@@ -4916,7 +4921,32 @@ function renderOM(){
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
-  const vaBloc = filtreDispo ? vaRows
+  // 🔒 Bot / Chloé au MÊME format que les VA, pour comparer la rentabilité d'un
+  // coup d'œil (demande d'André). Volontairement SOUS le tableau et marquées :
+  // elles ne sont ni payées ni classées et n'entrent dans AUCUN total d'équipe
+  // (elles restent archivées côté serveur — c'est ce qui les tient hors des
+  // salons que les VA voient). Uniquement sur « Tout » : leur détail par modèle
+  // n'est pas ventilé, l'afficher sous un titre « sur Layla » serait faux.
+  const horsRows=(function(){
+    if(OM_MODEL!=="all") return "";
+    const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
+    if(!ents.length) return "";
+    const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
+      // Jamais payée -> tout ce qu'elle génère EST la marge (aucun coût de paie).
+      const marge=(!ko&&e.revTotal!=null)?e.revTotal:null;
+      return `<div class="omv-row omv-hors">`
+        +`<span class="omv-rank">🔒</span>`
+        +`<span class="omv-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir sa fiche">${escapeHtml(e.nom)}</span>`
+        +`<span class="omv-s">${e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—"}</span>`
+        +`<span class="omv-r">${mnt(e.revTotal)}</span>`
+        +`<span class="omv-l">LTV ${ltvT(e.ltv)}</span>`
+        +`<span class="omv-m ${marge!=null?'pos':''}">${marge!=null?"+"+omMoney(marge,cur):"—"}</span>`
+        +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
+        +`</div>`;
+    }).join("");
+    return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows;
+  })();
+  const vaBloc = filtreDispo ? (vaRows+horsRows)
     : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
   // Argent non ventilable par modèle (repli sans API) : on le dit.
   const noteArg = (filtreDispo && argFiltreKo)
