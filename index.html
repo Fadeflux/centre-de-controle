@@ -3983,26 +3983,55 @@ function horsEquipeLigne(){
   }).join("");
   return `<div class="pcumul-tip" style="margin-top:8px">🎭 Hors classement (archivées, pas payées) — clique un nom pour le détail :</div>${rows}`;
 }
-// 📇 fiche Bot/Chloé : miroir de openVaCard, mais depuis HORS_EQUIPE_DATA (pas
-// OM_DATA — elles n'y figurent jamais, exprès). Peu de champs dispo (pas de
-// LTV/conversion/marge : elles ne sont pas dans le circuit de paie).
+// 📇 fiche Bot/Chloé : MÊME fiche qu'un VA (openVaCard), mais alimentée par
+// HORS_EQUIPE_DATA — elles ne figurent dans AUCUNE des sources habituelles
+// (OM_DATA, CONV_DATA, QUINZ_DATA, VASANTE, va-liens les filtrent toutes,
+// exprès). Le serveur refait ces calculs pour elles : voir hubHorsEquipe.js.
 function openHorsEquipeCard(nom){
   const d=(typeof HORS_EQUIPE_DATA!=="undefined")?HORS_EQUIPE_DATA:null;
   const ents=(d&&Array.isArray(d.entites))?d.entites:[];
   const v=ents.find(x=>x.nom===nom); if(!v) return;
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
+  const ko=(typeof revKo==="function")?revKo():false;
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
+  const c=v.conv, s=v.sante;
   const ov=document.createElement("div"); ov.className="ppick";
-  ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(v.nom)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
-    <div class="ppick-sub">Archivée du classement et de la paie — ce panneau existe juste pour que tu voies ce qu'elle rapporte.</div>
+  ov.innerHTML=`<div class="ppick-box"><h3>🔒 ${escapeHtml(v.nom)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
+    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(v.nom)}, au même endroit.</div>
     <div class="vacard-stats">
-      ${stat("Abonnés (depuis toujours)", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
-      ${stat("CA généré (depuis toujours)", v.revTotal!=null?money(v.revTotal)+" brut":"—")}
-      ${stat("Abonnés ce mois", fmtInt(v.subsMois||0))}
-      ${stat("CA ce mois", money(v.revMois||0)+" brut")}
+      ${stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
+      ${stat("Abonnés au total", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
+      ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), (ko||v.revTotal==null)?"":"brut : "+money(v.revTotal))}
+      ${stat("LTV (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur))}
+      ${stat("Conversion "+((d&&d.convDays)||14)+" j", (c&&c.cvr!=null)?String(c.cvr).replace(".",",")+" %":"—", c?fmtInt(c.clics)+" clics → "+fmtInt(c.subs)+" subs":"")}
+      ${stat("Quinzaine", fmtInt(v.quinzCur||0), "précédente : "+fmtInt(v.quinzPrev||0))}
     </div>
-    <div class="va-verdict vv-wait">👁️ Visible seulement ici et dans le salon Discord privé « CEO » — jamais dans le classement ni les salons que tes VA voient.</div>
+    ${(function(){
+      // Pas de verdict « rentable / à virer » ici : elle n'est pas payée, donc
+      // le ROI n'a aucun sens. On dit ce qui est vrai à la place.
+      if(ko||v.revTotal==null) return "";
+      return `<div class="va-verdict vv-ok">✅ Jamais payée — les ${fmtInt(v.subsTotal||0)} abonnés et ${money(v.revTotal)} (brut) qu'elle a générés sont du <b>bonus</b> pur, sans aucun coût de paie.</div>`;
+    })()}
+    ${(function(){
+      const rows=[];
+      if(s){
+        const lbl=s.traj.dir==="up"?"📈 progresse":s.traj.dir==="down"?"📉 décline":"➡️ stagne";
+        const pctT=s.traj.pct==null?"":(s.traj.pct>150?" (forte hausse)":s.traj.pct<-90?" (à l'arrêt)":` (${s.traj.pct>0?"+":""}${s.traj.pct}%)`);
+        rows.push(`<div class="vc-sante-row">${typeof sparkWeeks==="function"?sparkWeeks(s.weeks||[]):""}<span>${lbl}${pctT} sur 8 semaines</span></div>`);
+        if(s.daysSince!=null) rows.push(`<div class="vc-sante-row">${s.daysSince>=10?"🟠":"🟢"} ${s.daysSince>=10?"Calme":"Actif"} — dernier sub il y a ${s.daysSince===0?"moins d'un jour":s.daysSince+" j"}.</div>`);
+      }
+      return rows.length?`<div class="vc-sante"><div class="vc-sante-h">🩺 Santé & suivi</div>${rows.join("")}</div>`:"";
+    })()}
+    ${(function(){
+      const L=Array.isArray(v.liens)?v.liens:[];
+      if(!L.length) return "";
+      return `<div class="ml-sec"><div class="ml-h">🔗 Ses liens (${L.length})</div>`
+        +L.map(l=>`<div class="ml-va"><span>${escapeHtml(l.nom)}${l.modele?` <span style="opacity:.6">(${escapeHtml(l.modele)})</span>`:""}</span><span class="ml-va-n">${fmtInt(l.subs)} subs · ${fmtInt(l.clics)} clics</span></div>`).join("")
+        +`</div>`;
+    })()}
+    <div class="va-verdict vv-wait">👁️ Visible seulement ici et dans le serveur Discord privé « CEO » — jamais dans le classement ni les salons que tes VA voient.</div>
     <div class="vacard-btns"><button data-mc="close">Fermer</button></div></div>`;
   ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-mc]")) ov.remove(); });
   document.body.appendChild(ov);
