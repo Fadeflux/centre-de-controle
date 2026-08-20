@@ -7477,6 +7477,7 @@ function refreshEssentiel(){ try{ renderEssentiel(); renderActions(); renderReco
 // panneau → saute dessus. Index construit à la volée (VA depuis OM_DATA, panneaux
 // depuis PANNEAUX). La fiche VA elle-même existe déjà (openVaCard).
 function gsNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+let _heRetry=false;
 function gsIndex(){
   const items=[];
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
@@ -7486,6 +7487,16 @@ function gsIndex(){
   // taper leur nom ici donnait "Aucun résultat" alors que leur fiche existe
   // bel et bien (panneau Classement). Même source que ce panneau.
   const he=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
+  // ⚠️ Si cette liste n'a pas pu être chargée (page ouverte AVANT la connexion,
+  // ou cerveau injoignable au démarrage : loadHorsEquipe avale l'erreur), taper
+  // « bot » répondait « Aucun résultat » POUR TOUJOURS — on ne réessayait
+  // jamais. On la redemande ici, puis on ré-affiche les résultats tout seul.
+  if(!he.length && TOKEN && !_heRetry){
+    _heRetry=true;
+    if(typeof loadHorsEquipe==="function") Promise.resolve(loadHorsEquipe()).then(()=>{
+      _heRetry=false; const i=$("#gsInput"); if(i&&i.value.trim()) gsRender(i.value);
+    }).catch(()=>{ _heRetry=false; });
+  }
   he.forEach(e=>{ if(e&&e.nom) items.push({type:"horsequipe", label:e.nom, sub:"hors classement", key:e.nom}); });
   const seen={};
   // ⚠️ Ne pas proposer un panneau que l'opérateur a lui-même décoché (⚙️ → 🧩) :
@@ -7506,7 +7517,18 @@ function gsRender(q){
   q=gsNorm(q).trim();
   if(!q){ box.innerHTML=""; box.style.display="none"; return; }
   const hits=gsIndex().filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
-  if(!hits.length){ box.innerHTML=`<div class="gs-empty">Aucun résultat</div>`; box.style.display="block"; return; }
+  if(!hits.length){
+    // ⚠️ « Aucun résultat » MENTAIT quand la vraie cause était la connexion :
+    // sans session (ou cerveau injoignable), l'index est VIDE — aucun VA, aucun
+    // modèle — et l'écran laissait croire que le nom cherché n'existe pas.
+    // Vécu en vrai : « bot » introuvable alors que sa fiche existait bel et bien,
+    // le tableau de bord étant simplement retombé en mode démo.
+    const vide=!gsIndex().length;
+    const msg = !TOKEN ? "🔑 Connecte-toi pour chercher tes VA et tes panneaux."
+      : vide ? "⏳ Chiffres pas encore chargés — réessaie dans un instant."
+      : "Aucun résultat";
+    box.innerHTML=`<div class="gs-empty">${msg}</div>`; box.style.display="block"; return;
+  }
   box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":h.type==="model"?"🎭":h.type==="horsequipe"?"🔒":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
   box.style.display="block";
 }
