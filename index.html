@@ -4012,6 +4012,7 @@ function openHorsEquipeCard(nom){
       // Pas de verdict « rentable / à virer » ici : elle n'est pas payée, donc
       // le ROI n'a aucun sens. On dit ce qui est vrai à la place.
       if(ko||v.revTotal==null) return "";
+      if(!(Number(v.revTotal)>0)) return `<div class="va-verdict vv-ok">✅ Jamais payée — ses <b>${fmtInt(v.subsTotal||0)} abonnés</b> sont du <b>bonus</b> pur, sans aucun coût de paie. <span style="opacity:.7">Aucun revenu n'est rattaché à ses liens côté OnlyFans (0 $ enregistré, pas une donnée manquante).</span></div>`;
       return `<div class="va-verdict vv-ok">✅ Jamais payée — les ${fmtInt(v.subsTotal||0)} abonnés et ${money(v.revTotal)} (brut) qu'elle a générés sont du <b>bonus</b> pur, sans aucun coût de paie.</div>`;
     })()}
     ${(function(){
