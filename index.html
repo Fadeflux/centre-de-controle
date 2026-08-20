@@ -9058,8 +9058,32 @@ const ESSENTIEL_MASQUES=[
   // Technique : à consulter quand ça casse, pas à occuper l'écran tous les
   // jours (l'état des proxies, lui, RESTE visible — c'est opérationnel).
   "rw","incidents",
+  // Prix d'un abonné : 3 panneaux pour une colonne déjà dans le tableau.
+  // 🎯 Coût/abonné n'apprend RIEN : tu paies le même tarif (0,51 $) à tout le
+  // monde, donc le « coût par abonné » est identique pour chaque VA.
+  // 💳 Valeur d'un abonné = la colonne LTV du tableau, re-triée.
+  "cac","subval",
+  // 🎯 VA × modèle = le filtre Layla/Zoe du tableau OnlyMonster, en double.
+  "vamodel",
+  // 📊 Anomalies ⊂ 🔍 Patterns cachés (même idée, moins de contexte).
+  "anomalies",
+  // Lus une fois, jamais deux : 🤝 Partage 50/50 (un pourcentage fixe appliqué
+  // à un profit déjà affiché) et 🏖️ Dépendance à toi (constat annuel).
+  "split","busfactor",
 ];
-function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
+// Vrai si André n'a JAMAIS touché aux cases : on applique alors le tri
+// par défaut. Dès qu'il coche/décoche quoi que ce soit, son choix prime
+// pour toujours — on ne lui réimpose plus jamais notre liste.
+function panneauxChoisis(){ try{ return !!localStorage.getItem("ccn_panels_choix"); }catch(e){ return false; } }
+function marquerChoix(){ try{ localStorage.setItem("ccn_panels_choix","1"); }catch(e){} }
+function hiddenSet(){
+  try{
+    const raw=localStorage.getItem("ccn_hidden_panels");
+    // Premier passage (rien de choisi, rien d'enregistré) : on démarre trié.
+    if(raw==null && !panneauxChoisis()) return new Set(ESSENTIEL_MASQUES);
+    const a=JSON.parse(raw||"[]"); return new Set(Array.isArray(a)?a:[]);
+  }catch(e){ return new Set(); }
+}
 function applyHiddenPanels(){
   const h=hiddenSet();
   PANNEAUX.forEach(([id])=>{ const el=document.getElementById(id); if(el) el.classList.toggle("user-hidden", h.has(id)); });
@@ -9096,7 +9120,7 @@ function openPanelPicker(){
     ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
       <div class="ppick-sub">Décoche ce que tu ne regardes jamais. Le menu 📁 range un panneau dans la catégorie de TON choix (mémorisé sur cet appareil).</div>
       <div class="pp-quick"><button data-ppquick="essentiel">🎯 Mode essentiel</button><button data-ppquick="tout">👁️ Tout afficher</button>
-        <div class="ppick-sub" style="margin-top:5px">« Mode essentiel » masque ${ESSENTIEL_MASQUES.length} panneaux qui font doublon (6 disaient la même chose sur la santé des VA, 3 sur les modèles). Réversible : « Tout afficher » remet tout.</div></div>
+        <div class="ppick-sub" style="margin-top:5px">Le site démarre en <b>mode essentiel</b> : ${ESSENTIEL_MASQUES.length} panneaux en doublon sont masqués (6 disaient la même chose sur la santé des VA, 3 sur les modèles, 3 sur le prix d'un abonné). Rien n'est supprimé — « Tout afficher » les remet tous, et dès que tu coches une case c'est ton réglage qui prime.</div></div>
       ${groupedPanneaux().map(([label,rows])=>`<div class="secnav-cat"><div class="secnav-cat-h">${label}</div>${rows.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl} ${catsOpts(id)}</label>`).join("")}</div>`).join("")}
       <button class="ppick-close">Fermer</button></div>`;
   };
@@ -9106,6 +9130,7 @@ function openPanelPicker(){
     if(q){
       const mode=q.getAttribute("data-ppquick");
       localStorage.setItem("ccn_hidden_panels", JSON.stringify(mode==="essentiel"?ESSENTIEL_MASQUES:[]));
+      marquerChoix();
       applyHiddenPanels(); peindre();
       if(typeof toast==="function") toast(mode==="essentiel"?"🎯 Mode essentiel":"👁️ Tout affiché",
         mode==="essentiel"?ESSENTIEL_MASQUES.length+" panneaux en doublon masqués — rien n'est perdu.":"Tous les panneaux sont de nouveau visibles.");
@@ -9118,6 +9143,7 @@ function openPanelPicker(){
     if(cb){
       const s=hiddenSet(); cb.checked?s.delete(cb.getAttribute("data-pp")):s.add(cb.getAttribute("data-pp"));
       localStorage.setItem("ccn_hidden_panels", JSON.stringify([...s]));
+      marquerChoix();   // à partir d'ici, c'est SON réglage qui fait loi
       applyHiddenPanels();
       return;
     }
