@@ -1152,6 +1152,9 @@
   .omv-roi.pos{color:var(--ok)} .omv-roi.warn{color:#facc15} .omv-roi.neg{color:var(--down)}
   /* 🔒 lignes hors équipe (Bot/Chloé) : même gabarit que les VA, teinte à part
      pour qu'on ne les confonde JAMAIS avec quelqu'un à payer. */
+  .pp-quick{margin:2px 0 12px;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2,#17181b)}
+  .pp-quick button{margin-right:7px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:var(--card2,rgba(255,255,255,.06));color:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .pp-quick button:hover{border-color:var(--acc-line,#5b62a8)}
   .om-hors-head{margin-top:12px;padding-top:9px;border-top:1px dashed var(--line);font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
   .omv-hors{opacity:.86}
   .omv-hors .omv-va{color:var(--acc-ink,#c9cde8)}
@@ -9033,6 +9036,29 @@ const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modè
   ["costs","💸 Dépenses d'outils"],["onlychat","💬 Telegram automatique (OnlyChat)"],["onlychatcoach","🎓 Coaching Telegram (IA)"],["antileak","🛡️ Anti-leak"],["paiecumul","💸 Paie au cumul"],["meteo","🌤️ Météo des ventes"],["classement","🏆 Classement des VA"],
   ["objmois","🎯 Objectif du mois"],["concentration","⚠️ Risque de concentration"],["cohortes","📊 Cohortes & pourquoi"],["vatraj","📈 Trajectoire des VA"],["varisque","🚪 VA sur le départ"],["changements","📓 Journal des changements"],
   ["recos","🧭 À faire maintenant"],["moisrecord","🥇 Ce mois vs record"]];
+// 🎯 MODE ESSENTIEL — 54 panneaux affichés, c'est trop pour retrouver quoi que
+// ce soit. Cette liste masque UNIQUEMENT ce qui fait DOUBLON avec un panneau
+// plus complet, ou ce qui ne débouche sur aucune décision. Rien n'est supprimé
+// ni recalculé : c'est le même interrupteur que les cases à cocher juste à
+// côté, donc « Tout afficher » remet tout en un clic (mémorisé par appareil).
+const ESSENTIEL_MASQUES=[
+  // Santé des VA : 6 panneaux répondaient à « qui va bien / qui décroche ? ».
+  // On garde 📈 Trajectoire (la courbe, la plus complète) + 🏆 Classement.
+  "decroche","varisque","burnout","opportunites","ghosts",
+  // Modèles : le tableau OnlyMonster affiche DÉJÀ la ligne Layla/Zoe.
+  // On garde 🎭 Modèles ; ⚔️ Versus et 🥧 Répartition redisent la même chose.
+  "versus","pie",
+  // Gamification : agréable, mais ne change aucune décision.
+  "badges","achievements","streak",
+  // Projections et simulations : utiles ponctuellement, jamais au quotidien.
+  "sim","sim3","realloc","compare","saison",
+  // Doublons restants : 💔 Fans partis ⊂ Cohortes, 🥇 Ce mois vs record ⊂
+  // 📈 Historique, 🆕 Onboarding ⊂ Trajectoire.
+  "churn","moisrecord","onboarding",
+  // Technique : à consulter quand ça casse, pas à occuper l'écran tous les
+  // jours (l'état des proxies, lui, RESTE visible — c'est opérationnel).
+  "rw","incidents",
+];
 function hiddenSet(){ try{ const a=JSON.parse(localStorage.getItem("ccn_hidden_panels")||"[]"); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
 function applyHiddenPanels(){
   const h=hiddenSet();
@@ -9069,11 +9095,24 @@ function openPanelPicker(){
     };
     ov.innerHTML=`<div class="ppick-box"><h3>🧩 Panneaux affichés</h3>
       <div class="ppick-sub">Décoche ce que tu ne regardes jamais. Le menu 📁 range un panneau dans la catégorie de TON choix (mémorisé sur cet appareil).</div>
+      <div class="pp-quick"><button data-ppquick="essentiel">🎯 Mode essentiel</button><button data-ppquick="tout">👁️ Tout afficher</button>
+        <div class="ppick-sub" style="margin-top:5px">« Mode essentiel » masque ${ESSENTIEL_MASQUES.length} panneaux qui font doublon (6 disaient la même chose sur la santé des VA, 3 sur les modèles). Réversible : « Tout afficher » remet tout.</div></div>
       ${groupedPanneaux().map(([label,rows])=>`<div class="secnav-cat"><div class="secnav-cat-h">${label}</div>${rows.map(([id,lbl])=>`<label class="ppick-row"><input type="checkbox" data-pp="${id}" ${h.has(id)?"":"checked"}> ${lbl} ${catsOpts(id)}</label>`).join("")}</div>`).join("")}
       <button class="ppick-close">Fermer</button></div>`;
   };
   peindre();
-  ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest(".ppick-close")) ov.remove(); });
+  ov.addEventListener("click",e=>{
+    const q=e.target.closest("[data-ppquick]");
+    if(q){
+      const mode=q.getAttribute("data-ppquick");
+      localStorage.setItem("ccn_hidden_panels", JSON.stringify(mode==="essentiel"?ESSENTIEL_MASQUES:[]));
+      applyHiddenPanels(); peindre();
+      if(typeof toast==="function") toast(mode==="essentiel"?"🎯 Mode essentiel":"👁️ Tout affiché",
+        mode==="essentiel"?ESSENTIEL_MASQUES.length+" panneaux en doublon masqués — rien n'est perdu.":"Tous les panneaux sont de nouveau visibles.");
+      return;
+    }
+    if(e.target===ov||e.target.closest(".ppick-close")) ov.remove();
+  });
   ov.addEventListener("change",e=>{
     const cb=e.target.closest("[data-pp]");
     if(cb){
