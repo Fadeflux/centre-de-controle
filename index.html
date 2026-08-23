@@ -4029,7 +4029,17 @@ function openHorsEquipeCard(nom){
       ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), (ko||v.revTotal==null)?"":"brut : "+money(v.revTotal))}
       ${stat("LTV (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur))}
       ${stat("Conversion "+((d&&d.convDays)||14)+" j", (c&&c.cvr!=null)?String(c.cvr).replace(".",",")+" %":"—", c?fmtInt(c.clics)+" clics → "+fmtInt(c.subs)+" subs":"")}
-      ${stat("Quinzaine", fmtInt(v.quinzCur||0), "précédente : "+fmtInt(v.quinzPrev||0))}
+      ${(()=>{
+        // Même correctif que la fiche VA (2026-08-23) : comparer une quinzaine
+        // À PEINE COMMENCÉE à une quinzaine COMPLÈTE fait passer un démarrage
+        // normal pour un effondrement. On compare au même stade.
+        const qd=(typeof QUINZ_DATA!=="undefined"&&QUINZ_DATA)||null;
+        const je=qd?Number(qd.joursEcoules)||0:0, jt=qd?Number(qd.joursTotal)||0:0;
+        if(!je||!jt||je>=jt) return stat("Quinzaine", fmtInt(v.quinzCur||0), "précédente : "+fmtInt(v.quinzPrev||0));
+        const att=Math.round((Number(v.quinzPrev)||0)*je/jt);
+        return stat("Quinzaine", fmtInt(v.quinzCur||0),
+          "jour "+je+"/"+jt+" · au même stade la fois d'avant : "+fmtInt(att)+" "+((v.quinzCur||0)>=att?"▲":"▼")+" (total : "+fmtInt(v.quinzPrev||0)+")");
+      })()}
     </div>
     ${(function(){
       // Pas de verdict « rentable / à virer » ici : elle n'est pas payée, donc
@@ -8605,7 +8615,15 @@ function openModelCard(modelName){
 function openVaCard(vaName){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
   const v=(om.vas||[]).find(x=>x.va===vaName); if(!v) return;
-  const cur=om.currency||"$", ko=revKo();
+  // ⚠️ CORRIGÉ le 2026-08-23 — `revKo()` ne teste QUE la panne TOTALE de la
+  // source d'argent. Quand UN SEUL modèle est illisible (abonnement OnlyMonster
+  // expiré, 429), le backend le signale via `revenusPartiels` : le panneau
+  // principal affiche un bandeau d'avertissement, mais la fiche VA l'ignorait.
+  // Or les fans de ce modèle disparaissent de l'attribution : un VA qui ne
+  // travaille QUE sur ce modèle sortait « 0 $ généré, LTV 0,00 » avec le verdict
+  // « il te coûte plus qu'il ne rapporte » — une accusation fausse, tirée d'une
+  // panne. On considère donc les chiffres d'argent comme inconnus dans ce cas.
+  const cur=om.currency||"$", ko=revKo() || !!om.revenusPartiels;
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
   const arg=x=>ko?"—":money(x);
   const conv=((typeof CONV_DATA!=="undefined"&&CONV_DATA&&CONV_DATA.vas)||[]).find(x=>x.va===vaName);
@@ -8613,13 +8631,18 @@ function openVaCard(vaName){
   const goal=Number(((typeof VA_GOALS!=="undefined"&&VA_GOALS)||{})[vaName])||0;
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const ov=document.createElement("div"); ov.className="ppick";
+  // ⚠️ AJOUTÉ le 2026-08-23 — la fiche montre TOUJOURS les chiffres tous
+  // modèles confondus, même quand on a cliqué depuis l'onglet « Layla » ou
+  // « Zoe ». On lisait donc « 40 subs » dans le tableau filtré et « 152 subs »
+  // sur la fiche ouverte d'un clic, sans rien pour expliquer l'écart. On le dit.
+  const filtreActif = (typeof OM_MODEL!=="undefined" && OM_MODEL && OM_MODEL!=="all");
   ov.innerHTML=`<div class="ppick-box"><h3>👤 ${escapeHtml(vaName)}${v.unpaid?' <span class="mn-msg-note">· perso, jamais payée</span>':''}</h3>
-    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(vaName)}, au même endroit.</div>
+    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(vaName)}, au même endroit.${filtreActif?` <b>Chiffres tous modèles confondus</b>, pas seulement ${escapeHtml(OM_MODEL)}.`:""}</div>
     <div class="vacard-stats">
       ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):"pas d'objectif fixé")}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
-      ${stat("Net généré (est.)", ko?"—":money((Number(v.rev)||0)*NET_RATE), ko?"":"brut : "+money(v.rev))}
-      ${stat("LTV (par abonné)", ko?"—":fmtLtv(v.ltv,cur))}
+      ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*NET_RATE), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
+      ${stat("LTV (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"brut · net ≈ "+fmtLtv((Number(v.ltv)||0)*NET_RATE,cur))}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${(()=>{
         // ⚠️ CORRIGÉ le 2026-08-23 — la fiche affichait « Quinzaine 16 ·
@@ -8643,15 +8666,27 @@ function openVaCard(vaName){
       // 🧮 VERDICT : « ce VA vaut-il le coup ? » en une phrase claire.
       if(v.unpaid) return `<div class="va-verdict vv-ok">✅ Perso — jamais payée. Tout ce qu'elle génère est du <b>bonus</b> pur.</div>`;
       if(ko) return "";
-      const rev=Number(v.rev)||0, marge=Number(v.marge)||0, paie=Math.max(0,rev-marge), roi=v.roi;
+      // ⚠️ CORRIGÉ le 2026-08-23 — le verdict se calculait sur le CA BRUT, alors
+      // que ce que tu verses au VA est du cash bien réel. Or OnlyFans prélève
+      // ~22 % : comparer du brut à du versé surévalue le rendement d'autant.
+      // Vérifié sur l'équipe actuelle : personne ne bascule (tous largement
+      // rentables), mais Welzy s'affichait « 16,4 $ pour 1 $ versé » au lieu de
+      // 12,8 $. Et surtout, toute la bande où `versé < brut < versé/0,78` était
+      // étiquetée « rentable, garde-le » alors que le VA PERD de l'argent une
+      // fois la commission déduite. On tranche donc sur le NET.
+      const rev=Number(v.rev)||0, marge=Number(v.marge)||0, paie=Math.max(0,rev-marge);
       if((v.subs||0)<5) return `<div class="va-verdict vv-wait">⏳ Encore trop peu d'abonnés pour juger sa rentabilité.</div>`;
-      if(roi==null) return "";
-      if(marge>0){
-        const chaque=(roi+1);
-        const fort=roi>=3;
-        return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés génèrent <b>${money(rev)}</b> (brut). Chaque 1&nbsp;$ versé te rapporte <b>${(chaque).toFixed(1).replace(".",",")}&nbsp;$</b> → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
+      // Pas de mesure d'argent pour CE VA -> on ne juge pas (« absent ≠ 0 »).
+      if(v.rev==null) return `<div class="va-verdict vv-wait">❓ Revenus de ce VA non mesurés en ce moment — impossible de juger sa rentabilité.</div>`;
+      if(v.roi==null || !paie) return "";
+      const net=rev*NET_RATE, margeNet=net-paie, chaque=net/paie;
+      if(margeNet>0){
+        const fort=chaque>=4;
+        return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés te rapportent <b>${money(net)}</b> net (${money(rev)} brut − commission OnlyFans). Chaque 1&nbsp;$ versé te rend <b>${chaque.toFixed(1).replace(".",",")}&nbsp;$</b> net → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
       }
-      return `<div class="va-verdict vv-bad">⚠️ Ses abonnés génèrent <b>${money(rev)}</b> pour ~<b>${money(paie)}</b> versés : il te <b>coûte plus qu'il ne rapporte</b>. À surveiller — regarde ses liens et sa conversion avant de trancher.</div>`;
+      // Cas piégeux : rentable en brut, perdant une fois la commission déduite.
+      if(rev>paie) return `<div class="va-verdict vv-bad">⚠️ Attention au piège : ses abonnés génèrent <b>${money(rev)}</b> brut pour ~<b>${money(paie)}</b> versés, ce qui paraît rentable — mais après la commission OnlyFans il ne te reste que <b>${money(net)}</b> net. <b>Il te coûte plus qu'il ne rapporte.</b></div>`;
+      return `<div class="va-verdict vv-bad">⚠️ Ses abonnés te rapportent <b>${money(net)}</b> net pour ~<b>${money(paie)}</b> versés : il te <b>coûte plus qu'il ne rapporte</b>. À surveiller — regarde ses liens et sa conversion avant de trancher.</div>`;
     })()}
     ${(function(){
       // 🩺 #5 SANTÉ : trajectoire + risque de départ + qualité des fans + paie
@@ -8676,6 +8711,12 @@ function openVaCard(vaName){
       const pc=((typeof PCUMUL!=="undefined"&&PCUMUL&&PCUMUL.vas)||[]).find(x=>x.va===vaName);
       if(pc&&!v.unpaid&&pc.base!=null&&(Number(pc.nouveaux)||0)>0){
         rows.push(`<div class="vc-sante-row">💸 <b>${fmtInt(pc.nouveaux)} subs non payés</b> depuis ta dernière paie (~${pcMoney(pc.aPayer)}) — panneau « Paie au cumul ».</div>`);
+      }
+      // ⚠️ AJOUTÉ le 2026-08-23 — sans repère de paie, la fiche n'affichait
+      // RIEN sur ce point : on lisait « rien à payer » là où la vraie réponse
+      // est « je ne sais pas ». Le panneau « Paie au cumul », lui, le dit déjà.
+      else if(pc&&!v.unpaid&&pc.base==null){
+        rows.push(`<div class="vc-sante-row">❓ <b>Repère de paie non défini</b> pour ce VA : impossible de dire ce qui reste à lui payer — à poser dans le panneau « Paie au cumul ».</div>`);
       }
       return rows.length?`<div class="vc-sante"><div class="vc-sante-h">🩺 Santé & suivi</div>${rows.join("")}</div>`:"";
     })()}
