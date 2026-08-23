@@ -8656,7 +8656,7 @@ function openVaCard(vaName){
   ov.innerHTML=`<div class="ppick-box"><h3>👤 ${escapeHtml(vaName)}${v.unpaid?' <span class="mn-msg-note">· perso, jamais payée</span>':''}</h3>
     <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(vaName)}, au même endroit.${filtreActif?` <b>Chiffres tous modèles confondus</b>, pas seulement ${escapeHtml(OM_MODEL)}.`:""}</div>
     <div class="vacard-stats">
-      ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):"pas d'objectif fixé")}
+      ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):((typeof VA_GOALS!=="undefined"&&VA_GOALS)?"pas d'objectif fixé":"objectif en cours de chargement…"))}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
       ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*NET_RATE), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
       ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après 20 % OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies 0,50 $")}
@@ -8719,9 +8719,16 @@ function openVaCard(vaName){
       }
       const q=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).find(x=>x.va===vaName);
       if(q&&!ko){
+        // ⚠️ CORRIGE le 2026-08-23 — cette moyenne se calculait sur la liste
+        // AFFICHEE, qui est tronquee au TOP 10 cote serveur. Au-dela de 10 VA,
+        // la « moyenne de l'equipe » devenait celle des 10 MEILLEURS et un VA
+        // correct basculait a tort en « sous la moyenne, a coacher ⚠️ ».
+        // Le serveur envoie desormais la vraie moyenne, calculee sur TOUS les
+        // VA ; on ne la recalcule en local que s'il ne l'a pas fournie.
         const qs=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).filter(x=>x.va&&x.va!=="(inconnu)");
         const tf=qs.reduce((a,x)=>a+(Number(x.fans)||0),0);
-        const ta=tf>0?qs.reduce((a,x)=>a+(Number(x.avg)||0)*(Number(x.fans)||0),0)/tf:0;
+        const moyServeur=(typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):null;
+        const ta=(moyServeur!=null&&moyServeur>0)?moyServeur:(tf>0?qs.reduce((a,x)=>a+(Number(x.avg)||0)*(Number(x.fans)||0),0)/tf:0);
         const comp=ta>0?(q.avg>=ta*1.5?" — bien au-dessus de la moyenne 💎":q.avg<ta*0.4?" — sous la moyenne, à coacher ⚠️":" — dans la moyenne"):"";
         rows.push(`<div class="vc-sante-row">💎 Ses fans dépensent <b>${pcMoney(q.avg)}</b> dans leurs 30 premiers jours${comp}</div>`);
       }
