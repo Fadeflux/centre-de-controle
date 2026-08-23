@@ -2413,6 +2413,15 @@
 const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
 const HUB_BASE = HUB_URL.replace(/\/api\/hub$/, "");
 const REFRESH_MS = 60000;
+// ⚡ AJOUTÉ le 2026-08-23 — ne rien demander au cerveau quand l'onglet n'est
+// PAS regardé. Mesuré : un onglet ouvert envoyait ~19 requêtes par minute
+// (la boucle de 60 s + le sync des tâches toutes les 8 s), soit ~1 100 par
+// heure, même posé en arrière-plan toute la journée. C'est ce trafic à vide
+// qui remplissait le compteur anti-abus et provoquait les blocages « trop de
+// requêtes ». Rien n'est perdu : au retour sur l'onglet, on rafraîchit
+// IMMÉDIATEMENT, donc les chiffres sont à jour dès qu'ils sont regardés —
+// et plus frais qu'avant, puisqu'on ne dépend plus du prochain tic.
+function pageCachee(){ try{ return document.visibilityState === 'hidden'; }catch(e){ return false; } }
 
 const fmtMoney = v => HIDE ? "••• $" : (Math.round(v)).toLocaleString("fr-FR") + " $";
 // ⚠️ Le mode discret 🙈 sert à cacher les montants AUX YEUX DES AUTRES, à
@@ -4720,6 +4729,7 @@ async function loadTasks(){
 // Synchro auto entre appareils (toutes les 8 s) : fusion sûre par id, ne perd jamais un edit local plus récent, re-POST si besoin.
 async function syncTasks(){
   if(!TOKEN) return;
+  if(typeof pageCachee==="function" && pageCachee()) return;   // onglet en arrière-plan : inutile de sonder
   try{
     // ⚠️ Ce sync tourne toutes les 8 s : sans le garde « gate déjà ouverte », un
     // token expiré rouvrait l'écran de connexion en boucle et VOLAIT LE FOCUS
@@ -9296,7 +9306,7 @@ try{
 // restait figée sur les chiffres du chargement initial, SOUS un badge « à jour
 // à l'instant » rafraîchi par les autres appels — donc un chiffre périmé
 // présenté comme frais. Ajouté à la boucle comme loadCash/loadCharge.
-setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel();
+function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel();
   // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
   // échec — un redéploiement du cerveau au mauvais moment — verrouillait
   // l'écriture pour TOUTE la session, pendant que le reste de la page se
@@ -9309,7 +9319,19 @@ setInterval(()=>{ if(!$("#gate").classList.contains("show")){ load(); loadOM(); 
     if(typeof VANOTES_LOADED!=="undefined" && !VANOTES_LOADED) loadVaNotes();
     if(typeof COSTS_LOADED!=="undefined" && !COSTS_LOADED) loadCosts();
   }
-} }, REFRESH_MS);
+} }
+setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
+// Retour sur l'onglet : on rafraîchit tout de suite plutôt que d'attendre le
+// prochain tic — les chiffres sont donc à jour au moment précis où on les
+// regarde. (Garde-fou : pas plus d'un rafraîchissement toutes les 5 s, pour
+// qu'un aller-retour rapide entre onglets ne déclenche pas une rafale.)
+var _dernierReveil = 0;
+document.addEventListener('visibilitychange', function(){
+  if(pageCachee()) return;
+  if(Date.now() - _dernierReveil < 5000) return;
+  _dernierReveil = Date.now();
+  try{ boucleRafraichissement(); if(typeof syncTasks==="function") syncTasks(); }catch(e){}
+});
 setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
 // ⚠️ Safari iOS n'émet PAS `beforeprint` : sans ce rafraîchissement régulier,
 // « Partager → Imprimer » sortait toujours l'état des lieux figé à t+3,5 s
