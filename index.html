@@ -8621,7 +8621,23 @@ function openVaCard(vaName){
       ${stat("Net généré (est.)", ko?"—":money((Number(v.rev)||0)*NET_RATE), ko?"":"brut : "+money(v.rev))}
       ${stat("LTV (par abonné)", ko?"—":fmtLtv(v.ltv,cur))}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
-      ${stat("Quinzaine", qz?fmtInt(qz.cur):"—", qz?("précédente : "+fmtInt(qz.prev)):"")}
+      ${(()=>{
+        // ⚠️ CORRIGÉ le 2026-08-23 — la fiche affichait « Quinzaine 16 ·
+        // précédente : 96 » SANS dire qu'on n'est qu'au jour 5 sur 16. Lu tel
+        // quel, ça ressemble à un effondrement alors que c'est juste une
+        // quinzaine à peine commencée. Le panneau « Quinzaine vs précédente »
+        // fait DÉJÀ le prorata et l'explique (« sinon la quinzaine en cours
+        // perdrait toujours ») ; la fiche VA, elle, ne le faisait pas. On
+        // compare donc au MÊME STADE, comme partout ailleurs.
+        if(!qz) return stat("Quinzaine","—","");
+        const qd=(typeof QUINZ_DATA!=="undefined"&&QUINZ_DATA)||null;
+        const je=qd?Number(qd.joursEcoules)||0:0, jt=qd?Number(qd.joursTotal)||0:0;
+        if(!je||!jt||je>=jt) return stat("Quinzaine", fmtInt(qz.cur), "précédente : "+fmtInt(qz.prev));
+        const attendu=Math.round((Number(qz.prev)||0)*je/jt);
+        const signe=qz.cur>=attendu?"▲":"▼";
+        return stat("Quinzaine", fmtInt(qz.cur),
+          "jour "+je+"/"+jt+" · au même stade la fois d'avant : "+fmtInt(attendu)+" "+signe+" (total : "+fmtInt(qz.prev)+")");
+      })()}
     </div>
     ${(function(){
       // 🧮 VERDICT : « ce VA vaut-il le coup ? » en une phrase claire.
