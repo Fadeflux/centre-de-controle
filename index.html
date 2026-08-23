@@ -209,6 +209,13 @@
   .ocr-puce{font-size:11.5px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:var(--card2,rgba(255,255,255,.05));color:inherit;cursor:pointer}
   .ocr-puce:hover{border-color:var(--acc-line,#5b62a8)}
   .ocr-puce.on{background:rgba(250,204,21,.15);border-color:#facc15;color:#facc15}
+  .ocr-bilan{margin:10px 0;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2,#17181b)}
+  .ocr-bilan-h{font-size:12px;font-weight:700;margin-bottom:6px}
+  .ocr-vrow{font-size:12px;padding:2px 0}
+  .ocr-bilan-v{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:12.5px}
+  .ocr-vb{display:inline-block;margin-top:2px;font-size:10.5px;padding:1px 6px;border-radius:6px;border:1px solid var(--line)}
+  .ocr-v-chaud{color:#4ade80;border-color:rgba(74,222,128,.4)}
+  .ocr-v-a-verifier{color:#f87171;border-color:rgba(248,113,113,.4)}
   .ocr-row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:7px 0;border-top:1px solid var(--line)}
   .ocr-nom{font-weight:600;font-size:13px;color:var(--acc-ink,#c9cde8);text-decoration:none}
   .ocr-nom:hover{text-decoration:underline}
@@ -3404,13 +3411,31 @@ function renderOcRelance(){
     return `<div class="ocr-row">
       <a class="ocr-nom" href="${escapeHtml(f.lien)}" target="_blank" rel="noopener">${qui}</a>
       <span class="ocr-meta">${escapeHtml(f.modele)} · ${quand}${f.scriptsTotal?` · ${f.scriptsEnvoyes}/${f.scriptsTotal} scripts`:""}${f.robotActif?"":' · <b style="color:#f87171">robot éteint</b>'}</span>
-      <span class="ocr-seg">${escapeHtml(l.titre||f.segment)}</span>
+      <span class="ocr-seg">${escapeHtml(l.titre||f.segment)}${f.verdict?`<br><span class="ocr-vb ocr-v-${escapeHtml(f.verdict)}">${escapeHtml(((d.verdicts||{})[f.verdict]||{}).titre||f.verdict)}</span>`:""}</span>
     </div>`;
   }).join("")||`<div class="ppick-sub">Aucun fan dans cette catégorie.</div>`;
 
   const reste=liste.length>40?`<div class="ppick-sub" style="margin-top:6px">… et ${liste.length-40} autres dans cette catégorie.</div>`:"";
-  const aide=`<div class="sv-note" style="margin-top:8px">💡 Commence par « le robot est éteint » : ces fans sont actifs et <b>personne ne leur parle</b>. Un clic sur un nom ouvre sa conversation dans OnlyChat.</div>`;
-  body.innerHTML=entete+`<div class="ocr-puces">${puces}</div>`+lignes+reste+aide;
+  // Synthèse de la lecture des conversations : c'est ELLE qui répond à
+  // « faut-il écrire un script neuf, ou laisser tomber ces fans ? ».
+  let bilan="";
+  if(d.analysees>0){
+    const pv=d.parVerdict||{}, vd=d.verdicts||{};
+    const nSans=(pv['sans-reponse']||0), nChaud=(pv['chaud']||0), nVerif=(pv['a-verifier']||0);
+    const lignes=Object.keys(vd).sort((a,b)=>vd[a].ordre-vd[b].ordre).filter(k=>pv[k]).map(k=>
+      `<div class="ocr-vrow"><b>${pv[k]}</b> · ${escapeHtml(vd[k].titre)} <span class="ocr-note">— ${escapeHtml(vd[k].quoiFaire)}</span></div>`).join("");
+    const verdict=(nSans>nVerif*3)
+      ? `<b>La cause est le manque de script</b>, pas des fans pénibles : ${nSans} conversations s'arrêtent sur le message du fan contre ${nVerif} à vérifier. Écrire un script neuf débloquerait ce groupe d'un coup.`
+      : `À lire au cas par cas : ${nChaud} ont parlé argent, ${nVerif} sont à vérifier.`;
+    bilan=`<div class="ocr-bilan"><div class="ocr-bilan-h">🔍 Ce que disent les conversations <span class="ocr-note">(${d.analysees} lues)</span></div>${lignes}<div class="ocr-bilan-v">${verdict}</div></div>`;
+  }
+  const aide=`<div class="sv-note" style="margin-top:8px">💡 Un clic sur un nom ouvre sa conversation dans OnlyChat.${d.analysees?"":" <button class=\"ocr-puce\" id=\"ocrAnalyser\">🔍 Lire les conversations</button>"}</div>`;
+  body.innerHTML=entete+bilan+`<div class="ocr-puces">${puces}</div>`+lignes+reste+aide;
+  { const ba=$("#ocrAnalyser"); if(ba) ba.onclick=async()=>{
+      ba.disabled=true; ba.textContent="⏳ lecture en cours…";
+      try{ await fetch(HUB_BASE+"/api/hub/onlychat-relance/analyser",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({limite:60})}); }catch(e){}
+      setTimeout(loadOcRelance, 45000);
+    }; }
 }
 // Un clic sur une puce filtre la liste (re-clic = retour aux prioritaires).
 document.addEventListener("click",e=>{
