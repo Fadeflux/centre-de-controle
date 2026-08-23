@@ -3365,9 +3365,16 @@ function renderOcRelance(){
   const st=$("#ocrState");
   if(d.computing){
     if(st) st.textContent="";
-    body.innerHTML=`<div class="ppick-sub">⏳ Premier calcul en cours — reviens dans une minute.</div>`;
+    body.innerHTML=`<div class="ppick-sub">⏳ Premier calcul en cours (~15 s) — l'affichage se fera tout seul.</div>`;
+    // ⚠️ Sans ce re-essai, le panneau restait FIGE sur « calcul en cours »
+    // jusqu'au prochain rechargement de page : le premier appel arrive souvent
+    // avant que le serveur ait fini (cache vide apres un redemarrage). On
+    // repasse donc voir tout seul, 3 fois maximum pour ne pas boucler.
+    if(!window.__ocrEssais) window.__ocrEssais=0;
+    if(window.__ocrEssais<3){ window.__ocrEssais++; setTimeout(loadOcRelance, 12000); }
     return;
   }
+  window.__ocrEssais=0;
   const t=d.total||{}, seg=d.segments||{}, lib=d.libelles||{};
   if(st) st.innerHTML=(typeof fraicheur==="function"&&d.maj)?fraicheur(d.maj):"";
 
