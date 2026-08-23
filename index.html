@@ -2607,7 +2607,7 @@ function render(data){
   // Sous le seuil réglé dans OnlyChat, la carte porte une note d'alerte.
   if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.solde!=null){
     data["onlychat-solde"]={status:"online",metrics:{solde:ONLYCHAT_DATA.solde,jours:ONLYCHAT_DATA.soldeJoursRestants}};
-    const seuilOc=(ONLYCHAT_DATA.soldeSeuil!=null&&ONLYCHAT_DATA.soldeSeuil>0)?ONLYCHAT_DATA.soldeSeuil:50;
+    const seuilOc=(ONLYCHAT_DATA.soldeSeuil!=null&&ONLYCHAT_DATA.soldeSeuil>0)?ONLYCHAT_DATA.soldeSeuil:200;
     if(Number(ONLYCHAT_DATA.solde)<seuilOc) data["onlychat-solde"].note="Solde bas — recharge avant que l'IA de vente s'arrête";
   } else {
     // ⚠️ `data` est LAST, un objet qui SURVIT entre deux rendus : sans ce
@@ -3137,7 +3137,8 @@ function majMornSolde(){
   const d=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)||null;
   if(!d||d.solde==null){ z.innerHTML=""; return; }
   const jrs=d.soldeJoursRestants;
-  if(Number(d.solde)>=100 && !(jrs!=null&&jrs<=7)){ z.innerHTML=""; return; }
+  const seuilM=(d.soldeSeuil!=null&&d.soldeSeuil>0)?Number(d.soldeSeuil):200;   // 2026-08-23 : etait 100 en dur, desormais aligne sur le seuil officiel
+  if(Number(d.solde)>=seuilM && !(jrs!=null&&jrs<=7)){ z.innerHTML=""; return; }
   const rythme=(d.soldeConsoJour!=null&&jrs!=null)?` Au rythme actuel (~${tgMoney(d.soldeConsoJour)}/jour), à sec dans ~${jrs} jour${jrs>1?"s":""}.`:"";
   z.innerHTML=`<div class="mn-coach" style="border-left-color:#facc15"><div class="mn-coach-hd" style="color:#facc15">💳 Il te reste peu d'argent sur OnlyChat</div><div class="mn-coach-txt">Il reste <b>${tgMoney(d.solde)}</b> sur ton solde.${rythme} À zéro, l'IA de vente Telegram s'arrête — recharge aujourd'hui.</div></div>`;
 }
@@ -3289,7 +3290,7 @@ function renderOnlyChat(){
   // 💳 Solde prépayé de l'organisation : c'est lui qui finance l'IA de vente —
   // à zéro, elle s'arrête. Orange sous le seuil réglé dans OnlyChat. Absent
   // (null) = « je sais pas » → on n'affiche RIEN, jamais un 0 inventé.
-  const seuilSolde=(d.soldeSeuil!=null&&d.soldeSeuil>0)?d.soldeSeuil:50;
+  const seuilSolde=(d.soldeSeuil!=null&&d.soldeSeuil>0)?d.soldeSeuil:200;
   const soldeBas=(d.solde!=null&&Number(d.solde)<seuilSolde);
   // « ~X j » = au rythme réel de consommation des 7 derniers jours (calculé
   // par le cerveau sur les transactions). Absent si inconnu — jamais inventé.
@@ -7367,7 +7368,7 @@ function buildActions(){
   try{
     const oc=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)||null;
     if(oc&&oc.solde!=null){
-      const seuilOc=(oc.soldeSeuil!=null&&oc.soldeSeuil>0)?oc.soldeSeuil:50;
+      const seuilOc=(oc.soldeSeuil!=null&&oc.soldeSeuil>0)?oc.soldeSeuil:200;
       if(Number(oc.solde)<seuilOc) push(2,"💳",`Solde OnlyChat bas : ${eur(oc.solde)} — à zéro, l'IA de vente Telegram s'arrête`,"onlychat");
     }
   }catch(e){}
