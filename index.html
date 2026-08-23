@@ -4017,7 +4017,7 @@ function openHorsEquipeCard(nom){
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
   const ko=(typeof revKo==="function")?revKo():false;
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const c=v.conv, s=v.sante;
   const ov=document.createElement("div"); ov.className="ppick";
@@ -4840,9 +4840,11 @@ renderRoutines();
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
 const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
-// Ce que tu touches vraiment ≈ brut × 78 % (20 % OnlyFans + 2 % Skrill) — la
+// Ce que tu touches vraiment ≈ brut × 80 % (20 % OnlyFans). ⚠️ 2026-08-23 :
+// c'était 78 % (20 % OF + 2 % Skrill), mais André N'UTILISE PAS Skrill pour
+// Noctra — ces 2 % n'existent pas ici et rabotaient tous les chiffres nets.
 // même règle que Noctra Finance. Le NET s'affiche en premier, le brut en petit.
-const NET_RATE=0.78;
+const NET_RATE=0.80;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 // Comme tgMoney, mais réutilisable pour tout montant — AVEC les centimes.
 // Sert au "Net du mois" depuis qu'il additionne OnlyFans (arrondi) + Telegram
@@ -4855,14 +4857,14 @@ function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)|
 // ses VA 0,50 $ NET : comparer une LTV brute à un coût net surévaluait le
 // rendement d'un quart. Mesuré sur l'équipe : 4,92 $ brut affiché contre
 // 3,94 $ réellement encaissés par abonné.
-// On retire les 20 % OnlyFans. Les 2 % Skrill sont des frais de RETRAIT : ils
-// restent comptés au niveau global (« Net du mois », « Rentabilité »), pas par
-// abonné — choix explicite d'André le 2026-08-23.
+// On retire les 20 % OnlyFans, et RIEN d'autre : André n'utilise pas Skrill
+// pour Noctra (confirmé le 2026-08-23), donc les 2 % de frais de retrait qui
+// traînaient dans l'ancien taux de 78 % n'ont jamais eu lieu d'être ici.
 // La conversion est faite ICI, dans la fonction d'affichage, pour qu'aucun
 // endroit ne puisse l'oublier : les 7 points d'affichage passent tous par elle.
 // Les VALEURS BRUTES restent intactes côté données (v.ltv, m.ltv) : seul
 // l'affichage change, donc les calculs internes ne bougent pas.
-const LTV_NET_RATE = 0.80;
+const LTV_NET_RATE = NET_RATE;   // meme taux : plus de distinction depuis qu'il n'y a plus de Skrill
 function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*LTV_NET_RATE).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function ltvBrutTxt(v,cur){ return (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
@@ -4882,7 +4884,7 @@ function renderOM(){
   const mnt=(v)=>(ko||v==null)?"—":omMoney(v,cur);   // tout montant
   const ltvT=(v)=>(ko||v==null)?"—":fmtLtv(v,cur);   // toute LTV
   // 💡 Le NET d'abord, le brut en petit (comme OnlyFans) : net estimé = brut
-  // × 78 % (20 % OnlyFans + 2 % Skrill, la même règle que le site finances).
+  // × 80 % (20 % OnlyFans ; pas de Skrill chez Noctra).
   const netE=(v)=>ko?"—":omMoney((Number(v)||0)*NET_RATE,cur);
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
@@ -4953,8 +4955,8 @@ function renderOM(){
     return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}">${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   const vaHead=`<div class="om-va-head">Classement des VA${OM_MODEL!=="all"?" · sur "+escapeHtml(OM_MODEL):""} <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
-  // Rappel honnête : tout ici est du BRUT (avant la commission OnlyFans). Le vrai
-  // net, les 2 % Skrill et la part modèle se calculent sur Noctra Finance.
+  // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
+  // modèle, elle, se calcule sur Noctra Finance.
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
@@ -5321,7 +5323,7 @@ function renderRenta(){
   // On projette donc la marge, puis on retire les coûts d'outils UNE fois.
   const projMarge=(day>0?Math.round(margeMonth/day*dim):margeMonth);
   const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):Math.round(projMarge-coutOutils+projTg);
-  // Le vrai profit retire la commission plateforme (brut × 22 %) — avant, le
+  // Le vrai profit retire la commission plateforme (brut × 20 %) — avant, le
   // panneau la « oubliait » et surestimait le profit d'un quart.
   const commission=Math.round(netMonth*(1-NET_RATE));
   // 💬 Commission OnlyChat SUR LES VENTES (en plus des 180 $/mois
@@ -5355,7 +5357,7 @@ function renderRenta(){
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
-    <div class="rn-line"><span>− Commission OnlyFans + Skrill (22 %)</span><span class="rn-v neg">−${money(commission)}</span></div>
+    <div class="rn-line"><span>− Commission OnlyFans (20 %)</span><span class="rn-v neg">−${money(commission)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
@@ -5377,7 +5379,7 @@ function renderRenta(){
       if(lmOF==null && lmTg==null) return "";
       return `<div class="rn-proj" style="margin-top:8px;font-size:12px">📅 <b>Mois dernier</b> : OF (brut) ${lmOF!=null?money(lmOF):"—"}${lmTg!=null?` · Telegram ${money(lmTg)}`:""}${(lmOF!=null&&lmTg!=null)?` <span style="opacity:.6">(pas la même base, ne pas additionner)</span>`:""}</div>`;
     })()}
-    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 78 % (20 % OnlyFans + 2 % Skrill), la même règle que ton site finances. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
+    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 80 % (20 % OnlyFans). Pas de frais Skrill chez Noctra. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
   { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
 }
 function renderSplit(){
@@ -5391,7 +5393,7 @@ function renderSplit(){
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
-  // (brut × 22 %), comme le panneau Rentabilité. Avant, on partageait la marge
+  // (brut × 20 %), comme le panneau Rentabilité. Avant, on partageait la marge
   // BRUTE -> chaque associé se voyait attribuer ~508 $ que la plateforme prélève
   // et qui n'entre jamais. netMonth = CA brut du mois.
   const commission=Math.round((Number(d.totals.netMonth)||0)*(1-NET_RATE));
@@ -5673,7 +5675,7 @@ function buildPrintSummary(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const cur=(om&&om.currency)||"$";
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
   const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,cur);
@@ -5720,7 +5722,7 @@ function makeMonthReport(){
   x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.32; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
-  const HIDEv=(typeof HIDE!=="undefined"&&HIDE), ko=(typeof revKo==="function")?revKo():false, NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const HIDEv=(typeof HIDE!=="undefined"&&HIDE), ko=(typeof revKo==="function")?revKo():false, NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const money=v=>HIDEv?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const mois=new Date().toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
   x.fillStyle="#fff"; x.font="bold 60px Inter,Arial,sans-serif"; x.fillText(brand,80,140);
@@ -6807,7 +6809,7 @@ function renderCompare(){
 function renderCompareResult(){
   const res=$("#cmpRes"); if(!res||!COMPARE_DATA) return;
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const A=COMPARE_DATA.a, B=COMPARE_DATA.b, net=v=>Math.round((Number(v)||0)*NET);
   const delta=(a,b,fmt)=>{ const dd=a-b, up=dd>=0, pct=b>0?Math.round(dd/b*100):null; return `<span class="${up?'pos':'neg'}">${up?'▲':'▼'} ${fmt(Math.abs(dd))}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span>`; };
@@ -7213,7 +7215,7 @@ function openRevue(){
   const ov=$("#revue"), body=$("#revueBody"); if(!ov||!body) return;
   const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=d.totals||{}, cur=d.currency||"$";
   const ko=(typeof revKo==="function")?revKo():false;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   let caBloc="";
   const dn=Array.isArray(d.dailyNet)?d.dailyNet.map(x=>Number(x.v)||0):[];
@@ -7423,7 +7425,7 @@ function essTuilesCatalogue(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
@@ -7522,7 +7524,7 @@ function _milestonesDone(){ try{ return JSON.parse(localStorage.getItem("ccn_mil
 function checkMilestones(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals||(typeof revKo==="function"&&revKo())) return;
   const t=om.totals, done=_milestonesDone(), seeded=!!done.__seeded; let changed=false;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.78;
+  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
   const vals={ subsMonth:Number(t.subsMonth)||0, subsTotal:Number(t.subsTotal)||0, netMonth:Math.round((Number(t.netMonth)||0)*NET) };
   Object.keys(MILESTONE_PALIERS).forEach(metric=>{
     const cfg=MILESTONE_PALIERS[metric], v=vals[metric];
@@ -8682,7 +8684,7 @@ function openVaCard(vaName){
       if(ko) return "";
       // ⚠️ CORRIGÉ le 2026-08-23 — le verdict se calculait sur le CA BRUT, alors
       // que ce que tu verses au VA est du cash bien réel. Or OnlyFans prélève
-      // ~22 % : comparer du brut à du versé surévalue le rendement d'autant.
+      // 20 % : comparer du brut à du versé surévalue le rendement d'autant.
       // Vérifié sur l'équipe actuelle : personne ne bascule (tous largement
       // rentables), mais Welzy s'affichait « 16,4 $ pour 1 $ versé » au lieu de
       // 12,8 $. Et surtout, toute la bande où `versé < brut < versé/0,78` était
@@ -9269,7 +9271,7 @@ function renderModeles(){
     </div>`;
   }).join("");
   $("#modelesBody").innerHTML=`<div class="mdl-row">${html}</div>`
-    +`<div class="sv-note" style="margin-top:8px">Net estimé = brut × 78 %. Détail par VA : clique sur un modèle dans le panneau OnlyMonster.</div>`;
+    +`<div class="sv-note" style="margin-top:8px">Net estimé = brut × 80 %. Détail par VA : clique sur un modèle dans le panneau OnlyMonster.</div>`;
   if(typeof fixPairs==="function") fixPairs();
 }
 
