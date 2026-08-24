@@ -1178,6 +1178,13 @@
   .om-spend-c:hover{background:rgba(52,211,153,.18)}
   .om-spend-c i{color:var(--faint);font-style:normal;font-size:11.5px}
   .om-spend-n{color:var(--faint);font-size:11.5px;margin-top:2px}
+  .om-rec{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+  .om-rec-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .om-rec-l{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:3px 0;color:var(--muted)}
+  .om-rec-l b{color:var(--fg,#fff);white-space:nowrap}
+  .om-rec-l.tot{border-top:1px solid var(--line);margin-top:3px;padding-top:6px;font-weight:600;color:var(--fg,#fff)}
+  .om-rec-p{margin-top:7px;font-size:12px;color:var(--muted);background:rgba(99,102,241,.10);border-left:2px solid var(--accent,#6366f1);border-radius:0 6px 6px 0;padding:6px 9px}
+  .om-rec-w{margin-top:6px;font-size:11.5px;color:#facc15}
   .omv-rank{width:18px;color:var(--faint);font-size:12px;text-align:center;flex-shrink:0}
   .omv-va{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .omv-s{color:var(--muted);white-space:nowrap}
@@ -5162,6 +5169,39 @@ function renderOM(){
     `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${perDispo||x.k==="tout"?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
     + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
     + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
+  // 🧾 RÉCONCILIATION — pourquoi la carte du jour et le tableau ne disent pas
+  // le même chiffre (question d'André le 24/08 : « 492,85 $ ne correspond pas »).
+  // Trois écarts se cumulaient sans être nommés :
+  //   1. la carte est en NET (−20 % OnlyFans), le tableau en BRUT ;
+  //   2. la carte inclut Telegram, le tableau non (rail séparé) ;
+  //   3. tout l'argent n'est pas rattachable à un VA (fans sans lien, VA partis).
+  // On affiche donc l'addition complète, pour que le compte tombe juste à l'œil.
+  const reconcile=(cle)=>{
+    const t=d.totals||{};
+    if(ko || !t.brutFenetre || t.brutFenetre[cle]==null) return "";
+    const brut=Number(t.brutFenetre[cle])||0;
+    const hors=(t.horsVa&&t.horsVa[cle])?t.horsVa[cle]:{rev:0,payeurs:0};
+    const anc=(t.ancienVa&&t.ancienVa[cle])?t.ancienVa[cle]:{rev:0,vas:[]};
+    const auxVa=Math.round((brut-(hors.rev||0)-(anc.rev||0))*100)/100;
+    const lignes=[
+      `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVa,cur)}</b></div>`,
+      (hors.rev? `<div class="om-rec-l"><span>Abonnés arrivés <b>sans lien de VA</b>${hors.payeurs?` · ${fmtInt(hors.payeurs)} fan${hors.payeurs>1?"s":""}`:""}</span><b>${omMoney(hors.rev,cur)}</b></div>`:""),
+      (anc.rev? `<div class="om-rec-l"><span>Anciens VA, partis de l'équipe${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(anc.rev,cur)}</b></div>`:""),
+      `<div class="om-rec-l tot"><span>Total brut OnlyFans</span><b>${omMoney(brut,cur)}</b></div>`,
+    ].join("");
+    // Le pont vers la carte « 📅 Aujourd'hui » : net + Telegram.
+    let pont="";
+    if(cle==="today"){
+      const net=brut*NET_RATE;
+      const tg=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
+      pont=`<div class="om-rec-p">Sur ta carte du jour tu vois le <b>net</b> : ${omMoney(brut,cur)} − 20 % = <b>${moneyPrecis(net,cur)}</b>`
+        +(tg!=null?` · + Telegram <b>${tgMoney(tg)}</b> = <b>${moneyPrecis(net+tg,cur)}</b>`:` (+ Telegram)`)+`</div>`;
+    }
+    const part=brut>0?Math.round(((hors.rev||0)+(anc.rev||0))/brut*100):0;
+    return `<div class="om-rec"><div class="om-rec-h">🧾 D'où vient l'argent ${escapeHtml((OM_PERIODES.find(x=>x.k===cle)||{}).court||"")}</div>${lignes}${pont}`
+      +(part>=25?`<div class="om-rec-w">⚠️ ${part} % de cet argent n'est rattaché à aucun VA du classement — c'est pour ça que la somme du tableau est plus basse que le total.</div>`:"")
+      +`</div>`;
+  };
   // 💸 « Qui dépense aujourd'hui » — la question posée mot pour mot par André.
   // Toujours affiché (quelle que soit la fenêtre choisie) : c'est la ligne qu'il
   // vient chercher le matin. Un jour sans encaissement le dit franchement au
@@ -5173,10 +5213,12 @@ function renderOM(){
     const act=src.filter(v=>v.periodes.today.rev).sort((a,b)=>b.periodes.today.rev-a.periodes.today.rev);
     const tot=act.reduce((a,v)=>a+(v.periodes.today.rev||0),0);
     const nb=act.reduce((a,v)=>a+(v.periodes.today.payeurs||0),0);
-    if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.</div>`;
+    const rec=reconcile("today");
+    if(!act.length && !rec) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.</div>`;
     return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b> par ${fmtInt(nb)} abonné${nb>1?"s":""}</div>`
       +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)} <i>· ${fmtInt(v.periodes.today.payeurs||0)} payeur${(v.periodes.today.payeurs||0)>1?"s":""}</i></span>`).join("")
-      +`<div class="om-spend-n">Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Brut, avant les 20 % OnlyFans.</div></div>`;
+      +`<div class="om-spend-n">Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>.</div>`
+      +rec+`</div>`;
   })();
   // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
   // modèle, elle, se calcule sur Noctra Finance.
@@ -5184,6 +5226,7 @@ function renderOM(){
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
+  const recFenetre = (per==="tout"||ko) ? "" : reconcile(per);
   const noteAnciens = (per==="tout"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`;
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
@@ -5228,7 +5271,7 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?noteAnciens+noteBrut:"")+noteArg;
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+noteAnciens+noteBrut:"")+noteArg;
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
   renderModeles();
   renderCaJours();
