@@ -1170,6 +1170,11 @@
   .omv-pay{color:var(--muted);white-space:nowrap;font-size:12.5px}
   .omv-nopay{color:var(--faint);font-style:italic}
   .omv-s.vide{color:var(--faint)}
+  .omv-t{font-style:normal;font-size:10.5px;font-weight:700;margin-left:5px;cursor:help;white-space:nowrap}
+  .omv-t.up{color:#34d399}
+  .omv-t.down{color:#f87171}
+  .omv-t.neuf{color:#60a5fa;font-weight:600}
+  .omv-t.egal{color:var(--faint);font-weight:600}
   .omv-anc{font-style:normal;font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.12);border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:1px;cursor:help}
   .om-spend{background:var(--card2,#17171b);border:1px solid var(--line);border-left:3px solid #34d399;border-radius:10px;padding:10px 12px;margin:0 0 10px}
   .om-spend.vide{border-left-color:#3a3a42;color:var(--muted);font-size:13px}
@@ -5010,6 +5015,20 @@ const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,per
 // c'était 78 % (20 % OF + 2 % Skrill), mais André N'UTILISE PAS Skrill pour
 // Noctra — ces 2 % n'existent pas ici et rabotaient tous les chiffres nets.
 // même règle que Noctra Finance. Le NET s'affiche en premier, le brut en petit.
+const NET_RATE_DEFAUT=0.80;
+// ⭐ Le serveur envoie désormais son propre taux (`totals.netRate`, cf.
+// ofCommission.js). On le suit : sans ça, changer la commission d'un côté
+// laissait l'autre afficher l'ancien taux, sans que rien ne le signale.
+function netRate(){
+  try{ var r=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)?Number(OM_DATA.totals.netRate):NaN;
+       return (isFinite(r)&&r>0&&r<=1)?r:NET_RATE_DEFAUT; }catch(e){ return NET_RATE_DEFAUT; }
+}
+// Ce que je paie un sub (0,50 $ par défaut) — sert au seuil « ce VA me coûte
+// plus qu'il ne me rapporte », qui était figé à 0,50 en BRUT (donc 0,40 net).
+function prixSub(){
+  try{ var p=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)?Number(OM_DATA.totals.prixSub):NaN;
+       return (isFinite(p)&&p>0)?p:0.50; }catch(e){ return 0.50; }
+}
 const NET_RATE=0.80;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 // Comme tgMoney, mais réutilisable pour tout montant — AVEC les centimes.
@@ -5030,8 +5049,11 @@ function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)|
 // endroit ne puisse l'oublier : les 7 points d'affichage passent tous par elle.
 // Les VALEURS BRUTES restent intactes côté données (v.ltv, m.ltv) : seul
 // l'affichage change, donc les calculs internes ne bougent pas.
+// ⚠️ Conservé pour compatibilité, mais NE PLUS L'UTILISER dans du code neuf :
+// `netRate()` suit le taux annoncé par le serveur, cette constante non. Les
+// deux derniers usages ci-dessous sont passés à netRate() le 2026-08-24.
 const LTV_NET_RATE = NET_RATE;   // meme taux : plus de distinction depuis qu'il n'y a plus de Skrill
-function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*LTV_NET_RATE).toFixed(2).replace(".",",")+" "+(cur||"$"); }
+function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*netRate()).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function ltvBrutTxt(v,cur){ return (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function renderOM(){
   // Même sans données OM, les panneaux qui dépendent de HIDE doivent être
@@ -5129,7 +5151,12 @@ function renderOM(){
     // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
     // « LTV 0,00 » en rouge, « −91 $ » de marge et « ROI −1,0× » — un tableau où
     // toute l'équipe paraît déficitaire alors qu'on n'a rien lu.
-    const bad=!ko && !v.unpaid && v.ltv!=null && v.ltv<0.5, mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:((ko||v.rev==null)?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
+    // ⚠️ CORRIGÉ le 2026-08-24 — le seuil était figé à 0,50 en BRUT, soit 0,40 net :
+    // un VA à 0,60 $ brut encaissait 0,48 $ net, me coûtait 0,50 $ et n'était PAS
+    // signalé alors qu'il me faisait perdre de l'argent. On compare maintenant la
+    // LTV NETTE à ce que je paie vraiment.
+    const ltvNette=(v.ltv!=null)?v.ltv*netRate():null;
+    const bad=!ko && !v.unpaid && ltvNette!=null && ltvNette<prixSub(), mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:((ko||v.rev==null)?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
@@ -5147,9 +5174,11 @@ function renderOM(){
     if(per!=="tout"){
       const ps=pOf(v,"subs")||0, pr=pOf(v,"rev"), pp=pOf(v,"payeurs");
       const argKo = ko || pr==null;
+      const prc=(v.periodes&&v.periodes[per])?v.periodes[per].prec:null;
+      const tSubs=prc?tendance(ps,prc.subs):"", tRev=(prc&&!argKo)?tendance(pr,prc.rev):"";
       return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span>`
-        +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}</span>`
-        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
+        +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}${tSubs}</span>`
+        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}${tRev}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
         +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
         // Pas de jauge d'objectif ici : l'objectif est MENSUEL. Affiché à côté
         // d'une colonne « 7 j », « 12/50 » se lirait comme un objectif de la
@@ -5169,6 +5198,20 @@ function renderOM(){
     `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${perDispo||x.k==="tout"?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
     + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
     + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
+  // 📈 Tendance vs la MÊME durée juste avant. Trois cas distincts, et aucun
+  // ne doit se déguiser en un autre :
+  //   • pas de mesure précédente (30 j) -> rien du tout ;
+  //   • précédent à zéro mais actuel > 0 -> « nouveau », pas « +∞ % » ;
+  //   • les deux à zéro -> rien (afficher « = 0 % » serait du bruit).
+  const tendance=(a,b)=>{
+    if(b==null||a==null) return "";
+    const x=Number(a)||0, y=Number(b)||0;
+    if(!y) return x? `<i class="omv-t neuf" title="Rien sur la période précédente">nouveau</i>`:"";
+    const pct=Math.round((x/y-1)*100);
+    if(pct===0) return `<i class="omv-t egal" title="Identique à la période précédente">=</i>`;
+    const up=pct>0;
+    return `<i class="omv-t ${up?'up':'down'}" title="Période précédente de même durée : ${escapeHtml(String(y))}">${up?'▲':'▼'}${Math.abs(pct)} %</i>`;
+  };
   // 🧾 RÉCONCILIATION — pourquoi la carte du jour et le tableau ne disent pas
   // le même chiffre (question d'André le 24/08 : « 492,85 $ ne correspond pas »).
   // Trois écarts se cumulaient sans être nommés :
@@ -5222,11 +5265,18 @@ function renderOM(){
   })();
   // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
   // modèle, elle, se calcule sur Noctra Finance.
-  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
+  // ⚠️ Formulation corrigée le 2026-08-24 : tout n'est PAS brut. La colonne
+  // « généré » l'est, mais LTV / marge / ROI sont désormais NETS (ils comparent
+  // de l'argent encaissé à une paie réellement versée). Le dire précisément
+  // évite de re-diviser mentalement un chiffre déjà net.
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${Math.round((1-netRate())*100)} % OnlyFans). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
   const recFenetre = (per==="tout"||ko) ? "" : reconcile(per);
+  // Honnêteté sur 30 j : pas de flèche, et on dit pourquoi plutôt que de laisser
+  // croire que la colonne « tendance » a été oubliée.
+  const notePrec = (per!=="j30"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">↔️ Pas de comparaison sur 30 jours : il faudrait remonter à 60 jours d'historique chez OnlyMonster, ce qui doublerait le temps de calcul. Les tendances sont disponibles sur <b>7 j</b>, <b>14 j</b> et <b>aujourd'hui</b>.</div>`;
   const noteAnciens = (per==="tout"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`;
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
@@ -5271,7 +5321,7 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+noteAnciens+noteBrut:"")+noteArg;
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut:"")+noteArg;
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
   renderModeles();
   renderCaJours();
@@ -7311,7 +7361,7 @@ function renderCoutOpp(){
   if(payes.length<2){ panel.style.display="none"; return; }
   const ref=payes.reduce((a,v)=>Number(v.ltv)>Number(a.ltv)?v:a, payes[0]);
   const rows=payes.filter(v=>v.va!==ref.va && Number(v.ltv)<Number(ref.ltv))
-    .map(v=>({va:v.va, manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*LTV_NET_RATE), ltv:Number(v.ltv), subs:Number(v.monthSubs)}))   // meme base nette que la LTV affichee
+    .map(v=>({va:v.va, manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*netRate()), ltv:Number(v.ltv), subs:Number(v.monthSubs)}))   // meme base nette que la LTV affichee
     .filter(x=>x.manque>=5).sort((a,b)=>b.manque-a.manque);
   if(!rows.length){ panel.style.display="none"; return; }
   panel.style.display="block";
@@ -8978,7 +9028,7 @@ function openVaCard(vaName){
       // Pas de mesure d'argent pour CE VA -> on ne juge pas (« absent ≠ 0 »).
       if(v.rev==null) return `<div class="va-verdict vv-wait">❓ Revenus de ce VA non mesurés en ce moment — impossible de juger sa rentabilité.</div>`;
       if(v.roi==null || !paie) return "";
-      const net=rev*LTV_NET_RATE, margeNet=net-paie, chaque=net/paie;   // meme base que la LTV : net apres 20 % OnlyFans
+      const net=rev*netRate(), margeNet=net-paie, chaque=net/paie;   // meme base que la LTV : net apres 20 % OnlyFans
       if(margeNet>0){
         const fort=chaque>=4;
         return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés te rapportent <b>${money(net)}</b> net (${money(rev)} brut − 20 % OnlyFans). Chaque 1&nbsp;$ versé te rend <b>${chaque.toFixed(1).replace(".",",")}&nbsp;$</b> net → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
