@@ -1179,6 +1179,15 @@
   .ent-v{flex:0 0 92px;text-align:right;font-weight:600;color:var(--fg,#fff);white-space:nowrap}
   .ent-t{flex:0 0 54px;text-align:right;color:var(--faint);font-size:11.5px;white-space:nowrap}
   @media(max-width:520px){ .ent-k{flex-basis:96px;font-size:11.5px} .ent-v{flex-basis:74px;font-size:12px} .ent-t{flex-basis:44px} }
+  /* 📋 note du jour */
+  .nj-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .nj-note{font-size:30px;font-weight:800;line-height:1}
+  .nj-note small{font-size:14px;font-weight:600;color:var(--faint)}
+  .nj-note.good{color:#34d399}.nj-note.mid{color:#facc15}.nj-note.bad{color:#f87171}
+  .nj-txt{flex:1;min-width:200px;font-size:13px;color:var(--muted)}
+  .nj-l{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .nj-l b{color:var(--fg,#fff)}
+  .nj-l i{color:var(--faint);font-style:normal;font-size:11.5px}
   /* 🕐 histogramme des heures de paiement */
   .hp-graph{display:flex;align-items:flex-end;gap:3px;height:74px;margin:6px 0 2px}
   .hp-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:help}
@@ -1935,6 +1944,9 @@
     </div>
     <div id="omBody"></div>
   </div>
+    <div class="panel-box" id="notejour" style="display:none">
+      <div id="notejourBody"></div>
+    </div>
     <div class="panel-box" id="cash" style="display:none">
     <div class="pb-head">💵 Cash à venir</div>
     <div id="cashBody"></div>
@@ -2044,6 +2056,11 @@
       <div class="pb-head">🧮 Mes chiffres se contredisent-ils ? <span class="cc-lvl" id="cohState"></span></div>
       <div class="pb-sub">Une panne, ça se voit. Un chiffre faux, non : il reste affiché, plausible. Ce contrôle revérifie que les additions tombent juste.</div>
       <div id="coherenceBody"></div>
+    </div>
+    <div class="panel-box" id="iahumain" style="display:none">
+      <div class="pb-head">🤖 Qui fait la vente : l'IA ou un humain ?</div>
+      <div class="pb-sub">Sur les fans qui ont <b>payé</b> sur Telegram : leur conversation contenait-elle au moins un message écrit <b>à la main</b>, ou l'IA a-t-elle tout fait seule ? C'est la mesure qui dimensionne ton chatting hybride.</div>
+      <div id="iahumainBody"></div>
     </div>
     <div class="panel-box" id="heurespay" style="display:none">
       <div class="pb-head">🕐 L'heure où tes fans paient</div>
@@ -2921,7 +2938,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -5903,7 +5920,7 @@ async function loadOM(){
     // faisait tomber TOUS les suivants, figés sans le moindre message — le catch
     // en bas ne dit rien tant que OM_DATA existe déjà. Un panneau cassé ne doit
     // en emmener aucun autre avec lui.
-    [["classement",renderOM],["heures de paiement",typeof renderHeuresPay==="function"?renderHeuresPay:null],["rachat",typeof renderRachat==="function"?renderRachat:null],
+    [["classement",renderOM],["note du jour",typeof renderNoteJour==="function"?renderNoteJour:null],["heures de paiement",typeof renderHeuresPay==="function"?renderHeuresPay:null],["rachat",typeof renderRachat==="function"?renderRachat:null],
      ["concentration",typeof renderConcentration==="function"?renderConcentration:null],
      ["objectif",()=>renderGoal(LAST)],["valeur d'un abonné",renderSubValue],["conversion",renderConversion],
      ["Railway",renderRailway],["décrochage",renderDecroche],["opportunités",renderOpp],
@@ -8472,7 +8489,7 @@ async function loadSanteComptes(){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/sante-comptes",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    SANTEC_DATA=(await r.json()).data||null; renderSanteComptes();
+    SANTEC_DATA=(await r.json()).data||null; renderSanteComptes(); try{renderNoteJour();}catch(e){}
   }catch(e){}
 }
 function renderSanteComptes(){
@@ -8498,6 +8515,77 @@ function renderSanteComptes(){
       +`<div class="sv-note">Un compte de farm a une médiane de <b>7 à 45</b> followers ; au-delà de ${fmtInt(d.seuilSuspect)}, c'est probablement une page de modèle ou une référence mal rangée. <b>Rien n'est détaché automatiquement</b> : s'il y en a un qui n'appartient pas au VA, dis-le à Claude et il le détache — un « ⚠️ poste » fausse déjà les vues de son VA aujourd'hui.</div>`;
   }
   $("#santecomptesBody").innerHTML=html;
+  try{ fixPairs(); }catch(e){}
+}
+
+// 📋 NOTE DU JOUR SUR 100 (idée 17, validée le 24/08)
+// UN chiffre en haut : « est-ce que je peux faire confiance à mon dashboard, et
+// est-ce que la maison va bien ? ». Chaque composant est listé avec ses points
+// et sa raison — la note dit TOUJOURS pourquoi elle n'est pas à 100.
+function renderNoteJour(){
+  const p=$("#notejour"); if(!p) return;
+  const d=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  if(!d){ p.style.display="none"; return; }
+  p.style.display="block";
+  const comp=[];
+  const ko=(typeof revKo==="function")?revKo():true;
+  comp.push({nom:"Argent OnlyFans lisible",pts:ko?0:25,max:25,pb:ko?"la source d'argent ne répond pas":null});
+  const tg=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+  comp.push({nom:"Telegram lisible",pts:tg>0?10:0,max:10,pb:tg>0?null:"les chiffres Telegram manquent (0 affiché)"});
+  const cv=(typeof COH_DATA!=="undefined"&&COH_DATA)?COH_DATA.verdict:null;
+  comp.push({nom:"Les additions tombent juste",pts:cv==="ok"?20:(cv==="oeil"?12:(cv==="grave"?0:8)),max:20,pb:cv==="ok"?null:(cv==="grave"?"des chiffres se CONTREDISENT — ne décide pas dessus":(cv==="oeil"?"des écarts à surveiller":"contrôle pas encore passé"))});
+  const sc=(typeof SANTEC_DATA!=="undefined"&&SANTEC_DATA)?SANTEC_DATA:null;
+  const nEt=(sc&&Array.isArray(sc.eteints))?sc.eteints.length:0;
+  const nPo=(sc&&Array.isArray(sc.suspects))?sc.suspects.filter(x=>x.danger==="poste").length:0;
+  comp.push({nom:"Comptes Instagram sains",pts:Math.max(0,Math.round(15-nEt*1.5-nPo*3)),max:15,pb:(nEt||nPo)?(nEt+" compte"+(nEt>1?"s":"")+" éteint"+(nEt>1?"s":"")+(nPo?", "+nPo+" suspect(s) qui poste(nt)":"")):null});
+  const frais=(typeof OM_FETCHED_AT!=="undefined"&&OM_FETCHED_AT&&(Date.now()-OM_FETCHED_AT)<20*60*1000);
+  comp.push({nom:"Chiffres frais",pts:frais?10:4,max:10,pb:frais?null:"les chiffres datent d'un moment"});
+  let pPart=20; const pbs=[];
+  if(d.revenusPartiels){pPart-=7;pbs.push("totaux d'argent incomplets");}
+  if(d.attributionKo&&d.attributionKo.length){pPart-=7;pbs.push("classement faussé ("+d.attributionKo.join(", ")+")");}
+  if(d.totals&&d.totals.fenetresPartielles){pPart-=6;pbs.push("périodes incomplètes");}
+  comp.push({nom:"Rien d'amputé",pts:Math.max(0,pPart),max:20,pb:pbs.length?pbs.join(" · "):null});
+  const note=comp.reduce((a,c)=>a+c.pts,0);
+  const cls=note>=85?"good":(note>=65?"mid":"bad");
+  const pire=comp.filter(c=>c.pb).sort((a,b)=>(b.max-b.pts)-(a.max-a.pts))[0];
+  const detail=comp.map(c=>`<div class="nj-l"><span>${c.pts>=c.max?"✅":(c.pts>0?"🟡":"🔴")} ${escapeHtml(c.nom)}</span><b>${c.pts}/${c.max}</b>${c.pb?`<i>${escapeHtml(c.pb)}</i>`:""}</div>`).join("");
+  $("#notejourBody").innerHTML=`<div class="nj-top"><span class="nj-note ${cls}">${note}<small>/100</small></span>`
+    +`<span class="nj-txt">${note>=85?"Tout est en ordre — tu peux décider sur ces chiffres.":(pire&&pire.pb?`Le point qui coûte le plus : <b>${escapeHtml(pire.pb)}</b>.`:"Quelques points à regarder.")}</span>`
+    +`<button class="act" id="njDetail">détail</button></div>`
+    +`<div id="njLignes" style="display:none;margin-top:8px">${detail}</div>`;
+  const bt=$("#njDetail"); if(bt&&!bt._w){ bt._w=1; bt.addEventListener("click",()=>{ const L=$("#njLignes"); L.style.display=L.style.display==="none"?"block":"none"; }); }
+  try{ fixPairs(); }catch(e){}
+}
+
+// 🤖 QUI FAIT LA VENTE (idée 19, validée le 24/08)
+let IAH_DATA=null;
+async function loadIaHumain(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/ia-humain",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    IAH_DATA=(await r.json()).data||null; renderIaHumain();
+  }catch(e){}
+}
+function renderIaHumain(){
+  const p=$("#iahumain"); if(!p) return;
+  const d=IAH_DATA;
+  if(!d||!d.categories||!d.lus){ p.style.display="none"; return; }
+  p.style.display="block";
+  const c=d.categories, money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
+  const tot=c.iaSeule.n+c.humain.n+c.inconnu.n||1;
+  const pc=x=>Math.round(x/tot*100);
+  const ligne=(emo,nom,x,cls)=>`<div class="sv-row"><span class="sv-name">${emo} ${nom}</span><span class="sv-cell"><b>${x.n}</b> payeur${x.n>1?"s":""} · <b>${money(x.montant)}</b></span><span class="sv-part ${cls}">${pc(x.n)} %</span></div>`;
+  const mods=Object.keys(d.categories.parModele||{}).map(m=>{
+    const x=d.categories.parModele[m];
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(m)}</span><span class="sv-cell">IA seule <b>${x.iaSeule.n}</b> (${money(x.iaSeule.montant)}) · humain <b>${x.humain.n}</b> (${money(x.humain.montant)})${x.inconnu.n?` · inconnu ${x.inconnu.n}`:""}</span></div>`;
+  }).join("");
+  $("#iahumainBody").innerHTML=
+    ligne("🤖","L'IA a tout fait seule",c.iaSeule,"good")
+    +ligne("🧑","Un humain est intervenu",c.humain,"mid")
+    +(c.inconnu.n?ligne("❔","Pas de message créatrice lu",c.inconnu,"mid"):"")
+    +(mods?`<div class="sv-head" style="margin-top:10px">Par modèle</div>${mods}`:"")
+    +`<div class="sv-note">Sur <b>${d.lus}</b> payeurs lus. ⚠️ « Un humain est intervenu » = au moins un message écrit à la main dans la conversation — ça ne prouve pas que c'est LUI qui a vendu, c'est la borne haute de l'implication humaine. Mesuré le ${new Date(d.ts).toLocaleDateString("fr-FR")} ; remis à jour chaque midi.</div>`;
   try{ fixPairs(); }catch(e){}
 }
 
@@ -8569,7 +8657,7 @@ async function loadCoherence(){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/coherence",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
-    const j=await r.json(); COH_DATA=j.data||null; renderCoherence();
+    const j=await r.json(); COH_DATA=j.data||null; renderCoherence(); try{renderNoteJour();}catch(e){}
   }catch(e){}
 }
 function renderCoherence(){
@@ -9642,7 +9730,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["heurespay","🕐 Heures de paiement"],["rw","🚂 Coût Railway"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["heurespay","🕐 Heures de paiement"],["notejour","📋 Note du jour"],["iahumain","🤖 IA ou humain"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
