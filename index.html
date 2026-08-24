@@ -5136,6 +5136,20 @@ function renderOM(){
   const per = (OM_PERIODE!=="tout" && perDispo) ? OM_PERIODE : "tout";
   const perInfo = OM_PERIODES.find(x=>x.k===per) || OM_PERIODES[0];
   const pOf=(v,k)=>((v&&v.periodes&&v.periodes[per])?(v.periodes[per][k]):null);
+  // 📈 Tendance vs la MÊME durée juste avant. Trois cas distincts, et aucun
+  // ne doit se déguiser en un autre :
+  //   • pas de mesure précédente (30 j) -> rien du tout ;
+  //   • précédent à zéro mais actuel > 0 -> « nouveau », pas « +∞ % » ;
+  //   • les deux à zéro -> rien (afficher « = 0 % » serait du bruit).
+  const tendance=(a,b)=>{
+    if(b==null||a==null) return "";
+    const x=Number(a)||0, y=Number(b)||0;
+    if(!y) return x? `<i class="omv-t neuf" title="Rien sur la période précédente">nouveau</i>`:"";
+    const pct=Math.round((x/y-1)*100);
+    if(pct===0) return `<i class="omv-t egal" title="Identique à la période précédente">=</i>`;
+    const up=pct>0;
+    return `<i class="omv-t ${up?'up':'down'}" title="Période précédente de même durée : ${escapeHtml(String(y))}">${up?'▲':'▼'}${Math.abs(pct)} %</i>`;
+  };
   const tri = (ko||argFiltreKo) ? "subs" : OM_SORT;   // classer par argent inconnu = classement au hasard
   if(per!=="tout"){
     // Sur une fenêtre, « marge » et « ROI » n'ont pas de sens (la paie est au
@@ -5198,20 +5212,6 @@ function renderOM(){
     `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${perDispo||x.k==="tout"?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
     + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
     + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
-  // 📈 Tendance vs la MÊME durée juste avant. Trois cas distincts, et aucun
-  // ne doit se déguiser en un autre :
-  //   • pas de mesure précédente (30 j) -> rien du tout ;
-  //   • précédent à zéro mais actuel > 0 -> « nouveau », pas « +∞ % » ;
-  //   • les deux à zéro -> rien (afficher « = 0 % » serait du bruit).
-  const tendance=(a,b)=>{
-    if(b==null||a==null) return "";
-    const x=Number(a)||0, y=Number(b)||0;
-    if(!y) return x? `<i class="omv-t neuf" title="Rien sur la période précédente">nouveau</i>`:"";
-    const pct=Math.round((x/y-1)*100);
-    if(pct===0) return `<i class="omv-t egal" title="Identique à la période précédente">=</i>`;
-    const up=pct>0;
-    return `<i class="omv-t ${up?'up':'down'}" title="Période précédente de même durée : ${escapeHtml(String(y))}">${up?'▲':'▼'}${Math.abs(pct)} %</i>`;
-  };
   // 🧾 RÉCONCILIATION — pourquoi la carte du jour et le tableau ne disent pas
   // le même chiffre (question d'André le 24/08 : « 492,85 $ ne correspond pas »).
   // Trois écarts se cumulaient sans être nommés :
