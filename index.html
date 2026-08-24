@@ -1170,6 +1170,15 @@
   .omv-pay{color:var(--muted);white-space:nowrap;font-size:12.5px}
   .omv-nopay{color:var(--faint);font-style:italic}
   .omv-s.vide{color:var(--faint)}
+  /* 🎯 Entonnoir vues -> clics -> subs -> payeurs -> argent */
+  .ent{margin:6px 0 4px}
+  .ent-l{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12.5px}
+  .ent-k{flex:0 0 132px;color:var(--muted)}
+  .ent-b{flex:1;height:9px;background:var(--card2,#17171b);border-radius:5px;overflow:hidden;min-width:40px}
+  .ent-b i{display:block;height:100%;background:linear-gradient(90deg,var(--accent,#6366f1),#34d399);border-radius:5px}
+  .ent-v{flex:0 0 92px;text-align:right;font-weight:600;color:var(--fg,#fff);white-space:nowrap}
+  .ent-t{flex:0 0 54px;text-align:right;color:var(--faint);font-size:11.5px;white-space:nowrap}
+  @media(max-width:520px){ .ent-k{flex-basis:96px;font-size:11.5px} .ent-v{flex-basis:74px;font-size:12px} .ent-t{flex-basis:44px} }
   .omv-t{font-style:normal;font-size:10.5px;font-weight:700;margin-left:5px;cursor:help;white-space:nowrap}
   .omv-t.up{color:#34d399}
   .omv-t.down{color:#f87171}
@@ -2020,6 +2029,16 @@
       <div class="pb-head">💬 Telegram — OnlyChat <span class="cc-lvl" id="ocState"></span> <button class="act" id="ocGoalEdit">🎯 Objectif</button></div>
       <div class="pb-sub">Revenu, taux d'ouverture des PPV et LTV récupérés automatiquement (plus besoin de les noter à la main).</div>
       <div id="onlychatBody"></div>
+    </div>
+    <div class="panel-box" id="rachat" style="display:none">
+      <div class="pb-head">⏱️ Quand un abonné devient un client</div>
+      <div class="pb-sub">Un abonné qui paie son abonnement n'est pas encore un client. Le moment qui compte, c'est son <b>deuxième achat</b> — et il arrive vite ou jamais.</div>
+      <div id="rachatBody"></div>
+    </div>
+    <div class="panel-box" id="coherence" style="display:none">
+      <div class="pb-head">🧮 Mes chiffres se contredisent-ils ? <span class="cc-lvl" id="cohState"></span></div>
+      <div class="pb-sub">Une panne, ça se voit. Un chiffre faux, non : il reste affiché, plausible. Ce contrôle revérifie que les additions tombent juste.</div>
+      <div id="coherenceBody"></div>
     </div>
     <div class="panel-box" id="ocrelance" style="display:none">
       <div class="pb-head">💸 L'argent qui dort (Telegram) <span class="cc-lvl" id="ocrState"></span> <button class="act" id="ocrRefresh">🔄 Actualiser</button></div>
@@ -2874,7 +2893,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -4265,8 +4284,33 @@ function renderConcentration(){
   const html = ccBlock("👥 Par VA (abonnés du mois)", bySubs, "Plus c'est réparti, moins un départ te fait mal.")
     + (rok? ccBlock("💰 Par VA (revenu généré)", byRev, "Qui pèse vraiment dans ton chiffre, pas juste en volume.") : "")
     + (rok? ccBlock("🎭 Par modèle (revenu du mois)", byModel, "Un modèle qui pèse trop = risque si son contenu s'essouffle.") : "");
-  if(!html.trim()){ box.style.display="none"; return; }
-  $("#concentrationBody").innerHTML=html;
+  // 🎲 AJOUTÉ le 2026-08-24 — troisième forme de dépendance, dans le MÊME panneau
+  // plutôt qu'un panneau de plus au nom voisin : celle envers tes gros CLIENTS.
+  // Les deux blocs au-dessus disent « si un VA ou un modèle s'arrête » ; celui-ci
+  // dit « si cinq personnes arrêtent de dépenser ». Mesuré le 24/08 : les 10 plus
+  // gros fans pèsent 32 % du chiffre, les 20 plus gros 48 %.
+  const html2 = html + (function(){
+    const c=(d&&d.concentration)||null;
+    if(!c||!c.paliers||!c.paliers.length||!rok) return "";
+    const cur=(d.currency)||"$";
+    const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+    const t=c.paliers.find(x=>x.n===5)||c.paliers[c.paliers.length-1];
+    // Même langage visuel que les deux blocs au-dessus (cc-block / cc-row), pour
+    // que ça se lise comme une troisième forme du MÊME risque, pas comme un
+    // panneau greffé.
+    const niv = t.pct>=40?["🔴","Très concentré"]:t.pct>=25?["🟠","Concentré"]:["🟢","Bien réparti"];
+    const bars=c.paliers.map(x=>`<div class="cc-row"><span class="cc-va">Top ${x.n}</span>`
+      +`<span class="cc-bar"><span style="width:${Math.min(100,x.pct)}%"></span></span>`
+      +`<span class="cc-pct">${Math.round(x.pct)}%</span></div>`).join("");
+    const gros=(c.plusGros||[]).map((x,i)=>`<span class="om-spend-c" style="cursor:default">#${i+1} <b>${money(x.montant)}</b> <i>· ${x.va?escapeHtml(x.va):"aucun VA"}</i></span>`).join("");
+    return `<div class="cc-block"><div class="cc-title">🎲 Par CLIENT (dépenses sur 30 jours) <span class="cc-lvl">${niv[0]} ${niv[1]}</span></div>`
+      +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money(t.montant)}</b>.</div>`
+      +bars
+      +(gros?`<div style="margin-top:8px">${gros}</div>`:"")
+      +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money(c.total)}. Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
+  })();
+  if(!html2.trim()){ box.style.display="none"; return; }
+  $("#concentrationBody").innerHTML=html2;
 }
 
 /* ---------- 🎯 #15 objectif du mois + chemin (front, depuis OM_DATA) ---------- */
@@ -5774,7 +5818,7 @@ async function loadOM(){
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
       if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
       return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); if(typeof renderSaison==="function") renderSaison(); if(typeof renderBurnout==="function") renderBurnout(); if(typeof renderSim3==="function") renderSim3(); if(typeof renderStreak==="function") renderStreak(); if(typeof renderCoaching==="function") renderCoaching(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); if(typeof renderRachat==="function") renderRachat(); if(typeof renderConcentration==="function") renderConcentration(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); if(typeof renderSaison==="function") renderSaison(); if(typeof renderBurnout==="function") renderBurnout(); if(typeof renderSim3==="function") renderSim3(); if(typeof renderStreak==="function") renderStreak(); if(typeof renderCoaching==="function") renderCoaching(); refreshEssentiel();
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -8255,6 +8299,76 @@ async function loadHorsEquipe(){
   }catch(e){}
 }
 let CONV_DATA=null;
+// ⏱️ QUAND UN ABONNÉ DEVIENT UN CLIENT (idée 3)
+// Vient de OM_DATA.delaiDollar — aucun chargement séparé.
+function renderRachat(){
+  const p=$("#rachat"); if(!p) return;
+  const d=(typeof OM_DATA!=="undefined"&&OM_DATA)?OM_DATA.delaiDollar:null;
+  if(!d || !d.arrives){ p.style.display="none"; return; }
+  p.style.display="block";
+  const cur=(OM_DATA.currency)||"$";
+  const pc=(a,b)=>b>0?Math.round(a/b*1000)/10:null;
+  const pctPaye=pc(d.payeurs,d.arrives), pctRachat=pc(d.racheteurs,d.arrives);
+  const tuiles=`<div class="ent"><div class="ent-l"><span class="ent-k">Abonnés arrivés</span><span class="ent-b"><i style="width:100%"></i></span><span class="ent-v">${d.arrives.toLocaleString("fr-FR")}</span><span class="ent-t"></span></div>`
+    +`<div class="ent-l"><span class="ent-k">Ont payé une fois</span><span class="ent-b"><i style="width:${Math.max(4,Math.round(d.payeurs/d.arrives*100))}%"></i></span><span class="ent-v">${d.payeurs.toLocaleString("fr-FR")}</span><span class="ent-t">${pctPaye!=null?pctPaye+" %":""}</span></div>`
+    +`<div class="ent-l"><span class="ent-k">Ont <b>racheté</b></span><span class="ent-b"><i style="width:${Math.max(3,Math.round(d.racheteurs/d.arrives*100))}%"></i></span><span class="ent-v">${d.racheteurs.toLocaleString("fr-FR")}</span><span class="ent-t">${pctRachat!=null?pctRachat+" %":""}</span></div></div>`;
+  const delai=(d.medianRachat!=null)
+    ? `<div class="sv-note">⏱️ Quand un abonné rachète, il le fait au bout de <b>${String(d.medianRachat).replace(".",",")} jour${d.medianRachat>1?"s":""}</b> en médiane. Passé ce délai, les chances tombent : c'est là que se joue la relance.</div>`
+    : `<div class="sv-note">Pas encore assez de rachats mesurés pour donner un délai fiable.</div>`;
+  // Courbe : part qui a racheté sous X jours. `null` = pas assez de recul, on le
+  // dit au lieu d'afficher un point bas qui passerait pour un mauvais résultat.
+  const courbe=(d.courbe||[]).map(x=>`<div class="sv-row"><span class="sv-name">sous ${x.j} jour${x.j>1?"s":""}</span>`
+    +`<span class="sv-cell">${x.pct==null?`<span style="opacity:.55">pas assez de recul (${x.base} fans)</span>`:`<b>${String(x.pct).replace(".",",")} %</b> ont racheté <span style="opacity:.6">(sur ${x.base})</span>`}</span></div>`).join("");
+  const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null).map(v=>{
+    const cls=v.valeurMoy==null?"mid":(v.valeurMoy>=6?"good":(v.valeurMoy<4?"bad":"mid"));
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
+      +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
+      +`<span class="sv-part ${cls}">${v.valeurMoy!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(v.valeurMoy).replace(".",",")+" "+cur):"—"}</span></div>`;
+  }).join("");
+  $("#rachatBody").innerHTML=tuiles+delai
+    +`<div class="sv-head" style="margin-top:12px">Au bout de combien de temps ils rachètent</div>${courbe}`
+    +(vas?`<div class="sv-head" style="margin-top:12px">Par VA · ce que vaut vraiment un de ses abonnés</div>${vas}`:"")
+    +`<div class="sv-note">Sur les abonnés arrivés depuis le <b>${escapeHtml(String(d.depuis))}</b>. La colonne de droite est ce que rapporte en moyenne <b>un</b> abonné amené par ce VA — volume et qualité sont deux choses différentes.</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+
+// 🧮 CONTRÔLE DE COHÉRENCE (idée 4)
+let COH_DATA=null;
+async function loadCoherence(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/coherence",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json(); COH_DATA=j.data||null; renderCoherence();
+  }catch(e){}
+}
+function renderCoherence(){
+  const p=$("#coherence"); if(!p) return;
+  const d=COH_DATA;
+  if(!d){ p.style.display="none"; return; }
+  p.style.display="block";
+  const et=$("#cohState");
+  const V={ ok:["✅ tout concorde","good"], oeil:["👀 à regarder","mid"], grave:["🔴 ça ne colle pas","bad"], inconnu:["⏳ pas encore contrôlable","mid"] };
+  const v=V[d.verdict]||V.inconnu;
+  if(et){ et.textContent=v[0]; et.className="cc-lvl "+v[1]; }
+  if(d.verdict==="inconnu"){
+    $("#coherenceBody").innerHTML=`<div class="sv-note">${escapeHtml(d.raison||"Les chiffres ne sont pas encore calculés.")} — rien à contrôler pour l'instant. Ce n'est pas un problème.</div>`;
+    try{ fixPairs(); }catch(e){} return;
+  }
+  if(!d.problemes||!d.problemes.length){
+    $("#coherenceBody").innerHTML=`<div class="sv-note">✅ Les <b>${d.controles}</b> contrôles passent : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
+    try{ fixPairs(); }catch(e){} return;
+  }
+  const rows=d.problemes.map(x=>{
+    const grave=x.gravite==="grave";
+    return `<div class="sv-row"><span class="sv-name">${grave?"🔴":"👀"} ${escapeHtml(x.quoi)}</span>`
+      +`<span class="sv-cell">${escapeHtml(x.explication)}<div style="opacity:.65;margin-top:2px">attendu <b>${x.attendu}</b> · trouvé <b>${x.obtenu}</b> · écart <b>${x.ecart>0?"+":""}${x.ecart}</b></div></span></div>`;
+  }).join("");
+  $("#coherenceBody").innerHTML=rows
+    +`<div class="sv-note">${d.nbGraves?`⚠️ <b>${d.nbGraves} incohérence${d.nbGraves>1?"s":""} grave${d.nbGraves>1?"s":""}</b> : rien n'est tombé en panne, mais une addition ne tombe pas juste. <b>Ne décide pas sur ces chiffres avant vérification.</b>`:"Rien de grave — des écarts d'arrondi ou une source lue à deux instants différents. À regarder si ça persiste."}</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+
 async function loadConversion(){
   if(!TOKEN) return;
   try{
@@ -8297,7 +8411,43 @@ function renderConversion(){
         }).join("")
       + (rap&&rap!=="1.0"?`<div class="sv-note"><b>${escapeHtml(best.model)}</b> convertit <b>${rap}×</b> mieux que <b>${escapeHtml(last.model)}</b> sur un trafic comparable — c'est la page ou le contenu, pas le volume.</div>`:"");
   }
-  $("#convBody").innerHTML=`<div class="sv-head">Sur ${d.days} jours · moyenne ${moy} %</div>${rows}
+  // 🎯 ENTONNOIR COMPLET — vues → clics → subs → payeurs → $ (2026-08-24).
+  // Le panneau ne montrait que le milieu (clics → subs). Quand un VA s'effondre,
+  // le geste dépend de l'étape qui casse : poster plus, refaire la bio, ou
+  // changer de contenu. Les étapes absentes ne sont PAS affichées à 0 : elles
+  // disparaissent, avec la raison, sinon on lirait « 0 vue » comme un fait.
+  const ent=d.entonnoir;
+  let blocEnt="";
+  if(ent){
+    const etapes=[];
+    if(ent.etapeVues) etapes.push({k:"Vues Instagram", v:ent.vues, u:""});
+    etapes.push({k:"Clics sur les liens", v:ent.clics, u:""});
+    etapes.push({k:"Abonnés", v:ent.subs, u:""});
+    if(ent.etapeArgent){
+      etapes.push({k:"Ont sorti la carte", v:ent.payeurs, u:""});
+      etapes.push({k:"Encaissé (brut)", v:ent.revenu, u:" "+(cur||"$")});
+    }
+    const maxV=Math.max(...etapes.map(e=>Number(e.v)||0),1);
+    blocEnt=`<div class="sv-head">🎯 L'entonnoir complet · ${d.days} jours</div><div class="ent">`
+      + etapes.map((e,i)=>{
+          const prev=i>0?(Number(etapes[i-1].v)||0):null;
+          const val=Number(e.v)||0;
+          // Taux d'étape : seulement entre deux COMPTAGES. Entre « payeurs » et
+          // « encaissé » c'est un montant, un pourcentage n'aurait aucun sens.
+          const estMontant=!!e.u, precMontant=i>0&&!!etapes[i-1].u;
+          const taux=(prev&&prev>0&&!estMontant&&!precMontant)?(Math.round(val/prev*10000)/100):null;
+          const larg=Math.max(4,Math.round(val/maxV*100));
+          return `<div class="ent-l"><span class="ent-k">${escapeHtml(e.k)}</span>`
+            +`<span class="ent-b"><i style="width:${larg}%"></i></span>`
+            +`<span class="ent-v">${(typeof HIDE!=="undefined"&&HIDE)?"•••":val.toLocaleString("fr-FR")}${e.u}</span>`
+            +`<span class="ent-t">${taux!=null?(taux<0.5?taux.toFixed(2):taux.toFixed(1))+" %":""}</span></div>`;
+        }).join("")
+      + `</div>`
+      + `<div class="sv-note">${!ent.etapeVues?"⚠️ Les vues Instagram ne sont pas rattachées pour l'instant — l'entonnoir démarre aux clics. ":""}`
+      + `${!ent.etapeArgent?`⚠️ L'étape argent n'existe que sur <b>1, 7, 14 ou 30 jours</b> : sur ${d.days} jours, les payeurs seraient comptés sur une autre période que les clics. `:""}`
+      + `Lis-le de haut en bas : l'étape qui chute le plus est celle à réparer.</div>`;
+  }
+  $("#convBody").innerHTML=blocEnt+`<div class="sv-head" style="margin-top:12px">Par VA · sur ${d.days} jours · moyenne ${moy} %</div>${rows}
     ${blocMod}
     ${pires?`<div class="sv-head" style="margin-top:12px">Liens qui convertissent le moins</div>${pires}`:""}
     <div class="sv-note">${d.exploitable?`Le trafic est mesuré via tes tracking links — <b>${(d.totalClics||0).toLocaleString("fr-FR")} clics</b> sur la période, aucun outil externe nécessaire.
@@ -9254,11 +9404,11 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["rw","🚂 Coût Railway"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
-  ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
+  ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["rachat","⏱️ Quand ils rachètent"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
   ["🧭 À faire & décisions",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
   // ⚠️ tip/notepad/duo/ask VIVENT dans cette catégorie sur la page mais n'étaient
   // pas listés ici : injoignables depuis « Tout voir » et la recherche, et
