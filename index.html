@@ -2040,6 +2040,11 @@
       <div class="pb-sub">Une panne, ça se voit. Un chiffre faux, non : il reste affiché, plausible. Ce contrôle revérifie que les additions tombent juste.</div>
       <div id="coherenceBody"></div>
     </div>
+    <div class="panel-box" id="tgva" style="display:none">
+      <div class="pb-head">📲 Qui amène Telegram <span class="cc-lvl" id="tgvaState"></span></div>
+      <div class="pb-sub">Les fans entrés dans ton canal par le <b>lien nommé de chaque VA</b>, croisés avec ce qu'ils ont <b>vraiment dépensé</b> sur OnlyChat (identifiant Telegram contre identifiant — pas une estimation). Visible ici uniquement : les VA ne voient jamais Telegram.</div>
+      <div id="tgvaBody"></div>
+    </div>
     <div class="panel-box" id="entcomptes" style="display:none">
       <div class="pb-head">🔬 Entonnoir par compte</div>
       <div class="pb-sub">Quel <b>compte Instagram</b> convertit vraiment : ses vues → les visites de sa page bio → les clics vers OnlyFans. Les pages étant identiques, l'écart vient du <b>public</b> que chaque compte amène.</div>
@@ -2906,7 +2911,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -8480,6 +8485,41 @@ function renderSanteComptes(){
   try{ fixPairs(); }catch(e){}
 }
 
+// 📲 QUI AMÈNE TELEGRAM (CEO uniquement — demande du 24/08)
+let TGVA_DATA=null;
+async function loadTgVa(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/telegram-va",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    TGVA_DATA=(await r.json()).data||null; renderTgVa();
+  }catch(e){}
+}
+function renderTgVa(){
+  const p=$("#tgva"); if(!p) return;
+  const d=TGVA_DATA;
+  if(!d){ p.style.display="none"; return; }
+  p.style.display="block";
+  const et=$("#tgvaState");
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2})+" $";
+  if(!d.actif || !d.entrees){
+    if(et){ et.textContent="⏳ en attente"; et.className="cc-lvl mid"; }
+    $("#tgvaBody").innerHTML=`<div class="sv-note">${escapeHtml(d.raison||"Pas encore de données.")}<br><br>Pour l'allumer : ① crée un bot sur <b>@BotFather</b> et donne le token à Claude (variable Railway) · ② ajoute ce bot <b>admin</b> de ton canal · ③ crée un <b>lien d'invitation par VA</b> (le nom du lien = le nom du VA) et mets chacun sur la page bio du bon VA. Ensuite tout se remplit tout seul.</div>`;
+    try{ fixPairs(); }catch(e){} return;
+  }
+  if(et){ et.textContent="✅ actif"; et.className="cc-lvl good"; }
+  const rows=(d.parVa||[]).map(v=>{
+    const okP=v.payeurs!=null;
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
+      +`<span class="sv-cell"><b>${fmtInt(v.amenes)}</b> entré${v.amenes>1?"s":""} au canal · ${okP?`<b>${fmtInt(v.payeurs)}</b> payeur${(v.payeurs||0)>1?"s":""}`:"payeurs —"}</span>`
+      +`<span class="sv-part ${okP&&v.depense>0?"good":"mid"}">${okP?money(v.depense):"—"}</span></div>`;
+  }).join("");
+  $("#tgvaBody").innerHTML=(rows||`<div class="sv-note">Des entrées, mais aucun lien nommé pour l'instant.</div>`)
+    +`${d.horsCanal?`<div class="sv-note">💡 <b>${fmtInt(d.horsCanal.payeurs)}</b> payeur${d.horsCanal.payeurs>1?"s":""} OnlyChat (${money(d.horsCanal.depense)}) ne sont <b>jamais passés par le canal</b> — arrivés avant le système, ou allés directement au bot. La somme du tableau n'est donc pas tout Telegram.</div>`:""}`
+    +`${d.onlychatLu===false?`<div class="sv-note" style="color:#facc15">⚠️ OnlyChat n'a pas répondu : entrées justes, dépenses non mesurées (« — », pas zéro).</div>`:""}`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🧮 CONTRÔLE DE COHÉRENCE (idée 4)
 let COH_DATA=null;
 async function loadCoherence(){
@@ -9560,7 +9600,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["rw","🚂 Coût Railway"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
