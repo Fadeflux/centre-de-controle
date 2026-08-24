@@ -1161,6 +1161,21 @@
   .om-va-head button{margin-left:auto;font:inherit;font-size:11px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:7px;padding:4px 10px;cursor:pointer;text-transform:none;letter-spacing:0}
   .omv-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
   .omv-row:last-child{border-bottom:0}
+  /* 📅 Sélecteur de période du classement + « qui dépense aujourd'hui » */
+  .om-per{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px}
+  .om-per-b{background:var(--card2,#17171b);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;transition:.12s}
+  .om-per-b:hover:not(:disabled){color:var(--fg,#fff);border-color:#3a3a42}
+  .om-per-b.on{background:var(--accent,#6366f1);border-color:var(--accent,#6366f1);color:#fff}
+  .om-per-b:disabled{opacity:.35;cursor:default}
+  .omv-pay{color:var(--muted);white-space:nowrap;font-size:12.5px}
+  .omv-nopay{color:var(--faint);font-style:italic}
+  .om-spend{background:var(--card2,#17171b);border:1px solid var(--line);border-left:3px solid #34d399;border-radius:10px;padding:10px 12px;margin:0 0 10px}
+  .om-spend.vide{border-left-color:#3a3a42;color:var(--muted);font-size:13px}
+  .om-spend-h{font-size:13.5px;font-weight:600;margin-bottom:8px}
+  .om-spend-c{display:inline-flex;align-items:baseline;gap:5px;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:4px 9px;margin:0 6px 6px 0;font-size:12.5px;cursor:pointer;transition:.12s}
+  .om-spend-c:hover{background:rgba(52,211,153,.18)}
+  .om-spend-c i{color:var(--faint);font-style:normal;font-size:11.5px}
+  .om-spend-n{color:var(--faint);font-size:11.5px;margin-top:2px}
   .omv-rank{width:18px;color:var(--faint);font-size:12px;text-align:center;flex-shrink:0}
   .omv-va{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .omv-s{color:var(--muted);white-space:nowrap}
@@ -4970,6 +4985,17 @@ renderRoutines();
 
 /* ---------- mini-dashboard OnlyMonster ---------- */
 let OM_DATA = null, OM_MODEL = "all", OM_SORT = "subs";
+// 📅 Fenêtre du classement des VA (demande d'André : « savoir qui m'a ramené des
+// subs QUI ONT PAYÉ », sur plusieurs durées). « tout » = depuis le début, comme
+// avant. Le choix est mémorisé : André ouvre presque toujours la même vue.
+let OM_PERIODE = (function(){ try{ var v=localStorage.getItem("ccn_om_periode"); return ["tout","j30","j14","j7","today"].indexOf(v)>=0?v:"tout"; }catch(e){ return "tout"; } })();
+const OM_PERIODES = [
+  {k:"tout",  t:"Toujours",     court:"depuis le début"},
+  {k:"j30",   t:"30 j",         court:"sur 30 jours"},
+  {k:"j14",   t:"14 j",         court:"sur 14 jours"},
+  {k:"j7",    t:"7 j",          court:"sur 7 jours"},
+  {k:"today", t:"Aujourd'hui",  court:"aujourd'hui"},
+];
 const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 // Ce que tu touches vraiment ≈ brut × 80 % (20 % OnlyFans). ⚠️ 2026-08-23 :
 // c'était 78 % (20 % OF + 2 % Skrill), mais André N'UTILISE PAS Skrill pour
@@ -5069,8 +5095,27 @@ function renderOM(){
   // Argent inconnu sur ce modèle (repli sans API) : on trie par subs, pas par argent.
   const argFiltreKo = !!(modeleObj && modeleObj.revVentile===false);
   let vas=vaSource.slice();
+  // 📅 Fenêtre choisie. Deux garde-fous :
+  //   • le détail par modèle n'a PAS de ventilation par fenêtre -> on force
+  //     « Toujours » plutôt que d'afficher des colonnes vides (un 0 se lirait
+  //     comme « ce VA n'a rien ramené sur Layla en 7 j », ce qui serait faux) ;
+  //   • le serveur peut être plus vieux que la page (déploiement en cours) : sans
+  //     `periodes`, on le DIT au lieu d'afficher des zéros.
+  const perDispo = (OM_MODEL==="all") && vaSource.some(v=>v&&v.periodes);
+  const per = (OM_PERIODE!=="tout" && perDispo) ? OM_PERIODE : "tout";
+  const perInfo = OM_PERIODES.find(x=>x.k===per) || OM_PERIODES[0];
+  const pOf=(v,k)=>((v&&v.periodes&&v.periodes[per])?(v.periodes[per][k]):null);
   const tri = (ko||argFiltreKo) ? "subs" : OM_SORT;   // classer par argent inconnu = classement au hasard
-  vas.sort((a,b)=> tri==="rev"?(b.rev-a.rev): tri==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
+  if(per!=="tout"){
+    // Sur une fenêtre, « marge » et « ROI » n'ont pas de sens (la paie est au
+    // cumul, pas au jour) : on ne trie que par argent dépensé ou par subs amenés.
+    const parArgent = !ko && OM_SORT!=="subs";
+    vas.sort((a,b)=> parArgent ? ((pOf(b,"rev")||0)-(pOf(a,"rev")||0)) : ((pOf(b,"subs")||0)-(pOf(a,"subs")||0)));
+    // Un VA à 0 sub ET 0 $ sur la fenêtre n'a rien fait : il encombre la liste.
+    vas = vas.filter(v=>(pOf(v,"subs")||0)>0 || (pOf(v,"rev")||0)!==0);
+  } else {
+    vas.sort((a,b)=> tri==="rev"?(b.rev-a.rev): tri==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
+  }
   const vaRows=vas.slice(0,20).map((v,i)=>{
     // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
     // « LTV 0,00 » en rouge, « −91 $ » de marge et « ROI −1,0× » — un tableau où
@@ -5083,9 +5128,54 @@ function renderOM(){
     if(v.unpaid){ goalHtml=""; }
     else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal; goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
     else { goalHtml=`<span class="omv-goal"><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Fixer un objectif de subs">🎯 fixer un objectif</button></span>`; }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}">${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">Aucun VA.</div>`;
+    // --- Vue sur une FENÊTRE (30/14/7 j, aujourd'hui) ---
+    // Deux populations DIFFÉRENTES sur la même ligne, et c'est voulu :
+    //   « subs »  = abonnés qu'il a amenés PENDANT la fenêtre ;
+    //   « $ »     = ce que TOUS ses abonnés (même anciens) ont dépensé pendant.
+    // C'est exactement la question d'André (« qui m'a ramené des subs qui ont
+    // payé »). Ne PAS en déduire une LTV : diviser l'un par l'autre mélangerait
+    // les deux populations — d'où l'absence volontaire de colonne LTV ici.
+    if(per!=="tout"){
+      const ps=pOf(v,"subs")||0, pr=pOf(v,"rev"), pp=pOf(v,"payeurs");
+      const argKo = ko || pr==null;
+      return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span>`
+        +`<span class="omv-s" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amenés</span>`
+        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}</span>`
+        +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
+        // Pas de jauge d'objectif ici : l'objectif est MENSUEL. Affiché à côté
+        // d'une colonne « 7 j », « 12/50 » se lirait comme un objectif de la
+        // semaine. Il reste sur la vue « Toujours ».
+        +`</div>`;
+    }
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}">${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
-  const vaHead=`<div class="om-va-head">Classement des VA${OM_MODEL!=="all"?" · sur "+escapeHtml(OM_MODEL):""} <button id="omSort">${(ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge")}</button></div>`;
+  // Le bouton de tri : sur une fenêtre, « marge » n'existe pas -> deux choix.
+  const triTxt = per!=="tout"
+    ? ((ko||OM_SORT==="subs")?"par 👥 subs amenés":"par 💰 dépensé")
+    : ((ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge"));
+  const vaHead=`<div class="om-va-head">Classement des VA${OM_MODEL!=="all"?" · sur "+escapeHtml(OM_MODEL):""} <button id="omSort">${triTxt}</button></div>`;
+  // 📅 Le sélecteur de fenêtre. Masqué quand un modèle est filtré : la ventilation
+  // par fenêtre n'existe que sur « Tout » (voir perDispo).
+  const perBar = (OM_MODEL!=="all") ? "" :
+    `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${perDispo||x.k==="tout"?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
+    + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
+    + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
+  // 💸 « Qui dépense aujourd'hui » — la question posée mot pour mot par André.
+  // Toujours affiché (quelle que soit la fenêtre choisie) : c'est la ligne qu'il
+  // vient chercher le matin. Un jour sans encaissement le dit franchement au
+  // lieu de rester vide, pour qu'on distingue « rien » de « pas encore calculé ».
+  const spendToday=(function(){
+    if(OM_MODEL!=="all" || ko) return "";
+    const src=(d.vas||[]).filter(v=>v&&v.periodes&&v.periodes.today);
+    if(!src.length) return "";
+    const act=src.filter(v=>v.periodes.today.rev).sort((a,b)=>b.periodes.today.rev-a.periodes.today.rev);
+    const tot=act.reduce((a,v)=>a+(v.periodes.today.rev||0),0);
+    const nb=act.reduce((a,v)=>a+(v.periodes.today.payeurs||0),0);
+    if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.</div>`;
+    return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b> par ${fmtInt(nb)} abonné${nb>1?"s":""}</div>`
+      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)} <i>· ${fmtInt(v.periodes.today.payeurs||0)} payeur${(v.periodes.today.payeurs||0)>1?"s":""}</i></span>`).join("")
+      +`<div class="om-spend-n">Argent dépensé par les abonnés que chacun a amenés — anciens compris. Brut, avant les 20 % OnlyFans.</div></div>`;
+  })();
   // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
   // modèle, elle, se calcule sur Noctra Finance.
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
@@ -5099,6 +5189,9 @@ function renderOM(){
   // n'est pas ventilé, l'afficher sous un titre « sur Layla » serait faux.
   const horsRows=(function(){
     if(OM_MODEL!=="all") return "";
+    // Bot / Chloé n'ont pas de ventilation par fenêtre : plutôt que d'inventer
+    // des 0 sur « 7 j », on les retire de la vue et on dit pourquoi.
+    if(per!=="tout") return `<div class="om-hors-head">🔒 Bot et Chloé n'apparaissent que sur « Toujours » — leur détail par période n'est pas calculé.</div>`;
     const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
     if(!ents.length) return "";
     const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
@@ -5129,7 +5222,7 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+modelsRow+vaHead+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
   renderModeles();
   renderCaJours();
@@ -5588,7 +5681,17 @@ async function loadOM(){
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
   const gv=e.target.closest("[data-goalva]"); if(gv){ e.stopPropagation(); setVaGoal(gv.getAttribute("data-goalva")); return; }
-  if(e.target.id==="omSort"){ OM_SORT=OM_SORT==="subs"?"rev":OM_SORT==="rev"?"marge":"subs"; renderOM(); return; }
+  if(e.target.id==="omSort"){
+    // Sur une fenêtre, « marge » n'a pas de sens (la paie est au cumul) : on
+    // bascule seulement entre subs et argent, sinon un clic sur trois ne ferait rien.
+    const surFenetre = (typeof OM_PERIODE!=="undefined") && OM_PERIODE!=="tout" && OM_MODEL==="all";
+    if(surFenetre) OM_SORT = (OM_SORT==="subs") ? "rev" : "subs";
+    else OM_SORT=OM_SORT==="subs"?"rev":OM_SORT==="rev"?"marge":"subs";
+    renderOM(); return; }
+  const perB=e.target.closest&&e.target.closest("[data-omper]");
+  if(perB && !perB.disabled){ OM_PERIODE=perB.getAttribute("data-omper"); try{localStorage.setItem("ccn_om_periode",OM_PERIODE);}catch(_){} renderOM(); return; }
+  const vaCard=e.target.closest&&e.target.closest("[data-vacard]");
+  if(vaCard){ const nom=vaCard.getAttribute("data-vacard"); if(typeof openVaCard==="function") openVaCard(nom); else if(typeof gsGo==="function") gsGo(nom); return; }
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
 });
