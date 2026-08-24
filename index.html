@@ -1169,6 +1169,8 @@
   .om-per-b:disabled{opacity:.35;cursor:default}
   .omv-pay{color:var(--muted);white-space:nowrap;font-size:12.5px}
   .omv-nopay{color:var(--faint);font-style:italic}
+  .omv-s.vide{color:var(--faint)}
+  .omv-anc{font-style:normal;font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.12);border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:1px;cursor:help}
   .om-spend{background:var(--card2,#17171b);border:1px solid var(--line);border-left:3px solid #34d399;border-radius:10px;padding:10px 12px;margin:0 0 10px}
   .om-spend.vide{border-left-color:#3a3a42;color:var(--muted);font-size:13px}
   .om-spend-h{font-size:13.5px;font-weight:600;margin-bottom:8px}
@@ -5139,8 +5141,8 @@ function renderOM(){
       const ps=pOf(v,"subs")||0, pr=pOf(v,"rev"), pp=pOf(v,"payeurs");
       const argKo = ko || pr==null;
       return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span>`
-        +`<span class="omv-s" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amenés</span>`
-        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}</span>`
+        +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}</span>`
+        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
         +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
         // Pas de jauge d'objectif ici : l'objectif est MENSUEL. Affiché à côté
         // d'une colonne « 7 j », « 12/50 » se lirait comme un objectif de la
@@ -5174,11 +5176,15 @@ function renderOM(){
     if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.</div>`;
     return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b> par ${fmtInt(nb)} abonné${nb>1?"s":""}</div>`
       +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)} <i>· ${fmtInt(v.periodes.today.payeurs||0)} payeur${(v.periodes.today.payeurs||0)>1?"s":""}</i></span>`).join("")
-      +`<div class="om-spend-n">Argent dépensé par les abonnés que chacun a amenés — anciens compris. Brut, avant les 20 % OnlyFans.</div></div>`;
+      +`<div class="om-spend-n">Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Brut, avant les 20 % OnlyFans.</div></div>`;
   })();
   // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
   // modèle, elle, se calcule sur Noctra Finance.
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 Chiffres <b>bruts</b> (avant les 20 % OnlyFans). Ton <b>net réel</b> et tes marges après commission sont sur ton site <b>Noctra Finance</b>.</div>`;
+  // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
+  // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
+  // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
+  const noteAnciens = (per==="tout"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`;
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
   // 🔒 Bot / Chloé au MÊME format que les VA, pour comparer la rentabilité d'un
@@ -5222,7 +5228,7 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?noteBrut:"")+noteArg;
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?noteAnciens+noteBrut:"")+noteArg;
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
   renderModeles();
   renderCaJours();
