@@ -2040,6 +2040,16 @@
       <div class="pb-sub">Une panne, ça se voit. Un chiffre faux, non : il reste affiché, plausible. Ce contrôle revérifie que les additions tombent juste.</div>
       <div id="coherenceBody"></div>
     </div>
+    <div class="panel-box" id="entcomptes" style="display:none">
+      <div class="pb-head">🔬 Entonnoir par compte</div>
+      <div class="pb-sub">Quel <b>compte Instagram</b> convertit vraiment : ses vues → les visites de sa page bio → les clics vers OnlyFans. Les pages étant identiques, l'écart vient du <b>public</b> que chaque compte amène.</div>
+      <div id="entcomptesBody"></div>
+    </div>
+    <div class="panel-box" id="santecomptes" style="display:none">
+      <div class="pb-head">🧹 Santé des comptes Instagram</div>
+      <div class="pb-sub">Les comptes <b>bridés</b> sur lesquels on poste pour rien, et ceux qui ne ressemblent pas à des comptes de VA.</div>
+      <div id="santecomptesBody"></div>
+    </div>
     <div class="panel-box" id="ocrelance" style="display:none">
       <div class="pb-head">💸 L'argent qui dort (Telegram) <span class="cc-lvl" id="ocrState"></span> <button class="act" id="ocrRefresh">🔄 Actualiser</button></div>
       <div class="pb-sub">Les fans qui parlent à tes modèles mais n'ont <b>jamais payé un dollar</b>, classés par « qui vaut le coup de relancer en premier ». Clique un nom pour ouvrir sa conversation dans OnlyChat.</div>
@@ -2896,7 +2906,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -8403,6 +8413,73 @@ function renderRachat(){
   try{ fixPairs(); }catch(e){}
 }
 
+// 🔬 ENTONNOIR PAR COMPTE (idée 1, validée le 24/08)
+let ENTC_DATA=null;
+async function loadEntComptes(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/entonnoir-comptes",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    ENTC_DATA=(await r.json()).data||null; renderEntComptes();
+  }catch(e){}
+}
+function renderEntComptes(){
+  const p=$("#entcomptes"); if(!p) return;
+  const d=ENTC_DATA;
+  if(!d||((!d.comptes||!d.comptes.length)&&!d.nbComptesSansPont)){ p.style.display="none"; return; }
+  p.style.display="block";
+  const pctFr=v=>v==null?"—":String(v).replace(".",",")+" %";
+  const rows=(d.comptes||[]).slice(0,15).map(c=>{
+    // page→OF sous la médiane équipe (~76 %) = le public de CE compte est froid.
+    const cls=c.tauxClic==null?"mid":(c.tauxClic>=76?"good":(c.tauxClic<60?"bad":"mid"));
+    return `<div class="sv-row"><span class="sv-name">@${escapeHtml(c.insta)} <span style="opacity:.55">· ${escapeHtml(c.va||"?")}</span></span>`
+      +`<span class="sv-cell">${c.vues==null?"vues n/d":`<b>${fmtInt(c.vues)}</b> vues`} → <b>${fmtInt(c.visites)}</b> visites bio → <b>${fmtInt(c.clics)}</b> clics OF</span>`
+      +`<span class="sv-part ${cls}" title="Part des visiteurs de sa page bio qui cliquent jusqu'à OnlyFans">${pctFr(c.tauxClic)}</span></div>`;
+  }).join("");
+  const sansPont=(d.comptesSansPont||[]).slice(0,6).map(c=>`<span class="om-spend-c" style="cursor:default">@${escapeHtml(c.insta)} <i>· ${fmtInt(c.vues)} vues</i></span>`).join("");
+  $("#entcomptesBody").innerHTML=(rows||`<div class="sv-note">Aucun compte relié pour l'instant.</div>`)
+    +`<div class="sv-note">🔗 <b>${fmtInt(d.nbRelies)}</b> compte${(d.nbRelies||0)>1?"s":""} relié${(d.nbRelies||0)>1?"s":""} · <b>${fmtInt(d.nbComptesSansPont)}</b> compte${(d.nbComptesSansPont||0)>1?"s":""} avec des vues mais <b>sans lien relié</b> — le pont se remplit tout seul à chaque lien créé via le bot Discord. Pour relier un vieux compte : recrée simplement son lien via le bot.</div>`
+    +(sansPont?`<div class="sv-head" style="margin-top:10px">Plus gros comptes pas encore reliés</div><div>${sansPont}</div>`:"")
+    +`${d.gmsOk===false?`<div class="sv-note" style="color:#facc15">⚠️ GetMySocial n'a pas répondu : visites et clics peuvent être incomplets.</div>`:""}`;
+  try{ fixPairs(); }catch(e){}
+}
+
+// 🧹 SANTÉ DES COMPTES INSTAGRAM (idées 3 et 4, validées le 24/08)
+let SANTEC_DATA=null;
+async function loadSanteComptes(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/sante-comptes",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    SANTEC_DATA=(await r.json()).data||null; renderSanteComptes();
+  }catch(e){}
+}
+function renderSanteComptes(){
+  const p=$("#santecomptes"); if(!p) return;
+  const d=SANTEC_DATA;
+  const sus=(d&&Array.isArray(d.suspects))?d.suspects:null;
+  const ete=(d&&Array.isArray(d.eteints))?d.eteints:null;
+  if(!d||((sus==null||!sus.length)&&(ete==null||!ete.length))){ p.style.display="none"; return; }
+  p.style.display="block";
+  let html="";
+  if(ete&&ete.length){
+    html+=`<div class="sv-head">📉 Comptes en train de s'éteindre — ${ete.length}</div>`
+      +ete.slice(0,12).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
+        +`<span class="sv-cell"><b>${fmtInt(x.avant)}</b> → <b>${fmtInt(x.maintenant)}</b> vues/post <span style="opacity:.6">(${x.postsRecents} posts récents)</span></span>`
+        +`<span class="sv-part bad">${x.pct} %</span></div>`).join("")
+      +`<div class="sv-note">Chaque compte est comparé <b>à lui-même</b> : ses 5 derniers jours contre ses 15 jours d'avant. Sous 30 % de son propre niveau, chaque post dessus est probablement du travail perdu — à reposer ou remplacer. Tu reçois aussi un message privé Discord chaque matin s'il y a du nouveau.</div>`;
+  }
+  if(sus&&sus.length){
+    html+=`<div class="sv-head" style="margin-top:${ete&&ete.length?"12px":"0"}">🕵️ Comptes qui ne ressemblent pas à des comptes de VA — ${sus.length}</div>`
+      +sus.slice(0,10).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
+        +`<span class="sv-cell"><b>${fmtInt(x.followers)}</b> followers · ${x.posts30?`<b>${x.posts30}</b> posts / ${fmtInt(x.vues30)} vues sur 30 j`:"aucun post sur 30 j"}</span>`
+        +`<span class="sv-part ${x.danger==="poste"?"bad":"mid"}">${x.danger==="poste"?"⚠️ poste":"muet"}</span></div>`).join("")
+      +`<div class="sv-note">Un compte de farm a une médiane de <b>7 à 45</b> followers ; au-delà de ${fmtInt(d.seuilSuspect)}, c'est probablement une page de modèle ou une référence mal rangée. <b>Rien n'est détaché automatiquement</b> : s'il y en a un qui n'appartient pas au VA, dis-le à Claude et il le détache — un « ⚠️ poste » fausse déjà les vues de son VA aujourd'hui.</div>`;
+  }
+  $("#santecomptesBody").innerHTML=html;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 🧮 CONTRÔLE DE COHÉRENCE (idée 4)
 let COH_DATA=null;
 async function loadCoherence(){
@@ -9483,11 +9560,11 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["rw","🚂 Coût Railway"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
-  ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["rachat","⏱️ Quand ils rachètent"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
+  ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["rachat","⏱️ Quand ils rachètent"],["entcomptes","🔬 Entonnoir par compte"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
   ["🧭 À faire & décisions",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
   // ⚠️ tip/notepad/duo/ask VIVENT dans cette catégorie sur la page mais n'étaient
   // pas listés ici : injoignables depuis « Tout voir » et la recherche, et
