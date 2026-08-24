@@ -5154,9 +5154,21 @@ function renderOM(){
   const tiles=`<div class="om-tiles">
     <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">brut OF : ${mnt(net)}${(!ko&&tgM>0)?` · + Telegram ${tgMoney(tgM)}`:""}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
-    <div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(d.totals.subsWeek)}</div></div>
-    <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(d.totals.subsDay)}</div></div>
-    <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(d.totals.subsTotal)}</div></div>
+    ${(()=>{
+      // ⚠️ CORRIGÉ le 2026-08-24 (captures d'André) : sur l'onglet d'un modèle,
+      // ces trois tuiles affichaient les chiffres de TOUTE l'équipe — « Subs
+      // semaine : 332 » sur Layla ET sur Zoe. Sous un filtre, un chiffre non
+      // filtré se lit comme un chiffre filtré : c'est un mensonge involontaire.
+      // Un vieux serveur n'envoie pas ces champs -> fmtInt affiche « — »,
+      // jamais le chiffre d'équipe déguisé.
+      const mSel=(OM_MODEL!=="all"&&d.models)?(d.models[OM_MODEL]||{}):null;
+      const vSem=mSel?mSel.subsWeek:d.totals.subsWeek;
+      const vJour=mSel?mSel.subsDay:d.totals.subsDay;
+      const vTot=mSel?mSel.subsTotal:d.totals.subsTotal;
+      return `<div class="tile"><div class="lbl">Subs semaine</div><div class="val">${fmtInt(vSem)}</div></div>
+    <div class="tile"><div class="lbl">Aujourd'hui</div><div class="val">${fmtInt(vJour)}</div></div>
+    <div class="tile"><div class="lbl">Subs depuis le début</div><div class="val">${fmtInt(vTot)}</div></div>`;
+    })()}
     ${(()=>{
       // ⭐ Demande André : « je veux la LTV totale de TOUT, que ce soit les
       // liens des VA ou pas ». Sur la vue « Tout », `d.totals.ltv` (revenu
@@ -5166,9 +5178,17 @@ function renderOM(){
       // les fans. Repli sur `ltv` si absent (source non-API, ou vue par
       // modèle — la LTV par modèle reste sur son propre calcul, inchangé).
       const surTout=(OM_MODEL==="all");
-      const ltvVal=surTout?(d.totals.ltvGlobale!=null?d.totals.ltvGlobale:d.totals.ltv):((d.models[OM_MODEL]||{}).ltv);
+      // 📅 24/08 (captures d'André) : sur un onglet modèle, la LTV divisait le
+      // revenu RÉEL par les seuls fans amenés par l'équipe — dénominateur trop
+      // petit, chiffre trop beau. On affiche désormais la LTV RÉELLE du modèle
+      // (revenu total ÷ TOUS ses fans, lien de VA ou pas) quand le serveur la
+      // fournit, avec la même info-bulle que sur « Tout ». Repli sur l'ancienne.
+      const mL=surTout?null:(d.models[OM_MODEL]||{});
+      const ltvVal=surTout?(d.totals.ltvGlobale!=null?d.totals.ltvGlobale:d.totals.ltv):(mL.ltvGlobale!=null?mL.ltvGlobale:mL.ltv);
       const label=surTout?"LTV moyenne":"LTV ("+escapeHtml(OM_MODEL)+")";
-      const info=(surTout&&d.totals.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total ÷ tous les fans (${fmtInt(d.totals.subsTotalReel)}), qu'ils soient venus par un lien de VA ou non — pas juste ${fmtInt(d.totals.subsTotal)} fans attribués.">ⓘ</span>`:"";
+      const info=(surTout&&d.totals.ltvGlobale!=null)
+        ?` <span class="lbl-info" title="Revenu total ÷ tous les fans (${fmtInt(d.totals.subsTotalReel)}), qu'ils soient venus par un lien de VA ou non — pas juste ${fmtInt(d.totals.subsTotal)} fans attribués.">ⓘ</span>`
+        :((!surTout&&mL.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total de ${escapeHtml(OM_MODEL)} ÷ TOUS ses fans réels (${fmtInt(mL.fansReels)}), lien de VA ou pas — pas seulement les ${fmtInt(mL.subsTotal)} abonnés amenés par l'équipe.">ⓘ</span>`:"");
       return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
     })()}</div>`;
   const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${ko?'':((d.models[m].marge||0)>=0?'pos':'neg')}">Marge ${ko?"—":((d.models[m].marge||0)>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
