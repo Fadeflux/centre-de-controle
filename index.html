@@ -1179,6 +1179,11 @@
   .ent-v{flex:0 0 92px;text-align:right;font-weight:600;color:var(--fg,#fff);white-space:nowrap}
   .ent-t{flex:0 0 54px;text-align:right;color:var(--faint);font-size:11.5px;white-space:nowrap}
   @media(max-width:520px){ .ent-k{flex-basis:96px;font-size:11.5px} .ent-v{flex-basis:74px;font-size:12px} .ent-t{flex-basis:44px} }
+  /* 🕐 histogramme des heures de paiement */
+  .hp-graph{display:flex;align-items:flex-end;gap:3px;height:74px;margin:6px 0 2px}
+  .hp-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:help}
+  .hp-col i{display:block;width:100%;background:linear-gradient(180deg,#34d399,var(--accent,#6366f1));border-radius:3px 3px 0 0;min-height:2px}
+  .hp-col span{font-size:9.5px;color:var(--faint);margin-top:2px;height:12px}
   .omv-t{font-style:normal;font-size:10.5px;font-weight:700;margin-left:5px;cursor:help;white-space:nowrap}
   .omv-t.up{color:#34d399}
   .omv-t.down{color:#f87171}
@@ -2039,6 +2044,11 @@
       <div class="pb-head">🧮 Mes chiffres se contredisent-ils ? <span class="cc-lvl" id="cohState"></span></div>
       <div class="pb-sub">Une panne, ça se voit. Un chiffre faux, non : il reste affiché, plausible. Ce contrôle revérifie que les additions tombent juste.</div>
       <div id="coherenceBody"></div>
+    </div>
+    <div class="panel-box" id="heurespay" style="display:none">
+      <div class="pb-head">🕐 L'heure où tes fans paient</div>
+      <div class="pb-sub">Pas l'heure où ils s'abonnent — l'heure où ils <b>sortent la carte</b> (30 derniers jours, heure du Bénin). C'est le créneau où le chatting doit pousser les PPV.</div>
+      <div id="heurespayBody"></div>
     </div>
     <div class="panel-box" id="tgva" style="display:none">
       <div class="pb-head">📲 Qui amène Telegram <span class="cc-lvl" id="tgvaState"></span></div>
@@ -5274,7 +5284,13 @@ function renderOM(){
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
     let goalHtml;
     if(v.unpaid){ goalHtml=""; }
-    else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal; goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
+    else if(goal>0){ const pct=Math.max(2,Math.min(100,Math.round(prog/goal*100))), win=prog>=goal;
+      // 📈 Projection (idée 8, 24/08) : « à son rythme des 7 derniers jours, il
+      // finit le mois vers N ». null = fenêtre 7 j non mesurée -> rien d'affiché,
+      // jamais une projection inventée.
+      const proj=(v.projMois!=null&&isFinite(Number(v.projMois)))?Number(v.projMois):null;
+      const projTxt=(proj!=null&&!win)?` <span class="omv-t ${proj>=goal?"up":"down"}" title="À son rythme des 7 derniers jours, il finit le mois vers ${fmtInt(proj)} subs (objectif ${fmtInt(goal)})">→ ~${fmtInt(proj)} ${proj>=goal?"✅":"⚠️"}</span>`:"";
+      goalHtml=`<span class="omv-goal"><span class="omv-goal-bar"><i class="${win?'win':''}" style="width:${pct}%"></i></span><span class="omv-goal-txt">🎯 ${fmtInt(prog)}/${fmtInt(goal)} ${win?"✅":""}</span>${projTxt}<button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Modifier l'objectif">✏️</button></span>`; }
     else { goalHtml=`<span class="omv-goal"><button class="omv-goal-set" data-goalva="${escapeHtml(v.va)}" title="Fixer un objectif de subs">🎯 fixer un objectif</button></span>`; }
     // --- Vue sur une FENÊTRE (30/14/7 j, aujourd'hui) ---
     // Deux populations DIFFÉRENTES sur la même ligne, et c'est voulu :
@@ -5887,7 +5903,7 @@ async function loadOM(){
     // faisait tomber TOUS les suivants, figés sans le moindre message — le catch
     // en bas ne dit rien tant que OM_DATA existe déjà. Un panneau cassé ne doit
     // en emmener aucun autre avec lui.
-    [["classement",renderOM],["rachat",typeof renderRachat==="function"?renderRachat:null],
+    [["classement",renderOM],["heures de paiement",typeof renderHeuresPay==="function"?renderHeuresPay:null],["rachat",typeof renderRachat==="function"?renderRachat:null],
      ["concentration",typeof renderConcentration==="function"?renderConcentration:null],
      ["objectif",()=>renderGoal(LAST)],["valeur d'un abonné",renderSubValue],["conversion",renderConversion],
      ["Railway",renderRailway],["décrochage",renderDecroche],["opportunités",renderOpp],
@@ -8485,6 +8501,32 @@ function renderSanteComptes(){
   try{ fixPairs(); }catch(e){}
 }
 
+// 🕐 L'HEURE OÙ LES FANS PAIENT (idée 1, validée le 24/08)
+function renderHeuresPay(){
+  const p=$("#heurespay"); if(!p) return;
+  const h=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)?OM_DATA.totals.heuresArgent:null;
+  if(!h||!Array.isArray(h)||h.length!==24){ p.style.display="none"; return; }
+  const tot=h.reduce((a,x)=>a+(x.montant||0),0);
+  if(tot<50){ p.style.display="none"; return; }   // trop peu d'argent mesuré : un histogramme mentirait
+  p.style.display="block";
+  const max=Math.max(...h.map(x=>x.montant||0),1);
+  const barres=h.map(x=>{
+    const ht=Math.max(3,Math.round((x.montant||0)/max*100));
+    return `<div class="hp-col" title="${String(x.h).padStart(2,"0")} h : ${Math.round(x.montant)} $ (${x.n} paiement${x.n>1?"s":""})"><i style="height:${ht}%"></i><span>${x.h%6===0?x.h:""}</span></div>`;
+  }).join("");
+  // Meilleure fenêtre de 3 heures consécutives (sur le MONTANT, pas le nombre :
+  // une heure à 3 petits paiements pèse moins qu'une heure à un PPV de 99 $).
+  let best={de:0,part:0};
+  for(let i=0;i<24;i++){
+    const m=(h[i].montant||0)+(h[(i+1)%24].montant||0)+(h[(i+2)%24].montant||0);
+    if(m/tot>best.part) best={de:i,part:m/tot};
+  }
+  const fin=(best.de+3)%24;
+  $("#heurespayBody").innerHTML=`<div class="hp-graph">${barres}</div>`
+    +`<div class="sv-note">🎯 Ton meilleur créneau : <b>${best.de} h – ${fin} h</b> (heure Bénin) — <b>${Math.round(best.part*100)} %</b> de l'argent des 30 derniers jours tombe dans ces 3 heures. C'est là que les PPV doivent partir.</div>`;
+  try{ fixPairs(); }catch(e){}
+}
+
 // 📲 QUI AMÈNE TELEGRAM (CEO uniquement — demande du 24/08)
 let TGVA_DATA=null;
 async function loadTgVa(){
@@ -9600,7 +9642,7 @@ addEventListener("scroll",()=>{ if(_scT) return; _scT=setTimeout(()=>{ _scT=null
 // page (voir les en-têtes .sec-head générés dans le HTML) — le tiroir de
 // navigation et l'ordre réel de la page racontent maintenant la même histoire.
 const SECNAV_CATS=[
-  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["rw","🚂 Coût Railway"]]],
+  ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["heurespay","🕐 Heures de paiement"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
   ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
