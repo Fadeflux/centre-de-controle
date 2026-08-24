@@ -8440,7 +8440,7 @@ function renderConversion(){
           return `<div class="ent-l"><span class="ent-k">${escapeHtml(e.k)}</span>`
             +`<span class="ent-b"><i style="width:${larg}%"></i></span>`
             +`<span class="ent-v">${(typeof HIDE!=="undefined"&&HIDE)?"•••":val.toLocaleString("fr-FR")}${e.u}</span>`
-            +`<span class="ent-t">${taux!=null?(taux<0.5?taux.toFixed(2):taux.toFixed(1))+" %":""}</span></div>`;
+            +`<span class="ent-t">${taux!=null?String(taux<0.5?taux.toFixed(2):taux.toFixed(1)).replace(".",",")+" %":""}</span></div>`;
         }).join("")
       + `</div>`
       + `<div class="sv-note">${!ent.etapeVues?"⚠️ Les vues Instagram ne sont pas rattachées pour l'instant — l'entonnoir démarre aux clics. ":""}`
