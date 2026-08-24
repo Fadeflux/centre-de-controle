@@ -2507,7 +2507,10 @@ const fmtMoney = v => HIDE ? "••• $" : (Math.round(v)).toLocaleString("fr-
 // (= payer à l'aveugle). Ces deux cas utilisent les formats « en clair ».
 const moneyClair = v => (Math.round(Number(v)||0)).toLocaleString("fr-FR") + " $";
 const pcMoneyClair = v => { const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; };
-const fmtInt   = v => Math.round(v).toLocaleString("fr-FR");
+// ⚠️ « absent ≠ 0 » — et « absent ≠ NaN » : un serveur plus vieux que la page
+// n'envoie pas tous les champs, et `Math.round(undefined)` affichait « NaN »
+// en plein milieu d'une tuile (« Subs semaine : NaN »).
+const fmtInt   = v => isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString("fr-FR") : "—";
 const fmtBig   = v => {
   v = Number(v)||0;
   if (v >= 1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(".",",") + " M";
@@ -4196,7 +4199,7 @@ function openHorsEquipeCard(nom){
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
   const ko=(typeof revKo==="function")?revKo():false;
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const c=v.conv, s=v.sante;
   const ov=document.createElement("div"); ov.className="ppick";
@@ -4294,7 +4297,11 @@ function renderConcentration(){
     if(!c||!c.paliers||!c.paliers.length||!rok) return "";
     const cur=(d.currency)||"$";
     const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-    const t=c.paliers.find(x=>x.n===5)||c.paliers[c.paliers.length-1];
+    // Les seuils (40 % / 25 %) sont calibrés pour le TOP 5. Si ce palier n'existe
+    // pas, les appliquer au Top 20 sortait « 🔴 Très concentré » pour une
+    // répartition parfaitement normale. Sans Top 5, on n'affiche pas le bloc.
+    const t=c.paliers.find(x=>x.n===5);
+    if(!t||c.nbPayeurs==null||c.total==null||t.montant==null) return "";
     // Même langage visuel que les deux blocs au-dessus (cc-block / cc-row), pour
     // que ça se lise comme une troisième forme du MÊME risque, pas comme un
     // panneau greffé.
@@ -5073,6 +5080,9 @@ function prixSub(){
   try{ var p=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)?Number(OM_DATA.totals.prixSub):NaN;
        return (isFinite(p)&&p>0)?p:0.50; }catch(e){ return 0.50; }
 }
+// Texte du taux de commission, pour ne plus ecrire « 20 % » en dur dans des
+// phrases visibles : si le taux serveur change, les phrases suivaient l'ancien.
+function pctComm(){ return Math.round((1-netRate())*100)+" %"; }
 const NET_RATE=0.80;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 // Comme tgMoney, mais réutilisable pour tout montant — AVEC les centimes.
@@ -5117,10 +5127,13 @@ function renderOM(){
   const ltvT=(v)=>(ko||v==null)?"—":fmtLtv(v,cur);   // toute LTV
   // 💡 Le NET d'abord, le brut en petit (comme OnlyFans) : net estimé = brut
   // × 80 % (20 % OnlyFans ; pas de Skrill chez Noctra).
-  const netE=(v)=>ko?"—":omMoney((Number(v)||0)*NET_RATE,cur);
+  const netE=(v)=>ko?"—":omMoney((Number(v)||0)*netRate(),cur);
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
-  if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=d.models[OM_MODEL].net||0; subsMonth=d.models[OM_MODEL].subs||0; }
+  // ⚠️ `net` reste NULL si le modele n'a pas de montant mesure (repli sans API) :
+  // le `||0` d'avant affichait « Net du mois · Layla : 0,00 $ » comme une mesure,
+  // alors que la tuile LTV juste a cote affichait deja « — » sur la MEME source.
+  if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=(d.models[OM_MODEL].net==null?null:d.models[OM_MODEL].net); subsMonth=d.models[OM_MODEL].subs||0; }
   else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
   // 📲 Les revenus Telegram (saisis à la main, pas d'API) manquaient du "Net du
   // mois" — le chiffre du haut du dashboard ne bougeait jamais avec Telegram.
@@ -5130,14 +5143,14 @@ function renderOM(){
   // mois entier — comparer 12 jours à 30 ferait toujours paraître en retard).
   const prevTD = d.totals.netLastMonthToDate;
   // delta à l'échelle NET (comme le chiffre affiché juste à côté), pas en brut.
-  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(Math.round((Number(d.totals.netMonth)||0)*NET_RATE),Math.round((Number(prevTD)||0)*NET_RATE)):"";
+  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(Math.round((Number(d.totals.netMonth)||0)*netRate()),Math.round((Number(prevTD)||0)*netRate())):"";
   // Deux avertissements distincts : « je ne sais rien » et « je ne sais pas tout ».
   const bandeauKo=ko
     ? `<div class="om-prep" style="border-left:3px solid #f87171;margin-bottom:10px">⚠️ Revenus illisibles en ce moment — tous les montants affichent « — ». Ce n'est <b>pas</b> zéro. Les abonnés, eux, sont justes.</div>`
     : (d.revenusPartiels
       ? `<div class="om-prep" style="border-left:3px solid #facc15;margin-bottom:10px">⚠️ Totaux <b>incomplets</b> : je n'ai pas pu lire ${escapeHtml((d.modelesManquants||[]).join(", "))}. Les montants ci-dessous sont des <b>minimums</b>, pas des totaux.</div>`
       : "");
-  const netAvecTg=ko?"—":moneyPrecis((Number(net)||0)*NET_RATE+tgM,cur);
+  const netAvecTg=(ko||net==null)?"—":moneyPrecis((Number(net)||0)*netRate()+tgM,cur);
   const tiles=`<div class="om-tiles">
     <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">brut OF : ${mnt(net)}${(!ko&&tgM>0)?` · + Telegram ${tgMoney(tgM)}`:""}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
@@ -5176,7 +5189,13 @@ function renderOM(){
   //     comme « ce VA n'a rien ramené sur Layla en 7 j », ce qui serait faux) ;
   //   • le serveur peut être plus vieux que la page (déploiement en cours) : sans
   //     `periodes`, on le DIT au lieu d'afficher des zéros.
-  const perDispo = (OM_MODEL==="all") && vaSource.some(v=>v&&v.periodes);
+  // ⚠️ Disponibilité par FENÊTRE. Avant on ne testait que l'existence de l'objet
+  // `periodes` : si le serveur n'avait calculé que « today » et « j7 », les cinq
+  // boutons restaient actifs et un clic sur « 30 j » affirmait « Aucun VA n'a
+  // amené de sub ni encaissé sur 30 jours » — un zéro énoncé en toutes lettres
+  // là où rien n'avait été mesuré.
+  const dispoFenetre=(k)=>(OM_MODEL==="all") && vaSource.some(v=>v&&v.periodes&&v.periodes[k]);
+  const perDispo = dispoFenetre(OM_PERIODE);
   const per = (OM_PERIODE!=="tout" && perDispo) ? OM_PERIODE : "tout";
   const perInfo = OM_PERIODES.find(x=>x.k===per) || OM_PERIODES[0];
   const pOf=(v,k)=>((v&&v.periodes&&v.periodes[per])?(v.periodes[per][k]):null);
@@ -5253,7 +5272,7 @@ function renderOM(){
   // 📅 Le sélecteur de fenêtre. Masqué quand un modèle est filtré : la ventilation
   // par fenêtre n'existe que sur « Tout » (voir perDispo).
   const perBar = (OM_MODEL!=="all") ? "" :
-    `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${perDispo||x.k==="tout"?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
+    `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${(x.k==="tout"||dispoFenetre(x.k))?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
     + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
     + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
   // 🧾 RÉCONCILIATION — pourquoi la carte du jour et le tableau ne disent pas
@@ -5267,8 +5286,12 @@ function renderOM(){
     const t=d.totals||{};
     if(ko || !t.brutFenetre || t.brutFenetre[cle]==null) return "";
     const brut=Number(t.brutFenetre[cle])||0;
-    const hors=(t.horsVa&&t.horsVa[cle])?t.horsVa[cle]:{rev:0,payeurs:0};
-    const anc=(t.ancienVa&&t.ancienVa[cle])?t.ancienVa[cle]:{rev:0,vas:[]};
+    // ⚠️ Si les postes « sans lien » et « anciens VA » ne sont pas fournis pour
+    // CETTE fenêtre, on ne peut pas faire l'addition : la remplacer par 0
+    // affirmerait que 100 % de l'argent est rattaché aux VA, c'est-à-dire
+    // exactement l'écart que ce bloc est censé expliquer.
+    if(!(t.horsVa&&t.horsVa[cle])||!(t.ancienVa&&t.ancienVa[cle])) return "";
+    const hors=t.horsVa[cle], anc=t.ancienVa[cle];
     const auxVa=Math.round((brut-(hors.rev||0)-(anc.rev||0))*100)/100;
     const lignes=[
       `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVa,cur)}</b></div>`,
@@ -5279,9 +5302,9 @@ function renderOM(){
     // Le pont vers la carte « 📅 Aujourd'hui » : net + Telegram.
     let pont="";
     if(cle==="today"){
-      const net=brut*NET_RATE;
+      const net=brut*netRate();
       const tg=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
-      pont=`<div class="om-rec-p">Sur ta carte du jour tu vois le <b>net</b> : ${omMoney(brut,cur)} − 20 % = <b>${moneyPrecis(net,cur)}</b>`
+      pont=`<div class="om-rec-p">Sur ta carte du jour tu vois le <b>net</b> : ${omMoney(brut,cur)} − ${pctComm()} = <b>${moneyPrecis(net,cur)}</b>`
         +(tg!=null?` · + Telegram <b>${tgMoney(tg)}</b> = <b>${moneyPrecis(net+tg,cur)}</b>`:` (+ Telegram)`)+`</div>`;
     }
     const part=brut>0?Math.round(((hors.rev||0)+(anc.rev||0))/brut*100):0;
@@ -5299,11 +5322,15 @@ function renderOM(){
     if(!src.length) return "";
     const act=src.filter(v=>v.periodes.today.rev).sort((a,b)=>b.periodes.today.rev-a.periodes.today.rev);
     const tot=act.reduce((a,v)=>a+(v.periodes.today.rev||0),0);
-    const nb=act.reduce((a,v)=>a+(v.periodes.today.payeurs||0),0);
+    // Un nombre de payeurs ABSENT n'est pas zéro : on somme les valeurs connues et
+    // on retient si l'une manque, pour ne pas écrire « 492 $ par 0 abonné ».
+    let nb=0, nbInconnu=false;
+    act.forEach(v=>{ const p=v.periodes.today.payeurs; if(p==null) nbInconnu=true; else nb+=p; });
     const rec=reconcile("today");
-    if(!act.length && !rec) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.</div>`;
-    return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b> par ${fmtInt(nb)} abonné${nb>1?"s":""}</div>`
-      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)} <i>· ${fmtInt(v.periodes.today.payeurs||0)} payeur${(v.periodes.today.payeurs||0)>1?"s":""}</i></span>`).join("")
+    // Aucun VA n'a encaissé : on le DIT, au lieu d'un en-tête « 0 $ par 0 abonné ».
+    if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
+    return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}</div>`
+      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
       +`<div class="om-spend-n">Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>.</div>`
       +rec+`</div>`;
   })();
@@ -5313,7 +5340,7 @@ function renderOM(){
   // « généré » l'est, mais LTV / marge / ROI sont désormais NETS (ils comparent
   // de l'argent encaissé à une paie réellement versée). Le dire précisément
   // évite de re-diviser mentalement un chiffre déjà net.
-  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${Math.round((1-netRate())*100)} % OnlyFans). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
@@ -5360,7 +5387,7 @@ function renderOM(){
   // 📅 #7 — « à date » : où j'en suis aujourd'hui vs le mois dernier au même jour.
   let cmpMois="";
   if(!ko && OM_MODEL==="all" && prevTD!=null && !isNaN(prevTD)){
-    const curN=Math.round((Number(d.totals.netMonth)||0)*NET_RATE), prevN=Math.round((Number(prevTD)||0)*NET_RATE);
+    const curN=Math.round((Number(d.totals.netMonth)||0)*netRate()), prevN=Math.round((Number(prevTD)||0)*netRate());
     const j=new Date().getDate(), diff=curN-prevN, up=diff>=0;
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
@@ -5746,7 +5773,7 @@ function renderRenta(){
       if(lmOF==null && lmTg==null) return "";
       return `<div class="rn-proj" style="margin-top:8px;font-size:12px">📅 <b>Mois dernier</b> : OF (brut) ${lmOF!=null?money(lmOF):"—"}${lmTg!=null?` · Telegram ${money(lmTg)}`:""}${(lmOF!=null&&lmTg!=null)?` <span style="opacity:.6">(pas la même base, ne pas additionner)</span>`:""}</div>`;
     })()}
-    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × 80 % (20 % OnlyFans). Pas de frais Skrill chez Noctra. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
+    <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × ${Math.round(netRate()*100)} % (${pctComm()} OnlyFans). Pas de frais Skrill chez Noctra. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
   { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
 }
 function renderSplit(){
@@ -5818,7 +5845,27 @@ async function loadOM(){
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
       if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
       return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); renderOM(); if(typeof renderRachat==="function") renderRachat(); if(typeof renderConcentration==="function") renderConcentration(); renderGoal(LAST); renderSubValue(); renderConversion(); renderRailway(); renderDecroche(); renderOpp(); renderAnomalies(); renderRealloc(); renderCoutOpp(); renderVaModel(); renderDecisions(); renderCompare(); if(typeof renderOnboarding==="function") renderOnboarding(); if(typeof renderSaison==="function") renderSaison(); if(typeof renderBurnout==="function") renderBurnout(); if(typeof renderSim3==="function") renderSim3(); if(typeof renderStreak==="function") renderStreak(); if(typeof renderCoaching==="function") renderCoaching(); refreshEssentiel();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now();
+    // ⚠️ CHAQUE rendu est isolé (2026-08-24). Avant, la vingtaine d'appels était
+    // enchaînée sur une seule ligne dans le try de loadOM : un seul panneau qui
+    // plantait (une donnée absente, un champ que le serveur n'envoie plus)
+    // faisait tomber TOUS les suivants, figés sans le moindre message — le catch
+    // en bas ne dit rien tant que OM_DATA existe déjà. Un panneau cassé ne doit
+    // en emmener aucun autre avec lui.
+    [["classement",renderOM],["rachat",typeof renderRachat==="function"?renderRachat:null],
+     ["concentration",typeof renderConcentration==="function"?renderConcentration:null],
+     ["objectif",()=>renderGoal(LAST)],["valeur d'un abonné",renderSubValue],["conversion",renderConversion],
+     ["Railway",renderRailway],["décrochage",renderDecroche],["opportunités",renderOpp],
+     ["anomalies",renderAnomalies],["réallocation",renderRealloc],["coût d'opportunité",renderCoutOpp],
+     ["VA par modèle",renderVaModel],["décisions",renderDecisions],["comparaison",renderCompare],
+     ["onboarding",typeof renderOnboarding==="function"?renderOnboarding:null],
+     ["saisonnalité",typeof renderSaison==="function"?renderSaison:null],
+     ["burnout",typeof renderBurnout==="function"?renderBurnout:null],
+     ["simulateur",typeof renderSim3==="function"?renderSim3:null],
+     ["série",typeof renderStreak==="function"?renderStreak:null],
+     ["coaching",typeof renderCoaching==="function"?renderCoaching:null],
+     ["essentiel",refreshEssentiel]]
+      .forEach(([nom,fn])=>{ if(!fn) return; try{ fn(); }catch(err){ console.error("[panneau "+nom+"] "+(err&&err.message)); } });
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
@@ -8304,10 +8351,14 @@ let CONV_DATA=null;
 function renderRachat(){
   const p=$("#rachat"); if(!p) return;
   const d=(typeof OM_DATA!=="undefined"&&OM_DATA)?OM_DATA.delaiDollar:null;
-  if(!d || !d.arrives){ p.style.display="none"; return; }
+  // ⚠️ On exige les TROIS nombres. Avant, seul `arrives` était testé : un
+  // `payeurs` ou `racheteurs` absent faisait planter `.toLocaleString()`, et ce
+  // plantage était avalé par le catch de loadOM — figeant au passage tous les
+  // panneaux rendus après celui-ci, sans le moindre message.
+  if(!d || !isFinite(Number(d.arrives)) || !d.arrives || !isFinite(Number(d.payeurs)) || !isFinite(Number(d.racheteurs))){ p.style.display="none"; return; }
   p.style.display="block";
   const cur=(OM_DATA.currency)||"$";
-  const pc=(a,b)=>b>0?Math.round(a/b*1000)/10:null;
+  const pc=(a,b)=>(isFinite(Number(a))&&b>0)?Math.round(a/b*1000)/10:null;   // isFinite : `!=null` laissait passer NaN
   const pctPaye=pc(d.payeurs,d.arrives), pctRachat=pc(d.racheteurs,d.arrives);
   const tuiles=`<div class="ent"><div class="ent-l"><span class="ent-k">Abonnés arrivés</span><span class="ent-b"><i style="width:100%"></i></span><span class="ent-v">${d.arrives.toLocaleString("fr-FR")}</span><span class="ent-t"></span></div>`
     +`<div class="ent-l"><span class="ent-k">Ont payé une fois</span><span class="ent-b"><i style="width:${Math.max(4,Math.round(d.payeurs/d.arrives*100))}%"></i></span><span class="ent-v">${d.payeurs.toLocaleString("fr-FR")}</span><span class="ent-t">${pctPaye!=null?pctPaye+" %":""}</span></div>`
@@ -8319,7 +8370,7 @@ function renderRachat(){
   // dit au lieu d'afficher un point bas qui passerait pour un mauvais résultat.
   const courbe=(d.courbe||[]).map(x=>`<div class="sv-row"><span class="sv-name">sous ${x.j} jour${x.j>1?"s":""}</span>`
     +`<span class="sv-cell">${x.pct==null?`<span style="opacity:.55">pas assez de recul (${x.base} fans)</span>`:`<b>${String(x.pct).replace(".",",")} %</b> ont racheté <span style="opacity:.6">(sur ${x.base})</span>`}</span></div>`).join("");
-  const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null).map(v=>{
+  const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null&&v.pctRachat!=null).map(v=>{   // sans le 2e test : « null % rachètent »
     const cls=v.valeurMoy==null?"mid":(v.valeurMoy>=6?"good":(v.valeurMoy<4?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
       +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
@@ -8362,10 +8413,13 @@ function renderCoherence(){
   const rows=d.problemes.map(x=>{
     const grave=x.gravite==="grave";
     return `<div class="sv-row"><span class="sv-name">${grave?"🔴":"👀"} ${escapeHtml(x.quoi)}</span>`
-      +`<span class="sv-cell">${escapeHtml(x.explication)}<div style="opacity:.65;margin-top:2px">attendu <b>${x.attendu}</b> · trouvé <b>${x.obtenu}</b> · écart <b>${x.ecart>0?"+":""}${x.ecart}</b></div></span></div>`;
+      +`<span class="sv-cell">${escapeHtml(x.explication)}<div style="opacity:.65;margin-top:2px">attendu <b>${escapeHtml(String(x.attendu))}</b> · trouvé <b>${escapeHtml(String(x.obtenu))}</b> · écart <b>${escapeHtml((Number(x.ecart)>0?"+":"")+String(x.ecart))}</b></div></span></div>`;
   }).join("");
+  // On recompte les graves REELLEMENT affichés : se fier à `nbGraves` faisait
+  // écrire « rien de grave » juste sous une ligne rouge si le champ manquait.
+  const nbG=d.problemes.filter(x=>x.gravite==="grave").length;
   $("#coherenceBody").innerHTML=rows
-    +`<div class="sv-note">${d.nbGraves?`⚠️ <b>${d.nbGraves} incohérence${d.nbGraves>1?"s":""} grave${d.nbGraves>1?"s":""}</b> : rien n'est tombé en panne, mais une addition ne tombe pas juste. <b>Ne décide pas sur ces chiffres avant vérification.</b>`:"Rien de grave — des écarts d'arrondi ou une source lue à deux instants différents. À regarder si ça persiste."}</div>`;
+    +`<div class="sv-note">${nbG?`⚠️ <b>${nbG} incohérence${nbG>1?"s":""} grave${nbG>1?"s":""}</b> : rien n'est tombé en panne, mais une addition ne tombe pas juste. <b>Ne décide pas sur ces chiffres avant vérification.</b>`:"Rien de grave — des écarts d'arrondi ou une source lue à deux instants différents. À regarder si ça persiste."}</div>`;
   try{ fixPairs(); }catch(e){}
 }
 
@@ -8391,10 +8445,10 @@ function renderConversion(){
     const val = valeurDe[v.va];
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>
       <span class="sv-cell"><b>${v.clics.toLocaleString("fr-FR")}</b> clics → <b>${v.subs}</b> abonnés</span>
-      <span class="sv-part ${cls}">${v.cvr} %</span>
+      <span class="sv-part ${cls}">${String(v.cvr).replace(".",",")} %</span>
       <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b><span style="opacity:.6"> (depuis le début)</span>`:""}</span></div>`;
   }).join("");
-  const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${l.cvr} %</b></span></div>`).join("");
+  const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${String(l.cvr).replace(".",",")} %</b></span></div>`).join("");
   // 🎭 Par MODÈLE : à trafic comparable, celui qui convertit moins a un souci de
   // page ou de contenu, pas de volume.
   const mods=(d.modeles||[]);
@@ -8402,14 +8456,15 @@ function renderConversion(){
   if(mods.length>=2){
     const best=mods[0], last=mods[mods.length-1];
     const rap=(last.cvr>0)?(best.cvr/last.cvr).toFixed(1):null;
+    const rapFr=rap?rap.replace(".",","):null;   // virgule decimale francaise
     blocMod=`<div class="sv-head" style="margin-top:12px">Par modèle — même trafic, pas le même résultat</div>`
       + mods.map(m=>{
           const cls = m.cvr>=moy*1.1 ? "good" : (m.cvr<moy*0.7 ? "bad" : "mid");
           return `<div class="sv-row"><span class="sv-name">${escapeHtml(m.model)}</span>
             <span class="sv-cell"><b>${m.clics.toLocaleString("fr-FR")}</b> clics → <b>${m.subs}</b> abonnés</span>
-            <span class="sv-part ${cls}">${m.cvr} %</span></div>`;
+            <span class="sv-part ${cls}">${String(m.cvr).replace(".",",")} %</span></div>`;
         }).join("")
-      + (rap&&rap!=="1.0"?`<div class="sv-note"><b>${escapeHtml(best.model)}</b> convertit <b>${rap}×</b> mieux que <b>${escapeHtml(last.model)}</b> sur un trafic comparable — c'est la page ou le contenu, pas le volume.</div>`:"");
+      + (rap&&rap!=="1.0"?`<div class="sv-note"><b>${escapeHtml(best.model)}</b> convertit <b>${rapFr}×</b> mieux que <b>${escapeHtml(last.model)}</b> sur un trafic comparable — c'est la page ou le contenu, pas le volume.</div>`:"");
   }
   // 🎯 ENTONNOIR COMPLET — vues → clics → subs → payeurs → $ (2026-08-24).
   // Le panneau ne montrait que le milieu (clics → subs). Quand un VA s'effondre,
@@ -8427,7 +8482,11 @@ function renderConversion(){
       etapes.push({k:"Ont sorti la carte", v:ent.payeurs, u:""});
       etapes.push({k:"Encaissé (brut)", v:ent.revenu, u:" "+(cur||"$")});
     }
-    const maxV=Math.max(...etapes.map(e=>Number(e.v)||0),1);
+    // ⚠️ L'échelle ne porte QUE sur les comptages. En y mêlant le montant, la
+    // dernière barre pouvait être la plus large : l'entonnoir s'élargissait vers
+    // le bas et l'invitation « l'étape qui chute le plus est celle à réparer »
+    // se lisait à l'envers.
+    const maxV=Math.max(...etapes.filter(e=>!e.u).map(e=>Number(e.v)||0),1);
     blocEnt=`<div class="sv-head">🎯 L'entonnoir complet · ${d.days} jours</div><div class="ent">`
       + etapes.map((e,i)=>{
           const prev=i>0?(Number(etapes[i-1].v)||0):null;
@@ -8436,18 +8495,18 @@ function renderConversion(){
           // « encaissé » c'est un montant, un pourcentage n'aurait aucun sens.
           const estMontant=!!e.u, precMontant=i>0&&!!etapes[i-1].u;
           const taux=(prev&&prev>0&&!estMontant&&!precMontant)?(Math.round(val/prev*10000)/100):null;
-          const larg=Math.max(4,Math.round(val/maxV*100));
+          const larg=estMontant?100:Math.max(4,Math.round(val/maxV*100));
           return `<div class="ent-l"><span class="ent-k">${escapeHtml(e.k)}</span>`
             +`<span class="ent-b"><i style="width:${larg}%"></i></span>`
             +`<span class="ent-v">${(typeof HIDE!=="undefined"&&HIDE)?"•••":val.toLocaleString("fr-FR")}${e.u}</span>`
             +`<span class="ent-t">${taux!=null?String(taux<0.5?taux.toFixed(2):taux.toFixed(1)).replace(".",",")+" %":""}</span></div>`;
         }).join("")
       + `</div>`
-      + `<div class="sv-note">${!ent.etapeVues?"⚠️ Les vues Instagram ne sont pas rattachées pour l'instant — l'entonnoir démarre aux clics. ":""}`
+      + `<div class="sv-note">${!ent.etapeVues?"⚠️ Les vues Instagram ne sont pas rattachées pour l'instant — l'entonnoir démarre aux clics. ":(ent.vuesPartielles?`⚠️ Les vues ne couvrent que <b>${ent.vasAvecVues}</b> VA sur <b>${ent.vasTotal}</b> : le taux vues → clics est donc <b>optimiste</b>. `:"")}`
       + `${!ent.etapeArgent?`⚠️ L'étape argent n'existe que sur <b>1, 7, 14 ou 30 jours</b> : sur ${d.days} jours, les payeurs seraient comptés sur une autre période que les clics. `:""}`
       + `Lis-le de haut en bas : l'étape qui chute le plus est celle à réparer.</div>`;
   }
-  $("#convBody").innerHTML=blocEnt+`<div class="sv-head" style="margin-top:12px">Par VA · sur ${d.days} jours · moyenne ${moy} %</div>${rows}
+  $("#convBody").innerHTML=blocEnt+`<div class="sv-head" style="margin-top:12px">Par VA · sur ${d.days} jours · moyenne ${String(moy).replace(".",",")} %</div>${rows}
     ${blocMod}
     ${pires?`<div class="sv-head" style="margin-top:12px">Liens qui convertissent le moins</div>${pires}`:""}
     <div class="sv-note">${d.exploitable?`Le trafic est mesuré via tes tracking links — <b>${(d.totalClics||0).toLocaleString("fr-FR")} clics</b> sur la période, aucun outil externe nécessaire.
@@ -9141,7 +9200,7 @@ function openVaCard(vaName){
       ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):((typeof VA_GOALS!=="undefined"&&VA_GOALS)?"pas d'objectif fixé":"objectif en cours de chargement…"))}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
       ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*NET_RATE), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
-      ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après 20 % OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies 0,50 $")}
+      ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après "+pctComm()+" OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies "+prixSub().toFixed(2).replace(".",",")+" $")}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${(()=>{
         // ⚠️ CORRIGÉ le 2026-08-23 — la fiche affichait « Quinzaine 16 ·
@@ -9181,10 +9240,10 @@ function openVaCard(vaName){
       const net=rev*netRate(), margeNet=net-paie, chaque=net/paie;   // meme base que la LTV : net apres 20 % OnlyFans
       if(margeNet>0){
         const fort=chaque>=4;
-        return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés te rapportent <b>${money(net)}</b> net (${money(rev)} brut − 20 % OnlyFans). Chaque 1&nbsp;$ versé te rend <b>${chaque.toFixed(1).replace(".",",")}&nbsp;$</b> net → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
+        return `<div class="va-verdict vv-ok">${fort?"💚":"✅"} Tu le paies ~<b>${money(paie)}</b>, ses abonnés te rapportent <b>${money(net)}</b> net (${money(rev)} brut − ${pctComm()} OnlyFans). Chaque 1&nbsp;$ versé te rend <b>${chaque.toFixed(1).replace(".",",")}&nbsp;$</b> net → <b>${fort?"garde-le à fond":"rentable, garde-le"}</b>.</div>`;
       }
       // Cas piégeux : rentable en brut, perdant une fois la commission déduite.
-      if(rev>paie) return `<div class="va-verdict vv-bad">⚠️ Attention au piège : ses abonnés génèrent <b>${money(rev)}</b> brut pour ~<b>${money(paie)}</b> versés, ce qui paraît rentable — mais après les 20 % OnlyFans il ne te reste que <b>${money(net)}</b> net. <b>Il te coûte plus qu'il ne rapporte.</b></div>`;
+      if(rev>paie) return `<div class="va-verdict vv-bad">⚠️ Attention au piège : ses abonnés génèrent <b>${money(rev)}</b> brut pour ~<b>${money(paie)}</b> versés, ce qui paraît rentable — mais après les ${pctComm()} OnlyFans il ne te reste que <b>${money(net)}</b> net. <b>Il te coûte plus qu'il ne rapporte.</b></div>`;
       return `<div class="va-verdict vv-bad">⚠️ Ses abonnés te rapportent <b>${money(net)}</b> net pour ~<b>${money(paie)}</b> versés : il te <b>coûte plus qu'il ne rapporte</b>. À surveiller — regarde ses liens et sa conversion avant de trancher.</div>`;
     })()}
     ${(function(){
