@@ -5892,6 +5892,18 @@ function omIndispo(msg){
   $("#om").style.display="block";
   b.innerHTML=`<div class="om-prep">⚠️ ${escapeHtml(msg)}<br><span style="opacity:.75">Aucun chiffre n'est affiché tant que je ne peux pas les lire — mieux vaut rien qu'un montant faux.</span></div>`;
 }
+// ⚠️ #omFresh n'était écrit QUE dans renderOM. Quand le chargement échoue
+// alors que d'anciens chiffres sont déjà à l'écran, renderOM n'est pas rappelé :
+// le badge restait figé sur « à jour à l'instant » au-dessus de chiffres vieux de
+// plusieurs heures, pendant que le bandeau du haut, lui, vieillissait
+// correctement. Deux fraîcheurs contradictoires à l'écran, et la fausse était
+// celle collée aux chiffres.
+function majFraicheurOM(){
+  try{ const of=$("#omFresh");
+    if(of && typeof fraicheur==="function" && typeof OM_FETCHED_AT!=="undefined" && OM_FETCHED_AT)
+      of.innerHTML=fraicheur(OM_FETCHED_AT);
+  }catch(e){}
+}
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
   // ⚠️ `OM_DATA` sert de sentinelle « j'ai de vraies données » (`if(!OM_DATA)
@@ -5905,14 +5917,14 @@ async function loadOM(){
   }
   try{
     const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
-    if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); return; }
+    if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); else majFraicheurOM(); return; }
     const j=await r.json();
     // ⚠️ UN SEUL retry en vol : la boucle 60 s rappelle loadOM, et chaque appel
     // sans données planifiait son propre retry -> les chaînes s'empilaient
     // (N+1 boucles après N minutes) et matraquaient le serveur.
     if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
       if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
-      return; }
+      majFraicheurOM(); return; }
     OM_DATA=j.data; OM_FETCHED_AT=Date.now();
     // ⚠️ CHAQUE rendu est isolé (2026-08-24). Avant, la vingtaine d'appels était
     // enchaînée sur une seule ligne dans le try de loadOM : un seul panneau qui
@@ -5934,7 +5946,7 @@ async function loadOM(){
      ["coaching",typeof renderCoaching==="function"?renderCoaching:null],
      ["essentiel",refreshEssentiel]]
       .forEach(([nom,fn])=>{ if(!fn) return; try{ fn(); }catch(err){ console.error("[panneau "+nom+"] "+(err&&err.message)); } });
-  }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); }
+  }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); else majFraicheurOM(); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
@@ -8530,14 +8542,25 @@ function renderNoteJour(){
   const comp=[];
   const ko=(typeof revKo==="function")?revKo():true;
   comp.push({nom:"Argent OnlyFans lisible",pts:ko?0:25,max:25,pb:ko?"la source d'argent ne répond pas":null});
-  const tg=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
-  comp.push({nom:"Telegram lisible",pts:tg>0?10:0,max:10,pb:tg>0?null:"les chiffres Telegram manquent (0 affiché)"});
+  // ⚠️ On note la LECTURE, pas le montant : `tg>0` retirait 10 points à un mois
+  // Telegram réellement à zéro en prétendant que les chiffres « manquaient ».
+  const tgLu=(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null);
+  comp.push({nom:"Telegram lisible",pts:tgLu?10:0,max:10,pb:tgLu?null:"les chiffres Telegram n'ont pas pu être lus"});
   const cv=(typeof COH_DATA!=="undefined"&&COH_DATA)?COH_DATA.verdict:null;
   comp.push({nom:"Les additions tombent juste",pts:cv==="ok"?20:(cv==="oeil"?12:(cv==="grave"?0:8)),max:20,pb:cv==="ok"?null:(cv==="grave"?"des chiffres se CONTREDISENT — ne décide pas dessus":(cv==="oeil"?"des écarts à surveiller":"contrôle pas encore passé"))});
   const sc=(typeof SANTEC_DATA!=="undefined"&&SANTEC_DATA)?SANTEC_DATA:null;
-  const nEt=(sc&&Array.isArray(sc.eteints))?sc.eteints.length:0;
-  const nPo=(sc&&Array.isArray(sc.suspects))?sc.suspects.filter(x=>x.danger==="poste").length:0;
-  comp.push({nom:"Comptes Instagram sains",pts:Math.max(0,Math.round(15-nEt*1.5-nPo*3)),max:15,pb:(nEt||nPo)?(nEt+" compte"+(nEt>1?"s":"")+" éteint"+(nEt>1?"s":"")+(nPo?", "+nPo+" suspect(s) qui poste(nt)":"")):null});
+  if(!sc){
+    // ⚠️ Sans données, nEt=nPo=0 donnait 15/15 SANS aucun problème listé : la
+    // note certifiait « tout est en ordre » sur un contrôle qui n'a JAMAIS
+    // tourné. Un contrôle non mesuré n'est pas un contrôle réussi. Même
+    // convention que « Les additions tombent juste » : note partielle + raison
+    // explicite, jamais le maximum.
+    comp.push({nom:"Comptes Instagram sains",pts:6,max:15,pb:"contrôle des comptes pas passé (état non lu)"});
+  } else {
+    const nEt=Array.isArray(sc.eteints)?sc.eteints.length:0;
+    const nPo=Array.isArray(sc.suspects)?sc.suspects.filter(x=>x.danger==="poste").length:0;
+    comp.push({nom:"Comptes Instagram sains",pts:Math.max(0,Math.round(15-nEt*1.5-nPo*3)),max:15,pb:(nEt||nPo)?(nEt+" compte"+(nEt>1?"s":"")+" éteint"+(nEt>1?"s":"")+(nPo?", "+nPo+" suspect(s) qui poste(nt)":"")):null});
+  }
   const frais=(typeof OM_FETCHED_AT!=="undefined"&&OM_FETCHED_AT&&(Date.now()-OM_FETCHED_AT)<20*60*1000);
   comp.push({nom:"Chiffres frais",pts:frais?10:4,max:10,pb:frais?null:"les chiffres datent d'un moment"});
   let pPart=20; const pbs=[];
@@ -8889,8 +8912,8 @@ function renderHours(){
     ${posteReco}
     <div class="hr-grid">${cols}</div>
     <div class="hr-ax"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
-    <div class="hr-note">Meilleur créneau : <b>${mc.debut}h-${mc.fin}h</b> (${mc.part} % des abonnés).<br>
-      Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]}), le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]}).</div>
+    <div class="hr-note">${mc.debut!=null?`Meilleur créneau : <b>${mc.debut}h-${mc.fin}h</b> (${mc.part} % des abonnés).<br>`:""}
+      ${(fort&&bl[fort]!=null)?`Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]})${(faible&&bl[faible]!=null)?`, le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]})`:""}.`:""}</div>
     ${blocJours}
     ${d.fiable?"":`<div class="hr-warn">⚠️ Seulement ${d.total} abonnés analysés — trop peu pour en tirer une règle, à revoir dans quelques jours.</div>`}
     <div class="hr-warn">Sur ${d.days} jours · ${d.total} abonnés · heure de ${d.tz.split("/").pop().replace("_"," ")}</div>`;
@@ -10210,6 +10233,19 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
+// ⚠️ Ces panneaux n'étaient chargés QU'AU DÉMARRAGE (loadAll) : trésorerie,
+// cohérence, santé des comptes, CAC, décrochage, conversion, heures. Sur une page
+// laissée ouverte ils montraient les chiffres de l'ouverture pendant que tout le
+// reste se rafraîchissait à côté -- et la « cohérence » certifiait « tu peux
+// décider sur ces chiffres » sans avoir revu aucun des chiffres actuels.
+// Cadence plus lente que la boucle principale : ce sont des appels lourds.
+setInterval(function(){
+  if(pageCachee() || $("#gate").classList.contains("show")) return;
+  [ "loadTresorerie","loadCoherence","loadSanteComptes","loadCac",
+    "loadDecroche","loadConversion","loadHours" ].forEach(function(n){
+    try{ if(typeof window[n]==="function") window[n](); }catch(e){}
+  });
+}, REFRESH_MS*5);
 // Retour sur l'onglet : on rafraîchit tout de suite plutôt que d'attendre le
 // prochain tic — les chiffres sont donc à jour au moment précis où on les
 // regarde. (Garde-fou : pas plus d'un rafraîchissement toutes les 5 s, pour
