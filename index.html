@@ -3182,8 +3182,18 @@ async function loadOnlyChat(){
     const r = await fetch(HUB_BASE+"/api/hub/onlychat",{headers:{"x-hub-token":TOKEN}});
     if(r.ok){
       const j = await r.json();
-      ONLYCHAT_DATA = (j && j.totalRevenue!=null) ? j : null;
-      ok=true;
+      // ⭐ CORRIGÉ le 25/08 — LE bug du « Telegram qui disparaît ». Quand le
+      // serveur RECALCULE, il répond {computing:true} SANS montant. L'ancien
+      // code faisait alors ONLYCHAT_DATA=null ET ok=true : la valeur Telegram
+      // déjà affichée était EFFACÉE (carte à 0), sans même compter ça comme un
+      // échec. Or « en train de recalculer » n'est PAS « plus de Telegram » :
+      // on GARDE la dernière valeur connue et on réessaie vite. Le serveur sert
+      // désormais le dernier bon résultat, donc computing est rare — mais si ça
+      // arrive, on ne clignote plus.
+      if(j && j.computing){ ok=true; setTimeout(loadOnlyChat, 8000); }
+      else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; }
+      else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; }
+      // sinon (réponse inattendue) : on ne touche à rien, compté comme échec plus bas
     }
   }catch(e){}
   // ⚠️ Sans ça, une fois la donnée reçue, elle restait figée POUR TOUJOURS si
