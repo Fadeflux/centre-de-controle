@@ -46,8 +46,26 @@ self.addEventListener('fetch', function (e) {
   // Assets : cache-first + mise à jour en fond.
   e.respondWith((async function () {
     const cached = await caches.match(req);
-    if (cached) { fetch(req).then(function (n) { caches.open(CACHE).then(function (c) { c.put(req, n).catch(function () {}); }); }).catch(function () {}); return cached; }
-    try { const net = await fetch(req); caches.open(CACHE).then(function (c) { c.put(req, net.clone()).catch(function () {}); }); return net; }
+    if (cached) {
+      // `n` n'est pas rendu a la page : pas de clone necessaire ici.
+      fetch(req).then(function (n) {
+        caches.open(CACHE).then(function (c) { c.put(req, n).catch(function () {}); })
+          .catch(function () {});
+      }).catch(function () {});
+      return cached;
+    }
+    try {
+      const net = await fetch(req);
+      // Cloner AVANT de rendre la reponse. `net.clone()` etait appele dans le
+      // then de caches.open, donc une microtache PLUS TARD -- si la page avait
+      // deja commence a lire le corps, clone() levait une TypeError. Cette
+      // promesse n'ayant aucun catch, l'echec etait totalement silencieux et
+      // l'asset n'entrait jamais dans le cache hors-ligne.
+      const copie = net.clone();
+      caches.open(CACHE).then(function (c) { c.put(req, copie).catch(function () {}); })
+        .catch(function () {});
+      return net;
+    }
     catch (err) { return Response.error(); }
   })());
 });
