@@ -3190,7 +3190,13 @@ async function loadOnlyChat(){
       // on GARDE la dernière valeur connue et on réessaie vite. Le serveur sert
       // désormais le dernier bon résultat, donc computing est rare — mais si ça
       // arrive, on ne clignote plus.
-      if(j && j.computing){ ok=true; setTimeout(loadOnlyChat, 8000); }
+      // ⚠️ UN SEUL timer de relance (corrigé le 25/08, audit). Sans la garde
+      // `window._ocComputingTimer`, chaque tour de boucleRafraichissement (60 s)
+      // qui tombait sur « computing » armait une NOUVELLE chaîne de relances 8 s :
+      // 20 min de recalcul = ~20 chaînes en parallèle matraquant le hub, jusqu'à
+      // déclencher son rate-limit et re-faire disparaître Telegram. Même garde
+      // que loadOM (_omRetry).
+      if(j && j.computing){ ok=true; if(!window._ocComputingTimer){ window._ocComputingTimer=setTimeout(function(){ window._ocComputingTimer=null; loadOnlyChat(); },8000); } }
       else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; }
       else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; }
       // sinon (réponse inattendue) : on ne touche à rien, compté comme échec plus bas
@@ -3320,7 +3326,7 @@ function renderOcVersus(d){
   const sorted=noms.slice().sort((a,b)=>d.parModele[b].unlockRatio-d.parModele[a].unlockRatio);
   const best=sorted[0];
   const rows=noms.map(nom=>{
-    const m=d.parModele[nom], pct=Math.round(m.unlockRatio*1000)/10;
+    const m=d.parModele[nom], pct=String(Math.round(m.unlockRatio*1000)/10).replace(".",",");
     return `<div class="oc-vs-row${nom===best?" best":""}"><span class="oc-vs-name">${nom===best?"🏆 ":""}${escapeHtml(nom)}</span><span class="oc-vs-pct">${pct} %</span><span class="oc-vs-ltv">LTV ${m.ltv!=null?tgMoney(m.ltv):"—"}</span></div>`;
   }).join("");
   return `<div class="oc-vs-cap">🆚 Qui convertit le mieux (PPV ouverts)</div><div class="oc-vs">${rows}</div>`;
@@ -3401,7 +3407,7 @@ function renderOnlyChat(){
   el.style.display="";
   const maj = d.maj ? new Date(d.maj).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
   $("#ocState").textContent = maj ? `màj ${maj}` : "";
-  const pct = v => v==null ? "—" : (Math.round(v*1000)/10) + " %";
+  const pct = v => v==null ? "—" : String(Math.round(v*1000)/10).replace(".",",") + " %";
   const noms = Object.keys(d.parModele||{});
   const rows = noms.map(nom=>{
     const m=d.parModele[nom];
@@ -7106,7 +7112,7 @@ function renderRailway(){
     <div class="sv-note">
       ${reel
         ? `Facture du mois : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
-           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1)} %</b> de ton CA brut du mois.`:""}
+           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1).replace(".",",")} %</b> de ton CA brut du mois.`:""}
            ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse ${gros.part!=null?gros.part:"?"} % de la facture.`:""}`
         : `⚠️ Railway ne me donne pas de montant facturé, et son estimation d'usage varie trop d'un appel à l'autre pour être prise pour de l'argent.
            Ce qui est fiable, c'est la <b>part de chaque projet</b> ci-dessus.
@@ -7181,7 +7187,7 @@ function renderProxy(){
     jauge=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <div style="display:flex;align-items:baseline;gap:8px;font-size:13px">
         <span>⛽ Data proxy</span>
-        <b style="color:${coul};font-size:15px">${reste.toFixed(2)} Go</b>
+        <b style="color:${coul};font-size:15px">${reste.toFixed(2).replace(".",",")} Go</b>
         <span style="color:var(--faint)">restants sur ${tot}</span>
       </div>
       <div style="margin-top:6px;height:8px;border-radius:99px;background:var(--line);overflow:hidden">
@@ -8526,7 +8532,7 @@ function renderSanteComptes(){
     html+=`<div class="sv-head">📉 Comptes en train de s'éteindre — ${ete.length}</div>`
       +ete.slice(0,12).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
         +`<span class="sv-cell"><b>${fmtInt(x.avant)}</b> → <b>${fmtInt(x.maintenant)}</b> vues/post <span style="opacity:.6">(${x.postsRecents} posts récents)</span></span>`
-        +`<span class="sv-part bad">${x.pct} %</span></div>`).join("")
+        +`<span class="sv-part bad">${String(x.pct).replace(".",",")} %</span></div>`).join("")
       +`<div class="sv-note">Chaque compte est comparé <b>à lui-même</b> : ses 5 derniers jours contre ses 15 jours d'avant. Sous 30 % de son propre niveau, chaque post dessus est probablement du travail perdu — à reposer ou remplacer. Tu reçois aussi un message privé Discord chaque matin s'il y a du nouveau.</div>`;
   }
   if(sus&&sus.length){
@@ -8606,17 +8612,23 @@ function renderIaHumain(){
   if(!d||!d.categories||!d.lus){ p.style.display="none"; return; }
   p.style.display="block";
   const c=d.categories, money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
-  const tot=c.iaSeule.n+c.humain.n+c.inconnu.n||1;
+  // ⚠️ Lecture DEFENSIVE (corrigé le 25/08, audit) : un serveur plus vieux que
+  // la page peut renvoyer `categories` sans l'une des 3 clés → `c.inconnu.n`
+  // jetait un TypeError et le panneau disparaissait sans raison. On normalise.
+  const cat=k=>(c&&c[k]&&typeof c[k]==="object")?{n:Number(c[k].n)||0,montant:Number(c[k].montant)||0}:{n:0,montant:0};
+  const ia=cat("iaSeule"), hu=cat("humain"), inc=cat("inconnu");
+  const tot=ia.n+hu.n+inc.n||1;
   const pc=x=>Math.round(x/tot*100);
   const ligne=(emo,nom,x,cls)=>`<div class="sv-row"><span class="sv-name">${emo} ${nom}</span><span class="sv-cell"><b>${x.n}</b> payeur${x.n>1?"s":""} · <b>${money(x.montant)}</b></span><span class="sv-part ${cls}">${pc(x.n)} %</span></div>`;
-  const mods=Object.keys(d.categories.parModele||{}).map(m=>{
-    const x=d.categories.parModele[m];
-    return `<div class="sv-row"><span class="sv-name">${escapeHtml(m)}</span><span class="sv-cell">IA seule <b>${x.iaSeule.n}</b> (${money(x.iaSeule.montant)}) · humain <b>${x.humain.n}</b> (${money(x.humain.montant)})${x.inconnu.n?` · inconnu ${x.inconnu.n}`:""}</span></div>`;
+  const mods=Object.keys((c&&c.parModele)||{}).map(m=>{
+    const x=c.parModele[m]||{}, g=k=>(x[k]&&typeof x[k]==="object")?x[k]:{n:0,montant:0};
+    const xi=g("iaSeule"), xh=g("humain"), xn=g("inconnu");
+    return `<div class="sv-row"><span class="sv-name">${escapeHtml(m)}</span><span class="sv-cell">IA seule <b>${Number(xi.n)||0}</b> (${money(xi.montant)}) · humain <b>${Number(xh.n)||0}</b> (${money(xh.montant)})${(Number(xn.n)||0)?` · inconnu ${Number(xn.n)||0}`:""}</span></div>`;
   }).join("");
   $("#iahumainBody").innerHTML=
-    ligne("🤖","L'IA a tout fait seule",c.iaSeule,"good")
-    +ligne("🧑","Un humain est intervenu",c.humain,"mid")
-    +(c.inconnu.n?ligne("❔","Pas de message créatrice lu",c.inconnu,"mid"):"")
+    ligne("🤖","L'IA a tout fait seule",ia,"good")
+    +ligne("🧑","Un humain est intervenu",hu,"mid")
+    +(inc.n?ligne("❔","Pas de message créatrice lu",inc,"mid"):"")
     +(mods?`<div class="sv-head" style="margin-top:10px">Par modèle</div>${mods}`:"")
     +`<div class="sv-note">Sur <b>${d.lus}</b> payeurs lus. ⚠️ « Un humain est intervenu » = au moins un message écrit à la main dans la conversation — ça ne prouve pas que c'est LUI qui a vendu, c'est la borne haute de l'implication humaine. Mesuré le ${new Date(d.ts).toLocaleDateString("fr-FR")} ; remis à jour chaque midi.</div>`;
   try{ fixPairs(); }catch(e){}
@@ -8633,7 +8645,7 @@ function renderHeuresPay(){
   const max=Math.max(...h.map(x=>x.montant||0),1);
   const barres=h.map(x=>{
     const ht=Math.max(3,Math.round((x.montant||0)/max*100));
-    return `<div class="hp-col" title="${String(x.h).padStart(2,"0")} h : ${Math.round(x.montant)} $ (${x.n} paiement${x.n>1?"s":""})"><i style="height:${ht}%"></i><span>${x.h%6===0?x.h:""}</span></div>`;
+    return `<div class="hp-col" title="${String(x.h).padStart(2,"0")} h : ${Math.round(Number(x.montant)||0)} $ (${x.n} paiement${x.n>1?"s":""})"><i style="height:${ht}%"></i><span>${x.h%6===0?x.h:""}</span></div>`;
   }).join("");
   // Meilleure fenêtre de 3 heures consécutives (sur le MONTANT, pas le nombre :
   // une heure à 3 petits paiements pèse moins qu'une heure à un PPV de 99 $).
@@ -8861,7 +8873,7 @@ function renderSubValue(){
       <span class="sv-sugg">${sugg}</span></div>`;
   }).join("");
   const meilleur=calc[0], pire=calc[calc.length-1];
-  const mult = (pire.valeur>0) ? (meilleur.valeur/pire.valeur).toFixed(1)+"×" : "—";
+  const mult = (pire.valeur>0) ? (meilleur.valeur/pire.valeur).toFixed(1).replace(".",",")+"×" : "—";
   $("#subvalBody").innerHTML=`<div class="sv-head">Trié par valeur d'un abonné · ${tarifUnique?`tu paies <b>${money(tauxMax)}</b> par abonné à tout le monde`:`tarif variable selon les paliers`}</div>${rows}
     <div class="sv-note">Tu reverses en moyenne <b>${pct(partEquipe)}</b> de ce que l'équipe rapporte.
       Un abonné de <b>${escapeHtml(meilleur.va)}</b> vaut <b>${money(meilleur.valeur)}</b>, un de <b>${escapeHtml(pire.va)}</b> <b>${money(pire.valeur)}</b> —
