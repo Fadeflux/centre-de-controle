@@ -113,6 +113,12 @@
   .logo svg{width:23px;height:23px}
   h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.3px}
   .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  /* 🚦 Badge fiabilité des chiffres (en-tête). */
+  .dh{display:none;align-items:center;gap:6px;font-size:11px;font-weight:600;margin-top:5px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);width:max-content;max-width:100%}
+  .dh.on{display:inline-flex}
+  .dh-green{color:#34d399;border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.10)}
+  .dh-amber{color:#facc15;border-color:rgba(250,204,21,.35);background:rgba(250,204,21,.10)}
+  .dh-red{color:var(--down);border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.10)}
   .top-actions{display:flex;align-items:center;gap:8px}
   button.btn{
     font:inherit;font-size:13px;font-weight:500;color:var(--text);
@@ -1863,6 +1869,8 @@
         <h1>Noctra</h1>
         <div class="brand-tag">Centre de contrôle</div>
         <div class="sub" id="sub">Chargement…</div>
+        <!-- 🚦 Fiabilité des chiffres d'un coup d'œil (à jour / partiel / indispo). -->
+        <div id="dataHealth" class="dh" title="Fiabilité des chiffres d'argent en ce moment"></div>
       </div>
     </div>
 
@@ -5175,6 +5183,28 @@ function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)|
 const LTV_NET_RATE = NET_RATE;   // meme taux : plus de distinction depuis qu'il n'y a plus de Skrill
 function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*netRate()).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function ltvBrutTxt(v,cur){ return (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
+// 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
+// chiffres d'argent ? 🟢 à jour · 🟡 partiel (un compte muet → minimums) · 🔴 argent
+// indisponible. Masqué en mode démo/déconnecté (rien à certifier).
+function renderDataHealth(){
+  const el=document.getElementById("dataHealth"); if(!el) return;
+  const d=OM_DATA;
+  const enDemo=(typeof DEMO_OM!=="undefined" && d===DEMO_OM) || (typeof TOKEN==="undefined") || !TOKEN;
+  if(!d || enDemo){ el.className="dh"; el.textContent=""; return; }
+  let cls, txt;
+  if(d.revenusIndisponibles){
+    cls="dh-red"; txt="🔴 Argent indisponible — ne décide pas sur ces chiffres";
+  } else if(d.revenusPartiels || (d.totals&&d.totals.fenetresPartielles) || (d.modelesManquants&&d.modelesManquants.length)){
+    const mm=(d.modelesManquants&&d.modelesManquants.length)?" ("+d.modelesManquants.join(", ")+")":"";
+    cls="dh-amber"; txt="🟡 Chiffres partiels"+mm+" — ce sont des minimums";
+  } else {
+    let fr="";
+    if(typeof OM_FETCHED_AT!=="undefined" && OM_FETCHED_AT){ const m=Math.floor((Date.now()-OM_FETCHED_AT)/60000); fr=m<1?" · à l'instant":(m<60?" · il y a "+m+" min":" · vieux de "+Math.round(m/60)+" h"); }
+    cls="dh-green"; txt="🟢 Chiffres à jour et complets"+fr;
+  }
+  el.className="dh on "+cls;
+  el.textContent=txt;
+}
 function renderOM(){
   // Même sans données OM, les panneaux qui dépendent de HIDE doivent être
   // re-rendus (sinon un clic sur 🙈 laissait des montants en clair).
@@ -5435,6 +5465,19 @@ function renderOM(){
   // 🏷️ Tarif de paie lisible, tel que le serveur le calcule (jamais en dur).
   const payTxt = (d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub";
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans).<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
+  // 🧾 Veilleur remboursements/rejets du mois (argent qui REPART). 0 aujourd'hui,
+  // s'allume le jour où ça grimpe (fraude, fans mécontents). Source : totals.remboursements.
+  const remb = d.totals && d.totals.remboursements;
+  let noteRemb = "";
+  if (!ko && remb && typeof remb.count === "number") {
+    if (remb.count === 0) {
+      noteRemb = `<div class="sv-note" style="margin-top:6px">🧾 <b>Remboursements ce mois : 0</b> — aucun argent n'est reparti. ✅</div>`;
+    } else {
+      const rs = Math.abs(Number(remb.sum)||0);
+      const parMod = Object.keys(remb.byModel||{}).map(m=>`${escapeHtml(m)} −${omMoney(Math.abs(Number(remb.byModel[m])||0),cur)}`).join(" · ");
+      noteRemb = `<div class="sv-note" style="margin-top:6px;color:#facc15">🧾 <b>Remboursements ce mois : ${remb.count}</b> pour <b>−${omMoney(rs,cur)}</b>${parMod?` — ${parMod}`:""}. De l'argent qui repart${remb.count>=3?" — une hausse = fraude ou fans mécontents, regarde vite.":", à surveiller."}</div>`;
+    }
+  }
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
@@ -5486,8 +5529,9 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut:"")+noteArg;
+  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteArg;
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
+  try{ renderDataHealth(); }catch(e){}
   renderModeles();
   renderCaJours();
   renderRenta();
