@@ -175,7 +175,7 @@
      même bande que #secnav : les deux se superposaient et la barre de sections
      passait INTÉGRALEMENT sous les onglets — puces invisibles et intapables.
      On décale #secnav de la hauteur de la barre d'onglets quand elle existe. */
-  body.has-tabs #secnav{top:calc(env(safe-area-inset-top,0px) + 54px)}
+  body.has-tabs #secnav{top:calc(env(safe-area-inset-top,0px) + var(--tabbarH,54px))}
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
   .sec-chip:hover{color:var(--text);border-color:var(--acc-line);background:var(--acc-bg)}
@@ -5994,8 +5994,17 @@ function renderTabStrip(){
   document.body.classList.toggle("has-tabs", TABS.length>0);
   const home = `<div class="tab ${ACTIVE==='home'?'on':''}" data-tab="home">🏠 Accueil</div>`;
   $("#tabbar").innerHTML = home + TABS.map(t=>`<div class="tab ${ACTIVE===t.id?'on':''}" data-tab="${t.id}">${escapeHtml(t.name)} <span class="x" data-close="${t.id}">✕</span></div>`).join("");
+  // 📏 La barre de sections (#secnav) colle JUSTE sous les onglets. Sa hauteur
+  // réelle varie (police, zoom, densité d'écran, mobile) : un décalage FIXE de
+  // 54px laissait un liséré noir quand la barre était plus courte (le « rectangle
+  // noir » signalé) ou masquait les puces sous les onglets quand elle était plus
+  // haute. On mesure la vraie hauteur et on la donne au CSS.
+  try{ if(TABS.length){ const h=$("#tabbar").offsetHeight; if(h>0) document.documentElement.style.setProperty("--tabbarH", h+"px"); } }catch(e){}
 }
 renderTabStrip();
+// La hauteur des onglets peut changer au redimensionnement / rotation : on
+// resynchronise le décalage de #secnav pour que le liséré ne réapparaisse pas.
+window.addEventListener("resize", ()=>{ try{ const tb=$("#tabbar"); if(document.body.classList.contains("has-tabs") && tb && tb.offsetHeight>0) document.documentElement.style.setProperty("--tabbarH", tb.offsetHeight+"px"); }catch(e){} });
 function updateView(){
   renderTabStrip();
   document.querySelectorAll('#frames iframe').forEach(f=>f.classList.toggle('on', f.getAttribute('data-fr')===ACTIVE));
