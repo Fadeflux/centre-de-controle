@@ -8535,9 +8535,39 @@ function renderRachat(){
       +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
       +`<span class="sv-part ${cls}">${v.valeurMoy!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(v.valeurMoy).replace(".",",")+" "+cur):"—"}</span></div>`;
   }).join("");
+  // 🕵️ Détecteur de FAUX ABONNÉS : un VA qui amène du volume mais dont presque
+  // personne ne paie ET dont la valeur moyenne est quasi nulle = soit du trafic de
+  // très mauvaise qualité, soit des self-subs qui gonflent son classement. On
+  // FLAGGE avec les preuves, on n'ACCUSE pas — André juge sur pièce. Réservé à
+  // ce dashboard (aucun VA ne le voit). Seuils volontairement stricts (volume +
+  // conversion très basse vs l'équipe + valeur ~0) pour ne pas viser à tort un VA
+  // qui a juste du trafic moyen.
+  let suspects="";
+  // ⚠️ On ne juge QUE les VA PAYÉS du classement : les perso / hors-équipe
+  // (Chloe = « Insta Perso », Bot…) ont naturellement une conversion basse et ne
+  // trichent pas pour un classement — les inclure ferait un faux positif garanti
+  // (mesuré : Chloe 3 %, valeur 0,09). Ils ne sont pas dans OM_DATA.vas (filtrés
+  // côté serveur) ou y sont marqués `unpaid`.
+  const paidSet=new Set(((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid).map(v=>v.va));
+  const elig=(d.vas||[]).filter(v=>v.pctPayeur!=null && v.arrives>=15 && paidSet.has(v.va));
+  if(elig.length>=3){
+    const arr=elig.map(v=>v.pctPayeur).slice().sort((a,b)=>a-b);
+    const med=arr[Math.floor(arr.length/2)];
+    const flag=elig.filter(v=> v.arrives>=20 && med>0 && v.pctPayeur < med*0.4 && v.pctPayeur < 20 && v.valeurMoy!=null && v.valeurMoy < 2)
+      .sort((a,b)=>a.pctPayeur-b.pctPayeur);
+    if(flag.length){
+      const lignes=flag.map(v=>`<div class="sv-row"><span class="sv-name">⚠️ ${escapeHtml(v.va)}</span>`
+        +`<span class="sv-cell"><b>${v.arrives}</b> abonnés amenés, seulement <b>${v.payeurs}</b> ont payé `
+        +`(<b>${String(v.pctPayeur).replace(".",",")} %</b> vs médiane équipe ${String(med).replace(".",",")} %) · `
+        +`valeur/abonné ${v.valeurMoy!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(v.valeurMoy).replace(".",",")+" "+cur):"—"}</span></div>`).join("");
+      suspects=`<div class="sv-head" style="margin-top:12px;color:#facc15">🕵️ Abonnés suspects — à vérifier</div>${lignes}`
+        +`<div class="sv-note" style="color:#facc15">Ces VA amènent du volume mais <b>presque personne ne paie</b> et la valeur par abonné est quasi nulle. Deux explications : <b>trafic de mauvaise qualité</b>, ou <b>faux abonnés</b> (self-subs pour gonfler le classement). 👉 Ouvre <b>🔗 Sources</b> et regarde d'où viennent ces abonnés : s'ils sortent tous du <b>même lien</b> ou sont arrivés <b>en rafale le même jour</b> sans jamais payer, c'est le signe des faux. Ce panneau n'est visible que par toi.</div>`;
+    }
+  }
   $("#rachatBody").innerHTML=tuiles+delai
     +`<div class="sv-head" style="margin-top:12px">Au bout de combien de temps ils rachètent</div>${courbe}`
     +(vas?`<div class="sv-head" style="margin-top:12px">Par VA · ce que vaut vraiment un de ses abonnés</div>${vas}`:"")
+    +suspects
     +`<div class="sv-note">Sur les abonnés arrivés depuis le <b>${escapeHtml(String(d.depuis))}</b>. La colonne de droite est ce que rapporte en moyenne <b>un</b> abonné amené par ce VA — volume et qualité sont deux choses différentes.</div>`;
   try{ fixPairs(); }catch(e){}
 }
