@@ -191,6 +191,9 @@
     border-radius:4px 4px 0 0;min-height:2px;position:relative;cursor:default;transition:opacity .15s}
   .cj-bar:hover{opacity:.75}
   .cj-bar.best{background:linear-gradient(180deg,#4ade80,color-mix(in srgb,#4ade80 45%,transparent))}
+  /* 📅 la journée EN COURS (aujourd'hui) : hachures, pour la distinguer d'un jour fini */
+  .cj-bar.encours{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--acc) 70%,transparent) 0 6px,color-mix(in srgb,var(--acc) 30%,transparent) 6px 12px);opacity:.9}
+  .cj-days span.auj{color:var(--acc);font-weight:700}
   .cj-days{display:flex;gap:3px;margin-top:5px}
   .cj-days span{flex:1;min-width:0;text-align:center;font-size:9.5px;color:var(--faint)}
   /* petit rappel du brut sous un montant net */
@@ -10145,9 +10148,17 @@ function renderCaJours(){
   panel.style.display="block";
   const cur=d.currency||"$";
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-  const max=Math.max(...serie.map(x=>Number(x.v)||0),1);
-  const tot=serie.reduce((a,x)=>a+(Number(x.v)||0),0);
+  // 📅 La JOURNÉE EN COURS (aujourd'hui) : le serveur la donne à part (netToday),
+  // car elle est incomplète — elle ne doit pas fausser la moyenne ni le « meilleur
+  // jour » (calculés sur les jours FINIS). Mais André veut la VOIR : on l'ajoute
+  // comme dernière barre, hachurée, marquée « en cours ». Corrigé le 27/08 :
+  // avant, le graphe s'arrêtait à hier et le dernier jour n'était même pas étiqueté.
+  const auj=(d.netToday!=null && d.today) ? { date:d.today, v:Number(d.netToday)||0, enCours:true } : null;
+  const serieAff=auj ? serie.concat([auj]) : serie;
+  const max=Math.max(...serieAff.map(x=>Number(x.v)||0),1);
+  const tot=serie.reduce((a,x)=>a+(Number(x.v)||0),0);   // moyenne sur les jours COMPLETS
   const best=serie.reduce((a,x)=>(Number(x.v)||0)>(Number(a.v)||0)?x:a,serie[0]);
+  const dernierIdx=serieAff.length-1;
   const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
   // Le NET d'abord (comme OnlyFans), le brut entre parenthèses.
   const net=v=>money((Number(v)||0)*NET_RATE);
@@ -10165,13 +10176,19 @@ function renderCaJours(){
       }
     }
   }catch(e){}
-  $("#cjBody").innerHTML=`<div class="cj-wrap">`+serie.map(x=>{
+  $("#cjBody").innerHTML=`<div class="cj-wrap">`+serieAff.map((x,i)=>{
       const v=Number(x.v)||0, h=Math.max(2,Math.round(v/max*128));
-      const lbl=`${net(v)} net · ${money(v)} brut`;
-      return `<div class="cj-bar ${x.date===best.date?"best":""}" style="height:${h}px" data-date="${fr(x.date)}" data-lbl="${escapeHtml(lbl)}" title="${fr(x.date)} : ${lbl}"></div>`;
+      const enCours=!!x.enCours;
+      const lbl=enCours?`${net(v)} net · ${money(v)} brut · aujourd'hui, en cours`:`${net(v)} net · ${money(v)} brut`;
+      const cls=enCours?"encours":(x.date===best.date?"best":"");
+      const dateAff=enCours?(fr(x.date)+" (en cours)"):fr(x.date);
+      return `<div class="cj-bar ${cls}" style="height:${h}px" data-date="${dateAff}" data-lbl="${escapeHtml(lbl)}" title="${dateAff} : ${lbl}"></div>`;
     }).join("")+goalLine+`</div>
-    <div class="cj-days">`+serie.map((x,i)=>`<span>${(i%4===0||x.date===best.date)?parseInt(x.date.slice(8),10):""}</span>`).join("")+`</div>
-    <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${net(best.v)} net (${money(best.v)} brut). La journée en cours n'apparaît pas (incomplète par nature).</div>`;
+    <div class="cj-days">`+serieAff.map((x,i)=>{
+      const auj=!!x.enCours, lab=(i%4===0||i===dernierIdx||x.date===best.date)?parseInt(x.date.slice(8),10):"";
+      return `<span class="${auj?"auj":""}">${lab}</span>`;
+    }).join("")+`</div>
+    <div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${net(best.v)} net (${money(best.v)} brut).${auj?` La dernière barre <b>hachurée</b> = <b>aujourd'hui</b> (${net(auj.v)} net, en cours).`:` La journée en cours n'apparaît pas (incomplète par nature).`}</div>`;
   { const c=$("#cjBody"); if(c && !c.dataset.tapBound){ c.dataset.tapBound="1"; c.addEventListener("click",e=>{
     const bar=e.target.closest(".cj-bar[data-lbl]"); if(!bar) return;
     if(typeof toast==="function") toast("📅 "+bar.getAttribute("data-date"), bar.getAttribute("data-lbl"));
