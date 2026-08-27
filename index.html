@@ -8692,8 +8692,24 @@ function renderTgVa(){
       +`<span class="sv-cell"><b>${fmtInt(v.amenes)}</b> entré${v.amenes>1?"s":""} au canal · ${okP?`<b>${fmtInt(v.payeurs)}</b> payeur${(v.payeurs||0)>1?"s":""}`:"payeurs —"}</span>`
       +`<span class="sv-part ${okP&&v.depense>0?"good":"mid"}">${okP?money(v.depense):"—"}</span></div>`;
   }).join("");
+  // 🔎 Le contrôle d'appartenance (getChatMember) : parmi tes payeurs, lesquels
+  // sont ENCORE dans le canal ? Ceux-là, tu peux les retrouver à la main dans
+  // tes listes de liens pour les attribuer — la liste courte est ici.
+  const mem=d.membres;
+  let blocMem="";
+  if(mem && (mem.dedans||mem.dehors)){
+    blocMem=`<div class="sv-head" style="margin-top:12px">🔎 Tes payeurs et le canal</div>`
+      +`<div class="sv-row"><span class="sv-name">Dans le canal</span><span class="sv-cell"><b>${fmtInt(mem.dedans)}</b> payeur${mem.dedans>1?"s":""}</span><span class="sv-part good">${money(mem.sommeDedans)}</span></div>`
+      +`<div class="sv-row"><span class="sv-name">Hors du canal</span><span class="sv-cell"><b>${fmtInt(mem.dehors)}</b> payeur${mem.dehors>1?"s":""} (partis, ou jamais entrés)</span><span class="sv-part mid">${money(mem.sommeDehors)}</span></div>`;
+    const aCh=(mem.aChercher||[]).filter(x=>x.depense>0).sort((a,b)=>b.depense-a.depense).slice(0,15);
+    if(aCh.length){
+      blocMem+=`<div class="sv-note">👉 Ces payeurs sont <b>dans le canal</b> — cherche leur nom dans tes liens d'invitation Telegram pour savoir quel VA les a amenés :</div>`
+        +aCh.map(x=>`<div class="sv-row"><span class="sv-name">${escapeHtml(x.nom||"?")}${x.user?` <span style="opacity:.55">@${escapeHtml(x.user)}</span>`:""}</span><span class="sv-cell">${escapeHtml(x.modele||"")}</span><span class="sv-part good">${money(x.depense)}</span></div>`).join("");
+    }
+  }
   $("#tgvaBody").innerHTML=(rows||`<div class="sv-note">Des entrées, mais aucun lien nommé pour l'instant.</div>`)
-    +`${d.horsCanal?`<div class="sv-note">💡 <b>${fmtInt(d.horsCanal.payeurs)}</b> payeur${d.horsCanal.payeurs>1?"s":""} OnlyChat (${money(d.horsCanal.depense)}) ne sont <b>jamais passés par le canal</b> — arrivés avant le système, ou allés directement au bot. La somme du tableau n'est donc pas tout Telegram.</div>`:""}`
+    +blocMem
+    +`${d.horsCanal?`<div class="sv-note">💡 <b>${fmtInt(d.horsCanal.payeurs)}</b> payeur${d.horsCanal.payeurs>1?"s":""} OnlyChat (${money(d.horsCanal.depense)}) ne sont <b>jamais passés par un lien tracké</b> — arrivés avant le traqueur, ou directement au bot. Le tableau du haut ne montre que ce qui est <b>attribuable</b> ; ça se remplit tout seul avec les nouvelles entrées.</div>`:""}`
     +`${d.onlychatLu===false?`<div class="sv-note" style="color:#facc15">⚠️ OnlyChat n'a pas répondu : entrées justes, dépenses non mesurées (« — », pas zéro).</div>`:""}`;
   try{ fixPairs(); }catch(e){}
 }
