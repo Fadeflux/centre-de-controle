@@ -5432,7 +5432,9 @@ function renderOM(){
   // « généré » l'est, mais LTV / marge / ROI sont désormais NETS (ils comparent
   // de l'argent encaissé à une paie réellement versée). Le dire précisément
   // évite de re-diviser mentalement un chiffre déjà net.
-  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
+  // 🏷️ Tarif de paie lisible, tel que le serveur le calcule (jamais en dur).
+  const payTxt = (d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub";
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans).<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
