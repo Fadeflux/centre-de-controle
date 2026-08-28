@@ -4511,7 +4511,7 @@ function renderChangements(){
   const rows=ch.map(c=>{
     const dt=new Date(c.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
     const drv=(c.drivers||[]).map(x=>`${escapeHtml(x.va)} +${x.subs}`).join(" · ");
-    return `<div class="ch-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${c.ratio} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
+    return `<div class="ch-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${String(c.ratio).replace(".",",")} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
   }).join("");
   $("#changementsBody").innerHTML=rows+`<div class="cc-hint">Les jours où l'équipe a nettement dévié de sa moyenne, et qui l'a causé.</div>`;
 }
@@ -5294,7 +5294,7 @@ function renderOM(){
         :((!surTout&&mL.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total de ${escapeHtml(OM_MODEL)} ÷ TOUS ses fans réels (${fmtInt(mL.fansReels)}), lien de VA ou pas — pas seulement les ${fmtInt(mL.subsTotal)} abonnés amenés par l'équipe.">ⓘ</span>`:"");
       return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
     })()}</div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${ko?'':((d.models[m].marge||0)>=0?'pos':'neg')}">Marge ${ko?"—":((d.models[m].marge||0)>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
   // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
   // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
@@ -5721,9 +5721,11 @@ function renderVersus(){
   const mkSel=(id,val)=>`<select id="${id}">${models.map(m=>`<option value="${escapeHtml(m)}" ${m===val?"selected":""}>${escapeHtml(m)}</option>`).join("")}</select>`;
   $("#vsSel").innerHTML=mkSel("vsA",VS_A)+`<span style="align-self:center;color:var(--faint)">vs</span>`+mkSel("vsB",VS_B);
   const A=d.models[VS_A]||{}, B=d.models[VS_B]||{};
-  // ⛔ Revenus muets : les montants par modèle valent 0/marge négative fabriquée.
-  // On affiche « — » (jamais un faux zéro), comme le classement et la Rentabilité.
-  const ko=revKo();
+  // ⛔ Revenus muets OU PARTIELS (un modèle en 403 pendant que l'autre répond) :
+  // les montants du modèle non lu valent null → 0/marge fabriquée. On affiche « — »
+  // partout (jamais un faux zéro), comme le classement et la Rentabilité, et surtout
+  // on ne DÉSIGNE PAS de gagnant sur un modèle à 0 inventé (voir le verdict plus bas).
+  const ko=revKo() || !!d.revenusPartiels;
   const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   const ltv=v=>ko?"—":(HIDE?"•••":(Number(v)||0).toFixed(2).replace(".",",")+" "+cur);
   // rentabilité = marge du mois (déjà calculée côté cerveau)
@@ -5742,13 +5744,19 @@ function renderVersus(){
     barsHtml=`<div class="vs-legend"><span><i style="background:var(--acc)"></i>${escapeHtml(VS_A)}</span><span><i style="background:#e879f9"></i>${escapeHtml(VS_B)}</span></div>
     <div class="vs-bars">${hist.map(h=>{ const na=(h.byModel[VS_A]||{}).net||0, nb=(h.byModel[VS_B]||{}).net||0; return `<div class="vs-m"><div class="vs-m-wrap"><div class="vs-bar a" style="height:${Math.max(2,Math.round(na/maxN*64))}px" title="${escapeHtml(VS_A)} ${money(na)}"></div><div class="vs-bar b" style="height:${Math.max(2,Math.round(nb/maxN*64))}px" title="${escapeHtml(VS_B)} ${money(nb)}"></div></div><div class="vs-m-lbl">${escapeHtml(h.month)}</div></div>`; }).join("")}</div>`;
   }
-  // Verdict simple : qui rapporte le plus par sub + qui pousser
+  // Verdict simple : qui rapporte le plus par sub + qui pousser. ⚠️ JAMAIS quand
+  // les revenus sont muets/partiels : sinon on couronnait le modèle lisible face à
+  // l'autre tombé à 0 inventé, avec une consigne « pousse X » fausse.
   let verdict="";
-  const la=Number(A.ltv)||0, lb=Number(B.ltv)||0;
-  if(la>0||lb>0){
-    const better=la>=lb?VS_A:VS_B, worse=la>=lb?VS_B:VS_A, hi=Math.max(la,lb), lo=Math.min(la,lb);
-    const pct=lo>0?Math.round((hi-lo)/lo*100):null;
-    verdict=`<div class="vs-verdict">💡 <b>${escapeHtml(better)}</b> rapporte ${pct!=null?`<b>${pct}% de plus</b>`:"plus"} par sub que ${escapeHtml(worse)}. À qualité de trafic égale, <b>pousse ${escapeHtml(better)}</b> — chaque sub y vaut plus cher.</div>`;
+  if(ko){
+    verdict=`<div class="vs-verdict" style="color:#facc15">⚠️ Comparaison en pause : les revenus d'au moins un modèle ne sont pas lisibles en ce moment. Je préfère ne rien afficher qu'un faux gagnant — ça revient dès que la source répond.</div>`;
+  } else {
+    const la=Number(A.ltv)||0, lb=Number(B.ltv)||0;
+    if(la>0||lb>0){
+      const better=la>=lb?VS_A:VS_B, worse=la>=lb?VS_B:VS_A, hi=Math.max(la,lb), lo=Math.min(la,lb);
+      const pct=lo>0?Math.round((hi-lo)/lo*100):null;
+      verdict=`<div class="vs-verdict">💡 <b>${escapeHtml(better)}</b> rapporte ${pct!=null?`<b>${pct}% de plus</b>`:"plus"} par sub que ${escapeHtml(worse)}. À qualité de trafic égale, <b>pousse ${escapeHtml(better)}</b> — chaque sub y vaut plus cher.</div>`;
+    }
   }
   $("#versusBody").innerHTML=`<div class="vs-head"><span class="vs-name a">${escapeHtml(VS_A)}</span><span class="vs-vs">VS</span><span class="vs-name b">${escapeHtml(VS_B)}</span></div>${statHtml}${barsHtml}${verdict}`;
   const sa=$("#vsA"), sb=$("#vsB");
@@ -7439,7 +7447,7 @@ function renderSaison(){
   // meilleur mois (historique)
   if(!revKo()&&Array.isArray(om.history)&&om.history.length>=2){ const rec=om.history.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0}); if(rec.m) lignes.push(`🏆 Ton meilleur mois jusqu'ici : <b>${escapeHtml(rec.m)}</b> (${money(Math.round(rec.net*NET_RATE))} net).`); }
   // meilleur jour de la semaine
-  if(hd&&hd.fiable&&hd.meilleurJour&&hd.meilleurJour.jour){ lignes.push(`📆 Ton meilleur jour : <b>${escapeHtml(hd.meilleurJour.jour)}</b> (${hd.meilleurJour.moyenne} abonnés en moyenne)${hd.pireJour?`, le plus faible le <b>${escapeHtml(hd.pireJour.jour)}</b>`:""}.`); }
+  if(hd&&hd.fiable&&hd.meilleurJour&&hd.meilleurJour.jour){ lignes.push(`📆 Ton meilleur jour : <b>${escapeHtml(hd.meilleurJour.jour)}</b> (${String(hd.meilleurJour.moyenne).replace(".",",")} abonnés en moyenne)${hd.pireJour?`, le plus faible le <b>${escapeHtml(hd.pireJour.jour)}</b>`:""}.`); }
   // meilleur créneau horaire
   if(hd&&hd.fiable&&hd.meilleurCreneau&&hd.meilleurCreneau.debut!=null){ lignes.push(`⏰ Ton meilleur créneau : <b>${hd.meilleurCreneau.debut}h-${hd.meilleurCreneau.fin}h</b> (${hd.meilleurCreneau.part} % des abonnés).`); }
   if(!lignes.length){ panel.style.display="none"; return; }
@@ -8964,7 +8972,12 @@ function renderSubValue(){
   const calc=vas.map(v=>{
     const subs=Number(v.subs)||0, rev=Number(v.rev)||0, marge=Number(v.marge)||0;
     const paye=Math.max(0, rev*netRate()-marge);   // marge est NET : paie = rev×netRate − marge
-    return { va:v.va, subs, valeur:rev/subs, taux:paye/subs, paye, rev };
+    // ⚠️ valeur d'un abonné en NET (après 20 % OF), comme la LTV nette partout
+    // ailleurs — sinon « ce que vaut vraiment un abonné » affichait du brut et la
+    // part reversée était sous-estimée. Le revenu de base (pour la part d'équipe)
+    // est net lui aussi, pour rester cohérent.
+    const revNet=rev*netRate();
+    return { va:v.va, subs, valeur:revNet/subs, taux:paye/subs, paye, rev:revNet };
   });
   const totRev=calc.reduce((a,x)=>a+x.rev,0), totPaye=calc.reduce((a,x)=>a+x.paye,0);
   const partEquipe = totRev>0 ? totPaye/totRev : 0;     // référence neutre : la part actuelle de l'équipe
@@ -9035,12 +9048,12 @@ function renderHours(){
   if(pj.length===7){
     const mxj=Math.max.apply(null,pj.map(x=>x.moyenne))||1;
     const best=(d.meilleurJour||{}).jour, worst=(d.pireJour||{}).jour;
-    const cols2=pj.map(x=>`<div class="hr-col" title="${x.jour} : ${x.moyenne} abonnés/jour en moyenne"><div class="hr-b ${x.jour===best?"top":(x.jour===worst?"low":"")}" style="height:${Math.max(4,Math.round(x.moyenne/mxj*100))}%"></div></div>`).join("");
-    const ecart=(d.pireJour&&d.pireJour.moyenne>0)?(d.meilleurJour.moyenne/d.pireJour.moyenne).toFixed(1):null;
+    const cols2=pj.map(x=>`<div class="hr-col" title="${x.jour} : ${String(x.moyenne).replace(".",",")} abonnés/jour en moyenne"><div class="hr-b ${x.jour===best?"top":(x.jour===worst?"low":"")}" style="height:${Math.max(4,Math.round(x.moyenne/mxj*100))}%"></div></div>`).join("");
+    const ecart=(d.pireJour&&d.pireJour.moyenne>0)?(d.meilleurJour.moyenne/d.pireJour.moyenne).toFixed(1).replace(".",","):null;
     blocJours=`<div class="hr-sep">📅 Par jour de la semaine</div>
       <div class="hr-grid hr-grid-j">${cols2}</div>
       <div class="hr-ax">${pj.map(x=>`<span>${x.jour.slice(0,3)}</span>`).join("")}</div>
-      ${best?`<div class="hr-note">Ton meilleur jour est le <b>${best}</b> (${(d.meilleurJour||{}).moyenne} abonnés en moyenne), le plus faible le <b>${worst}</b> (${(d.pireJour||{}).moyenne})${ecart?` — soit <b>${ecart}×</b> d'écart`:""}.</div>`:""}`;
+      ${best?`<div class="hr-note">Ton meilleur jour est le <b>${best}</b> (${String((d.meilleurJour||{}).moyenne).replace(".",",")} abonnés en moyenne), le plus faible le <b>${worst}</b> (${String((d.pireJour||{}).moyenne).replace(".",",")})${ecart?` — soit <b>${ecart}×</b> d'écart`:""}.</div>`:""}`;
   }
   // 💡 #5 — recommandation de POST : poster ~2 h avant le pic d'arrivée pour que
   // le reel soit frais quand les abonnés arrivent le plus.
@@ -9566,8 +9579,10 @@ function vaNoteEtat(){ return (TOKEN && !VANOTES_LOADED) ? "✓ sur cet appareil
 function openModelCard(modelName){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
   const m=(om.models||{})[modelName]; if(!m) return;
-  const cur=om.currency||"$", ko=revKo();
-  const money=x=>ko?"—":(HIDE?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur);
+  // ko inclut les revenus PARTIELS (un modèle en 403) — sinon la fiche d'un modèle
+  // non lu affichait Net/brut/LTV/marge à « 0 » comme si c'était mesuré. Idem openVaCard.
+  const cur=om.currency||"$", ko=revKo() || !!om.revenusPartiels;
+  const money=x=>(ko||x==null)?"—":(HIDE?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur);
   const tot=om.totals||{};
   const partSubs=(Number(tot.subsMonth)>0 && m.subs!=null)?Math.round(Number(m.subs)/Number(tot.subsMonth)*100):null;
   const partNet=(Number(tot.netMonth)>0 && m.net!=null)?Math.round(Number(m.net)/Number(tot.netMonth)*100):null;
@@ -10235,9 +10250,10 @@ function renderModeles(){
   if(!d || noms.length<2){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
   panel.style.display="block";
   const cur=d.currency||"$", ko=revKo();
-  const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
+  // ko || v==null : un modèle non lu (revenus partiels) affiche « — », pas « 0 $ ».
+  const money=v=>(ko||v==null)?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   // Net d'abord (× 0,78), brut en petit — comme partout ailleurs.
-  const net=v=>ko?"—":money((Number(v)||0)*NET_RATE);
+  const net=v=>(ko||v==null)?"—":money((Number(v)||0)*NET_RATE);
   // subs du jour par modèle : somme des subs du jour des VA du modèle si dispo,
   // sinon on l'omet (le total du jour global reste sur la carte).
   const html=noms.map(m=>{
