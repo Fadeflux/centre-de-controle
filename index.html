@@ -204,6 +204,19 @@
        (subs · généré · LTV · marge · ROI) passent dessous — lisible. */
     .omv-va{ flex:1 1 calc(100% - 30px) !important; }
     .omv-row{ row-gap:3px; }
+    /* Même souci sur d'AUTRES tableaux : le nom écrasé, ou des phrases coupées.
+       Classement (#classement), trajectoires VA : nom sur sa ligne, barre déco cachée. */
+    .cl-row{ grid-template-columns:24px 1fr auto !important; }
+    .cl-bar{ display:none !important; }
+    .tj-row{ grid-template-columns:1fr auto !important; }
+    .tj-row .spark{ display:none !important; }
+    /* .sv-cell était nowrap (pensé pour des chiffres courts) mais réutilisé pour des
+       PHRASES (suspects, cohérence, entonnoir…) → la fin était coupée. On autorise
+       le retour à la ligne sur mobile. */
+    .sv-cell{ white-space:normal !important; }
+    /* 🔋 ~20 pastilles qui pulsent en boucle = coût GPU/batterie permanent sur
+       téléphone. On coupe l'animation sur mobile (le vert/rouge suffit à l'état). */
+    .dot.on{ animation:none !important; }
   }
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
@@ -2774,12 +2787,16 @@ function render(data){
   // suivent doivent quand même s'afficher (c'est ce qui manquait le plus à
   // l'opérateur quand la carte Grind faisait planter tout render()).
   try{
-    $("#sections").innerHTML = groups().map(g=>{
+    const secHtml = groups().map(g=>{
       const cards = g.tools.map(t=>cardHTML(t,data)).join("");
       return `<div class="section ${g.build?"build":""}">
         <div class="sec-head ${g.pin?"pin":""}"><span class="t">${g.cat}</span><span class="rule"></span></div>
         <div class="grid">${cards}</div></div>`;
     }).join("");
+    // ⚡ On ne réécrit (et ne rejoue l'animation ccRise sur toutes les cartes) que
+    // si le HTML a VRAIMENT changé — avant, ce teardown complet flashait toutes les
+    // 60 s même quand rien ne bougeait.
+    const secEl=$("#sections"); if(secEl && secEl._lastHtml!==secHtml){ secEl.innerHTML=secHtml; secEl._lastHtml=secHtml; }
   }catch(e){ console.error("catalogue outils:",e); }
 
   const live = TOOLS.filter(t=>!t.build && inWorld(t));
@@ -2800,8 +2817,8 @@ function render(data){
   }
   const pf = inWorld(toolById("noctra-finance")) ? gg("noctra-finance","profitMonth") : 0;
   tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${tiret(pf,fmtMoney)}</div></div>`);
-  $("#summary").innerHTML = tiles.join("");
-  { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const isMoney=/\$/.test(raw); animateCount(el,num,v=> isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR")); } }); } }
+  { const sumHtml=tiles.join(""); const s=$("#summary"); if(s && s._lastHtml!==sumHtml){ s.innerHTML=sumHtml; s._lastHtml=sumHtml; } }
+  { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const neg=/[-−]/.test(raw); const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const val=neg?-num:num; const isMoney=/\$/.test(raw); animateCount(el,val,v=>{ v=Math.round(v); return isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR"); }); } }); } }
 
   // alerte hors-ligne
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
@@ -4589,7 +4606,10 @@ function renderCohortes(){
     // que l'alerte auto côté serveur.
     const real=d.quality.filter(q=>q.va&&q.va!=="(inconnu)");
     const totF=real.reduce((a,q)=>a+(Number(q.fans)||0),0);
-    const teamAvg=totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0;
+    // Moyenne d'équipe sur TOUS les VA (envoyée par le serveur), pas sur le top-10
+    // tronqué de `quality` : sinon la moyenne est biaisée haut → des VA corrects
+    // étaient faussement marqués « à coacher ⚠️ ».
+    const teamAvg=(COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):(totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0);
     qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j)</div>`
       +d.quality.slice(0,8).map(q=>{
         const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&q.va!=="(inconnu)";
@@ -4616,7 +4636,7 @@ function renderRecos(){
   // Qualité des fans (cohortes) : moyenne équipe pondérée.
   const qual=((typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.quality)||[]).filter(q=>q.va&&q.va!=="(inconnu)");
   const totF=qual.reduce((a,q)=>a+(Number(q.fans)||0),0);
-  const teamAvg=totF>0?qual.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0;
+  const teamAvg=(typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):(totF>0?qual.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0);
   const totMs=vas.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)||1;
   // Meilleur modèle (LTV) pour orienter le volume.
   const models=(om&&om.models)||{};
@@ -4926,7 +4946,23 @@ function tkId(){ return Date.now().toString(36)+Math.random().toString(36).slice
 // tests → fixPairs croyait la case pleine et laissait des demi-colonnes vides.
 // (NE PAS utiliser getClientRects ici : dans une catégorie repliée tous les
 // enfants font 0 pixel et on effacerait les .solo à tort.)
-function fixPairs(){ document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>getComputedStyle(c).display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); }); try{ refreshSecnav(); }catch(e){} try{ refreshSecHeads(); }catch(e){} }
+// ⚡ fixPairs() était appelé à la fin de ~55 fonctions de rendu, et chaque appel
+// déclenchait un recalcul COMPLET de la nav (refreshSecnav + refreshSecHeads) qui
+// lit getComputedStyle sur les 76 panneaux en entrelaçant lectures et écritures
+// → des milliers de reflows synchrones par cycle de 60 s (le « ça bug » sur mobile,
+// pire depuis que tout est affiché). On COALESCE : les N appels d'un même tick se
+// réduisent à UN seul passage, au prochain frame. Le travail (pairs + nav) est
+// identique, juste fait une fois au lieu de ~30.
+function _fixPairsNow(){
+  _fixPairsRaf=0;
+  document.querySelectorAll(".pair-row").forEach(row=>{ const kids=[...row.children].filter(c=>c.classList.contains("panel-box")); const vis=kids.filter(c=>getComputedStyle(c).display!=="none"); kids.forEach(c=>c.classList.remove("solo")); if(vis.length%2===1) vis[vis.length-1].classList.add("solo"); });
+  try{ refreshSecnav(); }catch(e){} try{ refreshSecHeads(); }catch(e){}
+}
+let _fixPairsRaf=0;
+function fixPairs(){
+  if(_fixPairsRaf) return;
+  _fixPairsRaf=(typeof requestAnimationFrame==="function")?requestAnimationFrame(_fixPairsNow):setTimeout(_fixPairsNow,16);
+}
 // En-têtes de catégorie physiques sur la page (💰 Argent, 💬 Telegram…) —
 // cachés dès qu'AUCUN panneau de la catégorie n'est visible (mode associé,
 // panneaux masqués un par un, source de données indisponible…), pour ne
@@ -7557,7 +7593,9 @@ function renderSim3(){
   const g=SIM3_GROWTH/100;
   const proj=[1,2,3].map(k=>Math.round(baseNet*Math.pow(1+g,k)));
   const total3=proj.reduce((a,b)=>a+b,0)+baseNet;
-  const moisNom=k=>{ const d=new Date(); d.setMonth(d.getMonth()+k); return d.toLocaleDateString("fr-FR",{month:"long"}); };
+  // ⚠️ JOUR 1 avant de décaler le mois : sinon le 31, setMonth déborde (31 sept.
+  // → 1er oct.) et on affichait « octobre/octobre/décembre » en sautant des mois.
+  const moisNom=k=>{ const n=new Date(); return new Date(n.getFullYear(), n.getMonth()+k, 1).toLocaleDateString("fr-FR",{month:"long"}); };
   body.innerHTML=`<div class="cac-intro">Projette ton agence sur 3 mois selon un rythme de croissance. Base : ~${money(baseNet)} net ce mois.</div>
     <div class="s3-slider">Croissance mensuelle : <b id="s3v">${SIM3_GROWTH>=0?"+":""}${SIM3_GROWTH}</b> % <input type="range" id="s3r" min="-30" max="50" step="5" value="${SIM3_GROWTH}"></div>
     <div class="s3-rows">
@@ -8936,7 +8974,7 @@ function renderConversion(){
   if(!d || !Array.isArray(d.vas) || !d.vas.length){ panel.style.display="none"; return; }
   panel.style.display="block";
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, cur=om.currency||"$";
-  const valeurDe={}; (om.vas||[]).forEach(v=>{ const s=Number(v.subs)||0; if(s>0) valeurDe[v.va]=(Number(v.rev)||0)/s; });
+  const valeurDe={}; (om.vas||[]).forEach(v=>{ const s=Number(v.subs)||0; if(s>0) valeurDe[v.va]=(Number(v.rev)||0)*netRate()/s; });   /* NET par abonné, comme partout ailleurs (v.rev est brut) */
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
   const moy=Number(d.cvrGlobal)||0;
   const rows=d.vas.filter(v=>v.clics>=20).map(v=>{
@@ -9178,7 +9216,7 @@ function renderSim(){
     const joursRestants=Math.max(1,lastD-now.getDate()+1);
     const parVa = per==="jour" ? n*joursRestants : n;      // total ajouté par VA d'ici la fin du mois
     const ltv=Number((om.totals||{}).ltv)||0;
-    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*tarifVaReel(), marge=rev-pay;
+    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*tarifVaReel(), marge=rev*netRate()-pay;   /* rev = LTV BRUTE × subs → on retire d'abord les 20% OF, sinon la marge est gonflée de ~26% */
     const netM=Number((om.totals||{}).netMonth)||0;
     const intro = per==="jour"
       ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
@@ -9194,7 +9232,7 @@ function renderSim(){
     const v=vas.find(x=>x.va===sel.value); if(!v){ $("#simMultRes").innerHTML=""; return; }
     const k=parseFloat(mu.value)||2, subs=Number(v.monthSubs)||0, add=Math.round(subs*(k-1));
     const ltv=Number((om.totals||{}).ltv)||0, netM=Number((om.totals||{}).netMonth)||0;
-    const rev=add*ltv, pay=v.unpaid?0:add*tarifVaReel(), marge=rev-pay;
+    const rev=add*ltv, pay=v.unpaid?0:add*tarifVaReel(), marge=rev*netRate()-pay;   /* rev = LTV BRUTE × subs → on retire d'abord les 20% OF, sinon la marge est gonflée de ~26% */
     const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
     if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
     $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
