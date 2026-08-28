@@ -4426,7 +4426,7 @@ function renderObjMois(){
   $("#objmoisBody").innerHTML=`
     <div class="ob-goal">🎯 Objectif : <b>${money(goal)}</b> <span class="ob-sub">${manuel?"✏️ fixé par toi":"auto"} · mois dernier ${money(netLast)} · projection ${money(F)}</span></div>
     <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
-    <div class="ob-line">${money(netMonth)} atteints · <b>${pct}%</b> · jour ${day}/${dim}</div>
+    <div class="ob-line">${money(netMonth)} de <b>CA brut</b> atteints · <b>${pct}%</b> · jour ${day}/${dim} <span class="ob-sub">(objectif en brut OnlyFans, pas en net)</span></div>
     ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
     ${chemin?`<div class="ob-chemin">🧭 Le chemin, par VA : ${chemin}</div>`:""}
     <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>
@@ -5246,7 +5246,9 @@ function renderOM(){
   // mois entier — comparer 12 jours à 30 ferait toujours paraître en retard).
   const prevTD = d.totals.netLastMonthToDate;
   // delta à l'échelle NET (comme le chiffre affiché juste à côté), pas en brut.
-  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?deltaHTML(Math.round((Number(d.totals.netMonth)||0)*netRate()),Math.round((Number(prevTD)||0)*netRate())):"";
+  // La flèche compare le net OnlyFans seul (pas d'historique Telegram du mois
+  // dernier à date) alors que le grand chiffre inclut Telegram : on le dit en infobulle.
+  const delta=(!ko && OM_MODEL==="all" && prevTD!=null)?`<span title="Évolution du CA OnlyFans seul — Telegram non inclus (pas d'historique Telegram du mois dernier)">${deltaHTML(Math.round((Number(d.totals.netMonth)||0)*netRate()),Math.round((Number(prevTD)||0)*netRate()))}</span>`:"";
   // Deux avertissements distincts : « je ne sais rien » et « je ne sais pas tout ».
   const bandeauKo=ko
     ? `<div class="om-prep" style="border-left:3px solid #f87171;margin-bottom:10px">⚠️ Revenus illisibles en ce moment — tous les montants affichent « — ». Ce n'est <b>pas</b> zéro. Les abonnés, eux, sont justes.</div>`
@@ -5345,7 +5347,11 @@ function renderOM(){
     // Un VA à 0 sub ET 0 $ sur la fenêtre n'a rien fait : il encombre la liste.
     vas = vas.filter(v=>(pOf(v,"subs")||0)>0 || (pOf(v,"rev")||0)!==0);
   } else {
-    vas.sort((a,b)=> tri==="rev"?(b.rev-a.rev): tri==="marge"?((b.marge||0)-(a.marge||0)): (b.subs-a.subs));
+    // Tri : les VA au revenu/marge INCONNU (null) vont à la fin — sinon null→0 les
+    // ferait passer pour « 0 gagné » et couler au bas comme les vrais 0 (absent≠0).
+    vas.sort((a,b)=> tri==="rev"?(((a.rev==null)-(b.rev==null))||((Number(b.rev)||0)-(Number(a.rev)||0)))
+      : tri==="marge"?(((a.marge==null)-(b.marge==null))||((Number(b.marge)||0)-(Number(a.marge)||0)))
+      : (b.subs-a.subs));
   }
   const vaRows=vas.slice(0,20).map((v,i)=>{
     // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
@@ -5510,7 +5516,9 @@ function renderOM(){
     if(!ents.length) return "";
     const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
       // Jamais payée -> tout ce qu'elle génère EST la marge (aucun coût de paie).
-      const marge=(!ko&&e.revTotal!=null)?e.revTotal:null;
+      // revTotal est BRUT ; ces entités ne sont pas payées → leur marge = tout le
+      // NET (brut × netRate). Avant, on affichait le brut comme « marge » (+20 %).
+      const marge=(!ko&&e.revTotal!=null)?Math.round(e.revTotal*netRate()):null;
       return `<div class="omv-row omv-hors">`
         +`<span class="omv-rank">🔒</span>`
         +`<span class="omv-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir sa fiche">${escapeHtml(e.nom)}</span>`
