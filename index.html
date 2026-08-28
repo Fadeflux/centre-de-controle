@@ -4714,7 +4714,11 @@ function suggestGoal(){
   try{
     const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
     const proj=Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0;
-    const hist=(om.history||[]).map(m=>Number(m.net)||0).filter(v=>v>0);
+    // L'objectif se règle en CA BRUT (cf. carte Objectif) → on compare du brut, en
+    // excluant le mois EN COURS (dernier point, partiel) pour ne pas viser d'après
+    // un mois à peine commencé.
+    const histArr=om.history||[];
+    const hist=(histArr.length>1?histArr.slice(0,-1):histArr).map(m=>Number(m.net)||0).filter(v=>v>0);
     const record=hist.length?Math.max.apply(null,hist):0;
     const base=Math.max(proj, record);
     if(base<=0) return null;
@@ -4723,7 +4727,7 @@ function suggestGoal(){
     const m=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(x).toLocaleString("fr-FR")+" $";
     const raison = proj>=record
       ? `au rythme actuel tu finis vers ${m(proj)}`
-      : `ton meilleur mois est à ${m(record)}`;
+      : `ton meilleur mois de CA brut est à ${m(record)}`;
     return { value:v, affiche:m(v), raison:raison+" — on vise 10 % au-dessus" };
   }catch(e){ return null; }
 }
@@ -4755,7 +4759,7 @@ function renderGoal(data){
     $("#goalBody").innerHTML=`<div class="sv-note">⚠️ Revenus illisibles en ce moment — je ne peux pas dire où tu en es sur ton objectif. Ce n'est <b>pas</b> zéro.</div>`;
     return;
   }
-  const current = isRev ? (OM_DATA?Number(OM_DATA.totals.netMonth)||0:0) : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
+  const current = isRev ? ((OM_DATA&&OM_DATA.totals)?Number(OM_DATA.totals.netMonth)||0:0) : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
   const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
   const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
@@ -5217,6 +5221,11 @@ function renderOM(){
   // re-rendus (sinon un clic sur 🙈 laissait des montants en clair).
   if(!OM_DATA){ try{ renderRenta(); renderHistory(); }catch(e){} return; }
   const d=OM_DATA, cur=d.currency||"$", models=Object.keys(d.models||{});
+  // 🛡️ Garde-fou : un payload SANS `totals` (schéma cassé / recompute en cours)
+  // ferait planter renderOM avant le rendu, et — comme 16 panneaux sont dessinés
+  // à la suite dans ce même render — les gèlerait EN SILENCE (le « gel » historique).
+  // On affiche un message honnête et on sort proprement plutôt que de jeter.
+  if(!d.totals){ if(typeof omIndispo==="function") omIndispo("Chiffres en cours de calcul — reviens dans un instant."); return; }
   $("#om").style.display="block";
   // ⛔ REVENUS MUETS : ce panneau affichait « 0 $ », « LTV 0,00 » en rouge et
   // « ROI −1,0× » pour TOUTE l'équipe alors qu'aucun revenu n'avait été lu —
@@ -5782,10 +5791,32 @@ function tgMonthLabel(d){ return String(d.getMonth()+1).padStart(2,"0")+"/"+Stri
 // ce mois et tous les suivants. Les mois PASSÉS (avant qu'OnlyChat existe)
 // restent sur TGREV : c'est la seule vraie donnée qui existe pour eux.
 function tgHistMonth(monthLabel){
-  if(monthLabel===tgMonthLabel(new Date()) && typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
+  const now=new Date();
+  if(monthLabel===tgMonthLabel(now) && typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null){
     return Number(ONLYCHAT_DATA.totalRevenue)||0;
   }
+  // 💬 Le mois JUSTE AVANT : le vrai total OnlyChat du mois dernier. Sans ça, au
+  // passage au mois (1er sept.) le CA Telegram d'août — le 1er mois auto-tracké —
+  // disparaissait de « Mon année » ET du cumul, car TGREV (saisie manuelle) est
+  // gelé à 0 depuis qu'OnlyChat tourne. Garde `>0` : un mois PRÉ-OnlyChat (dont le
+  // total OnlyChat est ~0) reste sur ses vraies entrées manuelles TGREV.
+  const prev=new Date(now.getFullYear(), now.getMonth()-1, 1);
+  if(monthLabel===tgMonthLabel(prev) && typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && Number(ONLYCHAT_DATA.totalRevenueLastMonth)>0){
+    return Number(ONLYCHAT_DATA.totalRevenueLastMonth)||0;
+  }
   return TGREV.filter(x=>tgMonthLabel(new Date(x.ts||0))===monthLabel).reduce((a,x)=>a+(Number(x.amount)||0),0);
+}
+// 🥇 SOURCE UNIQUE du « meilleur mois ». Valeur nette d'un mois = OF net (× taux
+// serveur dynamique) + Telegram, et on EXCLUT le mois en cours (dernier point de
+// l'historique, encore partiel). Avant, 4 panneaux (Renta, Mon année, Saisonnalité,
+// suggestion d'objectif) le calculaient chacun différemment — brut vs net, avec ou
+// sans Telegram, mois en cours inclus ou pas — et pouvaient nommer un mois DIFFÉRENT.
+function moisValeurNet(h){ return (Number(h&&h.net)||0)*netRate() + ((typeof tgHistMonth==="function"&&h)?tgHistMonth(h.month):0); }
+function meilleurMoisComplet(history){
+  const hist=Array.isArray(history)?history:[];
+  const complets=hist.length>1?hist.slice(0,-1):[];
+  let best=null; complets.forEach(h=>{ if(h){ const v=moisValeurNet(h); if(best===null||v>best.v) best={m:h.month,month:h.month,v:v}; } });
+  return best;
 }
 function renderHistory(){
   const h = OM_DATA && OM_DATA.history;
@@ -5797,7 +5828,7 @@ function renderHistory(){
   // tels quels mélangeait net + brut et gonflait le total à tort — on convertit
   // donc l'OF en net (× NET_RATE) AVANT d'ajouter Telegram, comme partout ailleurs
   // sur le dashboard (« Net du mois »).
-  const val = m => useSubs ? (Number(m.subs)||0) : ((Number(m.net)||0)*NET_RATE+tgHistMonth(m.month));
+  const val = m => useSubs ? (Number(m.subs)||0) : ((Number(m.net)||0)*netRate()+tgHistMonth(m.month));
   const max = Math.max(1, ...h.map(val));
   const fmtK = v => { v=Number(v)||0; return v>=1000 ? (v/1000).toFixed(1).replace(".",",")+"k" : String(Math.round(v)); };
   const bars = h.map(m=>{
@@ -5813,9 +5844,11 @@ function renderHistory(){
       trend=`Ce mois-ci, tes ${what} sont <span class="${cls}">${arrow} ${Math.abs(pc)}%</span> vs le mois dernier.`; }
     else if(b>0){ trend=`Ce mois-ci tu démarres avec ${useSubs?fmtInt(b)+" subs":omMoney(b,cur)}.`; }
   }
-  const best = h.reduce((mx,m)=>val(m)>val(mx)?m:mx, h[0]);
-  // best.net (brut) remplacé par val(best) (net + Telegram) : sinon le libellé
-  // « meilleur mois » citait un chiffre différent de celui des barres.
+  // « Meilleur mois » = un mois COMPLET (on exclut le mois en cours, dernier point,
+  // encore partiel) — sinon un mois à peine commencé était couronné, et le libellé
+  // contredisait « Record à battre » de la Rentabilité (qui, lui, l'excluait).
+  const histC = (h.length>1) ? h.slice(0,-1) : h;
+  const best = histC.reduce((mx,m)=>val(m)>val(mx)?m:mx, histC[0]);
   if(best && val(best)>1){ trend += `${trend?" ":""}🏆 Meilleur mois : <b>${best.month}</b> (${useSubs?fmtInt(best.subs)+" subs":omMoney(val(best),cur)}).`; }
   // Record : le mois en cours dépasse tous les précédents → bannière + confettis (une seule fois)
   let recordBanner="";
@@ -5901,13 +5934,10 @@ function renderRenta(){
   const projProfitReel=projProfit-projOcFee;   // projProfit déjà net (via la marge) : pas de 2e commission
   // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
   // l'historique et encore partiel) + fourchette de prévision
-  const histAll=Array.isArray(d.history)?d.history:[];
-  const hist=histAll.length>1?histAll.slice(0,-1):[];
-  // ⚠️ MÊME MESURE QUE « Mon année », sinon les deux panneaux annonçaient un
-  // « meilleur mois » différent (et parfois un AUTRE mois) : ici on comparait
-  // du BRUT sans Telegram, là-bas du net AVEC Telegram. On aligne sur net+Telegram.
-  const valMois=h=>(Number(h&&h.net)||0)*NET_RATE + ((typeof tgHistMonth==="function"&&h)?tgHistMonth(h.month):0);
-  const rec=hist.reduce((a,h)=>{ const v=valMois(h); return (h&&v>a.v)?{m:h.month,v:v}:a; },{m:null,v:0});
+  // 🥇 Meilleur mois : SOURCE UNIQUE (net+Telegram, mois en cours exclu) — même
+  // helper que « Mon année », Saisonnalité et la suggestion d'objectif, pour qu'ils
+  // ne nomment jamais un mois/chiffre différent sous le même intitulé.
+  const rec=meilleurMoisComplet(d.history) || {m:null,v:0};
   const projAvecTg=Math.round(projNet*NET_RATE+projTg);   // même unité que rec.v
   const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*NET_RATE))}–${money(Math.round(F.net.high*NET_RATE))} net</span>`:"";
   let recordLine="";
@@ -7057,7 +7087,10 @@ let BADGES_OWNED=lsJSON("ccn_badges",[]); if(!Array.isArray(BADGES_OWNED)) BADGE
 function renderBadges(){
   const panel=$("#badges"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{};
-  let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>Number(m.net)||0)); isRecord=(Number(c.net)||0)>prevMax && prevMax>0; }
+  // Même base que la bannière record de « Mon année » (net + Telegram, via le helper)
+  // — sinon le badge + le pop-up se déclenchaient sur du BRUT et pouvaient fêter un
+  // record que « Mon année » niait (ou l'inverse).
+  let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>moisValeurNet(m))); isRecord=(moisValeurNet(c)>prevMax && prevMax>0); }
   const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?(Number(tot.netMonth)||0):(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
   const subsQz=Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
   const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, subsQuinzaine:subsQz, isRecord, goalMet };
@@ -7455,7 +7488,7 @@ function renderSaison(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const lignes=[];
   // meilleur mois (historique)
-  if(!revKo()&&Array.isArray(om.history)&&om.history.length>=2){ const rec=om.history.reduce((a,h)=>(h&&(Number(h.net)||0)>a.net)?{m:h.month,net:Number(h.net)||0}:a,{m:null,net:0}); if(rec.m) lignes.push(`🏆 Ton meilleur mois jusqu'ici : <b>${escapeHtml(rec.m)}</b> (${money(Math.round(rec.net*NET_RATE))} net).`); }
+  if(!revKo()&&Array.isArray(om.history)&&om.history.length>=2){ const rec=meilleurMoisComplet(om.history); if(rec) lignes.push(`🏆 Ton meilleur mois jusqu'ici : <b>${escapeHtml(rec.month)}</b> (${money(Math.round(rec.v))} net).`); }
   // meilleur jour de la semaine
   if(hd&&hd.fiable&&hd.meilleurJour&&hd.meilleurJour.jour){ lignes.push(`📆 Ton meilleur jour : <b>${escapeHtml(hd.meilleurJour.jour)}</b> (${String(hd.meilleurJour.moyenne).replace(".",",")} abonnés en moyenne)${hd.pireJour?`, le plus faible le <b>${escapeHtml(hd.pireJour.jour)}</b>`:""}.`); }
   // meilleur créneau horaire
@@ -7539,7 +7572,7 @@ function renderStreak(){
   const G=(typeof GOAL!=="undefined")?GOAL:null;
   let cible=0;
   if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)*NET_RATE/dim);
-  else { const lm=Math.round((Number(om.totals.netLastMonth)||0)*NET_RATE); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
+  else { const lm=Math.round((Number((om.totals||{}).netLastMonth)||0)*NET_RATE); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
   if(cible<=0) cible=Math.round(dn.reduce((a,b)=>a+b,0)/dn.length);
   let streak=0; for(let i=dn.length-1;i>=0;i--){ if(dn[i]>=cible) streak++; else break; }
   let best=0,c=0; dn.forEach(v=>{ if(v>=cible){ c++; best=Math.max(best,c); } else c=0; });
@@ -8909,7 +8942,7 @@ function renderConversion(){
       + mods.map(m=>{
           const cls = m.cvr>=moy*1.1 ? "good" : (m.cvr<moy*0.7 ? "bad" : "mid");
           return `<div class="sv-row"><span class="sv-name">${escapeHtml(m.model)}</span>
-            <span class="sv-cell"><b>${m.clics.toLocaleString("fr-FR")}</b> clics → <b>${m.subs}</b> abonnés</span>
+            <span class="sv-cell"><b>${(Number(m.clics)||0).toLocaleString("fr-FR")}</b> clics → <b>${Number(m.subs)||0}</b> abonnés</span>
             <span class="sv-part ${cls}">${String(m.cvr).replace(".",",")} %</span></div>`;
         }).join("")
       + (rap&&rap!=="1.0"?`<div class="sv-note"><b>${escapeHtml(best.model)}</b> convertit <b>${rapFr}×</b> mieux que <b>${escapeHtml(last.model)}</b> sur un trafic comparable — c'est la page ou le contenu, pas le volume.</div>`:"");
@@ -9612,7 +9645,7 @@ function openModelCard(modelName){
   ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(modelName)}</h3>
     <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(modelName)}, au même endroit.</div>
     <div class="vacard-stats">
-      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*NET_RATE), ko?"":"brut "+money(m.net)+(partNet!=null?" · "+partNet+" % du CA":""))}
+      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*netRate()+((typeof tgMonthTotal==="function")?tgMonthTotal(modelName):0)), ko?"":"brut OF "+money(m.net)+(partNet!=null?" · "+partNet+" % du CA":""))}
       ${stat("Subs du mois", fmtInt(m.subs||0), partSubs!=null?partSubs+" % de tes subs":"")}
       ${stat("LTV (par abonné)", ko?"—":fmtLtv(m.ltv,cur))}
       ${stat("Marge du mois", ko?"—":money(m.marge), partMarge!=null?partMarge+" % de ta marge":"")}
