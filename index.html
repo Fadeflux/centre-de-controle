@@ -2378,7 +2378,7 @@
       <div id="streakBody"></div>
     </div>
     <div class="panel-box" id="goal">
-    <div class="pb-head">🎯 Objectif de la quinzaine</div>
+    <div class="pb-head" id="goalHead">🎯 Objectif</div>
     <div id="goalBody"></div>
   </div>
   </div>
@@ -4728,6 +4728,13 @@ function suggestGoal(){
   }catch(e){ return null; }
 }
 function renderGoal(data){
+  // 🏷️ Le TITRE suit le type d'objectif : « du mois » pour un objectif en revenus
+  // (il suit netMonth, le CA du MOIS), « de la quinzaine » pour un objectif en subs
+  // (compteur remis à zéro tous les 15 j). Avant, le titre disait toujours
+  // « quinzaine » même sur un objectif mensuel en revenus → il montrait le CA du
+  // mois sous un titre de quinzaine (question d'André du 28/08).
+  { const gh=document.getElementById("goalHead");
+    if(gh) gh.textContent = (GOAL && GOAL.type==="rev") ? "🎯 Objectif du mois (revenus)" : (GOAL && GOAL.type==="subs") ? "🎯 Objectif de la quinzaine (subs)" : "🎯 Objectif"; }
   if(!GOAL){
     // Ne PAS reconstruire le bloc si l'utilisateur est en train de saisir :
     // le rafraîchissement automatique (60 s) effaçait ce qu'il tapait.
