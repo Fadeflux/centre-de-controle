@@ -193,6 +193,17 @@
      FLUIDITÉ compte plus. */
   @media (max-width:640px){
     .tabbar, #secnav{ backdrop-filter:none; -webkit-backdrop-filter:none; background:color-mix(in srgb,var(--bg) 94%,transparent); }
+    /* 👆 Cibles tactiles plus grandes au doigt : les petits boutons (période, tri,
+       filtres modèle, actions de panneau, onglets, fenêtres) passaient à 24-30px de
+       haut — durs à taper. On les monte à ~38-42px sur téléphone. */
+    .om-per-b, .om-va-head button, .pb-head .act, .tk-tab, #omModels button, #omSort{ padding-top:9px !important; padding-bottom:9px !important; }
+    .om-per{ gap:8px; }
+    .sec-chip{ padding-top:9px !important; padding-bottom:9px !important; }
+    /* 🏆 Classement VA : sur 375px, 7 colonnes écrasaient le NOM à ~4px (invisible).
+       On met le rang + le nom sur la 1re ligne (nom pleine largeur), les stats
+       (subs · généré · LTV · marge · ROI) passent dessous — lisible. */
+    .omv-va{ flex:1 1 calc(100% - 30px) !important; }
+    .omv-row{ row-gap:3px; }
   }
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
