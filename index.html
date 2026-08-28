@@ -576,13 +576,6 @@
   .ob-ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:10px 12px;font-size:13px}
   .ob-check{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .ob-step{font-size:13px;padding:4px 0;color:var(--text)}
-  /* #8 heatmap */
-  .hm-wrap{overflow-x:auto;padding-bottom:6px}
-  .hm{display:grid;grid-template-columns:34px repeat(24,minmax(13px,1fr));gap:2px;min-width:420px}
-  .hm-cell{height:18px;border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center}
-  .hm-c{border:1px solid var(--line)}
-  .hm-lbl{color:var(--muted);font-size:10px;font-weight:600;justify-content:flex-end;padding-right:3px}
-  .hm-h{color:var(--faint);font-size:9px}
   /* #5 saison */
   .sea-row{font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line);line-height:1.5} .sea-row:last-of-type{border-bottom:0}
   .sea-tip{margin-top:10px;background:rgba(139,124,246,.1);border:1px solid var(--acc-line,var(--line));border-radius:10px;padding:9px 12px;font-size:12.5px}
@@ -3453,7 +3446,6 @@ function renderOcHistory(){
 function renderOnlyChat(){
   const el=$("#onlychat"); if(!el) return;
   const d=ONLYCHAT_DATA;
-  const sh=$("#onlychatSecHead"); if(sh) sh.style.display = d ? "" : "none";
   if(!d){ el.style.display="none"; return; }
   el.style.display="";
   const maj = d.maj ? new Date(d.maj).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
@@ -4238,7 +4230,7 @@ function jfHtml(){
   let paieLine="";
   if(d.paies){
     const up=d.paies.pct>=0;
-    paieLine=`<div class="cc-hint">💵 Fenêtres de paie US (le 1-3 et le 15-17) : <b>${money(d.paies.avgPaie)}/jour</b> contre ${money(d.paies.avgAutres)} les autres jours → ${up?`<b class="co-up">+${d.paies.pct} %</b> — la théorie se vérifie chez toi, prépare tes pushs ces jours-là.`:`<b class="co-dn">${d.paies.pct} %</b> — chez toi ça ne se vérifie pas : fie-toi plutôt à tes jours forts ci-dessus.`}</div>`;
+    paieLine=`<div class="cc-hint">💵 Fenêtres de paie US (le 1-3 et le 15-17) : <b>${money(d.paies.avgPaie)}/jour</b> contre ${money(d.paies.avgAutres)} les autres jours → ${up?`<b class="co-up">+${String(d.paies.pct).replace(".",",")} %</b> — la théorie se vérifie chez toi, prépare tes pushs ces jours-là.`:`<b class="co-dn">${String(d.paies.pct).replace(".",",")} %</b> — chez toi ça ne se vérifie pas : fie-toi plutôt à tes jours forts ci-dessus.`}</div>`;
   }
   return `<div class="jf-box"><div class="co-why-h">📊 Tes vrais jours forts <span class="cc-lvl">(tes ventes réelles, ${d.days} j)</span></div>${bars}`
     +`<div class="cc-hint">Moyenne de ventes par jour de la semaine. 👑 = ton meilleur jour${d.best?` (${escapeHtml(d.best.jour)})`:""}${d.worst?` · le plus calme : ${escapeHtml(d.worst.jour)}`:""}.</div>${paieLine}</div>`;
@@ -4587,15 +4579,15 @@ function renderCohortes(){
       +`<div class="co-facts">`
       +`<div>Dépense moy. 30 j : <b>${money(dr.avgRecent)}</b> (${coMoisNom(dr.moisRecent)}) vs ${money(dr.avgPrec)} (${coMoisNom(dr.moisPrec)}) → <b>${dr.delta>=0?"+":""}${money(dr.delta)}</b></div>`
       +`<div>Cause : ${facteur}. Effet mix ${money(dr.mixEffect)} · effet taux ${money(dr.rateEffect)}.</div>`
-      +`<div>Baleine : le plus gros fan pèse ${dr.whaleRecent}% (vs ${dr.whalePrec}%) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
+      +`<div>Baleine : le plus gros fan pèse ${String(dr.whaleRecent).replace(".",",")} % (vs ${String(dr.whalePrec).replace(".",",")} %) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
       +`</div></div>`;
   } else if(d.soloDrivers && d.soloDrivers.perSrc && d.soloDrivers.perSrc.length){
     // Pas encore 2 mois à comparer : on explique qui tire la moyenne vers le haut/bas.
     const sd=d.soloDrivers;
-    const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${p.share}%</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("");
+    const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${String(p.share).replace(".",",")} %</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("");
     why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi la dépense moyenne est de ${money(sd.avg)}</div>`
       +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
-      +`<div class="co-facts">${rows}<div>Médiane ${money(sd.median)} · plus gros fan ${sd.whale}%${sd.whale>=50?" ⚠️ un gros fan tire la moyenne":""}</div></div>`
+      +`<div class="co-facts">${rows}<div>Médiane ${money(sd.median)} · plus gros fan ${String(sd.whale).replace(".",",")} %${sd.whale>=50?" ⚠️ un gros fan tire la moyenne":""}</div></div>`
       +`<div class="cc-hint">Pas encore 2 mois d'historique pour comparer — dès qu'un mois complet s'ajoute, tu verras l'évolution.</div></div>`;
   }
   let qual="";
@@ -5222,7 +5214,6 @@ function prixSub(){
 // Texte du taux de commission, pour ne plus ecrire « 20 % » en dur dans des
 // phrases visibles : si le taux serveur change, les phrases suivaient l'ancien.
 function pctComm(){ return Math.round((1-netRate())*100)+" %"; }
-const NET_RATE=0.80;
 function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
 // Comme tgMoney, mais réutilisable pour tout montant — AVEC les centimes.
 // Sert au "Net du mois" depuis qu'il additionne OnlyFans (arrondi) + Telegram
@@ -5245,7 +5236,6 @@ function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)|
 // ⚠️ Conservé pour compatibilité, mais NE PLUS L'UTILISER dans du code neuf :
 // `netRate()` suit le taux annoncé par le serveur, cette constante non. Les
 // deux derniers usages ci-dessous sont passés à netRate() le 2026-08-24.
-const LTV_NET_RATE = NET_RATE;   // meme taux : plus de distinction depuis qu'il n'y a plus de Skrill
 function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*netRate()).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 function ltvBrutTxt(v,cur){ return (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 // 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
@@ -5292,8 +5282,6 @@ function renderOM(){
   const mnt=(v)=>(ko||v==null)?"—":omMoney(v,cur);   // tout montant
   const ltvT=(v)=>(ko||v==null)?"—":fmtLtv(v,cur);   // toute LTV
   // 💡 Le NET d'abord, le brut en petit (comme OnlyFans) : net estimé = brut
-  // × 80 % (20 % OnlyFans ; pas de Skrill chez Noctra).
-  const netE=(v)=>ko?"—":omMoney((Number(v)||0)*netRate(),cur);
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
   // ⚠️ `net` reste NULL si le modele n'a pas de montant mesure (repli sans API) :
@@ -7936,7 +7924,7 @@ function openRevue(){
     <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
     <div class="rv-grid">
       ${caBloc}
-      <div class="rv-stat"><div class="rv-l">Subs de la semaine</div><div class="rv-v">${(tot.subsWeek!=null)?tot.subsWeek:"—"}</div></div>
+      <div class="rv-stat"><div class="rv-l">Subs de la semaine</div><div class="rv-v">${(tot.subsWeek!=null)?fmtInt(tot.subsWeek):"—"}</div></div>
     </div>
     <div class="rv-sec"><div class="rv-h">🏆 Top VA</div><div class="rv-txt">${topVa}</div></div>
     <div class="rv-sec"><div class="rv-h">📈 Ce qui a bougé</div><div class="rv-txt">${mov.length?mov.join("<br>"):"Rien de notable — semaine stable."}</div></div>
@@ -9031,7 +9019,11 @@ function renderConversion(){
           // Taux d'étape : seulement entre deux COMPTAGES. Entre « payeurs » et
           // « encaissé » c'est un montant, un pourcentage n'aurait aucun sens.
           const estMontant=!!e.u, precMontant=i>0&&!!etapes[i-1].u;
-          const taux=(prev&&prev>0&&!estMontant&&!precMontant)?(Math.round(val/prev*10000)/100):null;
+          // ⚠️ On n'affiche PAS de taux > 100 % : « Ont sorti la carte » compte les
+          // payeurs de TOUTE date sur les nouveaux abonnés de la fenêtre → un fan
+          // arrivé avant peut faire payeurs > abonnés, et « 200 % » n'a aucun sens
+          // pour un entonnoir. Dans ce cas on montre juste le nombre.
+          const taux=(prev&&prev>0&&!estMontant&&!precMontant&&val<=prev)?(Math.round(val/prev*10000)/100):null;
           const larg=estMontant?100:Math.max(4,Math.round(val/maxV*100));
           return `<div class="ent-l"><span class="ent-k">${escapeHtml(e.k)}</span>`
             +`<span class="ent-b"><i style="width:${larg}%"></i></span>`
