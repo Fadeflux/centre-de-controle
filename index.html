@@ -6327,7 +6327,9 @@ function makeMonthReport(){
   const mois=new Date().toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
   x.fillStyle="#fff"; x.font="bold 60px Inter,Arial,sans-serif"; x.fillText(brand,80,140);
   x.fillStyle=acc; x.font="600 33px Inter,Arial,sans-serif"; x.fillText("Rapport du mois — "+mois,80,196);
-  const curNet=Math.round((Number(tot.netMonth)||0)*NET);
+  // Net = OF net (brut × NET) + Telegram (déjà net), comme la carte « Net du mois » —
+  // sans Telegram, l'image partagée sous-comptait le vrai net.
+  const curNet=Math.round((Number(tot.netMonth)||0)*NET + ((typeof tgMonthTotal==="function")?tgMonthTotal():0));
   const prevTD=(tot.netLastMonthToDate!=null)?Math.round((Number(tot.netLastMonthToDate)||0)*NET):null;
   const growth=(prevTD!=null&&prevTD>0)?Math.round((curNet-prevTD)/prevTD*100):null;
   const stats=[["CA net (est.)",ko?"—":money(curNet)],["Subs du mois",(tot.subsMonth!=null?String(tot.subsMonth):"—")],["Subs au total",(tot.subsTotal!=null?String(tot.subsTotal):"—")],["vs mois dernier",(growth!=null?(growth>=0?"+":"")+growth+" %":"—")]];
