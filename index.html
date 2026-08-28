@@ -5848,7 +5848,11 @@ function renderRenta(){
   const d=OM_DATA, cur=d.currency||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const netMonth=Number(d.totals.netMonth)||0, margeMonth=Number(d.totals.margeMonth)||0;
-  const coutVA=netMonth-margeMonth;
+  // ⚠️ margeMonth est DÉJÀ net : = net(brut) − paie = 0,80·brut − paie (serveur,
+  // ofCommission). Le « Coût des VA » = la SEULE paie = net − marge (surtout PAS
+  // brut − marge, qui gonflait ce coût de la commission 20 % et faisait re-soustraire
+  // la commission une 2e fois plus bas → profit sous-estimé de 20 % du brut).
+  const coutVA=netMonth*NET_RATE-margeMonth;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
@@ -5862,13 +5866,15 @@ function renderRenta(){
   // On projette donc la marge, puis on retire les coûts d'outils UNE fois.
   const projMarge=(day>0?Math.round(margeMonth/day*dim):margeMonth);
   const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):Math.round(projMarge-coutOutils+projTg);
-  // Le vrai profit retire la commission plateforme (brut × 20 %) — avant, le
-  // panneau la « oubliait » et surestimait le profit d'un quart.
+  // `commission` sert UNIQUEMENT à la LIGNE d'affichage « − Commission OnlyFans »
+  // (le pas brut→net). On ne la re-soustrait PAS du profit : margeMonth (et donc
+  // profitNet) est DÉJÀ net de commission. La retirer une 2e fois sous-estimait le
+  // profit de 20 % du brut (bug corrigé le 28/08).
   const commission=Math.round(netMonth*(1-NET_RATE));
   // 💬 Commission OnlyChat SUR LES VENTES (en plus des 180 $/mois
   // d'abonnements déjà dans "Coûts des outils") : onlychatFee() ci-dessus.
   const ocFee=Math.round(onlychatFee(netMonth*NET_RATE, tgMonth));
-  const profitReel=profitNet-commission-ocFee;
+  const profitReel=profitNet-ocFee;
   // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
   const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
   const provision=Math.round(Math.max(0,profitReel)*TAX/100);
@@ -5876,7 +5882,7 @@ function renderRenta(){
   const taxLines=(TAX>0)?`<div class="rn-line"><span>− Impôts/charges à mettre de côté (${TAX} %)</span><span class="rn-v neg">−${money(provision)}</span></div>`
     +`<div class="rn-line rn-total"><span>= Vraiment à toi (dépensable)</span><span class="rn-v ${vraiment>=0?'pos':'neg'}">${vraiment>=0?'':'−'}${money(Math.abs(vraiment))}</span></div>`:"";
   const projOcFee=Math.round(onlychatFee(projNet*NET_RATE, projTg));
-  const projProfitReel=projProfit-Math.round(projNet*(1-NET_RATE))-projOcFee;
+  const projProfitReel=projProfit-projOcFee;   // projProfit déjà net (via la marge) : pas de 2e commission
   // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
   // l'historique et encore partiel) + fourchette de prévision
   const histAll=Array.isArray(d.history)?d.history:[];
@@ -5931,16 +5937,12 @@ function renderSplit(){
   const margeMonth=Number(d.totals.margeMonth)||0;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
-  // ⚠️ Le profit à PARTAGER doit être NET : on retire la commission plateforme
-  // (brut × 20 %), comme le panneau Rentabilité. Avant, on partageait la marge
-  // BRUTE -> chaque associé se voyait attribuer ~508 $ que la plateforme prélève
-  // et qui n'entre jamais. netMonth = CA brut du mois.
-  const commission=Math.round((Number(d.totals.netMonth)||0)*(1-NET_RATE));
-  // Même commission OnlyChat que le panneau Rentabilité (10 % OF + 15 %
-  // Telegram, sur les VENTES) — sinon on partage un profit qu'OnlyChat va
-  // prélever après coup, comme la commission plateforme oubliée avant.
+  // ⚠️ margeMonth est DÉJÀ net (0,80·brut − paie, serveur). On NE re-soustrait PAS
+  // la commission plateforme : elle est déjà retirée. (Avant, on la retirait une 2e
+  // fois → le pool à partager était trop bas de 20 % du brut, chaque associé lésé.)
+  // Commission OnlyChat sur les VENTES (10 % OF + 15 % Telegram), elle, s'ajoute.
   const ocFee=Math.round(onlychatFee((Number(d.totals.netMonth)||0)*NET_RATE, tgMonth));
-  const profit=margeMonth-commission-coutOutils-ocFee+tgMonth;
+  const profit=margeMonth-coutOutils-ocFee+tgMonth;
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
@@ -8490,14 +8492,14 @@ function addDecision(){
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
 // la comparaison des deux qui est parlante — bien convertir et ramener des fans
 // qui dépensent sont DEUX qualités différentes.
-// Tarif RÉELLEMENT payé par sub, dérivé des données du serveur (pay = rev - marge)
-// plutôt que codé en dur : si OF_SUB_PRICE change côté serveur, les simulations
-// suivaient un ancien 0,50 $ et affichaient des marges fausses.
+// Tarif RÉELLEMENT payé par sub, dérivé des données du serveur. ⚠️ marge est NET
+// (net − paie) : la paie se retrouve donc par rev×netRate − marge, PAS rev − marge
+// (qui ajoutait la commission 20 % à la paie → tarif ~3× trop haut, 1,50 au lieu de 0,50).
 function tarifVaReel(){
   try{
     const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>0);
     if(!vas.length) return 0.5;
-    const taux=vas.map(v=>Math.max(0,(Number(v.rev)||0)-(Number(v.marge)||0))/(Number(v.subs)||1)).filter(x=>x>0);
+    const taux=vas.map(v=>Math.max(0,(Number(v.rev)||0)*netRate()-(Number(v.marge)||0))/(Number(v.subs)||1)).filter(x=>x>0);
     if(!taux.length) return 0.5;
     return taux.reduce((a,b)=>a+b,0)/taux.length;
   }catch(e){ return 0.5; }
@@ -8961,7 +8963,7 @@ function renderSubValue(){
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
   const calc=vas.map(v=>{
     const subs=Number(v.subs)||0, rev=Number(v.rev)||0, marge=Number(v.marge)||0;
-    const paye=Math.max(0, rev-marge);
+    const paye=Math.max(0, rev*netRate()-marge);   // marge est NET : paie = rev×netRate − marge
     return { va:v.va, subs, valeur:rev/subs, taux:paye/subs, paye, rev };
   });
   const totRev=calc.reduce((a,x)=>a+x.rev,0), totPaye=calc.reduce((a,x)=>a+x.paye,0);
@@ -9090,7 +9092,7 @@ function renderSim(){
       <div id="simMultRes" class="sim-res"></div>
     </div>`;
   const cutSel=$("#simVa"), simN=$("#simN");
-  function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round((Number(v.rev)||0)-marge), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
+  function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round(Math.max(0,(Number(v.rev)||0)*netRate()-marge)), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
   // « subs de plus » au CHOIX : pour tout le mois, ou PAR JOUR (× les jours qui
   // restent). Les VA non payés (perso) ne coûtent rien, donc on ne compte que
   // les VA réellement payés dans la paie.
@@ -9660,7 +9662,7 @@ function openVaCard(vaName){
       // 12,8 $. Et surtout, toute la bande où `versé < brut < versé/0,78` était
       // étiquetée « rentable, garde-le » alors que le VA PERD de l'argent une
       // fois la commission déduite. On tranche donc sur le NET.
-      const rev=Number(v.rev)||0, marge=Number(v.marge)||0, paie=Math.max(0,rev-marge);
+      const rev=Number(v.rev)||0, marge=Number(v.marge)||0, paie=Math.max(0,rev*netRate()-marge);   // marge NET : paie = rev×netRate − marge
       if((v.subs||0)<5) return `<div class="va-verdict vv-wait">⏳ Encore trop peu d'abonnés pour juger sa rentabilité.</div>`;
       // Pas de mesure d'argent pour CE VA -> on ne juge pas (« absent ≠ 0 »).
       if(v.rev==null) return `<div class="va-verdict vv-wait">❓ Revenus de ce VA non mesurés en ce moment — impossible de juger sa rentabilité.</div>`;
