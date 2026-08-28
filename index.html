@@ -5512,12 +5512,24 @@ function renderOM(){
     let nb=0, nbInconnu=false;
     act.forEach(v=>{ const p=v.periodes.today.payeurs; if(p==null) nbInconnu=true; else nb+=p; });
     const rec=reconcile("today");
+    // 🔒 PERSO (hors équipe : Bot / Clhoe) — leur dépense DU JOUR, sur une ligne À
+    // PART pour ne pas polluer le total d'équipe. Demande d'André (28/08). null =
+    // rien payé aujourd'hui → on ne les montre pas (absent ≠ 0).
+    const perso=(function(){
+      const he=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
+      const actP=he.filter(e=>e&&e.revJour!=null&&e.revJour>0).sort((a,b)=>(b.revJour||0)-(a.revJour||0));
+      if(!actP.length) return "";
+      const totP=actP.reduce((a,e)=>a+(e.revJour||0),0);
+      return `<div class="om-spend" style="margin-top:8px"><div class="om-spend-h" style="font-size:13.5px">🔒 Perso aujourd'hui <span style="opacity:.65;font-weight:400">(hors équipe)</span> — <b>${omMoney(totP,cur)}</b></div>`
+        +actP.map(e=>`<span class="om-spend-c he-va" data-he="${escapeHtml(e.nom)}" title="Voir sa fiche"><b>${escapeHtml(e.nom)}</b> ${omMoney(e.revJour,cur)}${e.payeursJour==null?"":` <i>· ${fmtInt(e.payeursJour)} payeur${e.payeursJour>1?"s":""}</i>`}</span>`).join("")
+        +`<div class="om-spend-n">Bot et Clhoe (tes comptes perso) — comptés à part, jamais dans le total de l'équipe.</div></div>`;
+    })();
     // Aucun VA n'a encaissé : on le DIT, au lieu d'un en-tête « 0 $ par 0 abonné ».
-    if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
+    if(!act.length) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`+perso;
     return `<div class="om-spend"><div class="om-spend-h">💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}</div>`
       +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
       +`<div class="om-spend-n">Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>.</div>`
-      +rec+`</div>`;
+      +rec+`</div>`+perso;
   })();
   // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
   // modèle, elle, se calcule sur Noctra Finance.
