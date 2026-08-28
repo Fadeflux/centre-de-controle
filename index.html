@@ -957,7 +957,6 @@
   .goal-proj{font-size:13px;color:var(--muted);margin-top:8px}
   .goal-proj b{color:var(--text)}
   .goal-change{display:inline-block;margin-top:10px;color:var(--faint);font-size:13px}
-  .bdg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:12px}
   /* Badges v2 : pastilles gagnées + barres de progression vers le prochain palier */
   .bp-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
   .bp-chip{font-size:12px;font-weight:600;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:999px;padding:4px 11px;white-space:nowrap}
@@ -8932,7 +8931,7 @@ function renderCoherence(){
     try{ fixPairs(); }catch(e){} return;
   }
   if(!d.problemes||!d.problemes.length){
-    $("#coherenceBody").innerHTML=`<div class="sv-note">✅ Les <b>${d.controles}</b> contrôles passent : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
+    $("#coherenceBody").innerHTML=`<div class="sv-note">✅ ${d.controles>1?`Les <b>${d.controles}</b> contrôles passent`:`Le <b>${d.controles}</b> contrôle passe`} : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
     try{ fixPairs(); }catch(e){} return;
   }
   const rows=d.problemes.map(x=>{
