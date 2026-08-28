@@ -187,6 +187,13 @@
      passait INTÉGRALEMENT sous les onglets — puces invisibles et intapables.
      On décale #secnav de la hauteur de la barre d'onglets quand elle existe. */
   body.has-tabs #secnav{top:calc(env(safe-area-inset-top,0px) + var(--tabbarH,54px))}
+  /* 📱 Sur mobile, le flou (backdrop-filter) des barres collantes fait ramer le
+     défilement (coûteux pour le GPU d'un téléphone). On le retire et on met un fond
+     plus opaque à la place : le halo derrière compte moins sur petit écran, la
+     FLUIDITÉ compte plus. */
+  @media (max-width:640px){
+    .tabbar, #secnav{ backdrop-filter:none; -webkit-backdrop-filter:none; background:color-mix(in srgb,var(--bg) 94%,transparent); }
+  }
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
   .sec-chip:hover{color:var(--text);border-color:var(--acc-line);background:var(--acc-bg)}
@@ -5871,7 +5878,7 @@ function renderHistory(){
   const curLbl=tgMonthLabel(new Date());
   const tgPast=(typeof TGREV!=="undefined"?TGREV:[]).filter(x=>tgMonthLabel(new Date(x.ts||0))!==curLbl).reduce((a,x)=>a+(Number(x.amount)||0),0);
   const tgAllTime=tgPast+tgHistMonth(curLbl);
-  const genereNet=(tot.netTotal||0)*NET_RATE+tgAllTime;
+  const genereNet=(tot.netTotal||0)*netRate()+tgAllTime;
   const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
   const genereSub=(!revKo()&&!HIDE)?`<div class="tile-sub">brut OF : ${omMoney(tot.netTotal||0,cur)}${tgAllTime>0?" · + Telegram "+omMoney(tgAllTime,cur):""}</div>`:"";
   const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début (net, est.)</div>${genereSub}</div></div>`;
@@ -5901,7 +5908,7 @@ function renderRenta(){
   // ofCommission). Le « Coût des VA » = la SEULE paie = net − marge (surtout PAS
   // brut − marge, qui gonflait ce coût de la commission 20 % et faisait re-soustraire
   // la commission une 2e fois plus bas → profit sous-estimé de 20 % du brut).
-  const coutVA=netMonth*NET_RATE-margeMonth;
+  const coutVA=netMonth*netRate()-margeMonth;
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   const profitNet=margeMonth-coutOutils+tgMonth;
@@ -5919,10 +5926,10 @@ function renderRenta(){
   // (le pas brut→net). On ne la re-soustrait PAS du profit : margeMonth (et donc
   // profitNet) est DÉJÀ net de commission. La retirer une 2e fois sous-estimait le
   // profit de 20 % du brut (bug corrigé le 28/08).
-  const commission=Math.round(netMonth*(1-NET_RATE));
+  const commission=Math.round(netMonth*(1-netRate()));
   // 💬 Commission OnlyChat SUR LES VENTES (en plus des 180 $/mois
   // d'abonnements déjà dans "Coûts des outils") : onlychatFee() ci-dessus.
-  const ocFee=Math.round(onlychatFee(netMonth*NET_RATE, tgMonth));
+  const ocFee=Math.round(onlychatFee(netMonth*netRate(), tgMonth));
   const profitReel=profitNet-ocFee;
   // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
   const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
@@ -5930,7 +5937,7 @@ function renderRenta(){
   const vraiment=profitReel-provision;
   const taxLines=(TAX>0)?`<div class="rn-line"><span>− Impôts/charges à mettre de côté (${TAX} %)</span><span class="rn-v neg">−${money(provision)}</span></div>`
     +`<div class="rn-line rn-total"><span>= Vraiment à toi (dépensable)</span><span class="rn-v ${vraiment>=0?'pos':'neg'}">${vraiment>=0?'':'−'}${money(Math.abs(vraiment))}</span></div>`:"";
-  const projOcFee=Math.round(onlychatFee(projNet*NET_RATE, projTg));
+  const projOcFee=Math.round(onlychatFee(projNet*netRate(), projTg));
   const projProfitReel=projProfit-projOcFee;   // projProfit déjà net (via la marge) : pas de 2e commission
   // #6 — record du meilleur mois COMPLÉTÉ (on exclut le mois en cours, dernier de
   // l'historique et encore partiel) + fourchette de prévision
@@ -5938,8 +5945,8 @@ function renderRenta(){
   // helper que « Mon année », Saisonnalité et la suggestion d'objectif, pour qu'ils
   // ne nomment jamais un mois/chiffre différent sous le même intitulé.
   const rec=meilleurMoisComplet(d.history) || {m:null,v:0};
-  const projAvecTg=Math.round(projNet*NET_RATE+projTg);   // même unité que rec.v
-  const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*NET_RATE))}–${money(Math.round(F.net.high*NET_RATE))} net</span>`:"";
+  const projAvecTg=Math.round(projNet*netRate()+projTg);   // même unité que rec.v
+  const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*netRate()))}–${money(Math.round(F.net.high*netRate()))} net</span>`:"";
   let recordLine="";
   if(rec.m && netMonth>0){
     if(projAvecTg>=rec.v){ recordLine=`<div class="rn-record best">🏆 En route pour un <b>NOUVEAU RECORD</b> ! (meilleur mois jusqu'ici : ${money(Math.round(rec.v))} net en ${escapeHtml(rec.m)})</div>`; }
@@ -5956,7 +5963,7 @@ function renderRenta(){
     <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
     ${taxLines}
     <div class="rn-tax-set">🧾 Mettre de côté pour impôts/charges : <input type="number" id="taxRate" min="0" max="60" step="1" value="${TAX}" inputmode="numeric"> % <button class="mn-act-btn" id="taxSave">OK</button></div>
-    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*NET_RATE)}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*netRate())}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     ${(()=>{
@@ -5987,7 +5994,7 @@ function renderSplit(){
   // la commission plateforme : elle est déjà retirée. (Avant, on la retirait une 2e
   // fois → le pool à partager était trop bas de 20 % du brut, chaque associé lésé.)
   // Commission OnlyChat sur les VENTES (10 % OF + 15 % Telegram), elle, s'ajoute.
-  const ocFee=Math.round(onlychatFee((Number(d.totals.netMonth)||0)*NET_RATE, tgMonth));
+  const ocFee=Math.round(onlychatFee((Number(d.totals.netMonth)||0)*netRate(), tgMonth));
   const profit=margeMonth-coutOutils-ocFee+tgMonth;
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
@@ -6258,7 +6265,7 @@ function openCoachMem(){
 { const b=$("#coachmem"); if(b) b.onclick=openCoachMem; }
 // 🌅 Interrupteur de l'accueil léger — le réglage survit aux rechargements.
 { const b=$("#accueil"); if(b) b.onclick=()=>{
-  const actif=localStorage.getItem("ccn_accueil")!=="0";
+  const actif=localStorage.getItem("ccn_accueil")==="1";   // OFF par défaut : ON seulement si explicitement "1"
   localStorage.setItem("ccn_accueil", actif?"0":"1");
   if(actif){ toutVoir(); if(typeof toast==="function") toast("🌅 Accueil léger désactivé","La page s'ouvrira complète au prochain chargement."); }
   else { document.body.classList.add("accueil-leger"); const w=$("#toutVoirWrap"); if(w) w.style.display="block"; if(typeof toast==="function") toast("🌅 Accueil léger activé","Au chargement : l'essentiel d'abord, le reste à un tap."); }
@@ -6313,7 +6320,7 @@ function buildPrintSummary(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const cur=(om&&om.currency)||"$";
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
   const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,cur);
@@ -6360,7 +6367,7 @@ function makeMonthReport(){
   x.fillStyle="#0a0a0a"; x.fillRect(0,0,1080,1350);
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.32; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
-  const HIDEv=(typeof HIDE!=="undefined"&&HIDE), ko=(typeof revKo==="function")?revKo():false, NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const HIDEv=(typeof HIDE!=="undefined"&&HIDE), ko=(typeof revKo==="function")?revKo():false, NET=(typeof netRate==="function")?netRate():0.80;
   const money=v=>HIDEv?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const mois=new Date().toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
   x.fillStyle="#fff"; x.font="bold 60px Inter,Arial,sans-serif"; x.fillText(brand,80,140);
@@ -6459,7 +6466,7 @@ function paceVerdict(){
   // ailleurs → confusion net/brut sur la carte la plus consultée.
   // 🙈 : l'écran du matin/soir s'ouvre TOUT SEUL 1×/jour — sans ce masque, il
   // affichait les montants en clair même en mode discret (et en vue associé).
-  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>HIDE?("••• "+cur+" net"):(Math.round(v*NET_RATE).toLocaleString("fr-FR")+" "+cur+" net");
+  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>HIDE?("••• "+cur+" net"):(Math.round(v*netRate()).toLocaleString("fr-FR")+" "+cur+" net");
   if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmt(proj)} ce mois.`};
   const pct=Math.round((proj-lm)/lm*100);
   if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
@@ -6490,7 +6497,7 @@ function renderMorning(){
       // 📲 Revenus Telegram (saisis à la main) ajoutés au Net du mois — sinon
       // ce chiffre, ouvert 1x/jour, ne reflétait jamais Telegram.
       const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
-      const netMois=(tot.netMonth!=null)?tot.netMonth*NET_RATE+tgM:null;
+      const netMois=(tot.netMonth!=null)?tot.netMonth*netRate()+tgM:null;
       const nt=(typeof om.netToday==="number")?om.netToday:null;
       const ajSubs=(tot.subsDay!=null?tot.subsDay:"—")+" subs";
       // 💬 Un SEUL total « Aujourd'hui » (OnlyFans + Telegram), avec le détail
@@ -6499,7 +6506,7 @@ function renderMorning(){
       // connues (revKo()=faux ET OnlyChat chargé) ; sinon on retombe sur
       // l'ancien affichage OnlyFans seul (jamais un total qui ferait croire que
       // Telegram vaut 0 alors qu'il est juste indisponible).
-      const ofTodayNet=(!revKo()&&nt!=null)?nt*NET_RATE:null;
+      const ofTodayNet=(!revKo()&&nt!=null)?nt*netRate():null;
       const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
       const comboKnown=(ofTodayNet!=null && tgToday!=null);
       const totalToday=comboKnown?(ofTodayNet+tgToday):null;
@@ -6508,7 +6515,7 @@ function renderMorning(){
       // remonte donc de la ligne « par source » vers le chiffre principal, et
       // la ligne du dessous ne garde que la répartition OnlyFans/Telegram.
       const ajBrut=(!revKo()&&nt!=null)?` <span class="t-sub">(${money(nt)} brut OF)</span>`:"";
-      const ajArgent=totalToday!=null?(moneyPrecis(totalToday,cur)+ajBrut):(revKo()?"—":(nt!=null?(money(nt*NET_RATE))+ajBrut:"—"));
+      const ajArgent=totalToday!=null?(moneyPrecis(totalToday,cur)+ajBrut):(revKo()?"—":(nt!=null?(money(nt*netRate()))+ajBrut:"—"));
       const ajSplit=comboKnown?`<div class="mn-today-split">sur OnlyFans : <b>${money(ofTodayNet)}</b> net · sur Telegram : <b>${tgMoney(tgToday)}</b></div>`:"";
       return `<div class="lbl">💰 Net du mois (est.)</div>
         <div class="big" id="mnMoney">${moneyOuTiret(netMois, v=>moneyPrecis(v,cur))}</div>
@@ -6532,7 +6539,7 @@ function renderMorning(){
     // doit rester précise (sinon elle réécrivait le rendu ci-dessus avec un
     // entier juste après coup — le compteur qui défile n'a besoin d'être
     // qu'approximatif, pas le chiffre où il s'arrête).
-    const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,tot.netMonth*NET_RATE+_tgAnim,v=>moneyPrecis(v,cur)); }
+    const mv=$("#mnMoney"); if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,tot.netMonth*netRate()+_tgAnim,v=>moneyPrecis(v,cur)); }
   const cl=$("#mnClose"), go=$("#mnGo"); if(cl) cl.onclick=closeMorning; if(go) go.onclick=closeMorning;
   const sp=$("#mnSpeak"); if(sp) sp.onclick=()=>{ if(COACH_TEXT) speakCoach(COACH_TEXT, sp); else speakBriefing(); };
   // ⚡ EXPRESS : pour les matins pressés, on ne garde que les chiffres + l'action
@@ -7452,7 +7459,7 @@ function renderCompare(){
 function renderCompareResult(){
   const res=$("#cmpRes"); if(!res||!COMPARE_DATA) return;
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const A=COMPARE_DATA.a, B=COMPARE_DATA.b, net=v=>Math.round((Number(v)||0)*NET);
   const delta=(a,b,fmt)=>{ const dd=a-b, up=dd>=0, pct=b>0?Math.round(dd/b*100):null; return `<span class="${up?'pos':'neg'}">${up?'▲':'▼'} ${fmt(Math.abs(dd))}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span>`; };
@@ -7530,7 +7537,7 @@ function renderSim3(){
   const cur=(om.currency)||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const F=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net.value:null;
-  const baseNet=Math.round(((F!=null?F:Number(om.totals.netMonth))||0)*NET_RATE);   // mois en cours projeté, net
+  const baseNet=Math.round(((F!=null?F:Number(om.totals.netMonth))||0)*netRate());   // mois en cours projeté, net
   // croissance par défaut = évolution mois dernier -> ce mois (à date)
   let defG=0; const prev=Number(om.totals.netLastMonthToDate);
   if(prev>0) defG=Math.max(-30,Math.min(50,Math.round((Number(om.totals.netMonth)-prev)/prev*100)));
@@ -7567,12 +7574,12 @@ function renderStreak(){
   if(!TOKEN||!om||!Array.isArray(om.dailyNet)||revKo()){ panel.style.display="none"; return; }
   const cur=(om.currency)||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-  const dn=om.dailyNet.map(x=>(Number(x.v)||0)*NET_RATE); if(dn.length<4){ panel.style.display="none"; return; }
+  const dn=om.dailyNet.map(x=>(Number(x.v)||0)*netRate()); if(dn.length<4){ panel.style.display="none"; return; }
   const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const G=(typeof GOAL!=="undefined")?GOAL:null;
   let cible=0;
-  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)*NET_RATE/dim);
-  else { const lm=Math.round((Number((om.totals||{}).netLastMonth)||0)*NET_RATE); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
+  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)*netRate()/dim);
+  else { const lm=Math.round((Number((om.totals||{}).netLastMonth)||0)*netRate()); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
   if(cible<=0) cible=Math.round(dn.reduce((a,b)=>a+b,0)/dn.length);
   let streak=0; for(let i=dn.length-1;i>=0;i--){ if(dn[i]>=cible) streak++; else break; }
   let best=0,c=0; dn.forEach(v=>{ if(v>=cible){ c++; best=Math.max(best,c); } else c=0; });
@@ -7858,7 +7865,7 @@ function openRevue(){
   const ov=$("#revue"), body=$("#revueBody"); if(!ov||!body) return;
   const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=d.totals||{}, cur=d.currency||"$";
   const ko=(typeof revKo==="function")?revKo():false;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   let caBloc="";
   const dn=Array.isArray(d.dailyNet)?d.dailyNet.map(x=>Number(x.v)||0):[];
@@ -7904,7 +7911,7 @@ function audioSummary(){
   // contournait complètement le masquage (quelqu'un à côté entend le CA).
   const masque=(typeof HIDE!=="undefined"&&HIDE);
   const mm=v=>masque?"un montant masqué":v.toLocaleString("fr-FR")+" dollars";
-  const arr=Math.round((Number(om.totals.netMonth)||0)*NET_RATE/100)*100;
+  const arr=Math.round((Number(om.totals.netMonth)||0)*netRate()/100)*100;
   const parts=["Salut, voici ton résumé du "+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+"."];
   if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+mm(arr)+" net.");
   if(om.totals.subsDay!=null) parts.push(om.totals.subsDay+" nouveaux abonnés aujourd'hui, "+(om.totals.subsMonth||0)+" ce mois.");
@@ -8068,7 +8075,7 @@ function essTuilesCatalogue(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
   const ko=(typeof revKo==="function")?revKo():false;
   const tot=(om&&om.totals)||{};
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const money=v=>HIDE?"••• $":Math.round(Number(v)||0).toLocaleString("fr-FR")+" $";
   const tgM=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
@@ -8145,7 +8152,7 @@ function renderReco(){
   if(!reco && d && Array.isArray(d.vas) && !revKo()){
     const payes=d.vas.filter(v=>v&&!v.unpaid&&v.ltv!=null&&Number(v.ltv)>0&&Number(v.monthSubs)>0);
     if(payes.length>=2){ const ref=payes.reduce((a,v)=>Number(v.ltv)>Number(a.ltv)?v:a,payes[0]);
-      const cand=payes.filter(v=>v.va!==ref.va&&Number(v.ltv)<Number(ref.ltv)).map(v=>({va:v.va,manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*NET_RATE)})).filter(x=>x.manque>=20).sort((a,b)=>b.manque-a.manque)[0];
+      const cand=payes.filter(v=>v.va!==ref.va&&Number(v.ltv)<Number(ref.ltv)).map(v=>({va:v.va,manque:Math.round(Number(v.monthSubs)*(Number(ref.ltv)-Number(v.ltv))*netRate())})).filter(x=>x.manque>=20).sort((a,b)=>b.manque-a.manque)[0];
       if(cand) reco={ico:"💡", txt:`Travaille avec <b>${escapeHtml(cand.va)}</b> : ses abonnés valent moins que ceux de ${escapeHtml(ref.va)}. En l'aidant (accroche, ciblage), tu peux récupérer ~${HIDE?"••• $":Math.round(cand.manque).toLocaleString("fr-FR")+" $"}/mois.`, jump:"coutopp"}; }
   }
   if(!reco && typeof DECROCHE_FLAGS!=="undefined" && DECROCHE_FLAGS.length){ const f=DECROCHE_FLAGS[0]; reco={ico:"📉", txt:`Relance <b>${escapeHtml(f.va)}</b> avant qu'il passe en perte : ses subs baissent (−${f.chute} % sur 3 quinzaines) mais il est encore rentable.`, jump:"decroche"}; }
@@ -8167,7 +8174,7 @@ function _milestonesDone(){ try{ return JSON.parse(localStorage.getItem("ccn_mil
 function checkMilestones(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals||(typeof revKo==="function"&&revKo())) return;
   const t=om.totals, done=_milestonesDone(), seeded=!!done.__seeded; let changed=false;
-  const NET=(typeof NET_RATE!=="undefined")?NET_RATE:0.80;
+  const NET=(typeof netRate==="function")?netRate():0.80;
   const vals={ subsMonth:Number(t.subsMonth)||0, subsTotal:Number(t.subsTotal)||0, netMonth:Math.round((Number(t.netMonth)||0)*NET) };
   Object.keys(MILESTONE_PALIERS).forEach(metric=>{
     const cfg=MILESTONE_PALIERS[metric], v=vals[metric];
@@ -9194,7 +9201,7 @@ function renderPie(){
   // Les additionner tels quels gonflait la part OnlyFans et écrasait Telegram
   // dans le camembert ET dans le « Total généré ce mois ». On convertit l'OF en
   // net (× NET_RATE) comme le font déjà renderHistory et la tuile du haut.
-  let entries=Object.keys(models).map(m=>[m,(Number(models[m].net)||0)*NET_RATE]).filter(e=>e[1]>0);
+  let entries=Object.keys(models).map(m=>[m,(Number(models[m].net)||0)*netRate()]).filter(e=>e[1]>0);
   // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans.
   // ⭐ Préfère ONLYCHAT_DATA (auto, à jour) à la saisie manuelle TGREV — sinon,
   // depuis que la saisie manuelle est gelée, ce camembert affichait 0 $
@@ -9687,7 +9694,7 @@ function openVaCard(vaName){
     <div class="vacard-stats">
       ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):((typeof VA_GOALS!=="undefined"&&VA_GOALS)?"pas d'objectif fixé":"objectif en cours de chargement…"))}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
-      ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*NET_RATE), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
+      ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*netRate()), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
       ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après "+pctComm()+" OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies "+prixSub().toFixed(2).replace(".",",")+" $")}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${(()=>{
@@ -10296,7 +10303,7 @@ function renderModeles(){
   // ko || v==null : un modèle non lu (revenus partiels) affiche « — », pas « 0 $ ».
   const money=v=>(ko||v==null)?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
   // Net d'abord (× 0,78), brut en petit — comme partout ailleurs.
-  const net=v=>(ko||v==null)?"—":money((Number(v)||0)*NET_RATE);
+  const net=v=>(ko||v==null)?"—":money((Number(v)||0)*netRate());
   // subs du jour par modèle : somme des subs du jour des VA du modèle si dispo,
   // sinon on l'omet (le total du jour global reste sur la carte).
   const html=noms.map(m=>{
@@ -10335,7 +10342,7 @@ function renderCaJours(){
   const dernierIdx=serieAff.length-1;
   const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
   // Le NET d'abord (comme OnlyFans), le brut entre parenthèses.
-  const net=v=>money((Number(v)||0)*NET_RATE);
+  const net=v=>money((Number(v)||0)*netRate());
   $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut) · touche une barre pour le détail";
   // 🎯 Ligne d'objectif : ce qu'il faut par jour, au rythme restant du mois.
   let goalLine="";
@@ -10387,7 +10394,10 @@ if(localStorage.getItem("ccn_order_v2")!=="1"){ localStorage.removeItem("ccn_ord
 // 🌅 Accueil léger au chargement (interrupteur ⚙️ → 🌅, actif par défaut) :
 // le matin on veut l'Essentiel, la file d'actions et les tâches — pas les 76
 // panneaux. Tout est là, à UN tap (bouton « Tout voir » ou n'importe quel saut).
-if(localStorage.getItem("ccn_accueil")!=="0"){
+// 🌅 « Accueil léger » DÉSACTIVÉ par défaut (choix d'André le 28/08 : tout voir
+// d'un coup). On ne l'active QUE si l'utilisateur l'a explicitement demandé
+// (ccn_accueil==="1", via l'interrupteur ⚙️→🌅). Défaut / non réglé = tout affiché.
+if(localStorage.getItem("ccn_accueil")==="1"){
   document.body.classList.add("accueil-leger");
   { const w=document.getElementById("toutVoirWrap"); if(w) w.style.display="block"; }
 }
