@@ -5481,7 +5481,7 @@ function renderOM(){
     const lignes=[
       `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVa,cur)}</b></div>`,
       (hors.rev? `<div class="om-rec-l"><span>Abonnés arrivés <b>sans lien de VA</b>${hors.payeurs?` · ${fmtInt(hors.payeurs)} fan${hors.payeurs>1?"s":""}`:""}</span><b>${omMoney(hors.rev,cur)}</b></div>`:""),
-      (anc.rev? `<div class="om-rec-l"><span>Anciens VA, partis de l'équipe${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(anc.rev,cur)}</b></div>`:""),
+      (anc.rev? `<div class="om-rec-l"><span>Comptes hors équipe (perso, hors classement)${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(anc.rev,cur)}</b></div>`:""),
       `<div class="om-rec-l tot"><span>Total brut OnlyFans</span><b>${omMoney(brut,cur)}</b></div>`,
     ].join("");
     // Le pont vers la carte « 📅 Aujourd'hui » : net + Telegram.
