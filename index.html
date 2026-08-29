@@ -4806,7 +4806,11 @@ function renderGoal(data){
   const current = isRev
     ? ((OM_DATA&&OM_DATA.totals&&OM_DATA.totals.netMonth!=null) ? (Number(OM_DATA.totals.netMonth)||0)*_netR + _tgMois : 0)
     : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
-  const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
+  // 💶 En REVENUS, on affiche les CENTIMES (moneyPrecis) — exactement le même
+  // format que la carte « Net du mois » (9 738,30 $), pour que l'anneau et la
+  // carte tombent au centime près (demande d'André : objectif en net, 10 000 $
+  // = OF net + Telegram). En SUBS, un entier.
+  const fmt = isRev ? (v)=>moneyPrecis(v,(OM_DATA&&OM_DATA.currency)||"$") : (v)=>fmtInt(v);
   const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
   const R=52, CIRC=2*Math.PI*R, dash=Math.round(CIRC*pct/100);
@@ -4816,7 +4820,7 @@ function renderGoal(data){
     // La prévision serveur est en BRUT OnlyFans → même conversion que `current`
     // (net + Telegram), sinon la « prévision fin de mois » serait sur une autre
     // échelle que le chiffre courant juste au-dessus.
-    const toNet=(bruteOF)=>Math.round((Number(bruteOF)||0)*_netR + _tgMois);
+    const toNet=(bruteOF)=>(Number(bruteOF)||0)*_netR + _tgMois;  // centimes gardés (moneyPrecis arrondit à l'affichage)
     const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
     const projFin=FG?toNet(FG.value):(day>0&&current>0?Math.round(current/day*dim):null);
     if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(toNet(FG.value))}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(toNet(FG.low))} – ${fmt(toNet(FG.high))})</span>`:""}</div>`; }
