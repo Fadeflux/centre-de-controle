@@ -4746,12 +4746,16 @@ function confetti(){
 function suggestGoal(){
   try{
     const om=(typeof OM_DATA!=="undefined"&&OM_DATA); if(!om||!om.totals) return null;
-    const proj=Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0;
-    // L'objectif se règle en CA BRUT (cf. carte Objectif) → on compare du brut, en
-    // excluant le mois EN COURS (dernier point, partiel) pour ne pas viser d'après
-    // un mois à peine commencé.
+    // L'objectif se règle désormais en CA NET (+ Telegram), comme la carte
+    // « Net du mois » et la jauge — plus en brut. Sinon fixer la suggestion
+    // recréerait l'écart brut/net qu'on vient de corriger.
+    const _netR=(typeof netRate==="function")?netRate():0.80;
+    const _tgMois=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+    const proj=(Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0)*_netR + _tgMois;
+    // Record = meilleur mois passé en NET OnlyFans (le Telegram des mois passés
+    // n'est pas conservé mois par mois) ; on exclut le mois EN COURS (partiel).
     const histArr=om.history||[];
-    const hist=(histArr.length>1?histArr.slice(0,-1):histArr).map(m=>Number(m.net)||0).filter(v=>v>0);
+    const hist=(histArr.length>1?histArr.slice(0,-1):histArr).map(m=>(Number(m.net)||0)*_netR).filter(v=>v>0);
     const record=hist.length?Math.max.apply(null,hist):0;
     const base=Math.max(proj, record);
     if(base<=0) return null;
@@ -4760,7 +4764,7 @@ function suggestGoal(){
     const m=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(x).toLocaleString("fr-FR")+" $";
     const raison = proj>=record
       ? `au rythme actuel tu finis vers ${m(proj)}`
-      : `ton meilleur mois de CA brut est à ${m(record)}`;
+      : `ton meilleur mois (net) est à ${m(record)}`;
     return { value:v, affiche:m(v), raison:raison+" — on vise 10 % au-dessus" };
   }catch(e){ return null; }
 }
@@ -4792,7 +4796,16 @@ function renderGoal(data){
     $("#goalBody").innerHTML=`<div class="sv-note">⚠️ Revenus illisibles en ce moment — je ne peux pas dire où tu en es sur ton objectif. Ce n'est <b>pas</b> zéro.</div>`;
     return;
   }
-  const current = isRev ? ((OM_DATA&&OM_DATA.totals)?Number(OM_DATA.totals.netMonth)||0:0) : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
+  // 🎯 Le « courant » de l'objectif REVENUS doit être LE MÊME chiffre que la
+  // carte « Net du mois » du haut : net OnlyFans (brut × netRate) + Telegram.
+  // Avant, il prenait netMonth BRUT (sans les 20 %, sans Telegram) → l'objectif
+  // affichait 9 906 $ pendant que la carte affichait 9 738,30 $ pour le même
+  // mois (question récurrente d'André). Une seule définition du CA du mois.
+  const _netR=(typeof netRate==="function")?netRate():0.80;
+  const _tgMois=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+  const current = isRev
+    ? ((OM_DATA&&OM_DATA.totals&&OM_DATA.totals.netMonth!=null) ? (Number(OM_DATA.totals.netMonth)||0)*_netR + _tgMois : 0)
+    : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
   const fmt = isRev ? (v)=>(HIDE?"•••":Math.round(v).toLocaleString("fr-FR")+" $") : (v)=>fmtInt(v);
   const unit = isRev ? "" : "subs";
   const pct=Math.min(100,Math.round(current/GOAL.value*100)), win=current>=GOAL.value;
@@ -4800,9 +4813,13 @@ function renderGoal(data){
   let proj="", danger="";
   if(isRev){
     const FG=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
+    // La prévision serveur est en BRUT OnlyFans → même conversion que `current`
+    // (net + Telegram), sinon la « prévision fin de mois » serait sur une autre
+    // échelle que le chiffre courant juste au-dessus.
+    const toNet=(bruteOF)=>Math.round((Number(bruteOF)||0)*_netR + _tgMois);
     const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-    const projFin=FG?FG.value:(day>0&&current>0?Math.round(current/day*dim):null);
-    if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(FG.value)}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(FG.low)} – ${fmt(FG.high)})</span>`:""}</div>`; }
+    const projFin=FG?toNet(FG.value):(day>0&&current>0?Math.round(current/day*dim):null);
+    if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(toNet(FG.value))}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(toNet(FG.low))} – ${fmt(toNet(FG.high))})</span>`:""}</div>`; }
     else if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; }
     // 🎯 VERDICT « en danger » : au rythme actuel, on rate l'objectif ? On chiffre
     // le manque ET le rythme/jour qu'il faudrait pour rattraper — avant qu'il soit
