@@ -4120,8 +4120,11 @@ let PCUMUL=null, PCUMUL_HIST=null;
 function pcRoleList(k){ try{ const a=JSON.parse(localStorage.getItem(k)||"[]"); return Array.isArray(a)?a.filter(x=>typeof x==="string"):[]; }catch(_){ return []; } }
 function pcRoleSave(k,a){ try{ localStorage.setItem(k, JSON.stringify(a)); }catch(_){} }
 let MANAGERS=pcRoleList("ccn_managers"), LEADERS=pcRoleList("ccn_leaders");
-// Migration : ancien manager UNIQUE (ccn_manager_va) → liste des managers.
-{ const old=(localStorage.getItem("ccn_manager_va")||"").trim(); if(old && MANAGERS.indexOf(old)<0){ MANAGERS.push(old); pcRoleSave("ccn_managers",MANAGERS); } }
+// Migration ONE-SHOT : ancien manager UNIQUE (ccn_manager_va) → liste des managers,
+// puis on SUPPRIME l'ancienne clé. Sinon, retirer ce VA du rôle le ressuscitait à
+// chaque rechargement (la migration le ré-ajoutait de force).
+{ const old=(localStorage.getItem("ccn_manager_va")||"").trim();
+  if(old){ if(MANAGERS.indexOf(old)<0){ MANAGERS.push(old); pcRoleSave("ccn_managers",MANAGERS); } try{ localStorage.removeItem("ccn_manager_va"); }catch(_){} } }
 function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(va); else list.splice(i,1); pcRoleSave(key,list); }
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
 // les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
@@ -6521,7 +6524,8 @@ function makeDayCard(){
   const sy=290;
   for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*225; x.fillStyle="#141416"; roundRect(x,bx,by,440,195,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 29px Inter,Arial,sans-serif"; x.fillText(stats[i][0],bx+34,by+56); x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(stats[i][1],bx+34,by+146); }
   let vy=sy+2*225+70; x.fillStyle=acc; x.font="bold 40px Inter,Arial,sans-serif"; x.fillText("🏆 Top VA",80,vy);
-  ((om.vas||[]).slice(0,3)).forEach((v,i)=>{ vy+=72; x.fillStyle="#fff"; x.font="600 37px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText((i+1)+". "+v.va,90,vy); x.fillStyle="#8a8a92"; x.font="500 33px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(v.subs+" subs",1000,vy); });
+  // Trié par subs DU MOIS + perso exclu (image partagée → jamais de compte perso ni podium faux).
+  ((om.vas||[]).filter(v=>v&&!v.unpaid&&(Number(v.monthSubs)||0)>0).sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0)).slice(0,3)).forEach((v,i)=>{ vy+=72; x.fillStyle="#fff"; x.font="600 37px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText((i+1)+". "+v.va,90,vy); x.fillStyle="#8a8a92"; x.font="500 33px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText((v.monthSubs!=null?v.monthSubs:v.subs)+" subs",1000,vy); });
   x.textAlign="left";
   const undone=(typeof TASKS!=="undefined")?(["moi","other","general"].reduce((a,k)=>a+((TASKS[k]||[]).filter(t=>!t.done).length),0)):0;
   x.fillStyle="#57575f"; x.font="500 29px Inter,Arial,sans-serif"; x.fillText("✅ "+undone+" tâche(s) en cours · Centre de contrôle",80,1295);
@@ -6636,7 +6640,11 @@ function makeRankCard(){
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.3; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
   x.fillStyle="#fff"; x.font="bold 62px Inter,Arial,sans-serif"; x.fillText("🏆 Classement VA",70,140);
   x.fillStyle=acc; x.font="600 32px Inter,Arial,sans-serif"; x.fillText(new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}),70,196);
-  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}; const vas=(om.vas||[]).slice(0,8);
+  // ⚠️ Image PARTAGÉE aux VA : trier par subs DU MOIS, exclure le PERSO (Bot/Clhoe
+  // ne doivent JAMAIS apparaître dans une image vue par les VA) — sinon podium en
+  // ordre serveur + comptes perso exposés. Même base que makeMonthReport/renderClassement.
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
+  const vas=(om.vas||[]).filter(v=>v&&!v.unpaid&&(Number(v.monthSubs)||0)>0).sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0)).slice(0,8);
   const cur=om.currency||"$"; const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   // ⚠️ Cette carte est PARTAGÉE (image envoyée aux VA). Graver « 0 $ » à côté
   // d'un VA parce que la source de revenus ne répond pas, c'est publier un
@@ -6648,8 +6656,8 @@ function makeRankCard(){
     const rowH=124; x.fillStyle=i<3?"#17171b":"#121214"; roundRect(x,70,y,940,rowH-16,20); x.fill();
     if(i<3){ x.textAlign="center"; x.font="54px Inter,Arial,sans-serif"; x.fillText(medals[i],120,y+70); } else { x.fillStyle="#8a8a92"; x.font="bold 40px Inter,Arial,sans-serif"; x.textAlign="center"; x.fillText(String(i+1),120,y+68); }
     x.textAlign="left"; x.fillStyle="#fff"; x.font="600 40px Inter,Arial,sans-serif"; x.fillText(String(v.va),195,y+56);
-    x.fillStyle="#8a8a92"; x.font="500 28px Inter,Arial,sans-serif"; x.fillText(v.subs+" subs",195,y+92);
-    x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(argent(v.rev),980,y+72); x.textAlign="left";
+    x.fillStyle="#8a8a92"; x.font="500 28px Inter,Arial,sans-serif"; x.fillText((v.monthSubs!=null?v.monthSubs:v.subs)+" subs ce mois",195,y+92);
+    x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText(argent(v.rev==null?null:v.rev*netRate()),980,y+72); x.textAlign="left";
     y+=rowH;
   });
   if(!vas.length){ x.fillStyle="#8a8a92"; x.font="500 34px Inter,Arial,sans-serif"; x.fillText("Pas encore de données VA.",70,320); }
@@ -7347,7 +7355,10 @@ function renderBadges(){
   // sinon le badge « objectif atteint » se déclenchait sur du BRUT (seuil faux).
   const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?caNetMois():(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
   const subsQz=Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
-  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, subsQuinzaine:subsQz, isRecord, goalMet };
+  // netTotal est du BRUT : les paliers « X $ générés » doivent se déclencher en NET
+  // (× netRate), comme la tuile « Argent généré » et comme isRecord/goalMet — sinon
+  // le badge + les confettis sortaient ~20 % trop tôt, en contradiction avec la tuile.
+  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:(Number(tot.netTotal)||0)*netRate(), subsQuinzaine:subsQz, isRecord, goalMet };
   const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
   const owned=new Set(unlocked.map(b=>b.id));
   // ⚠️ 1er chargement (aucun badge encore en localStorage) : on ADOPTE les badges
@@ -9445,12 +9456,13 @@ function renderSim(){
     const sel=$("#simVa2"), mu=$("#simMult"); if(!sel||!mu) return;
     const v=vas.find(x=>x.va===sel.value); if(!v){ $("#simMultRes").innerHTML=""; return; }
     const k=parseFloat(mu.value)||2, subs=Number(v.monthSubs)||0, add=Math.round(subs*(k-1));
-    const ltv=Number((om.totals||{}).ltv)||0, netM=Number((om.totals||{}).netMonth)||0;
-    const rev=add*ltv, pay=v.unpaid?0:add*tarifVaReel(), marge=rev*netRate()-pay;   /* rev = LTV BRUTE × subs → on retire d'abord les 20% OF, sinon la marge est gonflée de ~26% */
+    const ltv=Number((om.totals||{}).ltv)||0, ltvNet=ltv*netRate();
+    const rev=add*ltv, revNet=rev*netRate(), pay=v.unpaid?0:add*tarifVaReel(), marge=revNet-pay;   /* tout en NET, comme « + de subs » : revenus nets, marge = revenus nets − paie */
+    const finMois=(typeof caNetMois==="function")?(caNetMois()+revNet):((Number((om.totals||{}).netMonth)||0)*netRate()+revNet);
     const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
     if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
     $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
-      +`<span class="sim-verdict ${rev>=0?"pos":"neg"}">${signe(rev)} de revenus</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>, le mois finirait vers <b>${money(netM+rev)}</b>.`;
+      +`<span class="sim-verdict ${revNet>=0?"pos":"neg"}">${signe(revNet)} de revenus nets</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>, le mois finirait vers <b>${money(finMois)}</b> net.`;
   }
   cutSel.onchange=renderCut; simN.oninput=renderAdd;
   { const sp=$("#simPer"); if(sp) sp.onchange=renderAdd; }
