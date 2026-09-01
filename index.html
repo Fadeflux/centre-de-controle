@@ -4480,7 +4480,14 @@ function renderObjMois(){
   const netR=(typeof netRate==="function")?netRate():0.80;
   const tgM=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
   const netNow=(typeof caNetMois==="function")?caNetMois():(netMonth*netR+tgM);
-  const goalN=goal*netR, FN=F*netR+tgM, netLastN=netLast*netR;
+  // 🎯 UN SEUL objectif : si l'anneau du haut a un objectif REVENUS (net), on prend
+  // LE MÊME ici → les deux panneaux affichent exactement le même but, le même % et
+  // le même « reste » (plus d'asymétrie Telegram : réalisé net+TG comparé à un
+  // objectif net+TG). Sans objectif d'anneau, on retombe sur l'objectif propre du
+  // panneau (OBJ_GOAL, stocké/serveur en brut) converti en net + Telegram du mois.
+  const ringGoal=(typeof GOAL!=="undefined"&&GOAL&&GOAL.type==="rev"&&Number(GOAL.value)>0)?Number(GOAL.value):null;
+  const suitAnneau=ringGoal!=null;
+  const goalN=suitAnneau?ringGoal:(goal*netR+tgM), FN=F*netR+tgM, netLastN=netLast*netR;
   const pct=goalN>0?Math.min(100,Math.round(netNow/goalN*100)):0;
   const projPct=goalN>0?Math.min(100,Math.round(FN/goalN*100)):0;
   const reste=Math.max(0,goalN-netNow);
@@ -4492,7 +4499,7 @@ function renderObjMois(){
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
   const onTrack=FN>=goalN;
   $("#objmoisBody").innerHTML=`
-    <div class="ob-goal">🎯 Objectif : <b>${money(goalN)}</b> <span class="ob-sub">${manuel?"✏️ fixé par toi":"auto"} · mois dernier ${money(netLastN)} · projection ${money(FN)}</span></div>
+    <div class="ob-goal">🎯 Objectif : <b>${money(goalN)}</b> <span class="ob-sub">${suitAnneau?"🎯 même que l'anneau":(manuel?"✏️ fixé par toi":"auto")} · mois dernier ${money(netLastN)} · projection ${money(FN)}</span></div>
     <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
     <div class="ob-line">${money(netNow)} de <b>CA net</b> atteints · <b>${pct}%</b> · jour ${day}/${dim} <span class="ob-sub">(net : OnlyFans après −20 % + Telegram — même base que l'anneau du haut)</span></div>
     ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
