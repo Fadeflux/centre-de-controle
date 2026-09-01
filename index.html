@@ -4201,9 +4201,15 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const role=e.target.closest("[data-role]");
   if(role){
     const rva=role.getAttribute("data-va"), which=role.getAttribute("data-role");
+    // Préserve les montants déjà tapés (prime/manager/leader) : sans ça, basculer un
+    // rôle re-rendait tout le panneau et effaçait une saisie en cours sur une autre ligne.
+    const _esc=v=>(window.CSS&&CSS.escape)?CSS.escape(v):String(v).replace(/["\\]/g,"\\$&");
+    const saved={};
+    document.querySelectorAll("#pcumulBody .pv-row").forEach(r=>{ const b=r.querySelector("[data-pcpay]"); if(!b) return; const g=s=>{ const el=r.querySelector(s); return el?el.value:undefined; }; saved[b.getAttribute("data-pcpay")]={p:g(".pc-prime"),m:g(".pc-manager"),l:g(".pc-leader")}; });
     if(which==="mgr") pcToggleRole(MANAGERS,"ccn_managers",rva);
     else if(which==="lead") pcToggleRole(LEADERS,"ccn_leaders",rva);
     renderPaieCumul();
+    Object.keys(saved).forEach(va=>{ const b=document.querySelector('#pcumulBody [data-pcpay="'+_esc(va)+'"]'); if(!b) return; const r=b.closest(".pv-row"), s=saved[va]; const setv=(sel,val)=>{ if(val==null||val==="") return; const el=r.querySelector(sel); if(el) el.value=val; }; setv(".pc-prime",s.p); setv(".pc-manager",s.m); setv(".pc-leader",s.l); });
     return;
   }
   const pay=e.target.closest("[data-pcpay]");
@@ -8171,7 +8177,7 @@ function audioSummary(){
   // contournait complètement le masquage (quelqu'un à côté entend le CA).
   const masque=(typeof HIDE!=="undefined"&&HIDE);
   const mm=v=>masque?"un montant masqué":v.toLocaleString("fr-FR")+" dollars";
-  const arr=Math.round((Number(om.totals.netMonth)||0)*netRate()/100)*100;
+  const arr=Math.round(((typeof caNetMois==="function")?caNetMois():(Number(om.totals.netMonth)||0)*netRate())/100)*100;   // net OF + Telegram (source unique), arrondi à la centaine
   const parts=["Salut, voici ton résumé du "+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+"."];
   if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+mm(arr)+" net.");
   if(om.totals.subsDay!=null) parts.push(om.totals.subsDay+" nouveaux abonnés aujourd'hui, "+(om.totals.subsMonth||0)+" ce mois.");
