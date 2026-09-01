@@ -961,10 +961,17 @@
   .pc-actions .pv-pay-btn{margin-left:auto}   /* « Payer » aligné à droite de la barre */
   .pc-field{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--faint)}
   .pc-field>span{font-weight:700;opacity:.7}
-  .pc-prime,.pc-manager{font:inherit;font-size:12px;width:78px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .pc-prime,.pc-manager,.pc-leader{font:inherit;font-size:12px;width:78px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .pc-manager{border-color:var(--acc-line)}
-  .pc-prime::placeholder,.pc-manager::placeholder{color:var(--faint)}
-  @media (max-width:640px){ .pc-prime,.pc-manager{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} }
+  .pc-leader{border-color:var(--gold)}
+  .pc-prime::placeholder,.pc-manager::placeholder,.pc-leader::placeholder{color:var(--faint)}
+  @media (max-width:640px){ .pc-prime,.pc-manager,.pc-leader{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} }
+  /* 👔/🧭 bascules de rôle : gris/estompé si inactif, coloré si actif (= badge). */
+  .pc-roles{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+  .pc-role{font-size:12px;line-height:1;padding:2px 5px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer;opacity:.4;filter:grayscale(1);transition:.12s}
+  .pc-role:hover{opacity:.8}
+  .pc-role.on{opacity:1;filter:none;border-color:var(--acc-line);background:var(--acc-bg)}
+  @media (max-width:640px){ .pc-role{ min-height:34px; padding:4px 8px; } }
   .pv-mgr-badge{display:inline-block;font-size:10.5px;font-weight:600;color:var(--acc-ink);background:color-mix(in srgb,var(--acc) 16%,transparent);border:1px solid var(--acc-line);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
   .pcumul-mgr{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--muted);padding:4px 0 10px;border-bottom:.5px solid var(--line);margin-bottom:6px}
   .pcumul-mgr select{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
@@ -4107,9 +4114,15 @@ $("#paieCsv").onclick = ()=>{
    quinzaine réclamait un « reste 1-15 » déjà réglé. Marquer payé avance la base et
    prévient le VA du montant dans son ticket (même canal que la fiche de paie). */
 let PCUMUL=null, PCUMUL_HIST=null;
-// 👔 Qui est le manager (reçoit une part manager EN PLUS de sa paie subs). Choisi
-// par André via un petit sélecteur dans la paie au cumul, changeable quand il veut.
-let MANAGER_VA=(localStorage.getItem("ccn_manager_va")||"").trim();
+// 👔🧭 Rôles avec paie EN PLUS : PLUSIEURS managers ET PLUSIEURS team leaders
+// possibles. Deux listes de va_name, mémorisées en local, basculées par un bouton
+// sur chaque ligne. Chaque rôle donne une case de montant sur la ligne du VA.
+function pcRoleList(k){ try{ const a=JSON.parse(localStorage.getItem(k)||"[]"); return Array.isArray(a)?a.filter(x=>typeof x==="string"):[]; }catch(_){ return []; } }
+function pcRoleSave(k,a){ try{ localStorage.setItem(k, JSON.stringify(a)); }catch(_){} }
+let MANAGERS=pcRoleList("ccn_managers"), LEADERS=pcRoleList("ccn_leaders");
+// Migration : ancien manager UNIQUE (ccn_manager_va) → liste des managers.
+{ const old=(localStorage.getItem("ccn_manager_va")||"").trim(); if(old && MANAGERS.indexOf(old)<0){ MANAGERS.push(old); pcRoleSave("ccn_managers",MANAGERS); } }
+function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(va); else list.splice(i,1); pcRoleSave(key,list); }
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
 // les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
 function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
@@ -4132,8 +4145,13 @@ function renderPaieCumul(){
   box.style.display="block";
   const rows=vas.map(v=>{
     const nom=escapeHtml(v.va);
-    const isMgr=!!(MANAGER_VA && v.va===MANAGER_VA);
-    const nameCell=`<span class="pv-va">${nom}${isMgr?` <span class="pv-mgr-badge" title="Manager — reçoit une part manager en plus">👔 manager</span>`:""}</span>`;
+    const isMgr=MANAGERS.indexOf(v.va)>=0, isLead=LEADERS.indexOf(v.va)>=0;
+    // Bascules de rôle (PLUSIEURS managers / PLUSIEURS team leaders possibles).
+    // L'état « on » du bouton sert AUSSI de badge. Pas de rôle pour le perso.
+    const roleBtns=v.unpaid?"":`<span class="pc-roles">`
+      +`<button class="pc-role ${isMgr?"on":""}" data-role="mgr" data-va="${nom}" title="Manager — part manager en plus (clique pour activer/désactiver)">👔</button>`
+      +`<button class="pc-role ${isLead?"on":""}" data-role="lead" data-va="${nom}" title="Team leader — part leader en plus (clique pour activer/désactiver)">🧭</button></span>`;
+    const nameCell=`<span class="pv-va">${nom}${roleBtns}</span>`;
     if(v.unpaid){
       return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
     }
@@ -4144,24 +4162,23 @@ function renderPaieCumul(){
     }
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
-    // Case manager UNIQUEMENT sur la ligne du manager désigné.
+    // Cases de rôle : un montant EN PLUS, uniquement si le VA a le rôle (👔/🧭).
     const mgrInput=isMgr?`<label class="pc-field"><span>👔</span><input class="pc-manager" type="number" min="0" step="any" inputmode="decimal" placeholder="manager" title="Part manager pour ${nom} — s'ajoute à sa paie"></label>`:"";
-    // Barre d'actions sur SA PROPRE ligne (flex-basis:100%) → carte nette : infos en
-    // haut, contrôles alignés dessous. Fini le bouton qui tombe « en vrac ».
+    const leadInput=isLead?`<label class="pc-field"><span>🧭</span><input class="pc-leader" type="number" min="0" step="any" inputmode="decimal" placeholder="leader" title="Part team leader pour ${nom} — s'ajoute à sa paie"></label>`:"";
+    // Barre d'actions sur SA PROPRE ligne (flex-basis:100%) → carte nette.
     const actions = (nouveaux>0)
       ? `<div class="pc-actions"><label class="pc-field"><span>+</span><input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA."></label>`
-        +mgrInput
+        +mgrInput+leadInput
         +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button></div>`
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row pcumul-row ${nouveaux>0?"":"pv-done"}">${nameCell}`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
       +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${actions}</div>`;
   }).join("");
-  // 👔 Sélecteur de manager (changeable quand André veut). Le manager choisi reçoit
-  // une case « + manager » sur sa ligne + un badge. Vide = aucun manager.
-  const mgrSel=`<div class="pcumul-mgr">👔 Manager : <select data-mgrsel><option value="">— aucun —</option>`
-    +vas.filter(v=>!v.unpaid).map(v=>`<option value="${escapeHtml(v.va)}"${v.va===MANAGER_VA?" selected":""}>${escapeHtml(v.va)}</option>`).join("")
-    +`</select> <span class="pcumul-mgr-note">reçoit une part manager en plus de sa paie</span></div>`;
+  // 👔🧭 Rappel : les rôles se règlent par les boutons 👔 (manager) / 🧭 (team
+  // leader) sur chaque ligne — plusieurs possibles. Un rôle actif ajoute une case
+  // de montant sur la ligne du VA.
+  const mgrSel=`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
@@ -4177,23 +4194,35 @@ function renderPaieCumul(){
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
 }
 $("#pcumulBody").addEventListener("click", async e=>{
+  // 👔/🧭 Bascule de rôle (manager / team leader) — plusieurs possibles.
+  const role=e.target.closest("[data-role]");
+  if(role){
+    const rva=role.getAttribute("data-va"), which=role.getAttribute("data-role");
+    if(which==="mgr") pcToggleRole(MANAGERS,"ccn_managers",rva);
+    else if(which==="lead") pcToggleRole(LEADERS,"ccn_leaders",rva);
+    renderPaieCumul();
+    return;
+  }
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
     const row=pay.closest(".pv-row");
-    // 💶 Prime + part manager saisies sur cette ligne (optionnelles) → s'ajoutent.
+    // 💶 Prime + part manager + part team leader saisies sur cette ligne → s'ajoutent.
     const primeEl=row?row.querySelector(".pc-prime"):null;
     const mgrEl=row?row.querySelector(".pc-manager"):null;
+    const leadEl=row?row.querySelector(".pc-leader"):null;
     const prime=primeEl?Math.max(0,Number(primeEl.value)||0):0;
     const manager=mgrEl?Math.max(0,Number(mgrEl.value)||0):0;
-    const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime+manager)*100)/100;
+    const leader=leadEl?Math.max(0,Number(leadEl.value)||0):0;
+    const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime+manager+leader)*100)/100;
+    const extra=(prime>0||manager>0||leader>0);
     // Confirmation d'un VERSEMENT réel → montants toujours lisibles.
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+((prime>0||manager>0)?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager})});
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+(j.notified?" · VA prévenu":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")); await loadPaieCumul(); }
       else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
     }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
     return;
@@ -4215,15 +4244,6 @@ $("#pcumulBody").addEventListener("click", async e=>{
     }catch(err){ alert("Réseau : "+err.message); }
     return;
   }
-});
-// 👔 Changer le manager (sélecteur) — mémorisé en local, re-rend pour montrer le
-// badge + la case « manager » sur la bonne ligne.
-$("#pcumulBody").addEventListener("change", e=>{
-  const sel=e.target.closest("[data-mgrsel]"); if(!sel) return;
-  MANAGER_VA=(sel.value||"").trim();
-  try{ localStorage.setItem("ccn_manager_va", MANAGER_VA); }catch(_){}
-  renderPaieCumul();
-  if(typeof toast==="function") toast("👔 Manager", MANAGER_VA?`${MANAGER_VA} est le manager`:"Aucun manager");
 });
 $("#pcumulRefresh").onclick=()=>loadPaieCumul();
 $("#pcumulCopy").onclick=()=>{
@@ -6163,6 +6183,7 @@ function renderRenta(){
   }
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
+    ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> en ce moment (une source ne répond pas) : ce compte de résultat est un <b>minimum</b>, le vrai profit est un peu plus haut.</div>`:""}
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
     <div class="rn-line"><span>− Commission OnlyFans (20 %)</span><span class="rn-v neg">−${money(commission)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
@@ -6213,6 +6234,7 @@ function renderSplit(){
   const wMe=Number(w.me)||0, wOther=Number(w.other)||0;
   panel.style.display="block";
   $("#splitBody").innerHTML=`
+    ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> (une source ne répond pas) : le profit réparti ci-dessous est un <b>minimum</b>.</div>`:""}
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameMe)} <span class="sp-pct">${pct}%</span></div><div class="sp-v">${money(partMe)}</div></div>
     <div class="sp-sub">déjà pris <input class="sp-w" id="spWme" type="number" inputmode="numeric" value="${wMe}"> ${cur} · reste <b>${money(partMe-wMe)}</b></div>
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameOther)} <span class="sp-pct">${100-pct}%</span></div><div class="sp-v">${money(partOther)}</div></div>
@@ -9406,15 +9428,16 @@ function renderSim(){
     const now=new Date(), lastD=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
     const joursRestants=Math.max(1,lastD-now.getDate()+1);
     const parVa = per==="jour" ? n*joursRestants : n;      // total ajouté par VA d'ici la fin du mois
-    const ltv=Number((om.totals||{}).ltv)||0;
-    const rev=parVa*cnt*ltv, pay=parVa*cntPayes*tarifVaReel(), marge=rev*netRate()-pay;   /* rev = LTV BRUTE × subs → on retire d'abord les 20% OF, sinon la marge est gonflée de ~26% */
+    const ltv=Number((om.totals||{}).ltv)||0, ltvNet=ltv*netRate();   // LTV affichée en NET, comme partout ailleurs (fmtLtv)
+    const rev=parVa*cnt*ltv, revNet=rev*netRate(), pay=parVa*cntPayes*tarifVaReel(), marge=revNet-pay;   /* tout en NET : LTV nette × subs = revenus nets ; marge = revenus nets − paie (valeur inchangée) */
     const netM=Number((om.totals||{}).netMonth)||0;
     const intro = per==="jour"
       ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
       : `<b>${n}</b> subs de plus par VA d'ici la fin du mois (${cnt} VA)`;
-    $("#simAddRes").innerHTML=`${intro}, à ta LTV moyenne ${money(ltv)} :<br>`
-      +`<span class="sim-verdict ${rev>=0?"pos":"neg"}">${signe(rev)} de revenus</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>`
-      +`<br>le mois finirait vers <b>${money(netM+rev)}</b>.`;
+    const finMois=(typeof caNetMois==="function")?(caNetMois()+revNet):(netM*netRate()+revNet);
+    $("#simAddRes").innerHTML=`${intro}, à ta LTV moyenne ${money(ltvNet)} (nette) :<br>`
+      +`<span class="sim-verdict ${revNet>=0?"pos":"neg"}">${signe(revNet)} de revenus nets</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>`
+      +`<br>le mois finirait vers <b>${money(finMois)}</b> net.`;
   }
   // 🚀 Projection SI UN VA précis montait en volume : combien de subs en plus, ce
   // que ça rapporte, et où finirait le mois. Les VA non payés (perso) ne coûtent rien.
