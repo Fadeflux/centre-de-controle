@@ -4046,7 +4046,9 @@ $("#paieCsv").onclick = ()=>{
   const liste=(typeof PAYMENTS!=="undefined"&&Array.isArray(PAYMENTS))?PAYMENTS.slice():[];
   if(!liste.length){ if(typeof toast==="function") toast("📤 Rien à exporter","Aucun paiement enregistré pour l'instant."); return; }
   liste.sort((a,b)=>(a.ts||0)-(b.ts||0));
-  const esc=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  // Anti-injection de formule Excel : un champ commençant par = + - @ (ou tab/CR)
+  // est préfixé d'une apostrophe pour rester du TEXTE et ne pas s'exécuter à l'ouverture.
+  const esc=v=>{ let s=String(v==null?"":v); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; };
   const lignes=[["Date","VA","Montant ($)","Quinzaine"].map(esc).join(";")];
   liste.forEach(p=>{
     lignes.push([
@@ -6524,7 +6526,10 @@ function makeMonthReport(){
   const sy=280;
   for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*200; x.fillStyle="#141416"; roundRect(x,bx,by,440,175,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 28px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText(stats[i][0],bx+32,by+54); x.fillStyle="#fff"; x.font="bold 56px Inter,Arial,sans-serif"; x.fillText(String(stats[i][1]),bx+32,by+134); }
   let vy=sy+2*200+62; x.fillStyle=acc; x.font="bold 38px Inter,Arial,sans-serif"; x.textAlign="left"; x.fillText("🏆 Top VA du mois",80,vy);
-  ((om.vas||[]).slice(0,5)).forEach((v,i)=>{ vy+=64; x.textAlign="left"; x.fillStyle="#fff"; x.font="600 34px Inter,Arial,sans-serif"; x.fillText((i+1)+". "+String(v.va),90,vy); x.fillStyle="#8a8a92"; x.font="500 30px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText((v.monthSubs!=null?v.monthSubs:v.subs)+" subs",1000,vy); });
+  // 🏆 Trié par subs DU MOIS (l'ordre serveur de om.vas n'est pas celui de
+  // monthSubs) et perso exclu — sinon l'image partagée classait le #1 avec moins
+  // de subs du mois que le #3. Même base que buildPrintSummary.
+  ((om.vas||[]).filter(v=>v&&!v.unpaid&&(Number(v.monthSubs)||0)>0).slice().sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0)).slice(0,5)).forEach((v,i)=>{ vy+=64; x.textAlign="left"; x.fillStyle="#fff"; x.font="600 34px Inter,Arial,sans-serif"; x.fillText((i+1)+". "+String(v.va),90,vy); x.fillStyle="#8a8a92"; x.font="500 30px Inter,Arial,sans-serif"; x.textAlign="right"; x.fillText((v.monthSubs!=null?v.monthSubs:v.subs)+" subs",1000,vy); });
   x.textAlign="left"; x.fillStyle="#57575f"; x.font="500 27px Inter,Arial,sans-serif"; x.fillText("Généré par ton Centre de contrôle",80,1300);
   return c;
 }
