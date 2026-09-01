@@ -2996,7 +2996,21 @@ function loadAll(){
 $("#pwGo").onclick = doLogin;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
 { const u=$("#pwUser"); if(u) u.addEventListener("keydown",e=>{ if(e.key==="Enter"){ if($("#pw").value) doLogin(); else $("#pw").focus(); } }); }
-$("#refresh").onclick = load;
+// 🔄 « Rafraîchir » = VRAI rechargement de la page (comme Ctrl+R), pas seulement
+// un re-téléchargement des données. Demande d'André (30/08) : quand les chiffres
+// n'ont pas bougé, un simple re-fetch « ne fait rien » à l'écran ; et surtout un
+// re-fetch ne récupère JAMAIS la dernière version du site après une mise en ligne
+// — seul un rechargement du document le fait. On casse le cache via un paramètre
+// ?r= (en gardant `go` et le #hash existants), et les onglets ouverts sont
+// rétablis au chargement (localStorage ccn_tabs), donc on ne perd rien.
+$("#refresh").onclick = function(){
+  try{ const ic=$("#rico"); if(ic) ic.textContent="⏳"; }catch(e){}
+  try{
+    const u=new URL(location.href);
+    u.searchParams.set("r", String(Date.now()));  // cache-buster → récupère le dernier code
+    location.replace(u.toString());
+  }catch(e){ try{ location.reload(); }catch(_){ } }
+};
 
 /* ---------- mode plein écran ---------- */
 $("#tv").onclick = ()=>{
