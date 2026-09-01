@@ -919,9 +919,12 @@
   .co-qual{margin-top:12px}
   .pb-head .act{margin-left:auto;font:inherit;font-size:12px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 11px;cursor:pointer}
   .pb-head .act:hover{background:var(--acc-bg)}
-  .pv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .pv-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .pv-row:last-child{border-bottom:0}
-  .pv-va{flex:1;font-weight:500}
+  /* Le nom garde une largeur minimale ET ne se casse jamais lettre par lettre :
+     avant, avec la case « prime » en plus, il était écrasé en vertical (1 lettre/ligne)
+     à 100 % de zoom. Si c'est serré, ce sont la case + le bouton qui passent dessous. */
+  .pv-va{flex:1 1 120px;min-width:110px;font-weight:500;overflow-wrap:normal;word-break:keep-all}
   .pv-subs{color:var(--muted);font-size:13px;min-width:64px;text-align:right}
   .pv-pay{min-width:78px;text-align:right;font-weight:600}
   .pv-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700}
