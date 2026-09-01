@@ -937,6 +937,9 @@
   .mdl-card .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   .mdl-card .day{font-size:11.5px;color:var(--acc-ink);margin-top:6px;font-weight:600}
   .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#fff;cursor:pointer}
+  .pc-prime{font:inherit;font-size:12px;width:74px;padding:5px 8px;margin-right:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;vertical-align:middle}
+  .pc-prime::placeholder{color:var(--faint)}
+  @media (max-width:640px){ .pc-prime{ min-height:38px; width:70px; } }
   .pv-paid{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer}
   .pv-row.pv-done .pv-va{color:var(--muted)}
   .pv-note{font-size:11px;color:var(--muted);font-weight:600}
@@ -4108,7 +4111,8 @@ function renderPaieCumul(){
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
     const right = (nouveaux>0)
-      ? `<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button>`
+      ? `<input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="+ prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA. Le manager, tu le gères à part.">`
+        +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button>`
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row ${nouveaux>0?"":"pv-done"}"><span class="pv-va">${nom}</span>`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
@@ -4132,13 +4136,17 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
-    // Confirmation d'un VERSEMENT réel → montant toujours lisible.
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs depuis ta dernière paie → ${pcMoneyClair(Number(amt)||0)}\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    // 💶 Prime saisie sur cette ligne (optionnelle) → s'ajoute au versement.
+    const primeEl=pay.closest(".pv-row")?pay.closest(".pv-row").querySelector(".pc-prime"):null;
+    const prime=primeEl?Math.max(0,Number(primeEl.value)||0):0;
+    const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime)*100)/100;
+    // Confirmation d'un VERSEMENT réel → montants toujours lisibles.
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va})});
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` (dont ${pcMoney(j.prime)} de prime)`:"")+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
       else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
     }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
     return;
