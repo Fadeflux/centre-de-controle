@@ -172,7 +172,6 @@
   .co-row:last-child{border-bottom:0}
   .co-name{flex:1;word-break:break-word}
   .co-amt{color:var(--text);font-weight:500}
-  .co-auto{font-size:9.5px;font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:5px;padding:1px 5px;margin-left:5px;vertical-align:middle}
   .co-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .co-del:hover{color:var(--down);opacity:1}
   .costs-empty{font-size:13px;color:var(--faint);padding:6px 0}
@@ -972,7 +971,6 @@
   .pc-role:hover{opacity:.8}
   .pc-role.on{opacity:1;filter:none;border-color:var(--acc-line);background:var(--acc-bg)}
   @media (max-width:640px){ .pc-role{ min-height:34px; padding:4px 8px; } }
-  .pv-mgr-badge{display:inline-block;font-size:10.5px;font-weight:600;color:var(--acc-ink);background:color-mix(in srgb,var(--acc) 16%,transparent);border:1px solid var(--acc-line);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
   .pcumul-mgr{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--muted);padding:4px 0 10px;border-bottom:.5px solid var(--line);margin-bottom:6px}
   .pcumul-mgr select{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .pcumul-mgr-note{color:var(--faint);font-size:11.5px}
@@ -988,8 +986,6 @@
   .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
   .goal-row select{flex:1;min-width:130px}
   .goal-row input{flex:1;min-width:110px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  .goal-gauge{height:12px;background:var(--surface-2);border-radius:20px;overflow:hidden;margin:9px 0 8px}
-  .goal-fill{height:100%;background:var(--acc);border-radius:20px;transition:width .6s}
   .goal-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
   .goal-ring{flex:0 0 auto}
   .goal-ring circle:last-of-type{transition:stroke-dasharray .8s ease}
@@ -1015,7 +1011,6 @@
   .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7a82c0);transition:width .5s}
   .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
   .bdg.on{opacity:1;filter:none;border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 30%,transparent)}
-  .bdg-ico{font-size:30px;line-height:1}
   .bdg-lbl{font-size:11px;color:var(--muted);font-weight:600;line-height:1.2}
   .bdg.on .bdg-lbl{color:var(--text)}
   .sim-block{padding:12px 0;border-bottom:.5px solid var(--line)}
@@ -1155,13 +1150,10 @@
   .an-add select:focus,.an-add input:focus{border-color:var(--acc)}
   .an-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .an-row:last-child{border-bottom:0}
-  .an-va{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .an-ten{font-size:12px;color:var(--muted);white-space:nowrap}
   .an-next{font-size:11px;font-weight:700;white-space:nowrap;color:var(--acc-ink)}
   .an-next.soon{color:var(--gold)} .an-next.today{color:var(--ok)}
   .an-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;opacity:.55}
   .an-del:hover{color:var(--down);opacity:1}
-  .an-empty{font-size:13px;color:var(--faint);padding:6px 0}
   /* Historique du coach (dans l'écran matin/soir) */
   .mn-hist{margin-top:4px;margin-bottom:16px}
   .mn-hist summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
@@ -1343,7 +1335,6 @@
   .ess-cfg-apercu{margin-left:auto;font-size:11.5px;color:var(--faint)}
   /* 📁 « Ranger dans… » du sélecteur de panneaux */
   .pp-cat{font:inherit;font-size:11.5px;margin-left:auto;max-width:150px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--muted);outline:none}
-  .fr-empty{font-size:13px;color:var(--muted);padding:6px 0}
   .pair-row{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0 0}
   .pair-row > .panel-box,.pair-row > .tgrev,.pair-row > .costs{margin:0}
   /* ⚠️ min-width:0 EST OBLIGATOIRE : un enfant de grille vaut `auto` par défaut,
@@ -2731,12 +2722,6 @@ function applyAccent(){
   document.documentElement.style.setProperty("--acc", a[0]);
   document.documentElement.style.setProperty("--acc-hover", a[1]);
 }
-function setWorld(w){
-  WORLD = w; localStorage.setItem("ccn_world", w);
-  [...document.querySelectorAll("#worlds button")].forEach(b=>b.classList.toggle("won", b.getAttribute("data-world")===w));
-  applyAccent(); render(LAST);
-}
-
 function statusClass(s){ return s==="online"?"on":s==="offline"?"off":s==="warn"?"warn":""; }
 function toolById(id){ return TOOLS.find(t=>t.id===id); }
 
@@ -5135,11 +5120,6 @@ function fixPairs(){
 // refreshSecHeads venait de masquer → le vide fantôme de ~23 px revenait).
 // Les deux noms sont conservés (ils sont appelés à plein d'endroits) mais
 // pointent désormais sur la même logique, donc elles ne peuvent plus diverger.
-function catContenuVisible(idx){
-  const b=document.getElementById("catBody"+idx); if(!b) return false;
-  const enfants=[...b.querySelectorAll("[id]")].filter(e=>e.parentElement===b || (e.parentElement.classList&&e.parentElement.classList.contains("pair-row")));
-  return enfants.some(p=>secnavVisible(p.id));
-}
 function appliqueCategories(){
   const replies=catCollapsedSet();
   SECNAV_CATS.forEach((_,idx)=>{
