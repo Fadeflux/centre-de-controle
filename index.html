@@ -220,6 +220,17 @@
     /* 🔋 ~20 pastilles qui pulsent en boucle = coût GPU/batterie permanent sur
        téléphone. On coupe l'animation sur mobile (le vert/rouge suffit à l'état). */
     .dot.on{ animation:none !important; }
+    /* 📏 COMPACITÉ mobile : le site était trop HAUT (trop de blanc). On resserre
+       marges/paddings des grands conteneurs répétés et la hauteur des graphes —
+       SANS toucher la police ni le contenu (~350-450px de scroll en moins). */
+    .panel-box{ margin-top:10px; padding:11px 13px; }
+    .pb-head{ margin-bottom:8px; }
+    .costs, .tgrev, .antileak{ margin-top:14px; padding:11px 13px; }
+    .sec-head{ margin-bottom:8px; }
+    .daily{ margin-bottom:12px; padding:10px 13px; }
+    header.top{ margin:8px 0 10px; padding-bottom:10px; }
+    .hr-grid{ min-height:112px; }
+    .cj-wrap{ height:106px; }
   }
   .sec-chip{flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
@@ -379,10 +390,10 @@
   .tg-mtag{font-size:11px;color:var(--acc);font-weight:600}
   .tg-add input:focus{border-color:var(--acc)}
   .tg-btn{margin:0;white-space:nowrap}
-  .tg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
+  .tg-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .tg-row:last-child{border-bottom:0}
   .tg-d{color:var(--muted);font-size:12px;min-width:74px}
-  .tg-n{flex:1;word-break:break-word;color:var(--muted)}
+  .tg-n{flex:1 1 120px;min-width:110px;overflow-wrap:normal;word-break:keep-all;color:var(--muted)}
   .tg-a{font-weight:600;min-width:64px;text-align:right}
   .tg-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
   .tg-del:hover{color:var(--down);opacity:1}
@@ -798,10 +809,10 @@
   .journal:not(.folded) .jr-caret{transform:rotate(90deg)}
   .journal.folded .jr-head{margin-bottom:0}
   .journal.folded #jrList{display:none}
-  .jr-row{display:flex;gap:11px;padding:9px 0;border-bottom:.5px solid var(--line)}
+  .jr-row{display:flex;flex-wrap:wrap;gap:6px 11px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .jr-row:last-child{border-bottom:0}
   .jr-src{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--acc-ink);background:var(--acc-bg);border:1px solid var(--acc-line);border-radius:6px;padding:3px 7px;height:fit-content;white-space:nowrap}
-  .jr-main{flex:1;min-width:0}
+  .jr-main{flex:1 1 140px;min-width:130px}
   .jr-title{font-size:14px;font-weight:500}
   .jr-body{font-size:13px;color:var(--muted);margin-top:2px;word-break:break-word}
   .jr-time{font-size:11px;color:var(--faint);white-space:nowrap}
@@ -887,9 +898,11 @@
   .ch-h{font-size:12.5px}
   .ch-x{color:var(--muted);font-size:11px}
   .ch-d{font-size:11.5px;color:var(--muted);margin-top:1px}
-  /* cohortes */
-  .co-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:5px 0;border-top:1px solid var(--line,#2a2a33);font-size:12.5px}
-  .co-row:first-child{border-top:0}
+  /* cohortes — classe RENOMMÉE (.coh-row) : « .co-row » entrait en collision avec
+     celle des Coûts fixes (L167, flex) et, définie plus bas, l'écrasait → le panneau
+     Coûts fixes était rendu avec cette grille à 4 colonnes et se cassait. */
+  .coh-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:5px 0;border-top:1px solid var(--line,#2a2a33);font-size:12.5px}
+  .coh-row:first-child{border-top:0}
   .co-m{font-weight:600}.co-n{color:var(--muted);font-size:11.5px}
   .co-a{font-variant-numeric:tabular-nums;text-align:right}
   .co-med{color:var(--faint);font-size:11px;text-align:right}
@@ -940,9 +953,14 @@
   .mdl-card .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   .mdl-card .day{font-size:11.5px;color:var(--acc-ink);margin-top:6px;font-weight:600}
   .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#fff;cursor:pointer}
-  .pc-prime{font:inherit;font-size:12px;width:74px;padding:5px 8px;margin-right:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;vertical-align:middle}
-  .pc-prime::placeholder{color:var(--faint)}
-  @media (max-width:640px){ .pc-prime{ min-height:38px; width:70px; } }
+  .pc-prime,.pc-manager{font:inherit;font-size:12px;width:74px;padding:5px 8px;margin-right:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;vertical-align:middle}
+  .pc-manager{border-color:var(--acc-line)}
+  .pc-prime::placeholder,.pc-manager::placeholder{color:var(--faint)}
+  @media (max-width:640px){ .pc-prime,.pc-manager{ min-height:38px; width:68px; } }
+  .pv-mgr-badge{display:inline-block;font-size:10.5px;font-weight:600;color:var(--acc-ink);background:color-mix(in srgb,var(--acc) 16%,transparent);border:1px solid var(--acc-line);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+  .pcumul-mgr{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--muted);padding:4px 0 10px;border-bottom:.5px solid var(--line);margin-bottom:6px}
+  .pcumul-mgr select{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  .pcumul-mgr-note{color:var(--faint);font-size:11.5px}
   .pv-paid{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer}
   .pv-row.pv-done .pv-va{color:var(--muted)}
   .pv-note{font-size:11px;color:var(--muted);font-weight:600}
@@ -4081,6 +4099,9 @@ $("#paieCsv").onclick = ()=>{
    quinzaine réclamait un « reste 1-15 » déjà réglé. Marquer payé avance la base et
    prévient le VA du montant dans son ticket (même canal que la fiche de paie). */
 let PCUMUL=null, PCUMUL_HIST=null;
+// 👔 Qui est le manager (reçoit une part manager EN PLUS de sa paie subs). Choisi
+// par André via un petit sélecteur dans la paie au cumul, changeable quand il veut.
+let MANAGER_VA=(localStorage.getItem("ccn_manager_va")||"").trim();
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
 // les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
 function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
@@ -4103,24 +4124,34 @@ function renderPaieCumul(){
   box.style.display="block";
   const rows=vas.map(v=>{
     const nom=escapeHtml(v.va);
+    const isMgr=!!(MANAGER_VA && v.va===MANAGER_VA);
+    const nameCell=`<span class="pv-va">${nom}${isMgr?` <span class="pv-mgr-badge" title="Manager — reçoit une part manager en plus">👔 manager</span>`:""}</span>`;
     if(v.unpaid){
-      return `<div class="pv-row"><span class="pv-va">${nom}</span><span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
+      return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
     }
     if(v.base==null){
-      return `<div class="pv-row"><span class="pv-va">${nom}</span><span class="pv-subs">${fmtInt(v.cumul)} subs cumul</span>`
+      return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs cumul</span>`
         +`<span class="pv-pay pcumul-warn">base ?</span>`
         +`<button class="pv-pay-btn" data-pcbase="${nom}">Définir la base</button></div>`;
     }
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
+    // Case manager UNIQUEMENT sur la ligne du manager désigné.
+    const mgrInput=isMgr?`<input class="pc-manager" type="number" min="0" step="any" inputmode="decimal" placeholder="+ manager" title="Part manager pour ${nom} — s'ajoute à sa paie">`:"";
     const right = (nouveaux>0)
-      ? `<input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="+ prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA. Le manager, tu le gères à part.">`
+      ? `<input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="+ prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA.">`
+        +mgrInput
         +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button>`
       : `<span class="pv-note">à jour ✓</span>`;
-    return `<div class="pv-row ${nouveaux>0?"":"pv-done"}"><span class="pv-va">${nom}</span>`
+    return `<div class="pv-row ${nouveaux>0?"":"pv-done"}">${nameCell}`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
       +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${right}</div>`;
   }).join("");
+  // 👔 Sélecteur de manager (changeable quand André veut). Le manager choisi reçoit
+  // une case « + manager » sur sa ligne + un badge. Vide = aucun manager.
+  const mgrSel=`<div class="pcumul-mgr">👔 Manager : <select data-mgrsel><option value="">— aucun —</option>`
+    +vas.filter(v=>!v.unpaid).map(v=>`<option value="${escapeHtml(v.va)}"${v.va===MANAGER_VA?" selected":""}>${escapeHtml(v.va)}</option>`).join("")
+    +`</select> <span class="pcumul-mgr-note">reçoit une part manager en plus de sa paie</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
@@ -4130,7 +4161,7 @@ function renderPaieCumul(){
       +`<span class="pay-h-n">+${fmtInt(h.subsPaid||0)} subs</span>`
       +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span></div>`;
   }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
-  $("#pcumulBody").innerHTML = rows
+  $("#pcumulBody").innerHTML = mgrSel + rows
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}</span><span class="pv-note"></span></div>`
     + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
@@ -4139,17 +4170,20 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
-    // 💶 Prime saisie sur cette ligne (optionnelle) → s'ajoute au versement.
-    const primeEl=pay.closest(".pv-row")?pay.closest(".pv-row").querySelector(".pc-prime"):null;
+    const row=pay.closest(".pv-row");
+    // 💶 Prime + part manager saisies sur cette ligne (optionnelles) → s'ajoutent.
+    const primeEl=row?row.querySelector(".pc-prime"):null;
+    const mgrEl=row?row.querySelector(".pc-manager"):null;
     const prime=primeEl?Math.max(0,Number(primeEl.value)||0):0;
-    const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime)*100)/100;
+    const manager=mgrEl?Math.max(0,Number(mgrEl.value)||0):0;
+    const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime+manager)*100)/100;
     // Confirmation d'un VERSEMENT réel → montants toujours lisibles.
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+((prime>0||manager>0)?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime})});
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` (dont ${pcMoney(j.prime)} de prime)`:"")+(j.notified?" · le VA est prévenu dans son ticket":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+(j.notified?" · VA prévenu":"")); await loadPaieCumul(); }
       else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
     }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
     return;
@@ -4171,6 +4205,15 @@ $("#pcumulBody").addEventListener("click", async e=>{
     }catch(err){ alert("Réseau : "+err.message); }
     return;
   }
+});
+// 👔 Changer le manager (sélecteur) — mémorisé en local, re-rend pour montrer le
+// badge + la case « manager » sur la bonne ligne.
+$("#pcumulBody").addEventListener("change", e=>{
+  const sel=e.target.closest("[data-mgrsel]"); if(!sel) return;
+  MANAGER_VA=(sel.value||"").trim();
+  try{ localStorage.setItem("ccn_manager_va", MANAGER_VA); }catch(_){}
+  renderPaieCumul();
+  if(typeof toast==="function") toast("👔 Manager", MANAGER_VA?`${MANAGER_VA} est le manager`:"Aucun manager");
 });
 $("#pcumulRefresh").onclick=()=>loadPaieCumul();
 $("#pcumulCopy").onclick=()=>{
@@ -4627,7 +4670,7 @@ function renderCohortes(){
   const coh=d.cohorts.map((c,i)=>{
     const prev=d.cohorts[i-1];
     const arr=prev?(c.avg>prev.avg?`<span class="co-up">▲</span>`:c.avg<prev.avg?`<span class="co-dn">▼</span>`:""):"";
-    return `<div class="co-row"><span class="co-m">${coMoisNom(c.mois)}</span><span class="co-n">${fmtInt(c.fans)} fans</span><span class="co-a">${money(c.avg)} ${arr}</span><span class="co-med">méd. ${money(c.median)}</span></div>`;
+    return `<div class="coh-row"><span class="co-m">${coMoisNom(c.mois)}</span><span class="co-n">${fmtInt(c.fans)} fans</span><span class="co-a">${money(c.avg)} ${arr}</span><span class="co-med">méd. ${money(c.median)}</span></div>`;
   }).join("");
   let why="";
   const dr=d.drivers;
