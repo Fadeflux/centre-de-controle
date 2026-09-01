@@ -23,6 +23,10 @@
     --text:#f6f5f8; --muted:#9d9ca8; --faint:#63626e;
     --acc:#9aa2d8; --acc-hover:#8891c9; --acc-bg:#181a29; --acc-line:#3a3f60; --acc-ink:#cdd3f2;
     --ok:#4ade80; --down:#f87171; --idle:#33343a; --gold:#e6c84a;
+    /* Alias historiques utilisés dans les panneaux Argent/Telegram : NON définis
+       avant → ils tombaient sur un fallback INDIGO (#6366f1) hors charte. On les
+       aligne sur la charte NOCTRA (lavande) pour un accent cohérent partout. */
+    --accent:var(--acc); --fg:var(--text); --card2:var(--surface-2); --ink:var(--text); --warn:var(--gold);
     --radius:14px;
     --card-grad:linear-gradient(180deg,#15151c 0%,#101015 100%);
     --card-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px -18px rgba(0,0,0,.9);
@@ -952,7 +956,7 @@
   .mdl-card .big{font-size:22px;font-weight:800;letter-spacing:-.02em}
   .mdl-card .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   .mdl-card .day{font-size:11.5px;color:var(--acc-ink);margin-top:6px;font-weight:600}
-  .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#fff;cursor:pointer}
+  .pv-pay-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:0;background:var(--acc);color:#0a0a0a;cursor:pointer}
   .pc-actions{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
   .pc-actions .pv-pay-btn{margin-left:auto}   /* « Payer » aligné à droite de la barre */
   .pc-field{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--faint)}
@@ -1040,7 +1044,7 @@
   .tk-me-txt b{font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;max-width:120px}
   .tk-tabs{display:flex;gap:6px;margin:10px 0 12px;flex-wrap:wrap}
   .tk-tab{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
-  .tk-tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .tk-tab.on{background:var(--acc);border-color:var(--acc);color:#0a0a0a}
   .tk-n{background:rgba(255,255,255,.25);border-radius:999px;padding:0 5px;font-size:11px;margin-left:3px}
   .tk-add{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
   .tk-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
@@ -1084,7 +1088,7 @@
   .tk-prio{margin-right:5px;font-size:11px}
   .tk-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .tk-fchip{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
-  .tk-fchip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .tk-fchip.on{background:var(--acc);border-color:var(--acc);color:#0a0a0a}
   /* le sélecteur ne rétrécissait pas sous sa taille intrinsèque (min-width auto
      par défaut en flex) → 2 px de débordement horizontal de toute la page sur
      iPhone. min-width:0 l'autorise à se compresser. */
@@ -1479,7 +1483,7 @@
   .ti-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:.5px solid var(--line)}
   .ti-row:last-child{border-bottom:0}
   .ti-check{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);flex-shrink:0;cursor:pointer;display:grid;place-items:center;color:transparent;font-size:12px;transition:.15s}
-  .ti-check.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .ti-check.on{background:var(--acc);border-color:var(--acc);color:#0a0a0a}
   .ti-text{flex:1;font-size:14px;cursor:pointer;word-break:break-word}
   .ti-row.on .ti-text{color:var(--faint);text-decoration:line-through}
   .ti-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:15px;opacity:.55;padding:0 2px}
@@ -1599,7 +1603,7 @@
   .mn-coach-txt{font-size:15px;line-height:1.5;color:var(--text)}
   .mn-coach-act{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--acc-line)}
   .mn-act-txt{font-size:14px;font-weight:600;color:var(--ink);flex:1;min-width:170px}
-  .mn-act-btn{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .mn-act-btn{background:var(--acc);color:#0a0a0a;border:0;border-radius:10px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
   .mn-act-btn:disabled{opacity:.55;cursor:default}
   .mn-act-btn.ghost{background:transparent;color:var(--acc-ink);border:1px solid var(--acc-line)}
   .mn-coach-msg{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
@@ -1661,7 +1665,7 @@
   .gate p{font-size:13px;color:var(--muted);margin:0 0 18px}
   .gate input{width:100%;font:inherit;font-size:15px;padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg);color:var(--text);margin-bottom:10px;text-align:center;outline:none}
   .gate input:focus{border-color:var(--acc)}
-  .gate button{width:100%;font:inherit;font-size:14px;font-weight:600;color:#fff;background:var(--acc);border:0;border-radius:10px;padding:12px;cursor:pointer;transition:.15s}
+  .gate button{width:100%;font:inherit;font-size:14px;font-weight:600;color:#0a0a0a;background:var(--acc);border:0;border-radius:10px;padding:12px;cursor:pointer;transition:.15s}
   .gate button:hover{background:var(--acc-hover)}
   .gate .err{color:var(--down);font-size:12.5px;min-height:16px;margin-top:8px}
 
@@ -3226,7 +3230,7 @@ function addCost(){
 }
 $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
-$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); } });
+$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ if(!confirm("Supprimer ce coût fixe ?")) return; COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); if(typeof toast==="function") toast("🗑️ Supprimé","Coût fixe retiré."); } });
 renderCosts();
 
 /* ---------- Revenus Telegram (saisie manuelle) ---------- */
@@ -7753,7 +7757,7 @@ let SIM3_GROWTH=null;
 function renderSim3(){
   const panel=$("#sim3"), body=$("#sim3Body"); if(!panel||!body) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;
-  if(!TOKEN||!om||!om.totals||revKo()){ panel.style.display="none"; return; }
+  if(!TOKEN||!om||!om.totals||revKo()||om.revenusPartiels){ panel.style.display="none"; return; }   // + panne PARTIELLE : base sous-estimée
   { const ae=document.activeElement; if(ae&&ae.id==="s3r") return; }   // ne pas casser le curseur en cours de glissement
   const cur=(om.currency)||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
@@ -8773,7 +8777,7 @@ function addDecision(){
   saveDecisions(); renderDecisions();
   if(typeof toast==="function") toast("📓 Décision notée","Je te montrerai son effet sur le CA.");
 }
-{ const b=$("#decisionsBody"); if(b) b.addEventListener("click",e=>{ const d=e.target.closest("[data-djdel]"); if(d){ DECISIONS=DECISIONS.filter(x=>x.id!==d.getAttribute("data-djdel")); saveDecisions(); renderDecisions(); } }); }
+{ const b=$("#decisionsBody"); if(b) b.addEventListener("click",e=>{ const d=e.target.closest("[data-djdel]"); if(d){ if(!confirm("Supprimer cette décision du journal ?")) return; DECISIONS=DECISIONS.filter(x=>x.id!==d.getAttribute("data-djdel")); saveDecisions(); renderDecisions(); if(typeof toast==="function") toast("🗑️ Supprimé","Décision retirée du journal."); } }); }
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
@@ -9362,9 +9366,12 @@ function renderSim(){
   // ⛔ Sans revenus, la marge d'un VA vaut exactement « − ce qu'il coûte », donc le
   // simulateur concluait « le couper est rentable » EN VERT pour n'importe qui.
   // C'est littéralement la décision qu'on a failli prendre le 2026-07-21.
-  if(revKo()){
+  // ⚠️ AUSSI en panne PARTIELLE (un modèle illisible) : un VA qui bosse sur ce
+  // modèle sort marge<0 et serait accusé « couper rentable » à tort. On met en
+  // pause comme renderVersus/openVaCard (qui gardent déjà revKo()||revenusPartiels).
+  if(revKo() || (typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)){
     panel.style.display="block";
-    $("#simBody").innerHTML=`<div class="sv-note">⚠️ Simulateur en pause : sans tes revenus, la marge de chaque VA vaut « moins ce qu'il coûte », et je conclurais que couper n'importe qui est rentable. Reviens quand la source répond.</div>`;
+    $("#simBody").innerHTML=`<div class="sv-note">⚠️ Simulateur en pause : tes revenus sont incomplets en ce moment (une source ne répond pas), donc la marge d'un VA peut sembler négative à tort — je ne conclurais rien de fiable. Reviens quand tout est lisible.</div>`;
     try{ fixPairs(); }catch(e){}
     return;
   }
@@ -9515,7 +9522,7 @@ function tmTick(){ const left=TM_END-Date.now(), d=$("#tmDisp"); if(left<=0){ cl
 function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_END=Date.now()+min*60000; if(TM_INT) clearInterval(TM_INT); const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); TM_INT=setInterval(tmTick,250); tmTick(); }
 { const a=$("#rmAdd"); if(a) a.onclick=addReminder; }
 { const t=$("#rmText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addReminder(); }); }
-{ const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){ REMINDERS=REMINDERS.filter(x=>x.id!==d.getAttribute("data-rmdel")); saveReminders(); renderReminders(); } }); }
+{ const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){ if(!confirm("Supprimer ce rappel ?")) return; REMINDERS=REMINDERS.filter(x=>x.id!==d.getAttribute("data-rmdel")); saveReminders(); renderReminders(); if(typeof toast==="function") toast("🗑️ Supprimé","Rappel retiré."); } }); }
 { const b=$("#tmStart"); if(b) b.onclick=tmStart; }
 renderReminders(); tickClock(); setInterval(tickClock, 5000);
 
