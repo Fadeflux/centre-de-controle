@@ -4471,30 +4471,39 @@ function renderObjMois(){
   // Objectif FIGÉ du mois (serveur) : l'auto recalculé en continu suit la
   // projection (~110 % du réalisé) → 100 % impossible. Le figé, lui, est battable.
   const figeM=(typeof OBJ_MONTH_GOAL==="number"&&OBJ_MONTH_GOAL>0)?OBJ_MONTH_GOAL:0;
-  const goal=manuel?OBJ_GOAL:(figeM||autoGoal);
-  const pct=goal>0?Math.min(100,Math.round(netMonth/goal*100)):0;
-  const projPct=goal>0?Math.min(100,Math.round(F/goal*100)):0;
-  const reste=Math.max(0,goal-netMonth);
+  const goal=manuel?OBJ_GOAL:(figeM||autoGoal);   // stocké/serveur en BRUT
+  // 💶 VUE NETTE : on affiche tout comme l'anneau et la carte « Net du mois »,
+  // pour ne pas avoir deux « Objectif du mois » qui se contredisent (le 9 906 brut
+  // vs 9 738 net). Réalisé = caNetMois (OF net + Telegram) ; objectif, projection
+  // et mois dernier convertis en net (× commission). L'objectif reste STOCKÉ en
+  // brut (serveur/paliers inchangés) : ici c'est une conversion d'affichage.
+  const netR=(typeof netRate==="function")?netRate():0.80;
+  const tgM=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+  const netNow=(typeof caNetMois==="function")?caNetMois():(netMonth*netR+tgM);
+  const goalN=goal*netR, FN=F*netR+tgM, netLastN=netLast*netR;
+  const pct=goalN>0?Math.min(100,Math.round(netNow/goalN*100)):0;
+  const projPct=goalN>0?Math.min(100,Math.round(FN/goalN*100)):0;
+  const reste=Math.max(0,goalN-netNow);
   const subsMonth=Number(t.subsMonth)||0;
-  const revPerSub=subsMonth>0?netMonth/subsMonth:(Number(t.ltv)||0);
+  const revPerSub=subsMonth>0?netNow/subsMonth:((Number(t.ltv)||0)*netR);
   const subsNeeded=revPerSub>0?Math.ceil(reste/revPerSub):null;
   const vas=(Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0).sort((a,b)=>b.monthSubs-a.monthSubs);
   const totMs=vas.reduce((a,v)=>a+Number(v.monthSubs),0)||1;
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
-  const onTrack=F>=goal;
+  const onTrack=FN>=goalN;
   $("#objmoisBody").innerHTML=`
-    <div class="ob-goal">🎯 Objectif : <b>${money(goal)}</b> <span class="ob-sub">${manuel?"✏️ fixé par toi":"auto"} · mois dernier ${money(netLast)} · projection ${money(F)}</span></div>
+    <div class="ob-goal">🎯 Objectif : <b>${money(goalN)}</b> <span class="ob-sub">${manuel?"✏️ fixé par toi":"auto"} · mois dernier ${money(netLastN)} · projection ${money(FN)}</span></div>
     <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
-    <div class="ob-line">${money(netMonth)} de <b>CA brut</b> atteints · <b>${pct}%</b> · jour ${day}/${dim} <span class="ob-sub">(objectif en brut OnlyFans, pas en net)</span></div>
+    <div class="ob-line">${money(netNow)} de <b>CA net</b> atteints · <b>${pct}%</b> · jour ${day}/${dim} <span class="ob-sub">(net : OnlyFans après −20 % + Telegram — même base que l'anneau du haut)</span></div>
     ${reste>0?`<div class="ob-line">Reste <b>${money(reste)}</b>${subsNeeded!=null?` ≈ <b>${fmtInt(subsNeeded)} subs</b>`:""} d'ici la fin.</div>`:`<div class="ob-line ob-ok">🎉 Objectif déjà atteint !</div>`}
     ${chemin?`<div class="ob-chemin">🧭 Le chemin, par VA : ${chemin}</div>`:""}
-    <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(F)} (${projPct}%). Il faut accélérer.`}</div>
+    <div class="ob-verdict ${onTrack?"ob-ok":"ob-warn"}">${onTrack?"✅ Au rythme actuel, tu y es.":`⚠️ Au rythme actuel tu finis vers ${money(FN)} (${projPct}%). Il faut accélérer.`}</div>
     ${(function(){
       // 📜 #2 historique : les mois clos figés par le serveur (objectif vs réalisé).
       const h=(typeof OBJ_HIST!=="undefined"&&Array.isArray(OBJ_HIST))?OBJ_HIST:[];
       if(!h.length) return "";
       const mois=ym=>{ const p=String(ym||"").split("-"); return (["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"][(+p[1])-1]||"?")+" "+String(p[0]||"").slice(2); };
-      const rows=h.slice(0,12).map(x=>{ const okM=x.pct!=null&&x.pct>=100; return `<div class="pay-h-row"><span>${mois(x.ym)}</span><span class="pay-h-d">objectif ${money(x.goal)}</span><span class="pay-h-n">fait ${money(x.net)}</span><span class="pay-h-a">${x.pct!=null?(okM?"✅ ":"")+x.pct+" %":"—"}</span></div>`; }).join("");
+      const rows=h.slice(0,12).map(x=>{ const okM=x.pct!=null&&x.pct>=100; return `<div class="pay-h-row"><span>${mois(x.ym)}</span><span class="pay-h-d">objectif ${money((Number(x.goal)||0)*netR)}</span><span class="pay-h-n">fait ${money((Number(x.net)||0)*netR)}</span><span class="pay-h-a">${x.pct!=null?(okM?"✅ ":"")+x.pct+" %":"—"}</span></div>`; }).join("");
       return `<details class="pay-hist"><summary>📜 Mes mois passés (objectif vs réalisé)</summary><div class="pay-h-list">${rows}</div></details>`;
     })()}`;
 }
@@ -4520,7 +4529,7 @@ async function saveObjGoal(g){
 }
 { const b=$("#objEdit"); if(b) b.onclick=()=>{
     const cur=OBJ_GOAL>0?String(OBJ_GOAL):"";
-    const v=prompt("Ton objectif de CA (brut) pour le mois, en $ ?\n\nLaisse VIDE pour revenir à l'objectif automatique.",cur);
+    const v=prompt("Ton objectif de CA du mois, en $ (montant BRUT OnlyFans — le panneau l'affiche ensuite converti en NET, comme l'anneau du haut) ?\n\nLaisse VIDE pour revenir à l'objectif automatique.",cur);
     if(v===null) return;
     const s=String(v).replace(/[^0-9]/g,"");
     if(s===""){ saveObjGoal(0); if(typeof toast==="function") toast("🎯 Objectif","Retour à l'objectif automatique."); return; }
@@ -5307,7 +5316,7 @@ function renderDataHealth(){
     cls="dh-amber"; txt="🟡 Chiffres partiels"+mm+" — ce sont des minimums";
   } else {
     let fr="";
-    if(typeof OM_FETCHED_AT!=="undefined" && OM_FETCHED_AT){ const m=Math.floor((Date.now()-OM_FETCHED_AT)/60000); fr=m<1?" · à l'instant":(m<60?" · il y a "+m+" min":" · vieux de "+Math.round(m/60)+" h"); }
+    { const _ma=omMesureAt(); if(_ma){ const m=Math.floor((Date.now()-_ma)/60000); fr=m<1?" · à l'instant":(m<60?" · il y a "+m+" min":" · vieux de "+Math.round(m/60)+" h"); } }
     cls="dh-green"; txt="🟢 Chiffres à jour et complets"+fr;
   }
   el.className="dh on "+cls;
@@ -5671,8 +5680,14 @@ function renderOM(){
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
     cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
-  $("#omBody").innerHTML=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteArg;
-  { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function"&&typeof OM_FETCHED_AT!=="undefined")?fraicheur(OM_FETCHED_AT):""; }
+  // ⚡ Garde anti-freeze mobile : on ne réécrit le gros panneau QUE si son contenu
+  // a changé (même motif que render()). Avant, #omBody était reconstruit à chaque
+  // cycle 60 s même sans changement → micro-gel + tuiles qui re-glissaient. Le badge
+  // de fraîcheur (#omFresh) est mis à jour JUSTE APRÈS, hors du garde, donc l'âge
+  // des chiffres continue d'avancer même quand on saute la reconstruction.
+  { const _ob=$("#omBody"); const _h=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteArg;
+    if(_ob && _ob._lastHtml!==_h){ _ob.innerHTML=_h; _ob._lastHtml=_h; } }
+  { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function")?fraicheur(omMesureAt()):""; }
   try{ renderDataHealth(); }catch(e){}
   renderModeles();
   renderCaJours();
@@ -6153,8 +6168,8 @@ function omIndispo(msg){
 // celle collée aux chiffres.
 function majFraicheurOM(){
   try{ const of=$("#omFresh");
-    if(of && typeof fraicheur==="function" && typeof OM_FETCHED_AT!=="undefined" && OM_FETCHED_AT)
-      of.innerHTML=fraicheur(OM_FETCHED_AT);
+    if(of && typeof fraicheur==="function" && omMesureAt())
+      of.innerHTML=fraicheur(omMesureAt());
   }catch(e){}
 }
 async function loadOM(){
@@ -8240,7 +8255,7 @@ function renderEssentiel(){
   const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
   const cat=essTuilesCatalogue(), choix=essTuilesChoisies();
   const tuiles=cat.filter(t=>choix.includes(t.k));
-  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(OM_FETCHED_AT)}<button class="ess-cfg" id="essCfg" title="Choisir les chiffres affichés ici">✎</button></div>`
+  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(omMesureAt())}<button class="ess-cfg" id="essCfg" title="Choisir les chiffres affichés ici">✎</button></div>`
     +`<div class="ess-figs">`
     +tuiles.map(t=>`<div class="ess-fig"><div class="ess-fl">${t.l}</div><div class="ess-fv">${t.v}</div></div>`).join("")
     +`</div>`;
@@ -8277,6 +8292,12 @@ function fraicheur(ts){
   const txt=m<1?"à jour à l'instant":m<60?`à jour il y a ${m} min`:`⚠️ vieux de ${Math.round(m/60)} h`;
   return `<span class="fresh ${c}">● ${txt}</span>`;
 }
+// 🕒 Heure de MESURE des chiffres OnlyMonster (calcul serveur), pas de téléchargement.
+// Le badge affichait « à jour à l'instant » à chaque fetch 60 s même quand le hub
+// resservait un cache vieux de plusieurs heures. On prend OM_DATA.maj (envoyé par
+// le serveur, comme trésorerie/OnlyChat) ; repli sur OM_FETCHED_AT si absent (vieux
+// serveur pas encore redéployé).
+function omMesureAt(){ const d=(typeof OM_DATA!=="undefined"&&OM_DATA); return (d&&Number(d.maj))||(typeof OM_FETCHED_AT!=="undefined"?OM_FETCHED_AT:0)||0; }
 // 🎯 #7 RECO DE LA SEMAINE : UNE priorité stratégique choisie pour toi (pas la
 // liste des problèmes = ça, c'est la file d'actions). Oriente vers la CROISSANCE.
 function renderReco(){
@@ -8873,7 +8894,7 @@ function renderNoteJour(){
     const nPo=Array.isArray(sc.suspects)?sc.suspects.filter(x=>x.danger==="poste").length:0;
     comp.push({nom:"Comptes Instagram sains",pts:Math.max(0,Math.round(15-nEt*1.5-nPo*3)),max:15,pb:(nEt||nPo)?(nEt+" compte"+(nEt>1?"s":"")+" éteint"+(nEt>1?"s":"")+(nPo?", "+nPo+" suspect(s) qui poste(nt)":"")):null});
   }
-  const frais=(typeof OM_FETCHED_AT!=="undefined"&&OM_FETCHED_AT&&(Date.now()-OM_FETCHED_AT)<20*60*1000);
+  const frais=(omMesureAt()>0&&(Date.now()-omMesureAt())<20*60*1000);
   comp.push({nom:"Chiffres frais",pts:frais?10:4,max:10,pb:frais?null:"les chiffres datent d'un moment"});
   let pPart=20; const pbs=[];
   if(d.revenusPartiels){pPart-=7;pbs.push("totaux d'argent incomplets");}
