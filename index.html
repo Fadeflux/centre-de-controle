@@ -197,6 +197,9 @@
        filtres modèle, actions de panneau, onglets, fenêtres) passaient à 24-30px de
        haut — durs à taper. On les monte à ~38-42px sur téléphone. */
     .om-per-b, .om-va-head button, .pb-head .act, .tk-tab, #omModels button, #omSort{ padding-top:9px !important; padding-bottom:9px !important; }
+    /* Petits boutons fréquents oubliés du bump : objectif VA (✏️/🎯 ~16px),
+       relance fan (📋), relance ghost — quasi intappables au doigt sinon. */
+    .omv-goal-set, .fr-msg, .gh-relance{ min-height:38px !important; padding-top:8px !important; padding-bottom:8px !important; }
     .om-per{ gap:8px; }
     .sec-chip{ padding-top:9px !important; padding-bottom:9px !important; }
     /* 🏆 Classement VA : sur 375px, 7 colonnes écrasaient le NOM à ~4px (invisible).
@@ -1753,12 +1756,15 @@
   .panel-box,.costs,.tgrev,.antileak,.journal{margin-top:20px}
   .pair-row{margin-top:20px}
 
-  /* Apparition douce des panneaux au chargement (une seule fois, subtile) */
+  /* Apparition douce des panneaux — UNIQUEMENT au chargement (classe body.booting,
+     retirée après le 1er rendu). Avant, l'animation rejouait à CHAQUE rafraîchis-
+     sement 60 s parce que #omBody est réécrit sans garde → les tuiles « Net du
+     mois », « Subs »… re-glissaient/refondaient sans arrêt (« ça saute »). */
   @keyframes ccRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .panel-box,.card,.tile,.costs,.tgrev,.antileak,.journal,.daily{animation:ccRise .34s ease both}
-  .summary .tile:nth-child(2){animation-delay:.03s}
-  .summary .tile:nth-child(3){animation-delay:.06s}
-  .summary .tile:nth-child(4){animation-delay:.09s}
+  body.booting .panel-box,body.booting .card,body.booting .tile,body.booting .costs,body.booting .tgrev,body.booting .antileak,body.booting .journal,body.booting .daily{animation:ccRise .34s ease both}
+  body.booting .summary .tile:nth-child(2){animation-delay:.03s}
+  body.booting .summary .tile:nth-child(3){animation-delay:.06s}
+  body.booting .summary .tile:nth-child(4){animation-delay:.09s}
 
   /* Boutons d'entête : pastille ronde plus nette, cohérente */
   .top-actions .btn{border-radius:10px}
@@ -1860,7 +1866,7 @@
   }
 </style>
 </head>
-<body>
+<body class="booting">
 
 <div class="gate" id="gate">
   <div class="box">
@@ -2811,7 +2817,9 @@ function render(data){
     tiles.push(`<div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
     tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
   }
-  const pf = inWorld(toolById("noctra-finance")) ? gg("noctra-finance","profitMonth") : 0;
+  // Hors monde Noctra, le profit n'est pas « 0 » : il est HORS PÉRIMÈTRE → null
+  // (→ « — »), sinon on affichait « Profit du mois : 0 $ » comme une mesure.
+  const pf = inWorld(toolById("noctra-finance")) ? gg("noctra-finance","profitMonth") : null;
   tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${tiret(pf,fmtMoney)}</div></div>`);
   { const sumHtml=tiles.join(""); const s=$("#summary"); if(s && s._lastHtml!==sumHtml){ s.innerHTML=sumHtml; s._lastHtml=sumHtml; } }
   { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const neg=/[-−]/.test(raw); const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const val=neg?-num:num; const isMoney=/\$/.test(raw); animateCount(el,val,v=>{ v=Math.round(v); return isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR"); }); } }); } }
@@ -3935,7 +3943,10 @@ async function loadJournal(){
 }
 
 /* ---------- fiche de paie + objectif ---------- */
-function fmtCur(v){ return HIDE ? "••• $" : fmtMoney(v); }
+// Argent inconnu (null/undefined/NaN) → « — », JAMAIS « 0 $ » ni « NaN $ » : sur
+// la fiche de paie, un « 0 $ » fabriqué se lit comme « ce VA ne touche rien » et
+// le bouton Payer enregistrerait un versement de 0. (Règle « absent ≠ 0 ».)
+function fmtCur(v){ return HIDE ? "••• $" : ((v==null || !isFinite(Number(v))) ? "—" : fmtMoney(v)); }
 /* ---------- cahier de paie ---------- */
 let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
 function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
@@ -3987,8 +3998,12 @@ function renderPaie(data){
     const paid=isPaid(v.va);
     // `unpaid` = associée/perso : jamais payée -> ni bouton « Payer », ni comptée
     // dans « x/N payés » (sinon le compteur ne peut jamais atteindre son total).
+    // Paie INCONNUE (null) ≠ 0 : pas de bouton « Payer » (il enregistrerait 0 et
+    // marquerait le VA payé). On le signale au lieu d'inventer un montant.
     const btn = v.unpaid ? `<span class="pv-note">perso · 0 paie</span>`
-      : (paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>` : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`);
+      : (paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>`
+        : (v.pay==null ? `<span class="pv-note" title="Montant non calculé — je ne l'invente pas">paie inconnue</span>`
+          : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`));
     return `<div class="pv-row ${paid?"pv-done":""}"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span>${btn}</div>`;
   }).join("");
   const aPayer = vas.filter(v=>!v.unpaid);
@@ -4019,7 +4034,7 @@ $("#paieBody").addEventListener("click",e=>{
 $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
   // Texte destiné à être COLLÉ (à un VA, dans un message) → jamais masqué.
-  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
+  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${v.pay==null?"— (paie inconnue)":moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 // 📤 Export compta : l'HISTORIQUE des paiements versés (PAYMENTS, la même
@@ -4676,7 +4691,7 @@ function renderRecos(){
   if(bestModel&&!revKo()){
     const totModelSubs=Object.keys(models).reduce((a,m)=>a+(Number(models[m].subs)||0),0)||1;
     const shareM=bestModel.subs/totModelSubs;
-    if(shareM<0.35) recos.push({p:1,ico:"🎭",act:`Pousse plus de trafic vers ${bestModel.m}`,why:`C'est ton modèle le plus rentable (LTV ${money(bestModel.ltv)}/abonné) mais il ne reçoit que ${Math.round(shareM*100)}% des subs. Y orienter tes VA à volume = argent facile.`});
+    if(shareM<0.35) recos.push({p:1,ico:"🎭",act:`Pousse plus de trafic vers ${bestModel.m}`,why:`C'est ton modèle le plus rentable (LTV ${fmtLtv(bestModel.ltv,cur)}/abonné, nette) mais il ne reçoit que ${Math.round(shareM*100)}% des subs. Y orienter tes VA à volume = argent facile.`});
   }
   if(!recos.length){ box.style.display="block"; $("#recosBody").innerHTML=`<div class="tk-empty">✅ Rien d'urgent : équipe équilibrée, personne en risque. Continue comme ça.</div>`; return; }
   box.style.display="block";
@@ -4818,7 +4833,7 @@ function renderGoal(data){
   const _netR=(typeof netRate==="function")?netRate():0.80;
   const _tgMois=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
   const current = isRev
-    ? ((OM_DATA&&OM_DATA.totals&&OM_DATA.totals.netMonth!=null) ? (Number(OM_DATA.totals.netMonth)||0)*_netR + _tgMois : 0)
+    ? caNetMois()   // net OF + Telegram — source unique (voir caNetMois)
     : (Number(((data["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0);
   // 💶 En REVENUS, on affiche les CENTIMES (moneyPrecis) — exactement le même
   // format que la carte « Net du mois » (9 738,30 $), pour que l'anneau et la
@@ -5915,6 +5930,16 @@ function tgHistMonth(monthLabel){
 // suggestion d'objectif) le calculaient chacun différemment — brut vs net, avec ou
 // sans Telegram, mois en cours inclus ou pas — et pouvaient nommer un mois DIFFÉRENT.
 function moisValeurNet(h){ return (Number(h&&h.net)||0)*netRate() + ((typeof tgHistMonth==="function"&&h)?tgHistMonth(h.month):0); }
+// 💶 LE CA NET DU MOIS EN COURS — source UNIQUE. Net OnlyFans (brut × commission)
+// + Telegram (déjà net), exactement comme la carte « Net du mois ». Tout ce qui
+// parle du « CA net du mois » ou d'une cible d'objectif (anneau, badge « objectif
+// atteint », série, ligne d'objectif du graphe, coach) DOIT passer par ici —
+// sinon l'écart brut/net/Telegram se réintroduit panneau par panneau (bug vécu).
+function caNetMois(){
+  const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
+  const tg=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+  return (Number(t.netMonth)||0)*netRate()+tg;
+}
 function meilleurMoisComplet(history){
   const hist=Array.isArray(history)?history:[];
   const complets=hist.length>1?hist.slice(0,-1):[];
@@ -6527,8 +6552,13 @@ async function shareRankCard(){
 
 /* ---------- écran du matin « Bonjour » : série + compteur + verdict ---------- */
 let LAST_NA=null, STREAK=0, STREAK_GOAL=false, MORNING_SHOWN=false, EVENING_SHOWN=false;
-function todayStr(){ return new Date().toISOString().slice(0,10); }
-function yStr(){ return new Date(Date.now()-864e5).toISOString().slice(0,10); }
+// Date LOCALE (pas UTC) : en UTC, « aujourd'hui » basculait 1 à 2 h trop tard
+// (fuseau +1/+2) → le montant « 📅 Aujourd'hui » et la réconciliation montraient
+// encore HIER pendant la 1re heure après minuit. On s'aligne sur l'heure de
+// l'opérateur, comme le fait déjà daysSinceFirstSale (Date.UTC de composantes locales).
+function _localISO(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function todayStr(){ return _localISO(new Date()); }
+function yStr(){ return _localISO(new Date(Date.now()-864e5)); }
 function computeStreak(){
   const t=todayStr();
   // Objectif de subs quotidien = objectif de la quinzaine ÷ 15 (si fixé).
@@ -6889,7 +6919,13 @@ async function loadBrief(force){
     // On envoie l'objectif du mois : le coach le transforme en CIBLE DU JOUR
     // (« il te faut X aujourd'hui ») au lieu de citer un cumul.
     const g=(typeof GOAL!=="undefined"&&GOAL&&Number(GOAL.value)>0)?{type:GOAL.type,value:Number(GOAL.value)}:null;
-    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force, goal:g})});
+    // 🎯 On envoie AUSSI le CA net du mois (+ Telegram) et la prévision nette, pour
+    // que la « cible du jour » du coach soit sur la MÊME échelle que l'objectif net.
+    // Sinon le serveur comparait l'objectif net à un cumul BRUT → cible fausse.
+    const _fgN=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
+    const curNet=(typeof caNetMois==="function")?Math.round(caNetMois()):null;
+    const projNet=_fgN?Math.round((Number(_fgN.value)||0)*netRate()+((typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0)):null;
+    const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force, goal:g, curNet:curNet, projNet:projNet})});
     if(r.status===401){ box.style.display="none"; return; }
     const j=await r.json();
     COACH_TEXT=(j.brief||"").trim();
@@ -7194,7 +7230,9 @@ function renderBadges(){
   // — sinon le badge + le pop-up se déclenchaient sur du BRUT et pouvaient fêter un
   // record que « Mon année » niait (ou l'inverse).
   let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>moisValeurNet(m))); isRecord=(moisValeurNet(c)>prevMax && prevMax>0); }
-  const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?(Number(tot.netMonth)||0):(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
+  // 🎯 Même base que l'anneau renderGoal : net OF + Telegram (via caNetMois),
+  // sinon le badge « objectif atteint » se déclenchait sur du BRUT (seuil faux).
+  const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?caNetMois():(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
   const subsQz=Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
   const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:Number(tot.netTotal)||0, subsQuinzaine:subsQz, isRecord, goalMet };
   const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
@@ -7676,7 +7714,7 @@ function renderStreak(){
   const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const G=(typeof GOAL!=="undefined")?GOAL:null;
   let cible=0;
-  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)*netRate()/dim);
+  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)/dim);   // G.value est déjà net (+ Telegram) ; dn[] sont nets → NE PAS re-décoter
   else { const lm=Math.round((Number((om.totals||{}).netLastMonth)||0)*netRate()); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
   if(cible<=0) cible=Math.round(dn.reduce((a,b)=>a+b,0)/dn.length);
   let streak=0; for(let i=dn.length-1;i>=0;i--){ if(dn[i]>=cible) streak++; else break; }
@@ -9342,6 +9380,10 @@ function renderPie(){
 applyAccent();
 fillMe();
 load();
+// Fin de l'animation d'entrée : on retire « booting » après le 1er rendu, pour que
+// les tuiles ne re-glissent plus à chaque rafraîchissement 60 s. (Au pire, si ce
+// timer ne partait pas, l'animation continuerait comme avant — jamais pire.)
+setTimeout(function(){ try{ document.body.classList.remove("booting"); }catch(e){} }, 2200);
 loadTodosFromBrain();
 loadJournal();
 /* ---------- chrono, horloge & rappels ---------- */
@@ -10452,10 +10494,15 @@ function renderCaJours(){
     if(typeof GOAL!=="undefined" && GOAL && GOAL.type==="rev" && d.totals){
       const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
       const reste=Math.max(1, dim-now.getDate()+1);
-      const need=(Number(GOAL.value)-(Number(d.totals.netMonth)||0))/reste;   // en BRUT (l'objectif est posé sur les chiffres bruts)
-      if(need>0){
-        const hh=Math.min(126,Math.max(3,Math.round(need/max*128)));
-        goalLine=`<div class="cj-goal" style="bottom:${hh}px" title="Objectif du mois : il te faut ~${money(need)} brut par jour (${net(need)} net)"><span>🎯 ${net(need)} net/j</span></div>`;
+      // Objectif NET (+ Telegram) − CA NET du mois = ce qu'il reste à faire en NET
+      // par jour. (Avant : net − brut puis re-décote → faux d'un facteur ~25.)
+      const needNet=(Number(GOAL.value)-caNetMois())/reste;
+      if(needNet>0){
+        // Les barres du graphe sont en BRUT (x.v) → on reconvertit needNet en brut
+        // uniquement pour poser la ligne à la bonne HAUTEUR sur cette échelle.
+        const needBrutJauge=needNet/(netRate()||0.8);
+        const hh=Math.min(126,Math.max(3,Math.round(needBrutJauge/max*128)));
+        goalLine=`<div class="cj-goal" style="bottom:${hh}px" title="Objectif du mois : il te faut ~${money(needNet)} net par jour pour l'atteindre"><span>🎯 ${money(needNet)} net/j</span></div>`;
       }
     }
   }catch(e){}
