@@ -3976,7 +3976,9 @@ function fmtCur(v){ return HIDE ? "••• $" : ((v==null || !isFinite(Number(
 let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
 function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
 function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
-function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})}).catch(()=>{}); } }
+function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})})
+    .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Paie NON enregistrée","Le serveur n'a pas pu écrire le cahier de paie. Le VA restera « à payer » — refais l'opération."); })
+    .catch(()=>{ if(typeof toast==="function") toast("⚠️ Paie NON enregistrée","Pas de réseau : rien n'est parti au serveur. Refais l'opération une fois reconnecté."); }); } }
 async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
 function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST);
   // Prévient le bot : il postera "ta paie a été envoyée" dans le ticket du VA (montant > 0 uniquement → exclut le perso à 0)
@@ -4218,7 +4220,24 @@ $("#pcumulBody").addEventListener("click", async e=>{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader})});
       const j=await r.json();
       if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")); await loadPaieCumul(); }
-      else { alert("Erreur : "+((j&&j.error)||"inconnue")); pay.disabled=false; pay.textContent=old; }
+      else if(j && j.saut && j.detail){
+        // Saut anormal détecté : on EXPLIQUE (detail) et on propose de confirmer,
+        // sinon le paiement de ce VA était impossible depuis le dashboard.
+        if(confirm(`⚠️ ${j.error}
+
+${j.detail}
+
+Confirmer quand même le paiement de ${va} ?`)){
+          try{
+            const r2=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, confirmer_saut:true})});
+            const j2=await r2.json();
+            if(j2&&j2.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")); await loadPaieCumul(); return; }
+            alert("Erreur : "+((j2&&(j2.detail||j2.error))||"inconnue"));
+          }catch(err){ alert("Réseau : "+err.message); }
+        }
+        pay.disabled=false; pay.textContent=old;
+      }
+      else { alert("Erreur : "+((j&&(j.detail||j.error))||"inconnue")); pay.disabled=false; pay.textContent=old; }
     }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
     return;
   }
@@ -7597,11 +7616,17 @@ function renderCash(){
   if(!d || d.error){ panel.style.display="none"; return; }
   panel.style.display="block";
   const cur=v=>HIDE?"••• $":(Math.round(Number(v)||0)).toLocaleString("fr-FR")+" $";
-  const retard=Number(d.resteRetard)||0;
-  const retardHtml=retard>0
+  const retardKo=!!d.retardIndispo;   // le serveur n'a PAS pu lire le cahier de paie
+  const retard=retardKo?0:(Number(d.resteRetard)||0);
+  // « absent ≠ 0 » : si le serveur n'a pas pu lire le cahier de paie, on le DIT au
+  // lieu de masquer la ligne (ce qui se lisait « rien en retard »).
+  const retardHtml=retardKo
+    ? `<div class="cash-line warn"><span>⚠️ Quinzaine passée : je ne sais pas</span><b>—</b></div>`
+      +`<div class="cash-sub">Le cahier de paie est illisible en ce moment : impossible de dire ce qui reste dû. Ce n'est <b>pas</b> « rien à payer ».</div>`
+    : (retard>0
     ? `<div class="cash-line warn"><span>⚠️ Quinzaine passée pas soldée</span><b>${cur(retard)}</b></div>`
       +`<div class="cash-sub">${(d.restantsPrev||[]).slice(0,6).map(o=>`${escapeHtml(o.va)} ${cur(o.pay)}`).join(" · ")}</div>`
-    : "";
+    : "");
   const enCoursHtml=`<div class="cash-line"><span>Quinzaine en cours (${escapeHtml(d.curLabel||"")})</span><b>${cur(d.duEnCours)}</b></div>`
     +`<div class="cash-sub">à ce jour (jour ${d.joursEcoules}/${d.joursTotal}) · projeté fin de quinzaine ≈ <b>${cur(d.projete)}</b></div>`;
   let tresoHtml;
@@ -9771,6 +9796,7 @@ async function doRestore(file){
     const r=await fetch(HUB_BASE+"/api/hub/config-import",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({data:data})});
     const res=await r.json().catch(()=>({}));
     if(r.ok&&res.ok){ if(typeof toast==="function") toast("♻️ Restauré",(res.restored||[]).length+" réglages restaurés. Rechargement…"); setTimeout(()=>location.reload(),1500); }
+    else if(r.status===207){ if(typeof toast==="function") toast("♻️ Restauré en partie",(res.message||`${(res.restored||[]).length} restaurés, ${(res.echecs||[]).length} en échec`)+" — rechargement…"); setTimeout(()=>location.reload(),1800); }
     else if(typeof toast==="function") toast("⚠️ Restauration échouée","");
   }catch(e){ if(typeof toast==="function") toast("⚠️ Fichier illisible",""); }
 }
