@@ -3991,11 +3991,21 @@ function fmtCur(v){ return HIDE ? "••• $" : ((v==null || !isFinite(Number(
 let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
 function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
 function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
-function savePayments(){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({payments:PAYMENTS})})
+// ⚠️ On n'envoie PLUS toute la liste : elle écrasait le cahier côté serveur, et
+// un paiement fait entre-temps (paie au cumul, autre onglet, 2e instance)
+// DISPARAISSAIT — le VA était alors relancé comme impayé pour la quinzaine
+// entière. On envoie l'opération ({ajout} ou {retrait}), que le serveur applique
+// dans une transaction. `payments` reste envoyé en secours pour un serveur pas
+// encore à jour.
+function savePayments(delta){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){
+  const corps = delta ? Object.assign({}, delta) : { payments: PAYMENTS };
+  fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(corps)})
     .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Paie NON enregistrée","Le serveur n'a pas pu écrire le cahier de paie. Le VA restera « à payer » — refais l'opération."); })
     .catch(()=>{ if(typeof toast==="function") toast("⚠️ Paie NON enregistrée","Pas de réseau : rien n'est parti au serveur. Refais l'opération une fois reconnecté."); }); } }
 async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
-function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()}); savePayments(); renderPaie(LAST);
+function payVa(va, amount){ if(isPaid(va)) return;
+  const ligne={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()};
+  PAYMENTS.unshift(ligne); savePayments({ajout:ligne}); renderPaie(LAST);
   // Prévient le bot : il postera "ta paie a été envoyée" dans le ticket du VA (montant > 0 uniquement → exclut le perso à 0)
   // ⚠️ Le message de succès partait AVANT de savoir si la requête avait marché
   // (`.then()` sans tester `r.ok`) : sur 401/500, l'opérateur lisait « le bot
@@ -4017,7 +4027,7 @@ function payVa(va, amount){ if(isPaid(va)) return; PAYMENTS.unshift({id:Date.now
 // correction dans le ticket si elle l'est.
 function unpayVa(va){
   const p=curPeriod();
-  PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments(); renderPaie(LAST);
+  PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments({retrait:{va:va, period:p}}); renderPaie(LAST);
   if(!TOKEN) return;
   fetch(HUB_BASE+"/api/hub/pay-notify/cancel",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
     body:JSON.stringify({va:va, period:p})})
