@@ -5744,6 +5744,8 @@ function renderOM(){
   if(per!=="tout"){
     // Sur une fenêtre, « marge » et « ROI » n'ont pas de sens (la paie est au
     // cumul, pas au jour) : on ne trie que par argent dépensé ou par subs amenés.
+    // ℹ️ L'explication du « de cash » vit dans une note VISIBLE (voir noteCash plus
+    // bas) : sur téléphone, une infobulle au survol n'existe pas.
     const parArgent = !ko && OM_SORT!=="subs";
     vas.sort((a,b)=> parArgent ? ((pOf(b,"rev")||0)-(pOf(a,"rev")||0)) : ((pOf(b,"subs")||0)-(pOf(a,"subs")||0)));
     // Un VA à 0 sub ET 0 $ sur la fenêtre n'a rien fait : il encombre la liste.
@@ -6040,6 +6042,10 @@ function renderOM(){
   const vaBloc = filtreDispo ? (vaRows+horsRows+recapSubs)
     : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
   // Argent non ventilable par modèle (repli sans API) : on le dit.
+  // Note VISIBLE de la marge de trésorerie (l'infobulle ne s'affiche pas au doigt).
+  const noteCash = (per!=="tout" && !ko)
+    ? `<div class="sv-note" style="margin-top:6px">💶 <b>« de cash »</b> = ce qui est entré ${escapeHtml(perInfo.court)}, <b>moins</b> ce que tu as versé au VA pour les abonnés qu'il a amenés pendant. C'est de la <b>trésorerie de la période</b>, pas la marge « depuis le début » : l'argent encaissé vient aussi d'abonnés qu'il avait amenés AVANT. Ne divise jamais les deux colonnes l'une par l'autre.</div>`
+    : "";
   const noteArg = (filtreDispo && argFiltreKo)
     ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Par modèle, seuls les abonnés sont disponibles en ce moment — les montants (généré, LTV, ROI) reviennent dès que la source d'argent répond. Ils restent visibles sur l'onglet « Tout ».</div>` : "";
   // 📅 #7 — « à date » : où j'en suis aujourd'hui vs le mois dernier au même jour.
@@ -6058,7 +6064,7 @@ function renderOM(){
   // cycle 60 s même sans changement → micro-gel + tuiles qui re-glissaient. Le badge
   // de fraîcheur (#omFresh) est mis à jour JUSTE APRÈS, hors du garde, donc l'âge
   // des chiffres continue d'avancer même quand on saute la reconstruction.
-  { const _ob=$("#omBody"); const _h=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteArg;
+  { const _ob=$("#omBody"); const _h=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteCash+noteArg;
     if(_ob && _ob._lastHtml!==_h){ _ob.innerHTML=_h; _ob._lastHtml=_h; } }
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function")?fraicheur(omMesureAt()):""; }
   try{ renderDataHealth(); }catch(e){}
@@ -9483,6 +9489,29 @@ function renderRachat(){
   $("#rachatBody").innerHTML=tuiles+delai
     +`<div class="sv-head" style="margin-top:12px">Au bout de combien de temps ils rachètent</div>${courbe}`
     +(vas?`<div class="sv-head" style="margin-top:12px">Par VA · ce que vaut vraiment un de ses abonnés</div>${vas}`:"")
+    +(function(){
+      // 💰 PAYÉ vs RAPPORTÉ, sur la même cohorte d'abonnés.
+      // `valeurMoy` = dépense moyenne des fans ARRIVÉS sur la fenêtre — c'est du
+      // BRUT (somme des transactions / nb d'arrivés), donc × netRate.
+      // ⚠️ Elle vaut null sous 15 arrivées : trop peu pour juger. On EXCLUT ces
+      // VA du tableau au lieu de les compter à 0.
+      const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
+      if(!(tarif>0)) return "";
+      const paidSet2=new Set(((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid).map(v=>v.va));
+      const ok=(d.vas||[]).filter(v=>v && v.valeurMoy!=null && Number(v.arrives)>0 && paidSet2.has(v.va));
+      if(!ok.length) return "";
+      const lignes=ok.map(v=>{
+        const paye=Number(v.arrives)*tarif, rapporte=Number(v.arrives)*Number(v.valeurMoy)*netRate();
+        const diff=rapporte-paye, cls=diff>=0?"pos":"neg";
+        return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
+          +`<span class="sv-cell">${fmtInt(v.arrives)} abonnés · payés <b>${moneyPrecis(paye,"$")}</b></span>`
+          +`<span class="sv-cell">rapporté <b>${moneyPrecis(rapporte,"$")}</b> net</span>`
+          +`<span class="sv-part ${cls}">${diff>=0?"+":""}${moneyPrecis(diff,"$")}</span></div>`;
+      }).join("");
+      const exclus=(d.vas||[]).filter(v=>v && paidSet2.has(v.va) && v.valeurMoy==null).length;
+      return `<div class="sv-head" style="margin-top:12px">💰 Ce que tu as payé pour eux, vs ce qu'ils t'ont rapporté</div>${lignes}`
+        +`<div class="sv-note">Même groupe d'abonnés des deux côtés : ceux <b>arrivés</b> ${d.depuis?`depuis le ${escapeHtml(String(d.depuis).slice(0,10))}`:"sur la période"}. « Payés » = ${moneyPrecis(tarif,"$")} × leur nombre ; « rapporté » = ce qu'ils ont dépensé <b>à ce jour</b>, net de la commission OnlyFans. C'est une cohorte <b>jeune</b> : elle continuera de rapporter après.${exclus>0?` ${exclus} VA écarté${exclus>1?"s":""} — moins de 15 abonnés arrivés, trop peu pour juger.`:""}</div>`;
+    })()
     +suspects
     +`<div class="sv-note">Sur les abonnés arrivés depuis le <b>${escapeHtml(String(d.depuis))}</b>. La colonne de droite est ce que rapporte en moyenne <b>un</b> abonné amené par ce VA — volume et qualité sont deux choses différentes.</div>`;
   try{ fixPairs(); }catch(e){}
