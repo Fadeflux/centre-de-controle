@@ -118,8 +118,11 @@
   h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.3px}
   .sub{font-size:12px;color:var(--muted);margin-top:2px}
   /* 🚦 Badge fiabilité des chiffres (en-tête). */
-  .dh{display:none;align-items:center;gap:6px;font-size:11px;font-weight:600;margin-top:5px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);width:max-content;max-width:100%}
-  .dh.on{display:inline-flex}
+  /* visibility plutôt que display : la place est réservée dès le premier rendu.
+     Avant, le badge apparaîssait 1-2 s après le chargement et décalait TOUT ce qui
+     est en dessous (les tuiles d'argent) au moment où on commence à les lire. */
+  .dh{display:inline-flex;visibility:hidden;min-height:20px;align-items:center;gap:6px;font-size:11px;font-weight:600;margin-top:5px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);width:max-content;max-width:100%}
+  .dh.on{visibility:visible}
   .dh-green{color:#34d399;border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.10)}
   .dh-amber{color:#facc15;border-color:rgba(250,204,21,.35);background:rgba(250,204,21,.10)}
   .dh-red{color:var(--down);border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.10)}
@@ -217,6 +220,13 @@
        colonne 1, large de 24 px. Comme .cl-pct est en nowrap aligné à droite, il
        débordait VERS LA GAUCHE, et overflow-x:clip le coupait sans un indice. */
     .cl-row{ grid-template-columns:24px 1fr auto auto !important; }
+    /* Croix « supprimer » : ~13×23 px au doigt, dont deux sur des lignes d'ARGENT
+       (une dépense fixe, une recette Telegram). */
+    .co-del,.tg-del,.al-del,.ti-del{min-width:38px;min-height:38px;padding:8px}
+    /* Radar fans : 5 enfants dont 4 incompressibles — le nom du fan tombait à
+       ~80 px et se coupait en « Fan #4… ». */
+    .fr-row{flex-wrap:wrap}
+    .fr-fan{flex:1 1 100%}
     .cl-bar{ display:none !important; }
     .tj-row{ grid-template-columns:1fr auto !important; }
     .tj-row .spark{ display:none !important; }
@@ -1112,7 +1122,7 @@
   .rm-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line)}
   .rm-row:last-of-type{border-bottom:0}
   .rm-at{font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc);min-width:48px}
-  .rm-tx{flex:1;font-size:14px}
+  .rm-tx{flex:1;min-width:0;word-break:break-word;font-size:14px}
   .rm-who{font-size:11px;color:var(--muted);background:var(--surface-2,#17181b);border-radius:6px;padding:2px 7px}
   .rm-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px}
   .dt-yearly{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:2px 0 12px;cursor:pointer}
@@ -1839,7 +1849,10 @@
     margin-bottom:10px;
   }
   .om-tiles .tile{padding:11px 12px}
-  .om-tiles .tile .lbl{font-size:9.5px;letter-spacing:.04em}
+  /* Ce libellé dit QUEL montant on regarde : ce n'est pas décoratif. À 9,5 px en
+     --faint sur le fond des tuiles, le contraste tombe à ~3,1:1 (seuil AA : 4,5).
+     --muted et 11 px le rendent lisible sans changer la mise en page. */
+  .om-tiles .tile .lbl{font-size:11px;letter-spacing:.04em;color:var(--muted)}
   .om-tiles .tile .val{
     font-size:clamp(16px,4vw,19px);
     white-space:nowrap;
@@ -2648,7 +2661,7 @@ const TOOLS = [
   { id:"clipfusion-perso", world:"noctra", cat:"Noctra", name:"ClipFusion Perso", icon:"C", openUrl:"https://clipfusionperso-production.up.railway.app",
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
-    metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+    metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"caMonth",l:"CA du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"noctra-ig-worker", world:"noctra", cat:"Noctra", name:"Publication IG", icon:"▶", openUrl:"https://noctra-ig-worker-production.up.railway.app",
     metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
   { id:"noctra-tw-worker", world:"noctra", cat:"Noctra", name:"Twitter", icon:"𝕏", openUrl:"https://noctra-tw-worker-production.up.railway.app",
@@ -4558,6 +4571,8 @@ function openHorsEquipeCard(nom){
       ${stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
       ${stat("Abonnés au total", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
       ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), (ko||v.revTotal==null)?"":"brut : "+money(v.revTotal))}
+      ${stat("Net CE MOIS", (ko||v.revMois==null)?"—":money((Number(v.revMois)||0)*NET), (ko||v.revMois==null)?"pas encore mesuré":"brut : "+money(v.revMois))}
+      ${(v.revJour!=null&&!ko)?stat("Aujourd'hui", money((Number(v.revJour)||0)*NET), (v.payeursJour!=null?v.payeursJour+" payeur"+(v.payeursJour>1?"s":""):"")):""}
       ${stat("LTV (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur))}
       ${stat("Conversion "+((d&&d.convDays)||14)+" j", (c&&c.cvr!=null)?String(c.cvr).replace(".",",")+" %":"—", c?fmtInt(c.clics)+" clics → "+fmtInt(c.subs)+" subs":"")}
       ${(()=>{
@@ -8116,10 +8131,13 @@ function renderCompareResult(){
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const A=COMPARE_DATA.a, B=COMPARE_DATA.b, net=v=>Math.round((Number(v)||0)*NET);
   const delta=(a,b,fmt)=>{ const dd=a-b, up=dd>=0, pct=b>0?Math.round(dd/b*100):null; return `<span class="${up?'pos':'neg'}">${up?'▲':'▼'} ${fmt(Math.abs(dd))}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span>`; };
-  res.innerHTML=`<table class="cmp-table"><tr><th></th><th>A<br><span>${escapeHtml(A.start)}→${escapeHtml(A.end)}</span></th><th>B<br><span>${escapeHtml(B.start)}→${escapeHtml(B.end)}</span></th><th>A vs B</th></tr>`
+  // overflow-x:auto : 4 colonnes ne tiennent pas sur téléphone, et html/body sont
+  // en overflow-x:clip — sans conteneur défilable, la 4e colonne était coupée sans
+  // le moindre indice qu'il y avait quelque chose à voir.
+  res.innerHTML=`<div style="overflow-x:auto"><table class="cmp-table"><tr><th></th><th>A<br><span>${escapeHtml(A.start)}→${escapeHtml(A.end)}</span></th><th>B<br><span>${escapeHtml(B.start)}→${escapeHtml(B.end)}</span></th><th>A vs B</th></tr>`
     +`<tr><td>CA net (est.)</td><td><b>${money(net(A.ca))}</b><div class="cmp-brut">brut ${money(A.ca)}</div></td><td><b>${money(net(B.ca))}</b></td><td>${delta(net(A.ca),net(B.ca),money)}</td></tr>`
     +`<tr><td>Subs</td><td><b>${fmtInt(A.subs)}</b></td><td><b>${fmtInt(B.subs)}</b></td><td>${delta(A.subs,B.subs,fmtInt)}</td></tr>`
-    +`<tr><td>CA net / jour</td><td>${money(net(A.ca)/Math.max(1,A.jours))}</td><td>${money(net(B.ca)/Math.max(1,B.jours))}</td><td>${delta(net(A.ca)/Math.max(1,A.jours),net(B.ca)/Math.max(1,B.jours),money)}</td></tr></table>`;
+    +`<tr><td>CA net / jour</td><td>${money(net(A.ca)/Math.max(1,A.jours))}</td><td>${money(net(B.ca)/Math.max(1,B.jours))}</td><td>${delta(net(A.ca)/Math.max(1,A.jours),net(B.ca)/Math.max(1,B.jours),money)}</td></tr></table></div>`;
 }
 
 // 🎓 #7 CONSEILS AUX VA : suggestions de coaching perso, dérivées des flags.
