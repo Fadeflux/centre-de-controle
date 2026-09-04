@@ -5558,6 +5558,11 @@ function renderOM(){
     // LTV NETTE à ce que je paie vraiment.
     const ltvNette=(v.ltv!=null)?v.ltv*netRate():null;
     const bad=!ko && !v.unpaid && ltvNette!=null && ltvNette<prixSub(), mp=(v.marge||0)>=0;const rr=v.roi;const roiCls=(ko||rr==null)?"":(rr>=1?"pos":rr>=0?"warn":"neg");const roiTxt=v.unpaid?`<span class="omv-perso">perso · 0 paie</span>`:((ko||v.rev==null)?"ROI —":(rr==null?"":`ROI ${rr>=0?"+":""}${(Number(rr)).toFixed(1).replace(".",",")}×`));
+    // 💡 Infobulle marge : le détail du calcul (brut − commission OnlyFans − paie VA),
+    // pour qu'on comprenne d'un coup d'oeil pourquoi la marge n'est pas « brut − paie ».
+    const _mNet=(v.rev==null)?null:v.rev*netRate();
+    const _mPay=(_mNet==null||v.marge==null)?null:(_mNet-v.marge);
+    const margeTip=(ko||v.marge==null||v.rev==null)?"":` title="${omMoney(v.rev,cur)} générés (brut) − ${pctComm()} OnlyFans = ${moneyPrecis(_mNet,cur)} net · − ${moneyPrecis(_mPay,cur)} de paie VA → ${moneyPrecis(v.marge,cur)} pour toi"`;
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
@@ -5592,7 +5597,7 @@ function renderOM(){
         // semaine. Il reste sur la vue « Toujours ».
         +`</div>`;
     }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}">${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}"${margeTip}>${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   // Le bouton de tri : sur une fenêtre, « marge » n'existe pas -> deux choix.
   const triTxt = per!=="tout"
