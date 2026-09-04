@@ -5799,6 +5799,22 @@ function renderOM(){
         +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}${tSubs}</span>`
         +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}${tRev}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
         +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
+        // 💶 MARGE DE TRÉSORERIE sur la fenêtre — « il était rentable, l'est-il
+        // ENCORE ? ». La colonne « marge » du mode « Toujours » porte sur toute la
+        // vie du VA : un VA qui décroche y reste vert pendant des mois.
+        // ⚠️ Ce n'est PAS une LTV : `pr` = ce qu'ont dépensé TOUS ses abonnés
+        // (anciens compris) sur la fenêtre, `ps` = ceux qu'il a amenés pendant.
+        // On ne divise donc JAMAIS l'un par l'autre — on soustrait juste le cash
+        // encaissé (net) et le cash versé. Le tarif est plat (prixSub) ; si des
+        // paliers arrivent un jour, ce calcul devient faux.
+        +(function(){
+          if(argKo || pr==null) return "";
+          const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
+          if(!(tarif>0)) return "";
+          const paye=ps*tarif, net=Number(pr)*netRate(), m=net-paye;
+          const cls=m>=0?"pos":"neg";
+          return `<span class="omv-m ${cls}" title="Trésorerie ${escapeHtml(perInfo.court)} : ${omMoney(Math.round(net),cur)} encaissés (net, après commission OnlyFans) moins ${moneyPrecis(paye,cur)} de paie pour les ${fmtInt(ps)} abonnés amenés. À ne pas confondre avec la marge « depuis le début » : ici on regarde le CASH de la période.">${m>=0?"+":""}${omMoney(Math.round(m),cur)} de cash</span>`;
+        })()
         // Pas de jauge d'objectif ici : l'objectif est MENSUEL. Affiché à côté
         // d'une colonne « 7 j », « 12/50 » se lirait comme un objectif de la
         // semaine. Il reste sur la vue « Toujours ».
