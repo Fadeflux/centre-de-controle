@@ -212,7 +212,11 @@
     .omv-row{ row-gap:3px; }
     /* Même souci sur d'AUTRES tableaux : le nom écrasé, ou des phrases coupées.
        Classement (#classement), trajectoires VA : nom sur sa ligne, barre déco cachée. */
-    .cl-row{ grid-template-columns:24px 1fr auto !important; }
+    /* ⚠️ 3 colonnes pour 4 éléments visibles (.cl-bar est masquée juste en
+       dessous, il reste medal/va/subs/pct) : le 4e était auto-placé en ligne 2,
+       colonne 1, large de 24 px. Comme .cl-pct est en nowrap aligné à droite, il
+       débordait VERS LA GAUCHE, et overflow-x:clip le coupait sans un indice. */
+    .cl-row{ grid-template-columns:24px 1fr auto auto !important; }
     .cl-bar{ display:none !important; }
     .tj-row{ grid-template-columns:1fr auto !important; }
     .tj-row .spark{ display:none !important; }
@@ -895,7 +899,11 @@
   .rk-va{font-size:13px;font-weight:600}
   .rk-why{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:2px}
   /* journal changements */
-  .ch-row{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line,#2a2a33)}
+  /* Renommée : « .ch-row » servait AUSSI au panneau « Charge de l'équipe »
+     (styles l.680). Cette règle-ci, écrite après, gagnait : la barre de charge se
+     collait en haut au lieu d'être centrée, avec un trait parasite entre chaque VA.
+     Même piège que .co-row -> .coh-row, déjà documenté plus bas. */
+  .chg-row{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line,#2a2a33)}
   .ch-row:first-child{border-top:0}
   .ch-ico{font-size:16px}
   .ch-h{font-size:12.5px}
@@ -964,7 +972,10 @@
   .pc-manager{border-color:var(--acc-line)}
   .pc-leader{border-color:var(--gold)}
   .pc-prime::placeholder,.pc-manager::placeholder,.pc-leader::placeholder{color:var(--faint)}
-  @media (max-width:640px){ .pc-prime,.pc-manager,.pc-leader{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} }
+  /* Le bump à 38 px avait été posé sur les champs mais PAS sur les boutons :
+     « Payer » et son annulation — deux actions d'ARGENT — restaient à ~30 px,
+     collés aux champs de 38 px. */
+  @media (max-width:640px){ .pc-prime,.pc-manager,.pc-leader{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} .pv-pay-btn,.pv-paid{min-height:44px;padding:10px 14px} }
   /* 👔/🧭 bascules de rôle : gris/estompé si inactif, coloré si actif (= badge). */
   .pc-roles{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
   .pc-role{font-size:12px;line-height:1;padding:2px 5px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer;opacity:.4;filter:grayscale(1);transition:.12s}
@@ -1021,7 +1032,7 @@
   .goal-info{font-size:13px;color:var(--muted)}
   .goal-win{color:var(--acc);font-weight:600}
   .ask-row{display:flex;gap:8px}
-  #askInput{flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  #askInput{font-size:16px;flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   #askInput:focus{border-color:var(--acc)}
   #askGo{font:inherit;font-size:13px;font-weight:600;color:#0a0a0a;background:var(--acc);border:0;border-radius:9px;padding:0 16px;cursor:pointer;white-space:nowrap}
   #askGo:disabled{opacity:.6;cursor:default}
@@ -1469,7 +1480,7 @@
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
-  #todoInput{width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
+  #todoInput{font-size:16px;width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
   #todoInput:focus{border-color:var(--acc)}
   .ti-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:.5px solid var(--line)}
   .ti-row:last-child{border-bottom:0}
@@ -1748,7 +1759,11 @@
     .summary{gap:9px}
     .summary .tile{padding:12px 13px}
     .grid{gap:10px}
-    .panel-box,.daily,.costs,.tgrev,.antileak,.journal,.todo{padding:14px 14px}
+/* ⚠️ Cette règle listait aussi .panel-box/.daily/.costs/.tgrev/.antileak et
+     REMETTAIT leur padding à 14 px, annulant le compactage mobile posé plus haut
+     (même spécificité, écrite après → elle gagnait). ~60 panneaux × 6 px =
+     environ 350 px de défilement rendus à l'utilisateur pour rien. */
+    .journal,.todo{padding:14px 14px}
   }
 
   /* ============================================================
@@ -3068,7 +3083,14 @@ function rerenderMoney(){
    // renderTgrev : le panneau 📲 Revenus Telegram affiche des montants (bandeau
    // + liste). Sans lui ici, il gardait ses chiffres EN CLAIR après un clic sur
    // 🙈 et en vue associé, quand aucun autre rendu ne le rattrapait.
-   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, renderOnlyChat, renderTgrev, renderSplit, function(){ renderPaie(LAST); }]
+   renderPaieCumul, renderEssentiel, renderSaison, renderSim3, renderStreak, renderCoutOpp, renderVaModel, renderRealloc, renderAnomalies, renderDecisions, renderVips, renderChurn, renderOnlyChat, renderTgrev, renderSplit,
+   // ⚠️ OUBLIÉS, et le pire cas de tous : renderTgVa (dépense par VA, fan par fan)
+   // et renderIaHumain (montants par catégorie et par modèle) affichent de l'argent
+   // ET ne sont dans AUCUNE boucle de rafraîchissement (leurs chargeurs ne sont
+   // appelés que dans loadAll). Après un clic sur 🙈 — le moment où l'on tend son
+   // écran à quelqu'un — ils gardaient leurs montants en clair POUR TOUJOURS.
+   typeof renderTgVa==="function"?renderTgVa:null, typeof renderIaHumain==="function"?renderIaHumain:null,
+   function(){ renderPaie(LAST); }]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 }
 
@@ -4759,7 +4781,7 @@ function renderChangements(){
   const rows=ch.map(c=>{
     const dt=new Date(c.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
     const drv=(c.drivers||[]).map(x=>`${escapeHtml(x.va)} +${x.subs}`).join(" · ");
-    return `<div class="ch-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${String(c.ratio).replace(".",",")} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
+    return `<div class="chg-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${String(c.ratio).replace(".",",")} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
   }).join("");
   $("#changementsBody").innerHTML=rows+`<div class="cc-hint">Les jours où l'équipe a nettement dévié de sa moyenne, et qui l'a causé.</div>`;
 }
