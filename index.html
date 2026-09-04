@@ -2865,6 +2865,12 @@ function renderBrief(data, live, onCount, stInW){
   const today = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
   let s = [];
   if (today!=null) s.push(`<b>${fmtInt(today)}</b> sub${today>1?"s":""} aujourd'hui`);
+  // 🧮 Le TOTAL de tous les abonnés (équipe + bots perso + venus seuls). Il
+  // existait côté serveur mais n'était affiché nulle part : le bandeau ne parlait
+  // que de la journée et de la quinzaine. Détail complet dans le Classement.
+  { const _tt=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
+    const _reel=(_tt.subsTotalReel!=null)?Number(_tt.subsTotalReel):null;
+    if(_reel!=null && !(typeof HIDE!=="undefined"&&HIDE)) s.push(`<b>${fmtInt(_reel)}</b> abonnés en tout`); }
   if (subsDelta!=null && subsDelta!==0) s.push(subsDelta>0 ? `quinzaine <b>en hausse</b> (+${fmtInt(subsDelta)})` : `quinzaine <b>en baisse</b> (${fmtInt(subsDelta)})`);
   if (stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
   s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
@@ -5845,7 +5851,39 @@ function renderOM(){
       : "";
     return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows+heTot+heAttente;
   })();
-  const vaBloc = filtreDispo ? (vaRows+horsRows)
+  // 🧮 D'OÙ VIENNENT TOUS MES ABONNÉS ? (demande d'André)
+  // Le total réel existait côté serveur (`totals.subsTotalReel` = TOUS les fans des
+  // comptes, lien de tracking ou pas) mais n'était affiché NULLE PART : l'écran ne
+  // montrait que l'équipe, et le perso à part « hors totaux ». Impossible de
+  // répondre à « combien j'ai eu en tout » sans additionner à la main — et en
+  // oubliant les abonnés arrivés SANS lien, que personne ne voyait.
+  const recapSubs=(function(){
+    if(OM_MODEL!=="all" || per!=="tout") return "";
+    const t=(d&&d.totals)||{};
+    const reel=(t.subsTotalReel!=null)?Number(t.subsTotalReel):null;   // tous les fans
+    const traces=(t.subsTotal!=null)?Number(t.subsTotal):null;          // rattachés à un lien
+    if(reel==null && traces==null) return "";
+    const equipe=(Array.isArray(d.vas)?d.vas:[]).reduce((a,v)=>a+(Number(v&&v.subs)||0),0);
+    const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
+    const persoConnu=ents.length && ents.every(e=>e.subsTotal!=null);
+    const perso=persoConnu?ents.reduce((a,e)=>a+(Number(e.subsTotal)||0),0):null;
+    // « Le reste » = ce qui n'est ni équipe ni perso. Deux morceaux distincts :
+    //  · rattachés à un lien mais à personne d'ici (ancien VA, lien non nommé) ;
+    //  · arrivés SANS lien du tout (ils sont venus seuls) — c'est l'écart
+    //    subsTotalReel - subsTotal, invisible jusqu'ici.
+    const autres=(traces!=null&&perso!=null)?Math.max(0,traces-equipe-perso):null;
+    const sansLien=(reel!=null&&traces!=null)?Math.max(0,reel-traces):null;
+    const li=(lbl,val,aide)=>`<div class="omv-row"><span class="omv-rank"></span><span class="omv-va" title="${aide||""}">${lbl}</span><span class="omv-s">${val!=null?fmtInt(val)+" sub"+(val>1?"s":""):"—"}</span><span class="omv-r"></span><span class="omv-l"></span><span class="omv-m"></span><span class="omv-roi"></span></div>`;
+    return `<div class="om-hors-head">🧮 D'où viennent TOUS tes abonnés (depuis le début)</div>`
+      +li("Ton équipe (VA payés)", equipe, "Somme des abonnés amenés par les VA du classement ci-dessus.")
+      +li("Tes comptes perso (Bot + Clhoe)", perso, "Jamais payés : tout ce qu'ils rapportent est de la marge.")
+      +(autres!=null&&autres>0?li("Autres liens", autres, "Rattachés à un lien de tracking, mais à personne de la liste (ancien VA, lien non nommé)."):"")
+      +li("Venus seuls (sans lien)", sansLien, "Abonnés arrivés sans passer par un lien de tracking : ni l'équipe ni les bots ne les ont amenés.")
+      +`<div class="omv-row" style="border-top:1px solid var(--line);font-weight:600"><span class="omv-rank">Σ</span><span class="omv-va">TOTAL réel</span><span class="omv-s">${reel!=null?fmtInt(reel)+" sub"+(reel>1?"s":""):"—"}</span><span class="omv-r"></span><span class="omv-l"></span><span class="omv-m"></span><span class="omv-roi"></span></div>`
+      +(sansLien!=null&&reel>0?`<div class="sv-note" style="margin-top:6px">💡 <b>${Math.round(sansLien/reel*100)} %</b> de tes abonnés sont venus <b>sans lien de tracking</b> — personne n'est payé pour eux, et ils n'apparaissent dans aucun classement.</div>`:"")
+      +(reel==null?`<div class="sv-note" style="margin-top:6px">⚠️ Le total réel n'a pas pu être mesuré (un compte n'a pas répondu) — ce n'est pas zéro.</div>`:"");
+  })();
+  const vaBloc = filtreDispo ? (vaRows+horsRows+recapSubs)
     : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
   // Argent non ventilable par modèle (repli sans API) : on le dit.
   const noteArg = (filtreDispo && argFiltreKo)
