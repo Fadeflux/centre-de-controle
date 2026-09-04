@@ -1433,6 +1433,14 @@
   .hb-bar-wrap{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
   .hb-bar{width:64%;max-width:34px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 55%,transparent));transition:height .35s}
   .hb-bar.rec{background:linear-gradient(180deg,#facc15,#f59e0b)}
+  /* Un mois PAS MESURÉ (panne API) ne doit pas ressembler à un mois à 0 $ :
+     barre fantôme hachurée sur toute la hauteur = « on ne sait pas ». Un mois
+     AMPUTÉ (quelques comptes illisibles) garde sa hauteur mais est hachuré :
+     le chiffre est un minimum. */
+  .hb-bar.unk{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 34%,transparent) 0 5px,transparent 5px 10px);border:1px dashed color-mix(in srgb,var(--muted) 55%,transparent);border-bottom:none}
+  .hb-bar.part{background:repeating-linear-gradient(135deg,var(--gold) 0 5px,color-mix(in srgb,var(--gold) 45%,transparent) 5px 10px)}
+  .hb-val.unk,.hb-val.part{color:var(--gold)}
+  .hb-trend .hb-warn{color:var(--gold)}
   .hb-val{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
   .hb-lbl{font-size:10px;color:var(--muted);white-space:nowrap}
   .hb-trend{margin-top:12px;font-size:13px;color:var(--muted);line-height:1.6}
@@ -6089,7 +6097,10 @@ function caNetMois(){
 }
 function meilleurMoisComplet(history){
   const hist=Array.isArray(history)?history:[];
-  const complets=hist.length>1?hist.slice(0,-1):[];
+  // « Complet » = mois terminé ET réellement mesuré. Un mois dont les revenus
+  // n'ont pas pu être lus (net:null) valait 0 et un mois amputé (partiel:true)
+  // valait son minimum : dans les deux cas le « record à battre » était trop bas.
+  const complets=(hist.length>1?hist.slice(0,-1):[]).filter(h=>h && h.net!=null && !h.partiel);
   let best=null; complets.forEach(h=>{ if(h){ const v=moisValeurNet(h); if(best===null||v>best.v) best={m:h.month,month:h.month,v:v}; } });
   return best;
 }
@@ -6103,33 +6114,56 @@ function renderHistory(){
   // tels quels mélangeait net + brut et gonflait le total à tort — on convertit
   // donc l'OF en net (× NET_RATE) AVANT d'ajouter Telegram, comme partout ailleurs
   // sur le dashboard (« Net du mois »).
+  // Le serveur distingue TROIS états par mois : mesuré et complet · AMPUTÉ
+  // (`partiel` — des comptes illisibles, le chiffre est un MINIMUM) · pas mesuré
+  // du tout (`net:null`). Le dashboard les écrasait tous en un nombre : un mois de
+  // panne s'affichait comme un vrai mois à 0 $, tirait la tendance vers le bas et
+  // pouvait déclencher un faux « nouveau record » le mois suivant.
+  const netInconnu = m => !useSubs && m && m.net==null;
+  const moisAmpute = m => !useSubs && !!(m && m.partiel);
+  const fiable     = m => !!m && !netInconnu(m) && !moisAmpute(m);
   const val = m => useSubs ? (Number(m.subs)||0) : ((Number(m.net)||0)*netRate()+tgHistMonth(m.month));
-  const max = Math.max(1, ...h.map(val));
+  const max = Math.max(1, ...h.filter(m=>!netInconnu(m)).map(val));
   const fmtK = v => { v=Number(v)||0; return v>=1000 ? (v/1000).toFixed(1).replace(".",",")+"k" : String(Math.round(v)); };
   const bars = h.map(m=>{
-    const v=val(m), pct=Math.round(v/max*100), rec=(v===max && max>1), tgM=useSubs?0:tgHistMonth(m.month);
-    const lab = HIDE ? "•••" : (useSubs ? fmtInt(v) : fmtK(v));
-    const detail=useSubs?"":` · ${omMoney(v,cur)} net (brut OF ${omMoney(m.net,cur)}${tgM>0?" · + Telegram "+omMoney(tgM,cur):""})`;
-    return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${rec?'rec':''}" style="height:${Math.max(3,pct)}%" title="${m.month} · ${fmtInt(m.subs)} subs${detail}"></div></div><div class="hb-val">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
+    const inc=netInconnu(m), amp=moisAmpute(m);
+    const v=val(m), pct=Math.round(v/max*100), rec=(!inc && !amp && v===max && max>1), tgM=useSubs?0:tgHistMonth(m.month);
+    const lab = HIDE ? "•••" : (inc ? "?" : (useSubs ? fmtInt(v) : (amp?"≥":"")+fmtK(v)));
+    const detail = useSubs ? ""
+      : (inc ? " · revenus NON MESURÉS ce mois-là (panne de lecture) — ce n'est pas un zéro"
+             : ` · ${omMoney(v,cur)} net (brut OF ${omMoney(m.net,cur)}${tgM>0?" · + Telegram "+omMoney(tgM,cur):""})`+(amp?" — lecture INCOMPLÈTE, c'est un minimum":""));
+    const cls = inc ? "unk" : (amp ? "part" : (rec?"rec":""));
+    const hb  = inc ? 100 : Math.max(3,pct);   // inconnu = fantôme pleine hauteur, pas une barre basse
+    return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${cls}" style="height:${hb}%" title="${m.month} · ${fmtInt(m.subs)} subs${detail}"></div></div><div class="hb-val ${inc?'unk':(amp?'part':'')}">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
   }).join("");
   let trend="";
   if(h.length>=2){
-    const a=val(h[h.length-2]), b=val(h[h.length-1]), what=useSubs?"subs":"revenus";
-    if(a>0){ const pc=Math.round((b-a)/a*100), cls=pc>=0?"up":"dn", arrow=pc>=0?"▲":"▼";
-      trend=`Ce mois-ci, tes ${what} sont <span class="${cls}">${arrow} ${Math.abs(pc)}%</span> vs le mois dernier.`; }
-    else if(b>0){ trend=`Ce mois-ci tu démarres avec ${useSubs?fmtInt(b)+" subs":omMoney(b,cur)}.`; }
+    const mp=h[h.length-2], mc=h[h.length-1], what=useSubs?"subs":"revenus";
+    if(netInconnu(mp)||netInconnu(mc)){
+      // Comparer à un mois non mesuré donnait un « ▲ 100 % » sorti de nulle part.
+      trend=`<span class="hb-warn">Comparaison impossible : les revenus d'un des deux mois n'ont pas pu être mesurés.</span>`;
+    } else {
+      const a=val(mp), b=val(mc);
+      if(a>0){ const pc=Math.round((b-a)/a*100), cls=pc>=0?"up":"dn", arrow=pc>=0?"▲":"▼";
+        trend=`Ce mois-ci, tes ${what} sont <span class="${cls}">${arrow} ${Math.abs(pc)}%</span> vs le mois dernier.`;
+        if(moisAmpute(mp)||moisAmpute(mc)) trend+=` <span class="hb-warn">(lecture incomplète d'un des deux mois — écart à prendre avec des pincettes)</span>`; }
+      else if(b>0){ trend=`Ce mois-ci tu démarres avec ${useSubs?fmtInt(b)+" subs":omMoney(b,cur)}.`; }
+    }
   }
   // « Meilleur mois » = un mois COMPLET (on exclut le mois en cours, dernier point,
   // encore partiel) — sinon un mois à peine commencé était couronné, et le libellé
   // contredisait « Record à battre » de la Rentabilité (qui, lui, l'excluait).
-  const histC = (h.length>1) ? h.slice(0,-1) : h;
-  const best = histC.reduce((mx,m)=>val(m)>val(mx)?m:mx, histC[0]);
+  const histC = ((h.length>1) ? h.slice(0,-1) : h).filter(fiable);
+  const best = histC.length ? histC.reduce((mx,m)=>val(m)>val(mx)?m:mx, histC[0]) : null;
   if(best && val(best)>1){ trend += `${trend?" ":""}🏆 Meilleur mois : <b>${best.month}</b> (${useSubs?fmtInt(best.subs)+" subs":omMoney(val(best),cur)}).`; }
   // Record : le mois en cours dépasse tous les précédents → bannière + confettis (une seule fois)
   let recordBanner="";
   if(h.length>=2){
-    const curM=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(val));
-    if(val(curM)>prevMax && prevMax>0){
+    // On ne CRIE un record que si tout est mesuré : un seul mois passé illisible
+    // (compté 0 ou amputé) suffisait à fabriquer un faux « meilleur mois de ta vie ».
+    const curM=h[h.length-1], passes=h.slice(0,-1), passesOk=passes.filter(fiable);
+    const prevMax=Math.max(0,...passesOk.map(val)), douteux=passesOk.length!==passes.length;
+    if(fiable(curM) && !douteux && val(curM)>prevMax && prevMax>0){
       const lab=useSubs?fmtInt(curM.subs)+" subs":omMoney(val(curM),cur);
       recordBanner=`<div class="hb-record">🏆 Nouveau record ! <b>${curM.month}</b> est ton meilleur mois : <b>${lab}</b> 🎉</div>`;
       const rk=`${curM.month}:${val(curM)}`;
@@ -7386,7 +7420,12 @@ function renderBadges(){
   // Même base que la bannière record de « Mon année » (net + Telegram, via le helper)
   // — sinon le badge + le pop-up se déclenchaient sur du BRUT et pouvaient fêter un
   // record que « Mon année » niait (ou l'inverse).
-  let isRecord=false; const h=om.history; if(h&&h.length>=2){ const c=h[h.length-1], prevMax=Math.max(0,...h.slice(0,-1).map(m=>moisValeurNet(m))); isRecord=(moisValeurNet(c)>prevMax && prevMax>0); }
+  // Même garde que la bannière record de « Mon année » : un mois passé non mesuré
+  // (net:null → 0) ou amputé fabriquait un faux record — et le badge, lui, reste.
+  let isRecord=false; const h=om.history;
+  if(h&&h.length>=2){ const c=h[h.length-1], passes=h.slice(0,-1), ok=passes.filter(m=>m&&m.net!=null&&!m.partiel);
+    const prevMax=Math.max(0,...ok.map(m=>moisValeurNet(m)));
+    isRecord=(c&&c.net!=null&&!c.partiel&&ok.length===passes.length&&moisValeurNet(c)>prevMax&&prevMax>0); }
   // 🎯 Même base que l'anneau renderGoal : net OF + Telegram (via caNetMois),
   // sinon le badge « objectif atteint » se déclenchait sur du BRUT (seuil faux).
   const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?caNetMois():(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
@@ -10667,7 +10706,12 @@ function renderCaJours(){
   const fr=s=>{ const dt=new Date(s+"T12:00:00Z"); return dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); };
   // Le NET d'abord (comme OnlyFans), le brut entre parenthèses.
   const net=v=>money((Number(v)||0)*netRate());
-  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut) · touche une barre pour le détail";
+  // ⚠️ Série AMPUTÉE (un modèle illisible ce jour-là) : les barres sont des
+  // MINIMUMS. Sans ce mot, un creux de PANNE se lisait comme une mauvaise journée
+  // — et la moyenne « net/j » servait ensuite à juger l'équipe.
+  const cjPart = !!d.dailyNetPartiel;
+  $("#cjCap").textContent="— "+serie.length+" derniers jours · moyenne "+net(tot/serie.length)+" net/j ("+money(tot/serie.length)+" brut) · touche une barre pour le détail"
+    + (cjPart ? " · ⚠️ lecture incomplète : ce sont des MINIMUMS" : "");
   // 🎯 Ligne d'objectif : ce qu'il faut par jour, au rythme restant du mois.
   let goalLine="";
   try{
