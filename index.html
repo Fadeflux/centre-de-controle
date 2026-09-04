@@ -1051,7 +1051,12 @@
   .goal-info{font-size:13px;color:var(--muted)}
   .goal-win{color:var(--acc);font-weight:600}
   .ask-row{display:flex;gap:8px}
-  #askInput{font-size:16px;flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
+  /* ⚠️ 16 px et pas 14 : sous 16 px, Safari iOS ZOOME la page au tap dans le
+     champ et n'en ressort pas. La garde globale `input{font-size:16px}` du bloc
+     mobile ne peut pas s'appliquer ici (un sélecteur d'ID la bat). Et un
+     `font-size` placé AVANT `font:inherit` serait écrasé par lui : il doit venir
+     APRÈS — c'est l'erreur qui rendait ce correctif totalement inopérant. */
+  #askInput{flex:1;min-width:0;font:inherit;font-size:16px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   #askInput:focus{border-color:var(--acc)}
   #askGo{font:inherit;font-size:13px;font-weight:600;color:#0a0a0a;background:var(--acc);border:0;border-radius:9px;padding:0 16px;cursor:pointer;white-space:nowrap}
   #askGo:disabled{opacity:.6;cursor:default}
@@ -1504,7 +1509,8 @@
   .todo{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--acc);border-radius:var(--radius);padding:15px 16px;margin-bottom:26px}
   .todo-head{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .todo-head .c{font-size:11px;color:var(--faint);font-weight:500}
-  #todoInput{font-size:16px;width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
+  /* Idem #askInput : 16 px APRÈS `font:inherit`, sinon iOS zoome au tap. */
+  #todoInput{width:100%;font:inherit;font-size:16px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;margin-bottom:6px}
   #todoInput:focus{border-color:var(--acc)}
   .ti-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:.5px solid var(--line)}
   .ti-row:last-child{border-bottom:0}
@@ -6413,7 +6419,23 @@ function caNetTotal(){
   const past=(typeof TGREV!=="undefined"&&Array.isArray(TGREV)?TGREV:[])
     .filter(x=>(typeof tgMonthLabel==="function")&&tgMonthLabel(new Date(x.ts||0))!==curLbl)
     .reduce((a,x)=>a+(Number(x.amount)||0),0);
-  const tgAll=past+((typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0);
+  // Le Telegram du mois PRÉCÉDENT est connu (tgHistMonth sait le rendre) mais
+    // n'était ajouté que pour le mois EN COURS : il apparaissait donc dans la barre
+    // d'août de « Mon année » et manquait dans le cumul juste au-dessus — la somme
+    // des barres ne tombait pas sur le total affiché à côté d'elles. On interroge
+    // chaque mois de l'historique, en évitant de recompter ceux déjà dans TGREV.
+    let tgAuto=0;
+    try{
+      const hist=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.history)||[]);
+      const dejaManuel=new Set((typeof TGREV!=="undefined"&&Array.isArray(TGREV)?TGREV:[])
+        .map(x=>(typeof tgMonthLabel==="function")?tgMonthLabel(new Date(x.ts||0)):null).filter(Boolean));
+      hist.forEach(h=>{ if(!h||!h.month||dejaManuel.has(h.month)) return;
+        tgAuto+=(typeof tgHistMonth==="function")?(Number(tgHistMonth(h.month))||0):0; });
+      if(!hist.some(h=>h&&h.month===curLbl) && !dejaManuel.has(curLbl)){
+        tgAuto+=(typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0;
+      }
+    }catch(e){ tgAuto=(typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0; }
+  const tgAll=past+tgAuto;
   return (Number(t.netTotal)||0)*netRate()+tgAll;
 }
 function meilleurMoisComplet(history){
@@ -6500,8 +6522,12 @@ function renderHistory(){
   // deux comptés en double pour le même mois.
   const curLbl=tgMonthLabel(new Date());
   const tgPast=(typeof TGREV!=="undefined"?TGREV:[]).filter(x=>tgMonthLabel(new Date(x.ts||0))!==curLbl).reduce((a,x)=>a+(Number(x.amount)||0),0);
+  // ⚠️ Cette tuile recalculait à la main la formule de caNetTotal() : la
+    // « source unique » ne l'était que de nom, et les deux auraient divergué au
+    // premier changement. On appelle le helper, et on garde le détail Telegram
+    // pour le sous-titre.
   const tgAllTime=tgPast+tgHistMonth(curLbl);
-  const genereNet=(tot.netTotal||0)*netRate()+tgAllTime;
+  const genereNet=(typeof caNetTotal==="function")?caNetTotal():((tot.netTotal||0)*netRate()+tgAllTime);
   const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
   const genereSub=(!revKo()&&!HIDE)?`<div class="tile-sub">brut OF : ${omMoney(tot.netTotal||0,cur)}${tgAllTime>0?" · + Telegram "+omMoney(tgAllTime,cur):""}</div>`:"";
   const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début (net, est.)</div>${genereSub}</div></div>`;
@@ -7491,7 +7517,12 @@ async function loadBrief(force){
     // Sinon le serveur comparait l'objectif net à un cumul BRUT → cible fausse.
     const _fgN=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
     const curNet=(typeof caNetMois==="function")?Math.round(caNetMois()):null;
-    const projNet=_fgN?Math.round((Number(_fgN.value)||0)*netRate()+((typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0)):null;
+    // ⚠️ Consommateur OUBLIÉ de l'unification des projections : celui-ci
+    // reconstruisait la formule à la main avec le Telegram DÉJÀ ENCAISSÉ, pendant
+    // que tous les panneaux passaient au Telegram PROJETÉ. Le coach raisonnait donc
+    // sur un chiffre plus bas que celui affiché juste à côté, et en tirait un
+    // « il te faut X aujourd'hui » faux.
+    const projNet=(typeof projNetMois==="function")?Math.round(projNetMois()):null;
     const r=await fetch(HUB_BASE+"/api/hub/brief",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({name:nm, mode:COACH_MODE, force:!!force, goal:g, curNet:curNet, projNet:projNet})});
     if(r.status===401){ box.style.display="none"; return; }
     const j=await r.json();
@@ -8780,7 +8811,13 @@ function renderCharge(){
     // celui qui s'est complètement arrêté était le SEUL qu'on ne voyait pas. Il ne
     // passait pas au rouge : il disparaîssait. On les sort à part, en haut.
   const vas=d.vas.filter(v=>v&&((v.posts7||0)>0||(v.postsPrev7||0)>0));
-  const arretes=d.vas.filter(v=>v&&!((v.posts7||0)>0||(v.postsPrev7||0)>0));
+  // ⚠️ Deux exclusions indispensables avant d'ACCUSER quelqu'un par son nom :
+    //  · `statsOnly` = l'opératrice (compte perso) — elle ne publie JAMAIS sur
+    //    Instagram, elle serait citée comme « arrêtée » tous les jours ;
+    //  · `lastPost` absent = le serveur n'a pas pu mesurer (son `catch` met posts7
+    //    à 0), donc « absent » deviendrait « zéro post ». Avant ce bandeau ces VA
+    //    étaient simplement filtrés ; maintenant ils seraient nommés en jaune.
+  const arretes=d.vas.filter(v=>v&&!v.statsOnly&&v.lastPost&&!((v.posts7||0)>0||(v.postsPrev7||0)>0));
   // `lastPost` était envoyé par le serveur et lu nulle part : c'est pourtant la
   // seule façon de dire DEPUIS QUAND quelqu'un s'est arrêté.
   const _joursDepuis=(iso)=>{ const t=Date.parse(iso||""); return isNaN(t)?null:Math.floor((Date.now()-t)/86400000); };
@@ -9864,7 +9901,7 @@ function renderConversion(){
       <span class="sv-cell"><b>${v.clics.toLocaleString("fr-FR")}</b> clics → <b>${v.subs}</b> abonnés</span>
       <span class="sv-part ${cls}">${String(v.cvr).replace(".",",")} %</span>
       <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b><span style="opacity:.6"> (depuis le début)</span>`:""}</span></div>
-      ${(v.tauxPayeur!=null||v.parSub!=null)?`<div class="sv-row" style="padding-top:0;border-top:0"><span class="sv-name"></span><span class="sv-cell" style="opacity:.85">${v.tauxPayeur!=null?`<b>${String(v.tauxPayeur).replace(".",",")} %</b> de ses abonnés sortent la carte`:""}${(v.tauxPayeur!=null&&v.parSub!=null)?" · ":""}${v.parSub!=null?`<b>${money(v.parSub)}</b> rapportés par abonné amené <span style="opacity:.6">(sur ${d.days} j)</span>`:""}</span></div>`:""}`;
+      ${(v.tauxPayeur!=null||v.parSub!=null)?`<div class="sv-row" style="padding-top:0;border-top:0"><span class="sv-name"></span><span class="sv-cell" style="opacity:.85">${v.tauxPayeur!=null?`<b>${String(v.tauxPayeur).replace(".",",")} %</b> de ses abonnés sortent la carte`:""}${(v.tauxPayeur!=null&&v.parSub!=null)?" · ":""}${v.parSub!=null?`<b>${money((Number(v.parSub)||0)*netRate())}</b> net rapportés par abonné amené <span style="opacity:.6">(sur ${d.days} j)</span>`:""}</span></div>`:""}`;
   }).join("");
   const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${String(l.cvr).replace(".",",")} %</b></span></div>`).join("");
   // 🎭 Par MODÈLE : à trafic comparable, celui qui convertit moins a un souci de
