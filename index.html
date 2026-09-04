@@ -1009,10 +1009,6 @@
   .bp-since input{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:12.5px;font-family:inherit;color-scheme:dark}
   .bp-bar{height:8px;background:var(--surface-2);border-radius:20px;overflow:hidden}
   .bp-bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--acc),#7a82c0);transition:width .5s}
-  .bdg{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;background:var(--surface-2,#17181b);border:1px solid var(--line);opacity:.42;filter:grayscale(1);text-align:center}
-  .bdg.on{opacity:1;filter:none;border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 30%,transparent)}
-  .bdg-lbl{font-size:11px;color:var(--muted);font-weight:600;line-height:1.2}
-  .bdg.on .bdg-lbl{color:var(--text)}
   .sim-block{padding:12px 0;border-bottom:.5px solid var(--line)}
   .sim-block:last-child{border-bottom:0}
   .sim-q{font-size:14px;font-weight:600}
@@ -1125,7 +1121,6 @@
   .gh-row:last-child{border-bottom:0}
   .gh-va{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .gh-meta{font-size:12px;color:var(--muted);white-space:nowrap}
-  .gh-days{font-size:11px;font-weight:700;color:var(--down);white-space:nowrap}
   .gh-relance{font:inherit;font-size:12px;font-weight:600;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
   .gh-relance:hover{background:var(--acc-bg)}
   .gh-relance:disabled{opacity:.6;cursor:default}
@@ -1143,17 +1138,6 @@
   .duo-list{margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.6}
   .duo-list .di{display:flex;gap:6px}
   .duo-empty{font-size:12px;color:var(--faint);margin-top:8px}
-  /* Anniversaires VA */
-  .an-add{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  .an-add select,.an-add input{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
-  #anVa{flex:1;min-width:120px} #anDate{min-width:150px}
-  .an-add select:focus,.an-add input:focus{border-color:var(--acc)}
-  .an-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
-  .an-row:last-child{border-bottom:0}
-  .an-next{font-size:11px;font-weight:700;white-space:nowrap;color:var(--acc-ink)}
-  .an-next.soon{color:var(--gold)} .an-next.today{color:var(--ok)}
-  .an-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;opacity:.55}
-  .an-del:hover{color:var(--down);opacity:1}
   /* Historique du coach (dans l'écran matin/soir) */
   .mn-hist{margin-top:4px;margin-bottom:16px}
   .mn-hist summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
@@ -1497,10 +1481,6 @@
   .ti-del:hover{color:var(--down);opacity:1}
   .todo-empty{font-size:13px;color:var(--faint);padding:8px 0 2px}
 
-  .worlds{display:inline-flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:3px;margin:0 0 18px}
-  .worlds button{font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:none;border:0;border-radius:8px;padding:7px 17px;cursor:pointer;transition:.15s}
-  .worlds button:hover{color:var(--text)}
-  .worlds button.won{color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc)}
 
   .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
   .tile{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--line);border-radius:var(--radius);padding:14px 16px;transition:.15s}
@@ -1732,7 +1712,6 @@
   .mn-go:active,.gate button:active,#askGo:active{transform:scale(.985)}
 
   /* Sélecteur de vue (Tout/…) : pastille pleine au lieu du liseré */
-  .worlds button.won{color:#fff;background:linear-gradient(135deg,var(--acc),#7a82c0);box-shadow:none}
 
   /* Onglets outils : état actif plus net */
   .tab.on{box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 35%,transparent)}
@@ -2719,18 +2698,10 @@ function lsJSON(cle, defaut){
   }
 }
 let TOKEN = localStorage.getItem("ccn_token") || "";
-let CURRENT_USER = localStorage.getItem("ccn_name") || "";
 let PINS  = lsJSON("ccn_pins",[]);
 let LAST  = DEMO;
-let WORLD = "all";
 let HIDE  = localStorage.getItem("ccn_hide") === "1";
 let IS_LIVE = false;
-const ACCENTS = { all:["#9aa2d8","#8891c9"], shinra:["#4ade80","#3dc970"], noctra:["#9aa2d8","#8891c9"] };
-function applyAccent(){
-  const a = ACCENTS[WORLD] || ACCENTS.all;
-  document.documentElement.style.setProperty("--acc", a[0]);
-  document.documentElement.style.setProperty("--acc-hover", a[1]);
-}
 function statusClass(s){ return s==="online"?"on":s==="offline"?"off":s==="warn"?"warn":""; }
 function toolById(id){ return TOOLS.find(t=>t.id===id); }
 
@@ -2790,7 +2761,11 @@ function cardHTML(t, data){
     ${body}${foot}</div>`;
 }
 
-function inWorld(t){ return WORLD==="all" || t.world===WORLD; }
+// Sélecteur de « mondes » (Shinra / Noctra) : jamais construit. WORLD valait
+// toujours "all" — aucune réaffectation nulle part — donc ce filtre laissait
+// TOUT passer, et applyAccent() reposait la couleur d'accent déjà écrite en CSS.
+// On garde la fonction (5 appels) et on retire la machinerie morte.
+function inWorld(){ return true; }
 function groups(){
   const out = [];
   const pinnedTools = PINS.map(toolById).filter(t=>t && !t.build && inWorld(t));
@@ -3011,7 +2986,7 @@ async function doLogin(){
   TOKEN=tok; localStorage.setItem("ccn_token",TOKEN);
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
-  if(name){ CURRENT_USER=name; localStorage.setItem("ccn_name",name); }
+  if(name){ localStorage.setItem("ccn_name",name); }   // CURRENT_USER retiré : écrit, jamais lu
   closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadAll();
 }
 /* 🔁 UN SEUL point d'entrée pour TOUT charger — utilisé au DÉMARRAGE comme à la
@@ -3609,7 +3584,7 @@ function renderOcRelance(){
   const puces=cles.map(k=>{
     const n=seg[k]||0; if(!n) return "";
     const actif=(OCR_FILTRE===k);
-    return `<button class="ocr-puce${actif?" on":""}" data-ocrseg="${k}" title="${escapeHtml(lib[k].pourquoi||"")}">${escapeHtml(lib[k].titre)} <b>${n}</b></button>`;
+    return `<button class="ocr-puce${actif?" on":""}" data-ocrseg="${escapeHtml(k)}" title="${escapeHtml(lib[k].pourquoi||"")}">${escapeHtml(lib[k].titre)} <b>${n}</b></button>`;
   }).join("");
 
   // Par défaut : les 3 segments prioritaires (on n'inonde pas avec les endormis).
@@ -3849,7 +3824,7 @@ function renderLeaks(){
     else if(st==="repost") actions=`<a class="al-leak-act prim" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">🚩 Signaler</a><button class="al-leak-act" data-alremoved="${escapeHtml(l.id)}">✓ Traité</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else if(st==="sent"||st==="removed") actions=`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else actions=`<button class="al-leak-act prim" data-aldmca="${escapeHtml(l.id)}">📤 DMCA</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
-    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${st}">${stLabel[st]||st}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
+    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${escapeHtml(st)}">${escapeHtml(stLabel[st]||st)}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
   }).join("");
 }
 function addWatch(){
@@ -8699,14 +8674,18 @@ function gsRender(q){
   const box=$("#gsRes"); if(!box) return;
   q=gsNorm(q).trim();
   if(!q){ box.innerHTML=""; box.style.display="none"; return; }
-  const hits=gsIndex().filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
+  // ⚠️ gsIndex() était appelé DEUX fois par frappe (ici et pour `vide`), et il
+  // parcourt tous les VA, tous les modèles, tout hors-équipe et tous les panneaux
+  // — en lisant localStorage au passage. Une seule construction par rendu.
+  const _idx=gsIndex();
+  const hits=_idx.filter(it=>gsNorm(it.label).indexOf(q)>=0).slice(0,8);
   if(!hits.length){
     // ⚠️ « Aucun résultat » MENTAIT quand la vraie cause était la connexion :
     // sans session (ou cerveau injoignable), l'index est VIDE — aucun VA, aucun
     // modèle — et l'écran laissait croire que le nom cherché n'existe pas.
     // Vécu en vrai : « bot » introuvable alors que sa fiche existait bel et bien,
     // le tableau de bord étant simplement retombé en mode démo.
-    const vide=!gsIndex().length;
+    const vide=!_idx.length;
     const msg = !TOKEN ? "🔑 Connecte-toi pour chercher tes VA et tes panneaux."
       : vide ? "⏳ Chiffres pas encore chargés — réessaie dans un instant."
       : "Aucun résultat";
@@ -8715,7 +8694,10 @@ function gsRender(q){
   box.innerHTML=hits.map(h=>`<button class="gs-item" data-gt="${h.type}" data-gk="${escapeHtml(h.key)}"><span class="gs-ic">${h.type==="va"?"👤":h.type==="model"?"🎭":h.type==="horsequipe"?"🔒":"📊"}</span><span class="gs-lbl">${escapeHtml(h.label)}</span><span class="gs-sub">${escapeHtml(h.sub)}</span></button>`).join("");
   box.style.display="block";
 }
-{ const inp=$("#gsInput"); if(inp){ inp.addEventListener("input",()=>gsRender(inp.value)); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
+// Anti-rafale : sans ça, chaque touche relançait un rendu complet (et gsIndex
+// peut déclencher un appel réseau vers hors-équipe). 140 ms = insensible à l'œil.
+{ const inp=$("#gsInput"); if(inp){ let _gsT=null;
+  inp.addEventListener("input",()=>{ clearTimeout(_gsT); _gsT=setTimeout(()=>gsRender(inp.value),140); }); inp.addEventListener("keydown",e=>{ if(e.key==="Escape"){ inp.value=""; gsRender(""); inp.blur(); } else if(e.key==="Enter"){ const f=$("#gsRes .gs-item"); if(f) f.click(); } }); } }
 { const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else if(t==="horsequipe"){ if(typeof openHorsEquipeCard==="function") openHorsEquipeCard(k); } else jumpPanel(k); }); }
 document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
 
@@ -9708,7 +9690,6 @@ function renderPie(){
 }
 
 /* ---------- démarrage ---------- */
-applyAccent();
 fillMe();
 load();
 // Fin de l'animation d'entrée : on retire « booting » après le 1er rendu, pour que
@@ -10979,7 +10960,10 @@ setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
 // ⚠️ Safari iOS n'émet PAS `beforeprint` : sans ce rafraîchissement régulier,
 // « Partager → Imprimer » sortait toujours l'état des lieux figé à t+3,5 s
 // (chiffres du démarrage, souvent encore vides). On le retient à jour.
-setInterval(()=>{ try{ refreshPrintSummary(); }catch(e){} }, REFRESH_MS);
+// Les deux boucles voisines se protègent (page cachée / écran de connexion) ;
+// celle-ci non : elle reconstruisait tout le résumé d'impression chaque minute,
+// à vide, même en arrière-plan sur mobile (batterie) et même déconnecté.
+setInterval(()=>{ try{ if(pageCachee() || !TOKEN) return; refreshPrintSummary(); }catch(e){} }, REFRESH_MS);
 </script>
 </body>
 </html>
