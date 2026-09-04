@@ -3608,7 +3608,11 @@ function renderOcRelance(){
 
   // Bandeau du haut : le chiffre qui donne envie d'agir.
   const potentiel=(t.potentiel10pct!=null)?`<div class="ocr-gain">Si <b>1 sur 10</b> payait une seule fois : <b>+${fmtInt(t.potentiel10pct)} $</b><span class="ocr-note"> — panier moyen réel ${t.panierMoyen!=null?pcMoney(t.panierMoyen):"—"}</span></div>`:"";
-  const partiel=(d.complet===false)?`<div class="sv-note" style="color:#facc15;margin-top:6px">⚠️ Lecture incomplète (OnlyChat n'a pas tout renvoyé) — les compteurs ci-dessous sont des <b>minimums</b>.</div>`:"";
+  // On CHIFFRE le trou : `depenseInconnue` = nombre de fans dont OnlyChat n'a pas
+  // renvoyé la dépense. Sans lui, « lecture incomplète » ne disait pas si c'était
+  // 3 fans ou 300 — donc si le chiffre du dessous valait quelque chose.
+  const _di=Number(d.depenseInconnue)||0;
+  const partiel=(d.complet===false)?`<div class="sv-note" style="color:#facc15;margin-top:6px">⚠️ Lecture incomplète (OnlyChat n'a pas tout renvoyé)${_di>0?` pour <b>${fmtInt(_di)} fans</b>`:""} — les compteurs ci-dessous sont des <b>minimums</b>.</div>`:"";
   const entete=`<div class="ocr-top">
       <div class="ocr-big">${fmtInt(t.jamaisPaye||0)}</div>
       <div class="ocr-lbl">fans n'ont <b>jamais payé</b><br><span class="ocr-note">sur ${fmtInt(t.fans||0)} au total · ${fmtInt(t.payeurs||0)} ont déjà acheté</span></div>
@@ -4291,7 +4295,7 @@ $("#pcumulBody").addEventListener("click", async e=>{
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")+(j.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); }
       else if(j && j.saut && j.detail){
         // Saut anormal détecté : on EXPLIQUE (detail) et on propose de confirmer,
         // sinon le paiement de ce VA était impossible depuis le dashboard.
@@ -4303,7 +4307,10 @@ Confirmer quand même le paiement de ${va} ?`)){
           try{
             const r2=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, confirmer_saut:true})});
             const j2=await r2.json();
-            if(j2&&j2.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")); await loadPaieCumul(); return; }
+            // Mêmes avertissements que la branche normale : cette branche-ci les
+            // perdait tous (contrôle anti-saut, historique) alors que c'est justement
+            // celle où l'on force un paiement malgré une alerte.
+            if(j2&&j2.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")+(j2.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); return; }
             alert("Erreur : "+((j2&&(j2.detail||j2.error))||"inconnue"));
           }catch(err){ alert("Réseau : "+err.message); }
         }
@@ -7877,6 +7884,15 @@ function renderProxy(){
     : has4gMort
       ? `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent par le résidentiel. Le 4G (secours) est à sec, mais ce n'est pas bloquant.</div>`
       : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
+  // ⚠️ PLAFOND QUOTIDIEN. Le serveur envoie `sante.capReached` (+ le compteur) :
+  // une fois atteint, le scraping passe en mode dégradé et les vues Instagram ne
+  // sont PLUS rafraîchies jusqu'au lendemain. Ce drapeau n'était lu nulle part :
+  // le panneau affichait « ✅ tes vues remontent bien » au moment PRÉCIS où elles
+  // ne remontent plus, et les vues gelées se lisaient comme des reels qui ratent.
+  const _sa=(d&&d.sante)||null;
+  const alertePlafond=(_sa&&_sa.capReached)
+    ? `<div class="sv-note" style="margin-top:8px;color:#facc15">⚠️ <b>Plafond quotidien atteint</b>${(_sa.residentialUsedToday!=null&&_sa.dailyCap)?` (${fmtInt(_sa.residentialUsedToday)}/${fmtInt(_sa.dailyCap)} requêtes)`:""} — tes vues Instagram <b>ne sont plus rafraîchies</b> jusqu'à demain. Les chiffres de vues que tu vois sont ceux d'avant : <b>ne juge pas un reel là-dessus aujourd'hui</b>.</div>`
+    : "";
   // Jauge de data restante (forfait prépayé au Go) : à zéro, plus de proxy et
   // les vues se figent. L'opérateur doit pouvoir recharger AVANT la panne sèche.
   let jauge="";
@@ -7900,7 +7916,7 @@ function renderProxy(){
         style="font-size:12px;color:var(--acc-ink)">Recharger sur FlameProxies →</a></div>
     </div>`;
   }
-  body.innerHTML=items.map(ligne).join("")+alerte+jauge+
+  body.innerHTML=items.map(ligne).join("")+alertePlafond+alerte+jauge+
     `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${d.maj?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   try{ fixPairs(); }catch(e){}
   const rb=$("#proxyRefresh");
@@ -9428,7 +9444,7 @@ function renderIaHumain(){
     +ligne("🧑","Un humain est intervenu",hu,"mid")
     +(inc.n?ligne("❔","Pas de message créatrice lu",inc,"mid"):"")
     +(mods?`<div class="sv-head" style="margin-top:10px">Par modèle</div>${mods}`:"")
-    +`<div class="sv-note">Sur <b>${d.lus}</b> payeurs lus. ⚠️ « Un humain est intervenu » = au moins un message écrit à la main dans la conversation — ça ne prouve pas que c'est LUI qui a vendu, c'est la borne haute de l'implication humaine. Mesuré le ${new Date(d.ts).toLocaleDateString("fr-FR")} ; remis à jour chaque midi.</div>`;
+    +`<div class="sv-note">Sur <b>${d.lus}</b> payeurs lus${(Number(d.payeurs)||0)>0?` sur <b>${fmtInt(d.payeurs)}</b> retenus${(Number(d.lus)||0) < (Number(d.payeurs)||0)*0.8?` — <span style="color:#facc15">plus d'un cinquième n'a pas pu être lu, le pourcentage ci-dessus porte donc sur une partie seulement</span>`:""}`:""}. ⚠️ « Un humain est intervenu » = au moins un message écrit à la main dans la conversation — ça ne prouve pas que c'est LUI qui a vendu, c'est la borne haute de l'implication humaine. Mesuré le ${new Date(d.ts).toLocaleDateString("fr-FR")} ; remis à jour chaque midi.</div>`;
   try{ fixPairs(); }catch(e){}
 }
 
@@ -9761,6 +9777,7 @@ function renderHours(){
       ${(fort&&bl[fort]!=null)?`Le plus productif reste <b>${noms[fort]||fort}</b> (${bl[fort]})${(faible&&bl[faible]!=null)?`, le plus faible <b>${noms[faible]||faible}</b> (${bl[faible]})`:""}.`:""}</div>
     ${blocJours}
     ${d.fiable?"":`<div class="hr-warn">⚠️ Seulement ${d.total} abonnés analysés — trop peu pour en tirer une règle, à revoir dans quelques jours.</div>`}
+    ${(Number(d.sansHeure)||0)>0?`<div class="hr-warn" style="color:#facc15">⚠️ <b>${fmtInt(d.sansHeure)} abonnés écartés</b> : leur heure d'arrivée n'était pas lisible. Ce n'est pas un mauvais mois — c'est la source qui n'a pas tout donné.</div>`:""}
     <div class="hr-warn">Sur ${d.days} jours · ${d.total} abonnés · heure de ${d.tz.split("/").pop().replace("_"," ")}</div>`;
   try{ fixPairs(); }catch(e){}   // la rangée compte 5 panneaux : on recalcule les demi-largeurs
 }
