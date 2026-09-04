@@ -1227,6 +1227,7 @@
   .om-model:hover{border-color:var(--acc-line)}
   .om-model-name{font-size:13px;font-weight:600}
   .om-model-net{font-size:20px;font-weight:700;color:var(--acc);margin-top:4px}
+  .om-model-base{font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.02em}
   .om-model-subs{font-size:12px;color:var(--muted);margin-top:1px}
   .om-va-head{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 8px}
   .om-va-head button{margin-left:auto;font:inherit;font-size:11px;font-weight:500;color:var(--acc-ink);background:none;border:1px solid var(--acc-line);border-radius:7px;padding:4px 10px;cursor:pointer;text-transform:none;letter-spacing:0}
@@ -5491,7 +5492,7 @@ function renderOM(){
         :((!surTout&&mL.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total de ${escapeHtml(OM_MODEL)} ÷ TOUS ses fans réels (${fmtInt(mL.fansReels)}), lien de VA ou pas — pas seulement les ${fmtInt(mL.subsTotal)} abonnés amenés par l'équipe.">ⓘ</span>`:"");
       return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
     })()}</div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net">${mnt(d.models[m].net)}</div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net" title="Brut OnlyFans — la LTV et la marge en dessous sont NETTES">${mnt(d.models[m].net)}<span class="om-model-base"> brut</span></div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
   // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
   // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
@@ -5561,7 +5562,7 @@ function renderOM(){
     // 💡 Infobulle marge : le détail du calcul (brut − commission OnlyFans − paie VA),
     // pour qu'on comprenne d'un coup d'oeil pourquoi la marge n'est pas « brut − paie ».
     const _mNet=(v.rev==null)?null:v.rev*netRate();
-    const _mPay=(_mNet==null||v.marge==null)?null:(_mNet-v.marge);
+    const _mPay=v.unpaid?0:((Number(v.subs)||0)*prixSub());   // paie EXACTE (subs × prix), pas déduite : rev est arrondi côté serveur
     const margeTip=(ko||v.marge==null||v.rev==null)?"":` title="${omMoney(v.rev,cur)} générés (brut) − ${pctComm()} OnlyFans = ${moneyPrecis(_mNet,cur)} net · − ${moneyPrecis(_mPay,cur)} de paie VA → ${moneyPrecis(v.marge,cur)} pour toi"`;
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
@@ -5597,7 +5598,7 @@ function renderOM(){
         // semaine. Il reste sur la vue « Toujours ».
         +`</div>`;
     }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r">${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}"${margeTip}>${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r"${(ko||v.rev==null)?"":` title="Brut OnlyFans, AVANT les ${pctComm()} de commission. La LTV et la marge à droite sont NETTES."`}>${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}"${margeTip}>${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   // Le bouton de tri : sur une fenêtre, « marge » n'existe pas -> deux choix.
   const triTxt = per!=="tout"
@@ -5684,7 +5685,7 @@ function renderOM(){
     // En-tête = TOTAL ÉQUIPE (les 🔒 perso ne s'y ajoutent pas). Si seul le perso
     // a payé, en-tête neutre pour ne pas afficher « 0 $ par 0 abonné ».
     const tete=act.length
-      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag"> · équipe</span>`
+      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag"> · brut · équipe</span>`
       : `💸 Qui dépense aujourd'hui`;
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
       +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
@@ -5964,7 +5965,7 @@ function renderVersus(){
   // on ne DÉSIGNE PAS de gagnant sur un modèle à 0 inventé (voir le verdict plus bas).
   const ko=revKo() || !!d.revenusPartiels;
   const money=v=>ko?"—":(HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur);
-  const ltv=v=>ko?"—":(HIDE?"•••":(Number(v)||0).toFixed(2).replace(".",",")+" "+cur);
+  const ltv=v=>ko?"—":fmtLtv(v,cur);   // LTV NETTE comme partout ailleurs (avant : brute → +25 % vs la fiche modèle)
   // rentabilité = marge du mois (déjà calculée côté cerveau)
   const rows=[
     ["CA brut du mois", money(A.net), money(B.net), ko?0:(Number(A.net)||0), ko?0:(Number(B.net)||0)],
@@ -6179,7 +6180,7 @@ function renderRenta(){
   $("#rentaBody").innerHTML=`
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> en ce moment (une source ne répond pas) : ce compte de résultat est un <b>minimum</b>, le vrai profit est un peu plus haut.</div>`:""}
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
-    <div class="rn-line"><span>− Commission OnlyFans (20 %)</span><span class="rn-v neg">−${money(commission)}</span></div>
+    <div class="rn-line"><span>− Commission OnlyFans (${pctComm()})</span><span class="rn-v neg">−${money(commission)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
@@ -9419,7 +9420,7 @@ function renderSim(){
       <div id="simMultRes" class="sim-res"></div>
     </div>`;
   const cutSel=$("#simVa"), simN=$("#simN");
-  function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round(Math.max(0,(Number(v.rev)||0)*netRate()-marge)), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
+  function renderCut(){ const v=vas.find(x=>x.va===cutSel.value); if(!v){ $("#simCutRes").innerHTML=""; return; } const marge=Number(v.marge)||0, pay=Math.round(Math.max(0,(Number(v.rev)||0)*netRate()-marge)), good=marge<0; $("#simCutRes").innerHTML=`Bilan de <b>${escapeHtml(v.va)}</b> : <b>${money(v.rev)}</b> générés (brut) − ${pctComm()} OnlyFans = <b>${money((Number(v.rev)||0)*netRate())}</b> net, pour <b>${money(pay)}</b> versés.<br><span class="sim-verdict ${good?"pos":"neg"}">${good?`✅ Il te fait perdre ${money(Math.abs(marge))} — le couper est rentable.`:`⚠️ Il te rapporte ${money(marge)} — réfléchis avant de couper.`}</span>`; }
   // « subs de plus » au CHOIX : pour tout le mois, ou PAR JOUR (× les jours qui
   // restent). Les VA non payés (perso) ne coûtent rien, donc on ne compte que
   // les VA réellement payés dans la paie.
@@ -10586,7 +10587,7 @@ function renderModeles(){
     </div>`;
   }).join("");
   $("#modelesBody").innerHTML=`<div class="mdl-row">${html}</div>`
-    +`<div class="sv-note" style="margin-top:8px">Net estimé = brut × 80 %. Détail par VA : clique sur un modèle dans le panneau OnlyMonster.</div>`;
+    +`<div class="sv-note" style="margin-top:8px">Net estimé = brut − ${pctComm()} OnlyFans. Détail par VA : clique sur un modèle dans le panneau OnlyMonster.</div>`;
   if(typeof fixPairs==="function") fixPairs();
 }
 
