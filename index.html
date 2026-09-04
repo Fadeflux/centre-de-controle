@@ -4248,7 +4248,7 @@ $("#pcumulBody").addEventListener("click", async e=>{
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")); await loadPaieCumul(); }
+      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")); await loadPaieCumul(); }
       else if(j && j.saut && j.detail){
         // Saut anormal détecté : on EXPLIQUE (detail) et on propose de confirmer,
         // sinon le paiement de ce VA était impossible depuis le dashboard.
