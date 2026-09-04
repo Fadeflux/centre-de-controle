@@ -35,7 +35,11 @@ self.addEventListener('fetch', function (e) {
     e.respondWith((async function () {
       try {
         const net = await fetch(req, { cache: 'no-store' });
-        const c = await caches.open(CACHE); c.put('./index.html', net.clone()).catch(function () {});
+        // Ne mettre en cache QUE des reponses valides : une panne passagere de
+        // GitHub Pages (500) ou une page d'erreur (404) devenait sinon le repli
+        // hors-ligne, et le dashboard s'ouvrait sur cette page d'erreur tant
+        // qu'un chargement reussi ne l'avait pas remplacee.
+        if (net && net.ok) { const c = await caches.open(CACHE); c.put('./index.html', net.clone()).catch(function () {}); }
         return net;
       } catch (err) {
         return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
@@ -49,6 +53,7 @@ self.addEventListener('fetch', function (e) {
     if (cached) {
       // `n` n'est pas rendu a la page : pas de clone necessaire ici.
       fetch(req).then(function (n) {
+        if (!n || !n.ok) return;   // idem : ne pas remplacer un asset valide par une erreur
         caches.open(CACHE).then(function (c) { c.put(req, n).catch(function () {}); })
           .catch(function () {});
       }).catch(function () {});
@@ -61,9 +66,11 @@ self.addEventListener('fetch', function (e) {
       // deja commence a lire le corps, clone() levait une TypeError. Cette
       // promesse n'ayant aucun catch, l'echec etait totalement silencieux et
       // l'asset n'entrait jamais dans le cache hors-ligne.
-      const copie = net.clone();
-      caches.open(CACHE).then(function (c) { c.put(req, copie).catch(function () {}); })
-        .catch(function () {});
+      if (net && net.ok) {
+        const copie = net.clone();
+        caches.open(CACHE).then(function (c) { c.put(req, copie).catch(function () {}); })
+          .catch(function () {});
+      }
       return net;
     }
     catch (err) { return Response.error(); }
