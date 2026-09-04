@@ -4150,6 +4150,11 @@ function renderPaieCumul(){
   const d=PCUMUL, vas=(d&&Array.isArray(d.vas))?d.vas:[];
   if(!vas.length){ box.style.display="none"; return; }
   box.style.display="block";
+  // ⚠️ Chiffres PÉRIMÉS : le bandeau prévenait, mais les boutons « Payer »
+  // restaient cliquables. Or le serveur RECALCULE le montant lui-même (le
+  // dashboard ne l'envoie pas) : on confirmait donc « Payer 150 $ » et c'est
+  // 210 $ qui partaient. Tant que le tableau n'est pas frais, on ne paie pas.
+  const pcPerime = !!(d && d._perime);
   const rows=vas.map(v=>{
     const nom=escapeHtml(v.va);
     const isMgr=MANAGERS.indexOf(v.va)>=0, isLead=LEADERS.indexOf(v.va)>=0;
@@ -4165,7 +4170,7 @@ function renderPaieCumul(){
     if(v.base==null){
       return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs cumul</span>`
         +`<span class="pv-pay pcumul-warn">base ?</span>`
-        +`<button class="pv-pay-btn" data-pcbase="${nom}">Définir la base</button></div>`;
+        +`<button class="pv-pay-btn" data-pcbase="${nom}"${pcPerime?' disabled title="Chiffres pas à jour — clique 🔄 avant"':''}>Définir la base</button></div>`;
     }
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
@@ -4176,7 +4181,7 @@ function renderPaieCumul(){
     const actions = (nouveaux>0)
       ? `<div class="pc-actions"><label class="pc-field"><span>+</span><input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA."></label>`
         +mgrInput+leadInput
-        +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}">Payer ${pcMoney(montant)}</button></div>`
+        +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}"${pcPerime?' disabled title="Chiffres pas à jour — le montant réel peut être différent. Clique 🔄 avant de payer."':''}>${pcPerime?"⚠️ Chiffres à rafraîchir":"Payer "+pcMoney(montant)}</button></div>`
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row pcumul-row ${nouveaux>0?"":"pv-done"}">${nameCell}`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
@@ -4223,6 +4228,9 @@ $("#pcumulBody").addEventListener("click", async e=>{
   }
   const pay=e.target.closest("[data-pcpay]");
   if(pay){
+    // Deuxième verrou : même si le bouton était réactivé (inspecteur, rendu raté),
+    // on ne déclenche pas un versement sur des chiffres qu'on sait périmés.
+    if(PCUMUL && PCUMUL._perime){ alert("⚠️ Les chiffres ne sont pas à jour — le serveur n'a pas répondu.\n\nClique 🔄 pour les recharger avant de payer."); return; }
     const va=pay.getAttribute("data-pcpay"), n=pay.getAttribute("data-n"), amt=pay.getAttribute("data-amt");
     const row=pay.closest(".pv-row");
     // 💶 Prime + part manager + part team leader saisies sur cette ligne → s'ajoutent.
