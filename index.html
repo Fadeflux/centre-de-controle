@@ -4583,10 +4583,14 @@ function renderConcentration(){
       +`<span class="cc-pct">${Math.round(x.pct)}%</span></div>`).join("");
     const gros=(c.plusGros||[]).map((x,i)=>`<span class="om-spend-c" style="cursor:default">#${i+1} <b>${money(x.montant)}</b> <i>· ${x.va?escapeHtml(x.va):"aucun VA"}</i></span>`).join("");
     return `<div class="cc-block"><div class="cc-title">🎲 Par CLIENT (dépenses sur 30 jours) <span class="cc-lvl">${niv[0]} ${niv[1]}</span></div>`
-      +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money(t.montant)}</b>.</div>`
+      // ⚠️ Ces montants sont des dépenses de fans OnlyFans = du BRUT (même base que
+      // `brutFenetre`, nommée brut ailleurs). Le pourcentage est juste (brut/brut) ;
+      // seuls les montants étaient affichés nus. On les étiquette, comme le fait
+      // déjà « Qui dépense aujourd'hui ».
+      +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money(t.montant)}</b> brut.</div>`
       +bars
       +(gros?`<div style="margin-top:8px">${gros}</div>`:"")
-      +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money(c.total)}. Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
+      +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money(c.total)} brut (avant commission OnlyFans). Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
   })();
   if(!html2.trim()){ box.style.display="none"; return; }
   $("#concentrationBody").innerHTML=html2;
@@ -4626,12 +4630,21 @@ function renderObjMois(){
   // panneau (OBJ_GOAL, stocké/serveur en brut) converti en net + Telegram du mois.
   const ringGoal=(typeof GOAL!=="undefined"&&GOAL&&GOAL.type==="rev"&&Number(GOAL.value)>0)?Number(GOAL.value):null;
   const suitAnneau=ringGoal!=null;
-  const goalN=suitAnneau?ringGoal:(goal*netR+tgM), FN=F*netR+tgM, netLastN=netLast*netR;
+  // FN = projection fin de mois : même helper que partout ailleurs (Telegram
+  // projeté), sinon ce panneau annonçait une prévision plus basse que la carte
+  // du matin et que la Rentabilité pour le même mois.
+  const goalN=suitAnneau?ringGoal:(goal*netR+tgM), FN=(typeof projNetMois==="function")?projNetMois():(F*netR+tgM), netLastN=netLast*netR;
   const pct=goalN>0?Math.min(100,Math.round(netNow/goalN*100)):0;
   const projPct=goalN>0?Math.min(100,Math.round(FN/goalN*100)):0;
   const reste=Math.max(0,goalN-netNow);
   const subsMonth=Number(t.subsMonth)||0;
-  const revPerSub=subsMonth>0?netNow/subsMonth:((Number(t.ltv)||0)*netR);
+  // ⚠️ netNow inclut le Telegram, subsMonth ne compte QUE les abonnés OnlyFans :
+  // chaque abonné OF se voyait créditer du revenu Telegram qu'il n'a pas amené, donc
+  // « Reste 1 400 $ ≈ 210 subs » sous-estimait le nombre réel — et le « chemin par
+  // VA » juste en dessous répartissait ce nombre trop bas entre les VA. On garde
+  // les deux côtés sur le périmètre OnlyFans.
+  const netNowOF=(Number(t.netMonth)||0)*netR;
+  const revPerSub=subsMonth>0?netNowOF/subsMonth:((Number(t.ltv)||0)*netR);
   const subsNeeded=revPerSub>0?Math.ceil(reste/revPerSub):null;
   const vas=(Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0).sort((a,b)=>b.monthSubs-a.monthSubs);
   const totMs=vas.reduce((a,v)=>a+Number(v.monthSubs),0)||1;
@@ -4833,7 +4846,7 @@ function renderRecos(){
     // 8 fans suffisent quand l'écart est net (Welzy : 22,75 $ vs 3,40 $ = ×6,7)
     // et 30 % de part : à 26 % on veut ENCORE pousser un VA pareil.
     if(q&&teamAvg>0&&(Number(q.avg)||0)>=teamAvg*1.5&&share<0.30&&(Number(q.fans)||0)>=8){
-      recos.push({p:1,ico:"🚀",act:`Donne plus de trafic à ${v.va}`,why:`Ses fans dépensent ${money(q.avg)} (${Math.round((q.avg/teamAvg)*100)/100>=2?"plus du double":"bien plus"} que la moyenne ~${money(teamAvg)}) mais il ne fait que ${Math.round(share*100)}% du volume. Chaque sub qu'il amène vaut plus.`,va:v.va});
+      recos.push({p:1,ico:"🚀",act:`Donne plus de trafic à ${v.va}`,why:`Ses fans dépensent ${money((Number(q.avg)||0)*netRate())} net (${Math.round((q.avg/teamAvg)*100)/100>=2?"plus du double":"bien plus"} que la moyenne ~${money((Number(teamAvg)||0)*netRate())}) mais il ne fait que ${Math.round(share*100)}% du volume. Chaque sub qu'il amène vaut plus.`,va:v.va});
     }
   });
   // 3) Risque de départ / trajectoire en baisse (VASANTE).
@@ -4935,7 +4948,8 @@ function suggestGoal(){
     // recréerait l'écart brut/net qu'on vient de corriger.
     const _netR=(typeof netRate==="function")?netRate():0.80;
     const _tgMois=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
-    const proj=(Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0)*_netR + _tgMois;
+    // Même source que l'anneau, la Rentabilité, la carte du matin et le simulateur.
+    const proj=(typeof projNetMois==="function")?projNetMois():((Number(om.forecast&&om.forecast.net&&om.forecast.net.value)||0)*_netR + _tgMois);
     // Record = meilleur mois passé en NET OnlyFans (le Telegram des mois passés
     // n'est pas conservé mois par mois) ; on exclut le mois EN COURS (partiel).
     const histArr=om.history||[];
@@ -5824,7 +5838,10 @@ function renderOM(){
     const curN=Math.round((Number(d.totals.netMonth)||0)*netRate()), prevN=Math.round((Number(prevTD)||0)*netRate());
     const j=new Date().getDate(), diff=curN-prevN, up=diff>=0;
     const pct = prevN>0 ? Math.round(diff/prevN*100) : null;
-    cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
+    // ⚠️ « net » tout court juste sous la tuile « Net du mois » (qui, elle, ajoute
+    // Telegram) donnait deux montants nets différents côte à côte, sans explication.
+    // On ne peut pas répartir le Telegram au jour J du mois dernier : on le DIT.
+    cmpMois=`<div class="om-cmp ${up?'up':'down'}">📅 Au ${j} du mois : <b>${omMoney(curN,cur)}</b> net <span class="om-cmp-d" style="opacity:.7">(OnlyFans seul, hors Telegram)</span> · le mois dernier à la même date <b>${omMoney(prevN,cur)}</b> <span class="om-cmp-d">${up?'▲':'▼'} ${omMoney(Math.abs(diff),cur)}${pct!=null?` (${up?'+':'−'}${Math.abs(pct)} %)`:''}</span></div>`;
   }
   // ⚡ Garde anti-freeze mobile : on ne réécrit le gros panneau QUE si son contenu
   // a changé (même motif que render()). Avant, #omBody était reconstruit à chaque
@@ -6044,13 +6061,16 @@ function renderVersus(){
     ["Rentabilité (marge)", money(A.marge), money(B.marge), ko?0:(Number(A.marge)||0), ko?0:(Number(B.marge)||0)],
   ];
   const statHtml=rows.map(r=>{ const aw=r[3]>r[4], bw=r[4]>r[3]; return `<div class="vs-stat"><span class="vs-a ${aw?"win":""}">${r[1]}</span><span class="vs-lbl">${r[0]}</span><span class="vs-b ${bw?"win":""}">${r[2]}</span></div>`; }).join("");
-  // Mini-courbe net par mois (depuis history.byModel)
+  // Mini-courbe par mois (depuis history.byModel) — ces montants sont du BRUT
+  // OnlyFans, comme la ligne « CA brut du mois » du tableau juste au-dessus.
+  // La ligne « LTV (par sub) » du même tableau, elle, est nette (fmtLtv) : les
+  // infobulles disent donc explicitement « brut » pour qu'on ne les mélange pas.
   const hist=(d.history||[]).filter(h=>h&&h.byModel);
   let barsHtml="";
   if(hist.length){
     const maxN=Math.max(1,...hist.map(h=>Math.max((h.byModel[VS_A]||{}).net||0,(h.byModel[VS_B]||{}).net||0)));
     barsHtml=`<div class="vs-legend"><span><i style="background:var(--acc)"></i>${escapeHtml(VS_A)}</span><span><i style="background:#e879f9"></i>${escapeHtml(VS_B)}</span></div>
-    <div class="vs-bars">${hist.map(h=>{ const na=(h.byModel[VS_A]||{}).net||0, nb=(h.byModel[VS_B]||{}).net||0; return `<div class="vs-m"><div class="vs-m-wrap"><div class="vs-bar a" style="height:${Math.max(2,Math.round(na/maxN*64))}px" title="${escapeHtml(VS_A)} ${money(na)}"></div><div class="vs-bar b" style="height:${Math.max(2,Math.round(nb/maxN*64))}px" title="${escapeHtml(VS_B)} ${money(nb)}"></div></div><div class="vs-m-lbl">${escapeHtml(h.month)}</div></div>`; }).join("")}</div>`;
+    <div class="vs-bars">${hist.map(h=>{ const na=(h.byModel[VS_A]||{}).net||0, nb=(h.byModel[VS_B]||{}).net||0; return `<div class="vs-m"><div class="vs-m-wrap"><div class="vs-bar a" style="height:${Math.max(2,Math.round(na/maxN*64))}px" title="${escapeHtml(VS_A)} ${money(na)} brut"></div><div class="vs-bar b" style="height:${Math.max(2,Math.round(nb/maxN*64))}px" title="${escapeHtml(VS_B)} ${money(nb)} brut"></div></div><div class="vs-m-lbl">${escapeHtml(h.month)}</div></div>`; }).join("")}</div>`;
   }
   // Verdict simple : qui rapporte le plus par sub + qui pousser. ⚠️ JAMAIS quand
   // les revenus sont muets/partiels : sinon on couronnait le modèle lisible face à
@@ -6112,6 +6132,45 @@ function caNetMois(){
   const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
   const tg=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
   return (Number(t.netMonth)||0)*netRate()+tg;
+}
+// 🔮 PROJECTION nette de fin de mois — SOURCE UNIQUE.
+// Il en existait DEUX formules à l'écran, et l'écart valait exactement le
+// Telegram du mois : l'anneau Objectif, le panneau Objectif du mois et le coach
+// ajoutaient Telegram ; la Rentabilité, la carte du matin/soir et le simulateur
+// 3 mois ne l'ajoutaient pas. Le matin « projection ~8 200 $ net », deux
+// panneaux plus bas « projection 8 750 $ » — même mois, même mot « net ».
+// Ici : prévision intelligente si le serveur en donne une, sinon au rythme du
+// mois ; convertie en net et augmentée du Telegram (déjà net), comme caNetMois.
+function projBrutOF(){
+  const om=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}), t=om.totals||{};
+  const F=(om.forecast&&om.forecast.net&&Number(om.forecast.net.value))?Number(om.forecast.net.value):null;
+  if(F!=null) return F;
+  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const nm=Number(t.netMonth)||0;
+  return day>0 ? (nm/day*dim) : nm;
+}
+// Le Telegram est PROJETÉ lui aussi : c'est une prévision de FIN DE MOIS.
+// N'ajouter que le Telegram déjà encaissé sous-estimait systématiquement la
+// prévision — et, dans la même phrase, la projection de PROFIT (qui, elle,
+// projetait déjà le Telegram) sortait SUPÉRIEURE à la projection de CA.
+function tgProjMois(){
+  const tg=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  return day>0 ? (tg/day*dim) : tg;
+}
+function projNetMois(){ return projBrutOF()*netRate()+tgProjMois(); }
+// 💰 CUMUL net depuis le début — SOURCE UNIQUE (net OF + TOUT le Telegram).
+// La tuile « généré depuis le début » l'ajoutait, la barre de progression des
+// badges juste en dessous ne l'ajoutait pas : 47 200 $ d'un côté, « 44 900 $ /
+// 50 000 $ » de l'autre, sur le même écran.
+function caNetTotal(){
+  const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
+  const curLbl=(typeof tgMonthLabel==="function")?tgMonthLabel(new Date()):"";
+  const past=(typeof TGREV!=="undefined"&&Array.isArray(TGREV)?TGREV:[])
+    .filter(x=>(typeof tgMonthLabel==="function")&&tgMonthLabel(new Date(x.ts||0))!==curLbl)
+    .reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const tgAll=past+((typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0);
+  return (Number(t.netTotal)||0)*netRate()+tgAll;
 }
 function meilleurMoisComplet(history){
   const hist=Array.isArray(history)?history:[];
@@ -6266,7 +6325,11 @@ function renderRenta(){
   // ne nomment jamais un mois/chiffre différent sous le même intitulé.
   const rec=meilleurMoisComplet(d.history) || {m:null,v:0};
   const projAvecTg=Math.round(projNet*netRate()+projTg);   // même unité que rec.v
-  const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*netRate()))}–${money(Math.round(F.net.high*netRate()))} net</span>`:"";
+  // La fourchette encadre le chiffre affiché juste avant : elle doit donc porter
+  // sur la MÊME chose (Telegram projeté compris), sinon on lisait « ~4 934 $ net,
+  // fourchette 1 032–1 336 $ » — une fourchette qui exclut sa propre valeur.
+  const _tgP=(typeof tgProjMois==="function")?tgProjMois():0;
+  const rangeHtml=(F&&F.net&&F.net.low!=null)?` <span style="opacity:.6">· fourchette ${money(Math.round(F.net.low*netRate()+_tgP))}–${money(Math.round(F.net.high*netRate()+_tgP))} net</span>`:"";
   let recordLine="";
   if(rec.m && netMonth>0){
     if(projAvecTg>=rec.v){ recordLine=`<div class="rn-record best">🏆 En route pour un <b>NOUVEAU RECORD</b> ! (meilleur mois jusqu'ici : ${money(Math.round(rec.v))} net en ${escapeHtml(rec.m)})</div>`; }
@@ -6284,7 +6347,7 @@ function renderRenta(){
     <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
     ${taxLines}
     <div class="rn-tax-set">🧾 Mettre de côté pour impôts/charges : <input type="number" id="taxRate" min="0" max="60" step="1" value="${TAX}" inputmode="numeric"> % <button class="mn-act-btn" id="taxSave">OK</button></div>
-    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNet*netRate())}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut)</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
+    <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNetMois())}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut OnlyFans → ${money(projNet*netRate())} net${projTg>0?" + "+money(projTg)+" Telegram projeté":""})</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     ${(()=>{
@@ -6801,12 +6864,19 @@ function paceVerdict(){
   // ailleurs → confusion net/brut sur la carte la plus consultée.
   // 🙈 : l'écran du matin/soir s'ouvre TOUT SEUL 1×/jour — sans ce masque, il
   // affichait les montants en clair même en mode discret (et en vue associé).
-  const proj=FV?FV.value:(day>0?nm/day*dim:nm), fmt=v=>HIDE?("••• "+cur+" net"):(Math.round(v*netRate()).toLocaleString("fr-FR")+" "+cur+" net");
-  if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmt(proj)} ce mois.`};
+  // ⚠️ La projection affichée passe par projNetMois() : même chiffre que
+  // l'anneau Objectif et le panneau Objectif du mois (Telegram compris). Avant,
+  // cette carte — la plus consultée — annonçait un net SANS Telegram.
+  // Les COMPARAISONS (vs mois dernier) restent en brut OnlyFans des deux côtés :
+  // netLastMonth est du brut OF, donc le pourcentage est homogène.
+  const proj=FV?FV.value:(day>0?nm/day*dim:nm);
+  const fmtN=v=>HIDE?("••• "+cur+" net"):(Math.round(v).toLocaleString("fr-FR")+" "+cur+" net");
+  const projAff=projNetMois();
+  if(lm<=0) return {up:true,text:`🚀 Bon rythme — ${FV?"prévision":"projection"} ~${fmtN(projAff)} ce mois.`};
   const pct=Math.round((proj-lm)/lm*100);
-  if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmt(proj)}).`};
+  if(pct>=0) return {up:true,text:`🟢 En avance : +${pct}% vs le mois dernier (projection ~${fmtN(projAff)}).`};
   const need=Math.max(0,Math.round((lm-nm)/Math.max(1,dim-day)));
-  return {up:false,text:`🔴 En retard : ${pct}% vs le mois dernier. Il te faut ~${fmt(need)}/jour pour rattraper.`};
+  return {up:false,text:`🔴 En retard : ${pct}% vs le mois dernier. Il te faut ~${fmtN(need*netRate())}/jour pour rattraper.`};
 }
 let COACH_MODE="morning";
 function renderMorning(){
@@ -7344,7 +7414,7 @@ function showWidgetHelp(){
   if(document.body.classList.contains("assoc-mode")) return;
   const url=HUB_BASE+"/api/hub/widget";
   const tok=TOKEN||"(connecte-toi d'abord)";
-  const scriptable=`// Widget Scriptable — colle dans un widget Scriptable\nconst r=await new Request("${url}");\nr.headers={"x-hub-token":"${tok}"};\nconst d=await r.loadJSON();\nconst w=new ListWidget();\nw.addText("Noctra");\nlet a=w.addText((d.netMonth??"—")+" $");\na.font=Font.boldSystemFont(26);\nw.addText(d.line||"");\nScript.setWidget(w);\nScript.complete();`;
+  const scriptable=`// Widget Scriptable — colle dans un widget Scriptable\nconst r=await new Request("${url}");\nr.headers={"x-hub-token":"${tok}"};\nconst d=await r.loadJSON();\nconst w=new ListWidget();\nw.addText("Noctra");\nlet a=w.addText((d.netMonth??"—")+" $ brut");\na.font=Font.boldSystemFont(26);\nw.addText(d.line||"");\nScript.setWidget(w);\nScript.complete();`;
   $("#widgetHelpBody").innerHTML=`
     <div class="mn-top"><div class="mn-hi">📱 Widget iPhone</div><button class="mn-close" id="whClose">✕</button></div>
     <div class="mn-date">Ton résumé (CA brut + subs) sur l'écran d'accueil, sans ouvrir le site.</div>
@@ -7451,7 +7521,10 @@ function renderBadges(){
   // netTotal est du BRUT : les paliers « X $ générés » doivent se déclencher en NET
   // (× netRate), comme la tuile « Argent généré » et comme isRecord/goalMet — sinon
   // le badge + les confettis sortaient ~20 % trop tôt, en contradiction avec la tuile.
-  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:(Number(tot.netTotal)||0)*netRate(), subsQuinzaine:subsQz, isRecord, goalMet };
+  // ⚠️ netTotal seul = net OnlyFans SANS Telegram, alors que la tuile
+  // « généré depuis le début » juste au-dessus l'ajoute : la tuile disait
+  // 47 200 $ et la barre de progression « 44 900 $ / 50 000 $ ». Même source.
+  const ctx={ daysSince:daysSinceFirstSale(), subsTotal:Number(tot.subsTotal)||0, netTotal:caNetTotal(), subsQuinzaine:subsQz, isRecord, goalMet };
   const unlocked=BADGES.filter(b=>{ try{ return b.cond(ctx); }catch(e){ return false; } });
   const owned=new Set(unlocked.map(b=>b.id));
   // ⚠️ 1er chargement (aucun badge encore en localStorage) : on ADOPTE les badges
@@ -7896,7 +7969,9 @@ function renderSim3(){
   const cur=(om.currency)||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const F=(om.forecast&&om.forecast.net&&om.forecast.net.method==="smart")?om.forecast.net.value:null;
-  const baseNet=Math.round(((F!=null?F:Number(om.totals.netMonth))||0)*netRate());   // mois en cours projeté, net
+  // Même base que partout ailleurs (Telegram compris) : sinon le simulateur
+  // partait ~25 % plus bas que l'anneau Objectif affiché juste au-dessus.
+  const baseNet=Math.round(projNetMois());   // mois en cours projeté, net OF + Telegram
   // croissance par défaut = évolution mois dernier -> ce mois (à date)
   let defG=0; const prev=Number(om.totals.netLastMonthToDate);
   if(prev>0) defG=Math.max(-30,Math.min(50,Math.round((Number(om.totals.netMonth)-prev)/prev*100)));
@@ -7939,14 +8014,21 @@ function renderStreak(){
   const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const G=(typeof GOAL!=="undefined")?GOAL:null;
   let cible=0;
-  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Number(G.value)/dim);   // G.value est déjà net (+ Telegram) ; dn[] sont nets → NE PAS re-décoter
+  // ⚠️ dn[] = net OnlyFans SEUL (la série jour par jour n'a pas de Telegram),
+  // alors que GOAL.value est un objectif net qui INCLUT le Telegram. On comparait
+  // donc un réalisé sans Telegram à une cible avec : la série cassait des jours
+  // qui étaient en réalité au-dessus. On retire du but la part Telegram, projetée
+  // sur le mois entier (elle s'accumule au fil des jours, comme le reste).
+  const _tgM=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
+  const _jour=now.getDate()||1, _tgProj=_tgM>0?(_tgM/_jour*dim):0;
+  if(G&&G.type==="rev"&&Number(G.value)>0) cible=Math.round(Math.max(0,(Number(G.value)-_tgProj))/dim);   // dn[] sont déjà nets → NE PAS re-décoter
   else { const lm=Math.round((Number((om.totals||{}).netLastMonth)||0)*netRate()); cible=lm>0?Math.round(lm/30):Math.round(dn.reduce((a,b)=>a+b,0)/dn.length); }
   if(cible<=0) cible=Math.round(dn.reduce((a,b)=>a+b,0)/dn.length);
   let streak=0; for(let i=dn.length-1;i>=0;i--){ if(dn[i]>=cible) streak++; else break; }
   let best=0,c=0; dn.forEach(v=>{ if(v>=cible){ c++; best=Math.max(best,c); } else c=0; });
   panel.style.display="block";
   const flame=streak>=3?"🔥".repeat(Math.min(5,Math.ceil(streak/3))):"🔥";
-  body.innerHTML=`<div class="cac-intro">Tes jours consécutifs au-dessus de ta cible (~${money(cible)}/jour). Garde la série !</div>
+  body.innerHTML=`<div class="cac-intro">Tes jours consécutifs au-dessus de ta cible (~${money(cible)}/jour de net <b>OnlyFans</b> — la part Telegram est déjà retirée de l'objectif). Garde la série !</div>
     <div class="st-big">${flame} <b>${streak}</b> jour${streak>1?"s":""} d'affilée</div>
     <div class="st-sub">Record : <b>${best}</b> jour${best>1?"s":""} · cible du jour ~${money(cible)}</div>
     <div class="st-msg">${streak>=best&&best>0?"🏆 Tu es sur ta meilleure série !":streak>=3?"💪 Belle série, continue !":streak===0?"Un bon jour aujourd'hui et c'est reparti.":"En route pour une série."}</div>`;
@@ -8143,7 +8225,12 @@ function renderAnomalies(){
       const z=(last-m)/sd;
       if(Math.abs(z)>=2.2 && Math.abs(last-m)>=m*0.35){
         const up=last>m;
-        ANOM_LIST.push({icon:up?"📈":"📉", sev:up?0:2, texte:`CA d'hier ${up?"anormalement HAUT":"anormalement BAS"} : <b>${money(last)}</b> vs habituel ~${money(m)}`, plain:`CA d'hier ${up?"anormalement haut":"anormalement bas"} : ${money(last)} vs habituel ~${money(m)}`, jump:"om"});
+        // ⚠️ dailyNet[].v est du BRUT : deux montants bruts non étiquetés dans un
+        // panneau d'alerte, alors que le graphe « CA par jour » affiche « X net · Y
+        // brut » pour la MÊME série. On affiche le net (la détection, elle, est un
+        // rapport sur base homogène : elle ne bouge pas).
+        const _aN=v=>money((Number(v)||0)*netRate());
+        ANOM_LIST.push({icon:up?"📈":"📉", sev:up?0:2, texte:`CA d'hier ${up?"anormalement HAUT":"anormalement BAS"} : <b>${_aN(last)}</b> net vs habituel ~${_aN(m)} net`, plain:`CA d'hier ${up?"anormalement haut":"anormalement bas"} : ${_aN(last)} net vs habituel ~${_aN(m)} net`, jump:"om"});
       }
     }
   }
@@ -8542,7 +8629,11 @@ function checkMilestones(){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!om.totals||(typeof revKo==="function"&&revKo())) return;
   const t=om.totals, done=_milestonesDone(), seeded=!!done.__seeded; let changed=false;
   const NET=(typeof netRate==="function")?netRate():0.80;
-  const vals={ subsMonth:Number(t.subsMonth)||0, subsTotal:Number(t.subsTotal)||0, netMonth:Math.round((Number(t.netMonth)||0)*NET) };
+  // ⚠️ Le palier s'intitule « Mois à X $ net » mais se comptait SANS Telegram :
+  // la carte « Net du mois » pouvait afficher 10 150 $ sans qu'aucun confetti ne
+  // parte (compteur interne à 9 600 $). Un palier fêté au mauvais moment est pire
+  // qu'un palier oublié : il fait douter du chiffre. Même source que l'anneau.
+  const vals={ subsMonth:Number(t.subsMonth)||0, subsTotal:Number(t.subsTotal)||0, netMonth:Math.round(caNetMois()) };
   Object.keys(MILESTONE_PALIERS).forEach(metric=>{
     const cfg=MILESTONE_PALIERS[metric], v=vals[metric];
     cfg.list.forEach(p=>{ if(v>=p){ const key=metric+"_"+p; if(!done[key]){ done[key]=Date.now(); changed=true; if(seeded){ if(typeof confetti==="function") setTimeout(confetti,200); if(typeof toast==="function") toast("🎉 "+cfg.label(p)+" !","Palier franchi 💪 bravo !"); } } } });
@@ -8872,7 +8963,11 @@ function decisionImpact(dateStr){
   const before=dn.slice(Math.max(0,idx-7),idx).map(x=>Number(x.v)||0), after=dn.slice(idx+1,idx+8).map(x=>Number(x.v)||0);
   if(before.length<3||after.length<3) return null;
   const avg=a=>a.reduce((x,y)=>x+y,0)/a.length, b=avg(before), a=avg(after);
-  return {avant:b, apres:a, pct:b>0?Math.round((a-b)/b*100):null};
+  // dailyNet[].v est du BRUT : on renvoie du NET, comme la Revue de la semaine.
+  // Le pourcentage est un rapport, il ne change pas ; seuls les deux montants
+  // affichés étaient ~25 % au-dessus de ce qui est réellement encaissé.
+  const _r=(typeof netRate==="function")?netRate():0.8;
+  return {avant:b*_r, apres:a*_r, pct:b>0?Math.round((a-b)/b*100):null};
 }
 function renderDecisions(){
   const panel=$("#decisions"), body=$("#decisionsBody"); if(!panel||!body) return;
@@ -8885,7 +8980,7 @@ function renderDecisions(){
   const list=DECISIONS.length?DECISIONS.slice().sort((a,b)=>(Number(b.ts)||0)-(Number(a.ts)||0)).map(d=>{
     const imp=decisionImpact(d.date);
     let impHtml;
-    if(imp){ const up=imp.apres>=imp.avant; impHtml=`<div class="dj-impact ${up?'pos':'neg'}">CA/jour : ${money(imp.avant)} avant → ${money(imp.apres)} après ${up?'▲':'▼'}${imp.pct!=null?` ${up?'+':'−'}${Math.abs(imp.pct)} %`:''}</div>`; }
+    if(imp){ const up=imp.apres>=imp.avant; impHtml=`<div class="dj-impact ${up?'pos':'neg'}">CA/jour (net) : ${money(imp.avant)} avant → ${money(imp.apres)} après ${up?'▲':'▼'}${imp.pct!=null?` ${up?'+':'−'}${Math.abs(imp.pct)} %`:''}</div>`; }
     else impHtml=d.outcome?"":`<div class="dj-impact muted">Effet pas encore mesurable (décision trop récente, ou hors des 4 dernières semaines).</div>`;
     // 📌 #7 verdict PERMANENT figé par le serveur 14 j après (subs 14 j avant/après).
     // Contrairement au CA/jour ci-dessus (fenêtre 28 j), celui-ci ne s'efface jamais.
@@ -10027,7 +10122,10 @@ function openModelCard(modelName){
   if(hist.length>=2){
     const hist6=hist.slice(-6);
     const maxN=Math.max(1,...hist6.map(h=>Number(h.byModel[modelName].net)||0));
-    bars=`<div class="ml-spark">${hist6.map(h=>{ const n=Number(h.byModel[modelName].net)||0; return `<span title="${escapeHtml(h.month)} : ${money(n)}" style="height:${Math.max(6,Math.round(n/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
+    // ⚠️ history.byModel[].net est du BRUT (comme la rangée modèles du panneau
+    // OM, qui l'étiquette « brut ») : le mot « Net » était écrit sous du brut,
+    // dans la fiche même où la tuile du haut affiche correctement le net.
+    bars=`<div class="ml-spark">${hist6.map(h=>{ const nb=Number(h.byModel[modelName].net)||0, nn=nb*netRate(); return `<span title="${escapeHtml(h.month)} : ${money(nn)} net (brut ${money(nb)})" style="height:${Math.max(6,Math.round(nb/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
   }
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(modelName)}</h3>
@@ -10147,7 +10245,13 @@ function openVaCard(vaName){
         const moyServeur=(typeof COHORTES!=="undefined"&&COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):null;
         const ta=(moyServeur!=null&&moyServeur>0)?moyServeur:(tf>0?qs.reduce((a,x)=>a+(Number(x.avg)||0)*(Number(x.fans)||0),0)/tf:0);
         const comp=ta>0?(q.avg>=ta*1.5?" — bien au-dessus de la moyenne 💎":q.avg<ta*0.4?" — sous la moyenne, à coacher ⚠️":" — dans la moyenne"):"";
-        rows.push(`<div class="vc-sante-row">💎 Ses fans dépensent <b>${pcMoney(q.avg)}</b> dans leurs 30 premiers jours${comp}</div>`);
+        // ⚠️ q.avg est du BRUT (dépenses de fans OnlyMonster) alors que la LTV
+        // affichée quelques centimètres plus haut dans la MÊME fiche est NETTE.
+        // Test décisif : une dépense sur 30 JOURS ne peut pas dépasser la LTV
+        // À VIE du même VA — quand ça arrivait à l'écran, c'était la preuve que les
+        // deux montants n'étaient pas sur la même base. Les seuils (« sous la
+        // moyenne ») restent calculés sur le brut : ce sont des rapports.
+        rows.push(`<div class="vc-sante-row">💎 Ses fans dépensent <b>${pcMoney((Number(q.avg)||0)*netRate())}</b> net dans leurs 30 premiers jours${comp}</div>`);
       }
       const pc=((typeof PCUMUL!=="undefined"&&PCUMUL&&PCUMUL.vas)||[]).find(x=>x.va===vaName);
       if(pc&&!v.unpaid&&pc.base!=null&&(Number(pc.nouveaux)||0)>0){
