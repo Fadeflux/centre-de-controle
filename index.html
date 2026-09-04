@@ -3598,6 +3598,8 @@ function renderOnlyChat(){
       <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conversations <i>(ce mois)</i></span></div>
       <div class="oc-stat"><b>${d.ltv!=null?tgMoney(d.ltv):"—"}</b><span>rapportés par conversation <i>(ce mois)</i></span></div>
       <div class="oc-stat"><b>${d.aiSalesCount??"—"}</b><span>ventes faites par l'IA <i>(ce mois)</i></span></div>
+      ${d.payingConversationsCount!=null?`<div class="oc-stat"><b>${fmtInt(d.payingConversationsCount)}</b><span>conversations qui ont <b>payé</b>${d.newConversationsCount?` <i>(sur ${fmtInt(d.newConversationsCount)})</i>`:""}</span></div>`:""}
+      ${d.averageBasket!=null?`<div class="oc-stat"><b>${tgMoney(d.averageBasket)}</b><span>panier moyen par vente</span></div>`:""}
     </div>
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${renderOcVersus(d)}
@@ -4685,7 +4687,38 @@ function renderConcentration(){
       +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money(c.total)} brut (avant commission OnlyFans). Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
   })();
   if(!html2.trim()){ box.style.display="none"; return; }
-  $("#concentrationBody").innerHTML=html2;
+  // 🏔️ LE SOCLE — « si j'arrête de recruter demain, il me reste combien ? »
+  // Trois sources d'argent des 30 derniers jours ne demandent AUCUNE paie :
+  //   · les abonnés déjà acquis d'un VA qui n'en a ramené aucun sur la fenêtre ;
+  //   · `ancienVa` — ⚠️ ce sont les comptes PERSO (Bot/Clhoe), PAS des gens partis
+  //     (piège déjà documenté) : on les nomme correctement ;
+  //   · `horsVa` — les fans venus sans aucun lien de tracking.
+  // C'est un PLANCHER : un VA actif encaisse aussi de ses vieux abonnés, ce qu'on
+  // ne sait pas isoler. On dit donc « au moins », jamais un chiffre exact.
+  const socle=(function(){
+    const t=(d&&d.totals)||{}, cur=(d&&d.currency)||"$";
+    const fen=(o)=>{ const x=o&&o.j30; return (x&&x.rev!=null)?Number(x.rev)||0:null; };
+    const anc=fen(t.ancienVa), hors=fen(t.horsVa);
+    const base=(t.brutFenetre&&t.brutFenetre.j30!=null)?Number(t.brutFenetre.j30)||0:null;
+    if(base==null || !(base>0) || (anc==null && hors==null)) return "";
+    // Abonnés déjà acquis : VA qui n'a ramené AUCUN sub sur 30 j mais dont les fans paient.
+    let dormant=0, nbDorm=0;
+    (Array.isArray(d.vas)?d.vas:[]).forEach(v=>{
+      const p=(v&&v.periodes&&v.periodes.j30)||null; if(!p) return;
+      if((Number(p.subs)||0)===0 && (Number(p.rev)||0)>0){ dormant+=Number(p.rev)||0; nbDorm++; }
+    });
+    const brut=(anc||0)+(hors||0)+dormant;
+    if(!(brut>0)) return "";
+    const net=brut*netRate(), pct=Math.round(brut/base*100);
+    const morceaux=[];
+    if(hors) morceaux.push(`<b>${omMoney(hors,cur)}</b> d'abonnés venus <b>sans lien</b>`);
+    if(anc) morceaux.push(`<b>${omMoney(anc,cur)}</b> de tes <b>comptes perso</b>`);
+    if(dormant>0) morceaux.push(`<b>${omMoney(dormant,cur)}</b> d'abonnés déjà acquis (${nbDorm} VA qui n'en a ramené aucun ce mois-ci)`);
+    return `<div class="cc-block"><div class="cc-title">🏔️ Ton socle — ce qui tombe sans payer personne</div>`
+      +`<div class="cc-kpi"><b>Au moins ${pct} %</b> de ton argent des 30 derniers jours (<b>${omMoney(Math.round(net),cur)}</b> net) arrive <b>sans que tu paies un VA pour</b>.</div>`
+      +`<div class="cc-hint">Le détail : ${morceaux.join(" · ")}. C'est un <b>plancher</b> : un VA actif encaisse aussi de ses anciens abonnés, et ça, on ne sait pas le séparer. Montants bruts, avant commission OnlyFans.</div></div>`;
+  })();
+  $("#concentrationBody").innerHTML=html2+socle;
 }
 
 /* ---------- 🎯 #15 objectif du mois + chemin (front, depuis OM_DATA) ---------- */
