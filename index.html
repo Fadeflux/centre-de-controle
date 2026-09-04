@@ -7504,7 +7504,9 @@ function renderRailway(){
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $";
   const actifs=d.projets.filter(p=>p.cout>0.01);
   const mx=Math.max.apply(null,actifs.map(p=>p.cout))||1;
-  const reel=!!(d.video&&d.video.factureSaisie);
+  // Drapeau lu à la RACINE en priorité : dans `video` il disparaissait quand
+  // ClipFusion ne répondait pas → le dashboard redemandait la facture en boucle.
+  const reel=!!(d.factureSaisie || (d.video&&d.video.factureSaisie));
   const rows=actifs.slice(0,8).map(p=>{
     const part=(p.part!=null)?p.part:(d.total>0?Math.round(p.cout/d.total*100):0);
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(p.projet)}</span>
