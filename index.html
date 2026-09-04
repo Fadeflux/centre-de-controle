@@ -3711,12 +3711,23 @@ function renderTgrev(){
     const auto=(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null) ? Number(ONLYCHAT_DATA.totalRevenue)||0 : null;
     if(auto!=null){
       const pm=ONLYCHAT_DATA.parModele||{};
-      const detail=Object.keys(pm).map(n=>`${escapeHtml(n)} <b>${tgMoney(Number(pm[n].totalRevenue)||0)}</b>`).join(" · ");
+      // ⚠️ Un modèle dont OnlyChat n'a pas renvoyé le total sort désormais
+      // `indisponible` côté serveur (avant : 0,00 $ présenté comme une mesure).
+      // Le total global reste juste — l'écart part dans « Autres » — donc rien
+      // dans les totaux ne pouvait trahir l'anomalie : on la NOMME.
+      const detail=Object.keys(pm).map(n=>pm[n].indisponible
+        ? `${escapeHtml(n)} <b style="color:var(--gold)">— non lu</b>`
+        : `${escapeHtml(n)} <b>${tgMoney(Number(pm[n].totalRevenue)||0)}</b>`).join(" · ");
+      const muets=(Array.isArray(ONLYCHAT_DATA.modelesMuets)?ONLYCHAT_DATA.modelesMuets:[]).map(escapeHtml);
+      const bandeauMuets=muets.length
+        ? `<div class="tg-sub" style="color:var(--gold)">⚠️ <b>Lecture incomplète</b> — OnlyChat n'a pas renvoyé le détail de <b>${muets.join(", ")}</b>. Leur revenu est compté dans le total (via « Autres »), mais la répartition par modèle est fausse : ne juge pas un modèle là-dessus.</div>`
+        : "";
       // ⚠️ NE PAS écrire ici « sers-t'en pour un revenu hors OnlyChat » : ce
       // serait FAUX. tgMonthTotal() prend le total OnlyChat et ignore
       // ENTIÈREMENT la saisie manuelle tant qu'OnlyChat répond — un revenu
       // ajouté à la main ne bougerait donc pas ton profit d'un centime.
       src.innerHTML=`<div class="tg-src-auto">✅ <b>Compté dans tes chiffres : ${tgMoney(auto)}</b> ce mois — automatique via OnlyChat${detail?`<div class="tg-src-det">${detail}</div>`:""}</div>`
+        +bandeauMuets
         +`<div class="tg-sub">Tant qu'OnlyChat répond, c'est <b>uniquement</b> ce chiffre qui compte : les saisies ci-dessous sont <b>gardées mais pas ajoutées</b> (sinon l'argent compterait deux fois). Elles reprennent la main automatiquement si OnlyChat tombe.</div>`;
     } else {
       const mk=tgMonthKey(Date.now());
@@ -7804,7 +7815,12 @@ function renderCac(){
       +`<div class="cac-cells"><span>${fmtInt(v.subs)} subs</span><span>coût/sub <b>${co1}</b></span><span>vaut <b>${val}</b></span>`
       +`${marge!=null?`<span class="${cls}">marge/sub <b>${marge>=0?'+':''}${cur(marge)}</b></span>`:""}</div></div>`;
   }).join("");
-  body.innerHTML=`<div class="cac-intro">Quinzaine ${escapeHtml(d.curLabel||"")} — ce que tu paies pour chaque abonné ramené, comparé à ce qu'un abonné de ce VA rapporte (LTV). Les moins rentables en haut.</div>${rows}`
+  // ✅ VÉRIFIÉ : `v.ltv` arrive DÉJÀ NET du serveur (jobs/cashFlow.js applique
+  // netRate avant d'envoyer), contrairement à OM_DATA.vas[].ltv qui est brut.
+  // NE PAS y appliquer fmtLtv/netRate ici : ce serait une double décote (~25 %
+  // trop bas) et le verdict « rentable / coûte + qu'il ne vaut » basculerait à
+  // tort. Note laissée exprès : une revue a déjà proposé de « corriger » ce point.
+  body.innerHTML=`<div class="cac-intro">Quinzaine ${escapeHtml(d.curLabel||"")} — ce que tu paies pour chaque abonné ramené, comparé à ce qu'un abonné de ce VA rapporte (LTV <b>nette</b>, après commission OnlyFans — même base que le coût, qui est du cash réel). Les moins rentables en haut.</div>${rows}`
     +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`);
 }
 
