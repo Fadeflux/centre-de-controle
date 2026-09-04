@@ -3899,6 +3899,13 @@ async function sendLeakDmca(id){
       const r=await fetch(HUB_BASE+"/api/hub/leak-dmca",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id})});
       if(r.ok){ const j=await r.json(); if(j.to) l.dmcaTo=j.to;
         if(j.sent){ l.status="sent"; l.dmcaTs=Date.now(); renderLeaks(); if(typeof toast==="function") toast("📤 DMCA envoyé",l.model+" → "+(j.to||"")); return; }
+        // Pas envoyé : on DIT pourquoi (sinon on ouvre un mail générique sans savoir quoi réparer).
+        if(j.reason && typeof toast==="function"){
+          const pourquoi={ "no_resend_key":"L'envoi automatique n'est pas configuré (clé d'email manquante).",
+                           "no_abuse":"Impossible de trouver l'adresse « abuse » de l'hébergeur.",
+                           "unknown_host":"Hébergeur inconnu — je ne sais pas à qui écrire." }[j.reason] || String(j.reason);
+          toast("✉️ Envoi auto impossible", pourquoi+" J'ouvre l'email pré-rempli.");
+        }
       }
     }catch(e){}
   }
@@ -10144,7 +10151,7 @@ function openVaCard(vaName){
         const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
           body:JSON.stringify({va:vaName,title:"🎯 Objectif du jour",body:msg.trim().slice(0,900),reason:"coach",thread:false})});
         const j=await r.json().catch(()=>({}));
-        if(r.ok&&j.ok&&j.added>0){ b.textContent="📬 En file"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."); }
+        if(r.ok&&j.ok&&j.added>0){ b.textContent="📬 En file"; if(typeof toast==="function") toast("📬 Message en file",vaName+" le recevra dans son ticket."+(j.filtered?" ⚠️ Une info interdite (argent…) a été retirée du texte.":"")); }
         else if(j&&j.refuses&&j.refuses.length){ b.disabled=false; b.textContent="⛔ Bloqué"; if(typeof toast==="function") toast("⛔ Non envoyé","Le message contenait une info interdite pour un VA (argent…). Reformule."); }
         else if(j&&j.partis&&j.partis.length){ b.textContent="⛔ Parti(e)"; }
         else { b.disabled=false; b.textContent="✉️ Lui écrire"; }
