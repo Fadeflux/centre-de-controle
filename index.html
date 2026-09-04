@@ -4124,7 +4124,8 @@ async function loadPaieCumul(){
       fetch(HUB_BASE+"/api/hub/paie-cumul",{headers:{"x-hub-token":TOKEN}}),
       fetch(HUB_BASE+"/api/hub/pay-history",{headers:{"x-hub-token":TOKEN}})
     ]);
-    if(r1.ok) PCUMUL=await r1.json();
+    if(r1.ok){ PCUMUL=await r1.json(); if(PCUMUL) PCUMUL._perime=false; }
+    else if(PCUMUL){ PCUMUL._perime=true; }   // garde l'ancien affichage MAIS le signale
     if(r2.ok) PCUMUL_HIST=((await r2.json()).history)||[];
   }catch(e){ /* garde l'ancien affichage en cas de coupure réseau */ }
   renderPaieCumul();
@@ -4169,7 +4170,12 @@ function renderPaieCumul(){
   // 👔🧭 Rappel : les rôles se règlent par les boutons 👔 (manager) / 🧭 (team
   // leader) sur chaque ligne — plusieurs possibles. Un rôle actif ajoute une case
   // de montant sur la ligne du VA.
-  const mgrSel=`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
+  // ⚠️ Données PÉRIMÉES (le serveur n'a pas répondu au dernier chargement) : on le
+  // dit, sinon on clique « Payer X $ » sur des chiffres qui ne sont plus à jour.
+  const perimeBanner = (d && d._perime)
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Chiffres pas à jour</b> — le serveur n'a pas répondu au dernier rafraîchissement. Ce tableau date de la dernière lecture réussie : <b>ne paie pas sur cette base</b>, clique 🔄 pour réessayer.</div>`
+    : "";
+  const mgrSel=perimeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
@@ -5921,6 +5927,14 @@ async function loadGhosts(retry){ if(!TOKEN) return; try{ const r=await fetch(HU
 function renderGhosts(){
   const panel=$("#ghosts"); if(!panel) return;
   const d=GHOSTS;
+  // ⚠️ absent ≠ 0 : si le détecteur n'a PAS pu mesurer (snapshots périmés ou
+  // ClipFusion injoignable), une liste vide ne veut pas dire « aucun fantôme ».
+  const ghAveugle = !!(d && (d.subsStale || (d.usesClipfusion===false)));
+  if(d && ghAveugle && (!d.ghosts || !d.ghosts.length)){
+    panel.style.display="block";
+    $("#ghostsBody").innerHTML=`<div class="tk-empty">⚠️ Détection impossible en ce moment (données de suivi trop vieilles ou source injoignable) — ce n'est <b>pas</b> « aucun VA fantôme ». Réessaie plus tard.</div>`;
+    if(typeof fixPairs==="function") fixPairs(); return;
+  }
   if(!d || !d.ghosts || !d.ghosts.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
   panel.style.display="block";
   $("#ghCount").textContent=d.count+" VA";
@@ -5938,7 +5952,11 @@ async function relanceGhost(va, btn){
   try{
     const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({items:[{va:va,title:"👋 On te voit plus, tout va bien ?",body:"Hey, ça fait un moment qu'on n'a pas vu d'activité de ta part 👀. Tout va bien ? Si tu es toujours dispo, remets-toi en route aujourd'hui 💪. Si tu as un souci (compte, contenu, perso…), dis-le nous ici, on t'aide.",reason:"fantome"}]})});
     const j=await r.json();
-    if(j.ok){ btn.textContent="✅ Envoyé"; } else { btn.textContent="⚠️"; btn.disabled=false; }
+    if(j.ok && Number(j.added)>0){ btn.textContent="✅ Envoyé"; }
+    else if(j.ok && j.partis && j.partis.length){ btn.textContent="⛔ VA parti"; if(typeof toast==="function") toast("⛔ Non envoyé","Ce VA n'a plus de ticket (parti de l'équipe)."); }
+    else if(j.ok && j.refuses && j.refuses.length){ btn.textContent="⛔ Bloqué"; if(typeof toast==="function") toast("⛔ Non envoyé","Le message contenait une info interdite pour un VA (argent…)."); }
+    else if(j.ok){ btn.textContent="déjà en file"; if(typeof toast==="function") toast("📬 Déjà en file","Une relance est déjà en attente pour ce VA — rien de nouveau envoyé."); }
+    else { btn.textContent="⚠️"; btn.disabled=false; }
   }catch(e){ btn.textContent="⚠️"; btn.disabled=false; }
 }
 $("#ghosts").addEventListener("click",e=>{ const g=e.target.closest("[data-ghost]"); if(g){ relanceGhost(g.getAttribute("data-ghost"), g); } });
