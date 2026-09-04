@@ -2635,9 +2635,9 @@ const TOOLS = [
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   { id:"noctra-ig-worker", world:"noctra", cat:"Noctra", name:"Publication IG", icon:"▶", openUrl:"https://noctra-ig-worker-production.up.railway.app",
-    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes KO",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
   { id:"noctra-tw-worker", world:"noctra", cat:"Noctra", name:"Twitter", icon:"𝕏", openUrl:"https://noctra-tw-worker-production.up.railway.app",
-    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes KO",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   // ⚠️ `ext:true` sur les 2 liens : DiddySMS renvoie `frame-ancestors 'none'` +
@@ -2651,7 +2651,7 @@ const TOOLS = [
   // Alimentée dans render() depuis ONLYCHAT_DATA (comme la carte SMS depuis
   // SMS_DATA) — solde inconnu = « — », jamais un 0 inventé.
   { id:"onlychat-solde",   world:"noctra", cat:"Noctra", name:"Solde OnlyChat", icon:"💬", openUrl:"https://app.only-chat.ai", external:true,
-    metrics:[{k:"solde",l:"Balance",f:fmtMoney},{k:"jours",l:"Autonomie",f:v=>"~"+v+" j"}] },
+    metrics:[{k:"solde",l:"Solde restant",f:fmtMoney},{k:"jours",l:"L'IA de vente tient encore",f:v=>"~"+v+" j"}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
@@ -2822,8 +2822,8 @@ function render(data){
   const stInW = inWorld(toolById("stats-tracker"));
   const tiles = [`<div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>`];
   if(stInW){
-    tiles.push(`<div class="tile"><div class="lbl">À payer (quinzaine)</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
-    tiles.push(`<div class="tile"><div class="lbl">Subs équipe</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
+    tiles.push(`<div class="tile"><div class="lbl" title="Vue historique par quinzaine. Le montant que tu verses vraiment est celui de « Paie au cumul », plus bas.">À payer si tu soldais la quinzaine</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
+    tiles.push(`<div class="tile"><div class="lbl" title="Abonnés amenés par tes VA sur la quinzaine en cours. À ne pas comparer avec « Subs du mois » du panneau OnlyMonster : période ET périmètre différents.">Subs équipe (cette quinzaine)</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
   }
   // Hors monde Noctra, le profit n'est pas « 0 » : il est HORS PÉRIMÈTRE → null
   // (→ « — »), sinon on affichait « Profit du mois : 0 $ » comme une mesure.
@@ -3528,10 +3528,10 @@ function renderOnlyChat(){
     ${tgToday!=null?`<div class="oc-today">📅 Aujourd'hui <b>${tgMoney(tgToday)}</b></div>`:""}
     ${goalBlock}
     <div class="oc-stats">
-      <div class="oc-stat"><b>${pct(d.unlockRatio)}</b><span>PPV ouverts</span></div>
-      <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conv.</span></div>
-      <div class="oc-stat"><b>${d.ltv!=null?tgMoney(d.ltv):"—"}</b><span>LTV / conv.</span></div>
-      <div class="oc-stat"><b>${d.aiSalesCount??"—"}</b><span>ventes IA</span></div>
+      <div class="oc-stat"><b>${pct(d.unlockRatio)}</b><span>des PPV ouverts <i>(ce mois)</i></span></div>
+      <div class="oc-stat"><b>${d.newConversationsCount??"—"}</b><span>nouvelles conversations <i>(ce mois)</i></span></div>
+      <div class="oc-stat"><b>${d.ltv!=null?tgMoney(d.ltv):"—"}</b><span>rapportés par conversation <i>(ce mois)</i></span></div>
+      <div class="oc-stat"><b>${d.aiSalesCount??"—"}</b><span>ventes faites par l'IA <i>(ce mois)</i></span></div>
     </div>
     ${rows?`<div class="oc-models">${rows}</div>`:""}
     ${renderOcVersus(d)}
@@ -4138,18 +4138,29 @@ function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
 // les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
 function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
+// Renvoie true si la lecture a réussi — le bouton 🔄 s'en sert pour DIRE si ça a
+// marché. Avant : il rechargeait en silence, exactement le « le rafraîchir fait
+// quoi ? j'ai l'impression rien » déjà signalé — sauf qu'ici c'est un versement
+// bloqué derrière, puisqu'on ne peut pas payer sur des chiffres périmés.
 async function loadPaieCumul(){
-  if(!TOKEN){ $("#paiecumul").style.display="none"; return; }
+  if(!TOKEN){ $("#paiecumul").style.display="none"; return false; }
+  var ok=false;
   try{
     const [r1,r2]=await Promise.all([
       fetch(HUB_BASE+"/api/hub/paie-cumul",{headers:{"x-hub-token":TOKEN}}),
       fetch(HUB_BASE+"/api/hub/pay-history",{headers:{"x-hub-token":TOKEN}})
     ]);
-    if(r1.ok){ PCUMUL=await r1.json(); if(PCUMUL) PCUMUL._perime=false; }
+    if(r1.ok){ PCUMUL=await r1.json(); if(PCUMUL){ PCUMUL._perime=false; PCUMUL._luA=Date.now(); } ok=true; }
     else if(PCUMUL){ PCUMUL._perime=true; }   // garde l'ancien affichage MAIS le signale
     if(r2.ok) PCUMUL_HIST=((await r2.json()).history)||[];
-  }catch(e){ /* garde l'ancien affichage en cas de coupure réseau */ }
+  }catch(e){
+    // ⚠️ Une COUPURE RÉSEAU ne marquait PAS le tableau comme périmé : seul un
+    // serveur qui répond en erreur le faisait. Résultat, plus de réseau = l'ancien
+    // tableau restait affiché comme s'il était frais, boutons « Payer » actifs.
+    if(PCUMUL) PCUMUL._perime=true;
+  }
   renderPaieCumul();
+  return ok;
 }
 function renderPaieCumul(){
   const box=$("#paiecumul"); if(!box) return;
@@ -4294,7 +4305,17 @@ Confirmer quand même le paiement de ${va} ?`)){
     return;
   }
 });
-$("#pcumulRefresh").onclick=()=>loadPaieCumul();
+$("#pcumulRefresh").onclick=async(e)=>{
+  const b=e.currentTarget, old=b.textContent;
+  b.disabled=true; b.textContent="⏳";
+  let ok=false;
+  try{ ok=await loadPaieCumul(); }catch(_){ ok=false; }
+  b.disabled=false; b.textContent=old;
+  if(typeof toast==="function"){
+    if(ok) toast("✅ Chiffres recalculés","Le tableau est à jour — tu peux payer.");
+    else toast("❌ Toujours pas de réponse","Le serveur n'a pas répondu. Réessaie dans 2 minutes — <b>ne paie pas d'ici là</b>.");
+  }
+};
 $("#pcumulCopy").onclick=()=>{
   const d=PCUMUL, vas=(d&&d.vas)||[]; if(!vas.length) return;
   const lignes=vas.filter(v=>!v.unpaid&&v.base!=null&&(Number(v.nouveaux)||0)>0)
@@ -4762,7 +4783,7 @@ function renderCohortes(){
   const coh=d.cohorts.map((c,i)=>{
     const prev=d.cohorts[i-1];
     const arr=prev?(c.avg>prev.avg?`<span class="co-up">▲</span>`:c.avg<prev.avg?`<span class="co-dn">▼</span>`:""):"";
-    return `<div class="coh-row"><span class="co-m">${coMoisNom(c.mois)}</span><span class="co-n">${fmtInt(c.fans)} fans</span><span class="co-a">${money(c.avg)} ${arr}</span><span class="co-med">méd. ${money(c.median)}</span></div>`;
+    return `<div class="coh-row"><span class="co-m">${coMoisNom(c.mois)}</span><span class="co-n">${fmtInt(c.fans)} fans</span><span class="co-a">${money(c.avg)} ${arr}</span><span class="co-med" title="Médiane : la moitié des fans de ce mois ont dépensé moins que ça, l'autre moitié plus. Moins sensible qu'une moyenne à un gros dépensier isolé.">la moitié sous ${money(c.median)}</span></div>`;
   }).join("");
   let why="";
   const dr=d.drivers;
@@ -5769,7 +5790,7 @@ function renderOM(){
   // évite de re-diviser mentalement un chiffre déjà net.
   // 🏷️ Tarif de paie lisible, tel que le serveur le calcule (jamais en dur).
   const payTxt = (d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub";
-  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans).<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 <b>LTV</b> = tout ce qu'un abonné t'a rapporté <b>depuis son arrivée</b>, divisé par le nombre d'abonnés — c'est un total sur toute sa vie, <b>pas un montant par mois</b>.<br>La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans).<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // 🧾 Veilleur remboursements/rejets du mois (argent qui REPART). 0 aujourd'hui,
   // s'allume le jour où ça grimpe (fraude, fans mécontents). Source : totals.remboursements.
   const remb = d.totals && d.totals.remboursements;
@@ -7689,7 +7710,7 @@ function renderTresorerie(){
 
   const lignes=d.modeles.map(m=>`<div class="tr-row">
       <span class="n">${escapeHtml(m.nom)}</span>
-      <span class="tr-mode ${m.mode==="manual"?"man":"auto"}">${escapeHtml(m.modeLabel||m.mode)}</span>
+      <span class="tr-mode ${m.mode==="manual"?"man":"auto"}">${escapeHtml(m.modeLabel || (m.mode==="manual"?"à la main":m.mode==="auto"?"automatique":m.mode||""))}</span>
       <span class="d">${money(m.dispo)}</span>
       ${m.attente?`<span class="p">+${money(m.attente)}</span>`:""}
     </div>`).join("");
@@ -7821,7 +7842,7 @@ function renderProxy(){
   const ligne=([key,p])=>{
     const vivant=p.vivant===true;
     const pastille=vivant?"🟢":"🔴";
-    const etat=vivant?`en ligne · IP <b>${escapeHtml(p.ip||"?")}</b>`:`<b style="color:#f87171">ne répond pas</b>${p.erreur?` <span style="color:var(--faint)">(${escapeHtml(p.erreur)})</span>`:""}`;
+    const etat=vivant?`en ligne · IP <b>${escapeHtml(p.ip||"?")}</b>`:`<b style="color:#f87171">ne répond pas</b>${p.erreur?` <span style="color:var(--faint)" title="Détail technique : ${escapeHtml(p.erreur)}">(détail technique masqué)</span>`:""}`;
     return `<div class="sv-row"><span class="sv-name">${pastille} ${noms[key]||key}</span><span class="sv-cell" style="flex:1">${etat}</span></div>`;
   };
   const has4gMort=Array.isArray(d.morts)&&d.morts.indexOf("4g")>=0;
@@ -7863,9 +7884,19 @@ function renderProxy(){
 // j'ai / j'attends sur OnlyFans. Source serveur /api/hub/cash (lecture seule).
 function fmtJourFr(s){ try{ const p=String(s).split("-").map(Number); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}); }catch(e){ return s; } }
 let CASH_DATA=null;
+// ⚠️ `if(!r.ok) return;` sortait SANS re-dessiner : le bouton 🔄 du panneau,
+// qui vient d'être passé à « ⏳ » et désactivé, restait bloqué sur le sablier POUR
+// TOUJOURS. On conclut que l'app est plantée alors que seule la requête a raté.
+// On renvoie maintenant le succès, et on re-dessine dans tous les cas.
 async function loadCash(force){
-  if(!TOKEN) return;
-  try{ const r=await fetch(HUB_BASE+"/api/hub/cash"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; CASH_DATA=await r.json(); renderCash(); }catch(e){}
+  if(!TOKEN) return false;
+  var ok=false;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/cash"+(force?"?force=1":""),{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){ CASH_DATA=await r.json(); ok=true; }
+  }catch(e){}
+  try{ renderCash(); }catch(e){}   // re-dessine même en échec : le bouton se remet
+  return ok;
 }
 function renderCash(){
   const panel=$("#cash"), body=$("#cashBody"); if(!panel||!body) return;
@@ -7905,7 +7936,14 @@ function renderCash(){
     +`<div class="cash-line total"><span>Total à sortir bientôt</span><b>${cur(d.totalASortir)}</b></div></div>`
     +`<div class="cash-block"><div class="cash-h">Ce que tu as / attends</div>${tresoHtml}</div>${verdict}`
     +`<div class="bp-since" style="margin-top:8px"><button class="mn-act-btn" id="cashRefresh" style="padding:6px 12px">🔄 Rafraîchir</button>${d.maj?` <span style="color:var(--faint);font-size:11px">à jour ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
-  const rb=$("#cashRefresh"); if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳"; await loadCash(true); };
+  const rb=$("#cashRefresh"); if(rb) rb.onclick=async()=>{
+    rb.disabled=true; rb.textContent="⏳ Je recalcule…";
+    let ok=false; try{ ok=await loadCash(true); }catch(_){ ok=false; }
+    // renderCash() vient de reconstruire le panneau : ce bouton-ci peut avoir été
+    // remplacé. On remet donc l'état sur le bouton PRÉSENT, pas sur l'ancien.
+    const b2=$("#cashRefresh"); if(b2){ b2.disabled=false; b2.textContent="🔄 Rafraîchir"; }
+    if(!ok && typeof toast==="function") toast("❌ Pas rafraîchi","Le serveur n'a pas répondu — les montants affichés sont ceux d'avant.");
+  };
   if(typeof refreshEssentiel==="function") refreshEssentiel();
 }
 
@@ -8639,10 +8677,10 @@ function essTuilesCatalogue(){
     // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
     {k:"netmois", l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
     {k:"subsauj", l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
-    {k:"apres",   l:"Après la paie",      v:(cd&&!cd.error&&cd.apresPaie!=null)?money(cd.apresPaie):"—"},
+    {k:"apres",   l:"Ce qu'il te resterait après la paie (estimé)", v:(cd&&!cd.error&&cd.apresPaie!=null)?("~"+money(cd.apresPaie)):"—"},
     {k:"tg",      l:"Telegram ce mois",   v:(oc&&oc.totalRevenue!=null)?tgMoney(oc.totalRevenue):(tgM>0?tgMoney(tgM):"—")},
     {k:"ocsolde", l:"Solde OnlyChat",     v:(oc&&oc.solde!=null)?(tgMoney(oc.solde)+(oc.soldeJoursRestants!=null?" · ~"+oc.soldeJoursRestants+" j":"")):"—"},
-    {k:"apayer",  l:"À payer (quinzaine)",v:(st.aPayer!=null)?money(st.aPayer):"—"},
+    {k:"apayer",  l:"À payer si tu soldais la quinzaine",v:(st.aPayer!=null)?money(st.aPayer):"—"},
     {k:"subsq",   l:"Subs quinzaine",     v:(st.subsQuinzaine!=null)?String(st.subsQuinzaine):"—"},
   ];
 }
@@ -9233,7 +9271,7 @@ function renderEntComptes(){
     // page→OF sous la médiane équipe (~76 %) = le public de CE compte est froid.
     const cls=c.tauxClic==null?"mid":(c.tauxClic>=76?"good":(c.tauxClic<60?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">@${escapeHtml(c.insta)} <span style="opacity:.55">· ${escapeHtml(c.va||"?")}</span></span>`
-      +`<span class="sv-cell">${c.vues==null?"vues n/d":`<b>${fmtInt(c.vues)}</b> vues`} → <b>${fmtInt(c.visites)}</b> visites bio → <b>${fmtInt(c.clics)}</b> clics OF</span>`
+      +`<span class="sv-cell">${c.vues==null?"vues pas encore mesurées":`<b>${fmtInt(c.vues)}</b> vues`} → <b>${fmtInt(c.visites)}</b> visites bio → <b>${fmtInt(c.clics)}</b> clics OF</span>`
       +`<span class="sv-part ${cls}" title="Part des visiteurs de sa page bio qui cliquent jusqu'à OnlyFans">${pctFr(c.tauxClic)}</span></div>`;
   }).join("");
   const sansPont=(d.comptesSansPont||[]).slice(0,6).map(c=>`<span class="om-spend-c" style="cursor:default">@${escapeHtml(c.insta)} <i>· ${fmtInt(c.vues)} vues</i></span>`).join("");
@@ -9815,7 +9853,7 @@ function renderPie(){
   const R=52, C=2*Math.PI*R; let off=0;
   const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");
   const legend=entries.map((e,i)=>`<div class="pie-lg"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-nm">${escapeHtml(e[0])}</span><span class="pie-v">${money(e[1])} · ${Math.round(e[1]/total*100)}%</span></div>`).join("");
-  const head=`<div class="pie-total"><span>💰 Total généré ce mois</span><b>${money(total)}</b></div>`;
+  const head=`<div class="pie-total"><span>💰 Total encaissé <b>net</b> ce mois</span><b>${money(total)}</b></div>`;
   $("#pieBody").innerHTML=head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+`<div class="pie-note">OnlyFans en <b>net</b>${tg>0?" + Telegram réunis":""}. Le détail par modèle reste au-dessus.</div>`;
 }
 
