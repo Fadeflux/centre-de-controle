@@ -5815,7 +5815,35 @@ function renderOM(){
         +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
         +`</div>`;
     }).join("");
-    return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows;
+    // 🧮 TOTAL des comptes perso — la question d'André : « combien j'ai gagné
+    // avec mes deux bots ? ». Ils ne sont dans AUCUN total d'équipe (c'est voulu :
+    // ils ne sont ni payés ni classés), donc ce chiffre n'existait nulle part et il
+    // fallait additionner deux lignes de tête. Jamais payés → le net EST la marge.
+    // On n'affiche le total que si TOUS les montants sont connus : additionner en
+    // sautant un montant absent donnerait un total silencieusement trop bas.
+    const heMontantsOk = !ko && ents.length && ents.every(e=>e.revTotal!=null);
+    const heTot = heMontantsOk ? (function(){
+      const brut = ents.reduce((a,e)=>a+(Number(e.revTotal)||0),0);
+      const subs = ents.reduce((a,e)=>a+(Number(e.subsTotal)||0),0);
+      const net  = brut*netRate();
+      const ltv  = subs>0 ? net/subs : null;
+      return `<div class="omv-row omv-hors" style="border-top:1px solid var(--line);font-weight:600">`
+        +`<span class="omv-rank">Σ</span>`
+        +`<span class="omv-va">Total perso</span>`
+        +`<span class="omv-s">${fmtInt(subs)} subs</span>`
+        +`<span class="omv-r">${omMoney(brut,cur)}</span>`
+        +`<span class="omv-l">LTV ${ltv!=null?moneyPrecis(ltv,cur):"—"}</span>`
+        +`<span class="omv-m pos">+${omMoney(Math.round(net),cur)}</span>`
+        +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
+        +`</div>`
+        +`<div class="sv-note" style="margin-top:6px">💰 Tes deux comptes perso t'ont rapporté <b>${omMoney(Math.round(net),cur)} net</b> depuis le début (${omMoney(brut,cur)} brut, moins les ${pctComm()} d'OnlyFans) — et comme tu ne les paies pas, <b>tout est de la marge</b>.</div>`;
+    })() : "";
+    // « — » muet sur TOUTE la ligne = on ne sait pas dire pourquoi. On distingue
+    // « pas encore calculé » (le serveur le dit avec argentPret) de « pas de revenus ».
+    const heAttente = (typeof HORS_EQUIPE_DATA!=="undefined" && HORS_EQUIPE_DATA && HORS_EQUIPE_DATA.argentPret===false)
+      ? `<div class="sv-note" style="margin-top:6px">⏳ Les montants de Bot et Clhoe se calculent encore côté serveur — ils apparaîtront <b>tout seuls</b> ici dans une minute.</div>`
+      : "";
+    return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows+heTot+heAttente;
   })();
   const vaBloc = filtreDispo ? (vaRows+horsRows)
     : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
@@ -10984,6 +11012,14 @@ try{
 function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel();
   // Filet de sécurité : si l'écran du matin est resté ouvert, ses chiffres suivent.
   try{ if(typeof majMorningChiffres==="function") majMorningChiffres(); }catch(e){}
+  // ⚠️ loadHorsEquipe n'était appelé QU'AU CHARGEMENT de la page. Si les montants
+  // n'étaient pas encore prêts à cet instant (le serveur finit son 1er calcul après
+  // un redémarrage : il renvoie alors argentPret=false et des montants à null), le
+  // navigateur gardait ce résultat POUR TOUJOURS — Bot et Clhoe restaient sur
+  // « — » alors que le serveur avait les chiffres 60 s plus tard (mesuré :
+  // Bot 356 $ / LTV 8,48 · Clhoe 1 260 $ / LTV 8,69). Le reste du dashboard se
+  // rafraîchissait normalement, ce qui rendait la panne invisible.
+  try{ if(typeof loadHorsEquipe==="function") loadHorsEquipe(); }catch(e){}
   // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
   // échec — un redéploiement du cerveau au mauvais moment — verrouillait
   // l'écriture pour TOUTE la session, pendant que le reste de la page se
