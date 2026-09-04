@@ -2335,7 +2335,7 @@
   <div class="pair-row">
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
-      <div id="convBody"></div>
+<div id="cookieAlerte" style="display:none"></div><div id="convBody"></div>
     </div>
     <div class="panel-box" id="sources" style="display:none">
       <div class="pb-head">🔗 Qualité de tes sources (par lien)</div>
@@ -3026,7 +3026,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources,
+    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -3545,12 +3545,39 @@ function renderOnlyChat(){
   // par le cerveau sur les transactions). Absent si inconnu — jamais inventé.
   const jrs=d.soldeJoursRestants;
   const jrsTxt=(jrs!=null)?` <span class="oc-solde-j${jrs<=7?" urgent":""}" title="Au rythme actuel (~${d.soldeConsoJour!=null?tgMoney(d.soldeConsoJour):"?"}/jour de commissions)">· ~${jrs} j</span>`:"";
+  // 🧮 CE QUE L'IA COÛTE VRAIMENT, vs ce que le compte de résultat lui facture.
+  // Le panneau Rentabilité estime la commission OnlyChat par une FORMULE
+  // (10 % du net OnlyFans + 15 % du net Telegram). Ici, `soldeConsoJour` est une
+  // MESURE : les prélèvements réels sur le solde prépayé, sur la fenêtre
+  // réellement observée (jusqu'à 7 j). Les deux n'avaient jamais été comparés.
+  // On n'écrase RIEN : on affiche l'écart, en disant que c'est une extrapolation.
+  const coutReel=(function(){
+    const parJour=Number(d.soldeConsoJour);
+    if(!isFinite(parJour) || parJour<=0) return "";   // non mesuré -> on se tait
+    const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const mesure=parJour*dim;
+    // La formule du compte de résultat, avec les mêmes entrées que renderRenta.
+    const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
+    const ofNet=(Number(t.netMonth)||0)*netRate();
+    const tgNet=Number(d.totalRevenue)||0;
+    if(!(ofNet>0||tgNet>0)) return "";
+    const formule=(typeof onlychatFee==="function")?onlychatFee(ofNet,tgNet):(ofNet*0.10+tgNet*0.15);
+    const ecart=mesure-formule;
+    if(!(ecart>formule*0.25)) return "";   // écart négligeable : rien à signaler
+    return `<div class="sv-note" style="margin-top:8px;color:#facc15">⚠️ <b>Ce que l'IA te coûte vraiment.</b>
+      Ton compte de résultat lui facture <b>${tgMoney(Math.round(formule))}</b> ce mois (une formule).
+      Mais sur ton solde prépayé, elle prélève <b>${tgMoney(d.soldeConsoJour)} par jour</b> — soit
+      <b>${tgMoney(Math.round(mesure))}</b> sur un mois complet. Écart : <b>${tgMoney(Math.round(ecart))}</b>,
+      donc ton profit du mois est probablement <b>surestimé d'autant</b>.
+      <span style="opacity:.75">(Le coût par jour est mesuré sur les 7 derniers jours et étendu au mois : à vérifier sur ta facture OnlyChat avant d'en tirer une conclusion définitive.)</span></div>`;
+  })();
   const soldeLigne=(d.solde!=null)
     ? `<div class="oc-solde${soldeBas?" bas":""}" title="Solde prépayé qui finance l'IA de vente — à zéro elle s'arrête (seuil d'alerte : ${seuilSolde} $)">💳 Solde : <b>${tgMoney(d.solde)}</b>${jrsTxt}${soldeBas?" ⚠️ recharge bientôt":""}</div>`
     : "";
   $("#onlychatBody").innerHTML = `
     <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
     ${soldeLigne}
+    ${coutReel}
     ${tgToday!=null?`<div class="oc-today">📅 Aujourd'hui <b>${tgMoney(tgToday)}</b></div>`:""}
     ${goalBlock}
     <div class="oc-stats">
@@ -5073,6 +5100,15 @@ function renderGoal(data){
     const projFin=FG?toNet(FG.value):(day>0&&current>0?Math.round(current/day*dim):null);
     if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(toNet(FG.value))}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(toNet(FG.low))} – ${fmt(toNet(FG.high))})</span>`:""}</div>`; }
     else if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; }
+    // 👥 Le serveur prédit AUSSI le nombre d'abonnés de fin de mois, avec la même
+    // méthode que la prévision d'argent. Il n'était affiché nulle part : l'objectif
+    // d'abonnés se pilotait donc à l'aveugle, alors que le chiffre existe.
+    try{
+      const _fs=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.subs)||null;
+      if(_fs && _fs.value!=null && !(typeof HIDE!=="undefined"&&HIDE)){
+        proj+=`<div class="goal-proj" style="opacity:.85">👥 Et côté abonnés : <b>${fmtInt(_fs.value)}</b> prévus fin de mois${_fs.low!=null?` <span style="opacity:.75">(${fmtInt(_fs.low)} – ${fmtInt(_fs.high)})</span>`:""}</div>`;
+      }
+    }catch(e){}
     // 🎯 VERDICT « en danger » : au rythme actuel, on rate l'objectif ? On chiffre
     // le manque ET le rythme/jour qu'il faudrait pour rattraper — avant qu'il soit
     // trop tard. (objectif « revenus » uniquement ; les subs se jugent autrement.)
@@ -8570,8 +8606,21 @@ function renderCharge(){
   const panel=$("#charge"), body=$("#chargeBody"); if(!panel||!body) return;
   const d=CHARGE_DATA; SAT_FLAGS=[];
   if(!TOKEN||!d||!Array.isArray(d.vas)){ panel.style.display="none"; if(typeof renderActions==="function") renderActions(); return; }
+  // ⚠️ Ce filtre écartait les VA à 0 post sur les DEUX semaines — autrement dit,
+    // celui qui s'est complètement arrêté était le SEUL qu'on ne voyait pas. Il ne
+    // passait pas au rouge : il disparaîssait. On les sort à part, en haut.
   const vas=d.vas.filter(v=>v&&((v.posts7||0)>0||(v.postsPrev7||0)>0));
-  if(!vas.length){ panel.style.display="none"; if(typeof renderActions==="function") renderActions(); return; }
+  const arretes=d.vas.filter(v=>v&&!((v.posts7||0)>0||(v.postsPrev7||0)>0));
+  // `lastPost` était envoyé par le serveur et lu nulle part : c'est pourtant la
+  // seule façon de dire DEPUIS QUAND quelqu'un s'est arrêté.
+  const _joursDepuis=(iso)=>{ const t=Date.parse(iso||""); return isNaN(t)?null:Math.floor((Date.now()-t)/86400000); };
+  const blocArretes=arretes.length
+    ? `<div class="sv-note" style="color:#facc15;margin-bottom:8px">🚫 <b>N'ont rien posté depuis 2 semaines :</b> `
+      + arretes.map(v=>{ const j=_joursDepuis(v.lastPost); return `${escapeHtml(v.va)}${j!=null?` (${j} j)`:""}`; }).join(" · ")
+      + `</div>`
+    : "";
+  if(!vas.length && !arretes.length){ panel.style.display="none"; if(typeof renderActions==="function") renderActions(); return; }
+  if(!vas.length){ panel.style.display="block"; body.innerHTML=blocArretes; if(typeof renderActions==="function") renderActions(); return; }
   const maxP=Math.max(1,...vas.map(v=>v.posts7||0));
   const sorted=vas.map(v=>v.posts7||0).slice().sort((a,b)=>a-b);
   const med=sorted[Math.floor(sorted.length/2)]||0;
@@ -8595,9 +8644,9 @@ function renderCharge(){
     const p=v.posts7||0;
     let badge=(p>=med*1.5 && p>=6)?`<span class="ch-badge fond">⚡ à fond</span>`:(p<=Math.max(1,med*0.5))?`<span class="ch-badge marge">🌱 de la marge</span>`:"";
     if(sat.indexOf(v)>=0) badge=`<span class="ch-badge sat">🔴 saturé</span>`;
-    return `<div class="ch-row"><div class="ch-bar-wrap"><span class="ch-bar" style="width:${Math.max(4,Math.round(p/maxP*100))}%"></span></div><div class="ch-info"><div class="ch-name">${escapeHtml(v.va)} ${badge}</div><div class="ch-meta">${p} post${p>1?"s":""}/sem · ${_fmtVues(v.views7)} vues${(v.subsQ!=null)?` · ${v.subsQ} subs`:""}</div></div></div>`;
+    return `<div class="ch-row"><div class="ch-bar-wrap"><span class="ch-bar" style="width:${Math.max(4,Math.round(p/maxP*100))}%"></span></div><div class="ch-info"><div class="ch-name">${escapeHtml(v.va)} ${badge}</div><div class="ch-meta">${p} post${p>1?"s":""}/sem · ${_fmtVues(v.views7)} vues${(v.subsQ!=null)?` · ${v.subsQ} subs`:""}${(function(){ const j=_joursDepuis(v.lastPost); return (j!=null&&j>=2)?` · <span style="color:#facc15">rien depuis ${j} j</span>`:""; })()}</div></div></div>`;
   }).join("");
-  body.innerHTML=`<div class="cac-intro">Effort (posts Instagram, 7 derniers jours) vs résultat (vues, subs). Qui est à fond, qui a de la marge pour produire plus, et qui poste beaucoup pour rien.</div>${satHtml}${rows}`;
+  body.innerHTML=`<div class="cac-intro">Effort (posts Instagram, 7 derniers jours) vs résultat (vues, subs). Qui est à fond, qui a de la marge pour produire plus, et qui poste beaucoup pour rien.</div>${blocArretes}${satHtml}${rows}`;
   try{ fixPairs(); }catch(e){}
 }
 
@@ -9225,6 +9274,34 @@ async function loadHorsEquipe(){
     HORS_EQUIPE_DATA=await r.json(); renderClassement();
   }catch(e){}
 }
+// 🍪 COOKIE GetMySocial : il expire tous les ~30 jours et NE SE RENOUVELLE PAS
+// tout seul. Quand il meurt, les liens de tracking des VA s'arrêtent en silence
+// et la panne se découvre par un VA qui n'arrive plus à travailler. Le serveur
+// sait dire combien de jours il reste (/api/hub/cookie) — la route n'était
+// appelée par personne.
+let COOKIE_DATA=null;
+async function loadCookie(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/cookie",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    COOKIE_DATA=await r.json(); renderCookie();
+  }catch(e){}
+}
+function renderCookie(){
+  const el=$("#cookieAlerte"); if(!el) return;
+  const d=COOKIE_DATA, j=(d&&d.jours!=null)?Number(d.jours):null;
+  // Absent = on ne sait pas : on n'affiche rien plutôt qu'un faux « tout va bien ».
+  if(j==null){ el.style.display="none"; el.innerHTML=""; return; }
+  if(j>7){ el.style.display="none"; el.innerHTML=""; return; }   // rien à signaler
+  const urgent=j<=2;
+  el.style.display="block";
+  el.className="sv-note";
+  el.style.color=urgent?"#f87171":"#facc15";
+  el.innerHTML=(j<0)
+    ? `🚨 <b>Le cookie GetMySocial a expiré</b> (le ${escapeHtml(d.expire_le||"?")}). Les liens de tracking de tes VA ne fonctionnent plus — leurs abonnés ne sont plus comptés. À remplacer maintenant.`
+    : `${urgent?"🚨":"⚠️"} <b>Cookie GetMySocial : ${j} jour${j>1?"s":""} restant${j>1?"s":""}</b> (expire le ${escapeHtml(d.expire_le||"?")}). Il ne se renouvelle pas tout seul : quand il meurt, les liens de tes VA s'arrêtent <b>sans alerte</b> et leurs abonnés cessent d'être comptés.`;
+}
 let CONV_DATA=null;
 // ⏱️ QUAND UN ABONNÉ DEVIENT UN CLIENT (idée 3)
 // Vient de OM_DATA.delaiDollar — aucun chargement séparé.
@@ -9588,7 +9665,8 @@ function renderConversion(){
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>
       <span class="sv-cell"><b>${v.clics.toLocaleString("fr-FR")}</b> clics → <b>${v.subs}</b> abonnés</span>
       <span class="sv-part ${cls}">${String(v.cvr).replace(".",",")} %</span>
-      <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b><span style="opacity:.6"> (depuis le début)</span>`:""}</span></div>`;
+      <span class="sv-sugg sv-cell">${val?`1 abonné vaut <b>${money(val)}</b><span style="opacity:.6"> (depuis le début)</span>`:""}</span></div>
+      ${(v.tauxPayeur!=null||v.parSub!=null)?`<div class="sv-row" style="padding-top:0;border-top:0"><span class="sv-name"></span><span class="sv-cell" style="opacity:.85">${v.tauxPayeur!=null?`<b>${String(v.tauxPayeur).replace(".",",")} %</b> de ses abonnés sortent la carte`:""}${(v.tauxPayeur!=null&&v.parSub!=null)?" · ":""}${v.parSub!=null?`<b>${money(v.parSub)}</b> rapportés par abonné amené <span style="opacity:.6">(sur ${d.days} j)</span>`:""}</span></div>`:""}`;
   }).join("");
   const pires=(d.liens||[]).slice(0,3).map(l=>`<div class="sv-row"><span class="sv-cell">🚩 <b>${escapeHtml(l.lien)}</b> ${l.model?"("+escapeHtml(l.model)+")":""}</span><span class="sv-cell sv-sugg"><b>${l.clics}</b> clics → <b>${l.subs}</b> abonnés · <b>${String(l.cvr).replace(".",",")} %</b></span></div>`).join("");
   // 🎭 Par MODÈLE : à trafic comparable, celui qui convertit moins a un souci de
@@ -11139,6 +11217,7 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
   // Bot 356 $ / LTV 8,48 · Clhoe 1 260 $ / LTV 8,69). Le reste du dashboard se
   // rafraîchissait normalement, ce qui rendait la panne invisible.
   try{ if(typeof loadHorsEquipe==="function") loadHorsEquipe(); }catch(e){}
+  try{ if(typeof loadCookie==="function") loadCookie(); }catch(e){}
   // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
   // échec — un redéploiement du cerveau au mauvais moment — verrouillait
   // l'écriture pour TOUTE la session, pendant que le reste de la page se
