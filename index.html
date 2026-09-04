@@ -8065,8 +8065,59 @@ function renderCac(){
   // NE PAS y appliquer fmtLtv/netRate ici : ce serait une double décote (~25 %
   // trop bas) et le verdict « rentable / coûte + qu'il ne vaut » basculerait à
   // tort. Note laissée exprès : une revue a déjà proposé de « corriger » ce point.
+  // 💵 LE VRAI PLANCHER D'UN ABONNÉ — la paie n'est pas ton seul coût.
+  // Ce panneau compare la valeur d'un abonné à la seule PAIE (0,50 $). Mais tes
+  // outils tournent tous les mois quel que soit le nombre d'abonnés : ramenés au
+  // nombre d'abonnés du mois, ils relèvent le seuil sous lequel un abonné te fait
+  // PERDRE de l'argent. ⚠️ COSTS est une saisie manuelle : si la liste est vide,
+  // on ne présente PAS 0,50 $ comme un plancher complet.
+  const plancher=(function(){
+    const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
+    const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+((typeof coutMensuel==="function")?coutMensuel(c):0),0):0;
+    const sm=Number(((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{}).subsMonth)||0;
+    if(!(tarif>0)) return "";
+    if(!(outils>0) || !(sm>0)){
+      return `<div class="cac-intro" style="margin-top:10px;color:var(--muted)">ℹ️ Ce tableau compare la valeur d'un abonné à sa <b>paie seule</b> (${moneyPrecis(tarif,"$")}). Tes <b>outils</b> coûtent en plus, tous les mois — renseigne-les dans « Dépenses d'outils » et je te dirai le <b>vrai</b> seuil sous lequel un abonné te fait perdre de l'argent.</div>`;
+    }
+    const parSub=outils/sm, tot=tarif+parSub;
+    return `<div class="cac-intro" style="margin-top:10px;color:#facc15">⚠️ <b>Un abonné ne te coûte pas ${moneyPrecis(tarif,"$")}, mais ${moneyPrecis(tot,"$")}</b> — ${moneyPrecis(tarif,"$")} de paie + ${moneyPrecis(parSub,"$")} d'outils, répartis sur tes <b>${fmtInt(sm)}</b> abonnés de ce mois. <b>En dessous de ${moneyPrecis(tot,"$")} de valeur nette, un abonné te fait perdre de l'argent.</b> <span style="opacity:.75">(Les outils tournent même sans abonné : plus tu en ramènes, plus cette part baisse.)</span></div>`;
+  })();
+
+  // ⚖️ PAYER AU MÉRITE — simulation, rien n'est appliqué.
+  // Tu paies le même tarif à tout le monde alors qu'un abonné vaut du simple au
+  // triple selon qui l'amène. Deux façons de différencier, chiffrées.
+  // ⚠️ v.ltv est DÉJÀ NET (cf. note ci-dessus) — aucune décote à appliquer.
+  // ⚠️ Un VA sans LTV mesurée est EXCLU de la simulation, jamais compté à 0.
+  const merite=(function(){
+    const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
+    const ok=vas.filter(v=>v && v.ltv!=null && Number(v.subs)>0);
+    if(!(tarif>0) || ok.length<2) return "";
+    const totSubs=ok.reduce((a,v)=>a+Number(v.subs),0);
+    const totValeur=ok.reduce((a,v)=>a+Number(v.subs)*Number(v.ltv),0);
+    const totPaie=totSubs*tarif;
+    if(!(totValeur>0) || !(totPaie>0)) return "";
+    const part=totPaie/totValeur;                    // ce que tu reverses aujourd'hui, en % de la valeur
+    const exclus=vas.length-ok.length;
+    // A) à budget constant : on redistribue le même total au prorata de la valeur.
+    // B) personne ne baisse : on garde le tarif actuel comme plancher.
+    const lignes=ok.slice().sort((a,b)=>Number(b.ltv)-Number(a.ltv)).map(v=>{
+      const tA=Number(v.ltv)*part, tB=Math.max(tarif,tA);
+      return `<div class="cac-row"><div class="cac-name">${escapeHtml(v.va)} <span style="opacity:.7;font-weight:400">1 abonné vaut ${moneyPrecis(Number(v.ltv),"$")}</span></div>`
+        +`<div class="cac-cells"><span>${fmtInt(v.subs)} subs</span><span>aujourd'hui <b>${moneyPrecis(tarif,"$")}</b></span>`
+        +`<span>à budget égal <b>${moneyPrecis(tA,"$")}</b></span>`
+        +`<span>sans baisser personne <b>${moneyPrecis(tB,"$")}</b></span></div></div>`;
+    }).join("");
+    const coutB=ok.reduce((a,v)=>a+Number(v.subs)*Math.max(tarif,Number(v.ltv)*part),0);
+    return `<details class="mn-hist" style="margin-top:12px"><summary>⚖️ Et si je payais au mérite ? (simulation — rien n'est appliqué)</summary>
+      <div class="cac-intro">Tu paies <b>${moneyPrecis(tarif,"$")}</b> à tout le monde, alors qu'un abonné vaut de <b>${moneyPrecis(Math.min.apply(null,ok.map(v=>Number(v.ltv))),"$")}</b> à <b>${moneyPrecis(Math.max.apply(null,ok.map(v=>Number(v.ltv))),"$")}</b> selon qui l'amène. Aujourd'hui tu reverses <b>${Math.round(part*100)} %</b> de ce qu'un abonné rapporte. Deux façons de différencier, sur cette quinzaine :</div>
+      ${lignes}
+      <div class="cac-intro" style="margin-top:8px">À <b>budget égal</b>, tu paies toujours <b>${moneyPrecis(totPaie,"$")}</b> — mais l'argent va vers ceux qui amènent des abonnés qui payent. <b>Sans baisser personne</b>, tu paierais <b>${moneyPrecis(coutB,"$")}</b>, soit <b>${moneyPrecis(coutB-totPaie,"$")} de plus</b>.</div>
+      <div class="cac-intro" style="opacity:.8">⚠️ Ce sont des chiffres, pas une recommandation : baisser la paie de quelqu'un a un coût humain que ce tableau ne voit pas. Et la valeur d'un abonné bouge d'une quinzaine à l'autre — regarde-la sur plusieurs avant de changer un tarif.${exclus>0?` ${exclus} VA sans valeur mesurée ${exclus>1?"sont exclus":"est exclu"} de ce calcul.`:""}</div>
+    </details>`;
+  })();
   body.innerHTML=`<div class="cac-intro">Quinzaine ${escapeHtml(d.curLabel||"")} — ce que tu paies pour chaque abonné ramené, comparé à ce qu'un abonné de ce VA rapporte (LTV <b>nette</b>, après commission OnlyFans — même base que le coût, qui est du cash réel). Les moins rentables en haut.</div>${rows}`
-    +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`);
+    +(d.ltvSource?"":`<div class="cac-intro" style="color:#facc15">Valeur d'un sub indisponible (revenus non lus) — comparaison partielle.</div>`)
+    +plancher+merite;
 }
 
 // 🔗 #4 QUALITÉ DES SOURCES : tes liens de tracking classés par conversion
