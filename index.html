@@ -3311,6 +3311,10 @@ async function loadOnlyChat(){
   // L'écran du matin s'ouvre souvent AVANT que la donnée OnlyChat n'arrive
   // (chargements en parallèle) : on remplit/actualise sa bannière solde ici.
   try{ if(typeof majMornSolde==="function") majMornSolde(); }catch(e){}
+  // … et ses CHIFFRES : le Telegram arrive souvent après OnlyMonster, donc après
+  // l'ouverture de l'écran. Sans ce rappel, le « Net du mois » de l'écran du matin
+  // restait sur la valeur sans Telegram (ou sur « — ») jusqu'à sa fermeture.
+  try{ if(typeof majMorningChiffres==="function") majMorningChiffres(); }catch(e){}
 }
 // 🗓️ Relire les briefings passés — le serveur les garde déjà (setting
 // hub_brief_history, ~30 entrées, endpoint /api/hub/brief-history) : il ne
@@ -6447,6 +6451,7 @@ async function loadOM(){
      ["simulateur",typeof renderSim3==="function"?renderSim3:null],
      ["série",typeof renderStreak==="function"?renderStreak:null],
      ["coaching",typeof renderCoaching==="function"?renderCoaching:null],
+     ["écran du matin",typeof majMorningChiffres==="function"?majMorningChiffres:null],
      ["essentiel",refreshEssentiel]]
       .forEach(([nom,fn])=>{ if(!fn) return; try{ fn(); }catch(err){ console.error("[panneau "+nom+"] "+(err&&err.message)); } });
   }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); else majFraicheurOM(); }
@@ -6865,24 +6870,16 @@ function paceVerdict(){
   return {up:false,text:`🔴 En retard : ${pct}% vs le mois dernier. Il te faut ~${fmtN(need*netRate())}/jour pour rattraper.`};
 }
 let COACH_MODE="morning";
-function renderMorning(){
+// 💰 Bloc chiffres de l'écran du matin — SORTI de renderMorning pour pouvoir le
+// rafraîchir SEUL quand les données arrivent, sans reconstruire tout le modal (ce
+// qui effacerait le texte du coach déjà chargé). Symptôme corrigé : après un
+// rechargement, ouvrir l'écran du matin tout de suite affichait « — » partout et
+// le chiffre n'arrivait JAMAIS — rien ne repeignait ce bloc une fois les données là.
+function mnMoneyHtml(){
   const ev=COACH_MODE==="evening";
-  const name=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"toi";
-  const streak=computeStreak();
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
   const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
-  const h=new Date().getHours(), hi=ev?"Bonne soirée":(h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir");
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
-  const verdict=paceVerdict();
-  // Matin = tâches à faire ; soir = ce qu'il reste + ce qui est déjà noté pour demain.
-  const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
-  const na=LAST_NA;
-  const QUOTES=["Chaque sub compte. Reste constant.","Le succès = la somme de petits efforts répétés.","Concentre-toi sur ce qui rapporte.","Un VA motivé vaut dix VA à surveiller.","Discipline > motivation.","Ce que tu mesures, tu l'améliores.","Aujourd'hui, fais mieux qu'hier.","Les détails font la différence.","Avance, même d'un petit pas.","Ton business grandit pendant que tu bosses."];
-  const quote=QUOTES[new Date().getDate()%QUOTES.length];
-  $("#morningBody").innerHTML=`
-    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnExpress" title="Version express : chiffres + action">⚡</button><button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
-    <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
-    <div class="mn-money">${(function(){
       // Net d'abord (× 0,78), brut en petit — et surtout le CA D'AUJOURD'HUI en
       // argent (pas juste les subs). `om.netToday` = CA brut du jour EN COURS.
       // 📲 Revenus Telegram (saisis à la main) ajoutés au Net du mois — sinon
@@ -6914,10 +6911,28 @@ function renderMorning(){
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${ajSplit}
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
-    })()}</div>
-    ${revKo()?`<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`:""}<div id="mnSolde"></div><div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button><button class="mn-coach-play" id="mnCoachHist" title="Relire les briefings des jours passés">🗓️</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
+}
+function renderMorning(){
+  const ev=COACH_MODE==="evening";
+  const name=(typeof NAMES!=="undefined"&&NAMES[(typeof WHO!=="undefined")?WHO:"moi"])||"toi";
+  const streak=computeStreak();
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
+  const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
+  const h=new Date().getHours(), hi=ev?"Bonne soirée":(h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir");
+  const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
+  const verdict=paceVerdict();
+  // Matin = tâches à faire ; soir = ce qu'il reste + ce qui est déjà noté pour demain.
+  const tasks=[]; ["moi","general"].forEach(k=>{ ((typeof TASKS!=="undefined"&&TASKS[k])||[]).filter(t=>!t.done).forEach(t=>tasks.push(t)); }); const shown=tasks.slice(0,6);
+  const na=LAST_NA;
+  const QUOTES=["Chaque sub compte. Reste constant.","Le succès = la somme de petits efforts répétés.","Concentre-toi sur ce qui rapporte.","Un VA motivé vaut dix VA à surveiller.","Discipline > motivation.","Ce que tu mesures, tu l'améliores.","Aujourd'hui, fais mieux qu'hier.","Les détails font la différence.","Avance, même d'un petit pas.","Ton business grandit pendant que tu bosses."];
+  const quote=QUOTES[new Date().getDate()%QUOTES.length];
+  $("#morningBody").innerHTML=`
+    <div class="mn-top"><div class="mn-hi">${hi} ${escapeHtml(name)} ${ev?"🌙":"👋"}</div><div style="display:flex;gap:10px;align-items:center">${streak>0?`<span class="mn-streak">🔥 ${streak} j${STREAK_GOAL?" 🎯":""}</span>`:""}<button class="mn-close" id="mnExpress" title="Version express : chiffres + action">⚡</button><button class="mn-close" id="mnSpeak" title="Écouter mon résumé">🔊</button><button class="mn-close" id="mnClose">✕</button></div></div>
+    <div class="mn-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
+    <div class="mn-money">${mnMoneyHtml()}</div>
+    <div id="mnEtatRev">${mnBanniereRevenus()}</div><div id="mnSolde"></div><div class="mn-coach" id="mnCoach" style="display:none"><div class="mn-coach-hd">${ev?"🌙 Ton coach du soir":"🎙️ Ton coach du matin"} <button class="mn-coach-play" id="mnCoachPlay">🔊 Écouter</button><button class="mn-coach-play" id="mnCoachNew" title="Réécrire un briefing neuf avec les chiffres à jour">🔄</button><button class="mn-coach-play" id="mnCoachHist" title="Relire les briefings des jours passés">🗓️</button></div><div class="mn-coach-txt" id="mnCoachTxt"></div><div class="mn-coach-act" id="mnCoachAct" style="display:none"></div><div class="mn-coach-msg" id="mnCoachMsg" style="display:none"></div><div class="mn-coach-mem" id="mnCoachMem"></div></div>
     <details class="mn-hist" id="mnHist" style="display:none"><summary>🗂️ Mes derniers coachs</summary><div id="mnHistList"></div></details>
-    ${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}
+    <div id="mnVerdictBox">${verdict?`<div class="mn-verdict ${verdict.up?"up":"dn"}">${verdict.text}</div>`:""}</div>
     ${na&&!ev?`<div class="mn-next">👉 ${na.icon||""} <b>${escapeHtml(na.text||"")}</b></div>`:""}
     <div class="mn-tasks"><h4>${ev?"📋 À préparer pour demain":"📋 Ta journée"} ${shown.length?`(${tasks.length})`:""}</h4>${shown.length?shown.map(t=>`<div class="mn-task">⬜ ${escapeHtml(t.text)}</div>`).join(""):`<div style="color:var(--muted);font-size:14px">Rien pour l'instant 🎉</div>`}</div>
     <div class="mn-quote">💬 ${escapeHtml(quote)}</div>
@@ -6952,6 +6967,39 @@ function renderMorning(){
 // l'écran du matin / la carte partageable affichaient un « 0 $ » présenté comme
 // un vrai chiffre — exactement la règle « absent ≠ zéro » qu'on s'impose.
 function revKo(){ try{ return (typeof OM_DATA==="undefined" || !OM_DATA || !!OM_DATA.revenusIndisponibles); }catch(e){ return true; } }
+// ⏳ « pas encore arrivé » ≠ « injoignable ». Juste après un rechargement, OM_DATA
+// est vide pendant quelques secondes : revKo() répondait « vrai » et l'écran du
+// matin affichait le bandeau ROUGE « Revenus indisponibles · API injoignable »,
+// alors que la requête était simplement en route.
+function revEnAttente(){
+  try{
+    if(typeof TOKEN==="undefined" || !TOKEN) return false;          // mode démo : rien à attendre
+    if(typeof OM_DATA!=="undefined" && OM_DATA) return false;        // déjà là
+    return true;
+  }catch(e){ return false; }
+}
+function mnBanniereRevenus(){
+  if(revEnAttente()) return `<div class="mn-coach"><div class="mn-coach-hd">⏳ Chiffres en cours de chargement</div><div class="mn-coach-txt">Ils s'afficheront <b>tout seuls</b> ici, sans rien toucher. Compte quelques secondes — et parfois <b>1 à 2 minutes juste après un rechargement</b>, le temps que le serveur recalcule tes chiffres OnlyMonster. Inutile de recharger à nouveau : ça repart de zéro à chaque fois.</div></div>`;
+  if(revKo()) return `<div class="mn-coach" style="border-left-color:#f87171"><div class="mn-coach-hd" style="color:#f87171">⚠️ Revenus indisponibles</div><div class="mn-coach-txt">Les chiffres d'argent n'ont pas pu être lus (API OnlyMonster injoignable). Ce n'est PAS zéro — les abonnés ci-dessus restent justes. Réessaie dans quelques minutes.</div></div>`;
+  return "";
+}
+// Repeint UNIQUEMENT les chiffres de l'écran du matin (et le verdict de rythme),
+// si l'écran est ouvert. Appelé dès que les données arrivent : OnlyMonster,
+// OnlyChat/Telegram, et le tour de rafraîchissement général.
+function majMorningChiffres(){
+  const box=$("#morning"); if(!box || !box.classList.contains("show")) return;
+  const zone=box.querySelector(".mn-money"); if(!zone) return;
+  const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, tot=om.totals||{}, cur=om.currency||"$";
+  zone.innerHTML=mnMoneyHtml();
+  const et=$("#mnEtatRev"); if(et) et.innerHTML=mnBanniereRevenus();
+  const vb=$("#mnVerdictBox");
+  if(vb){ const v=paceVerdict(); vb.innerHTML=v?`<div class="mn-verdict ${v.up?"up":"dn"}">${v.text}</div>`:""; }
+  // Même animation qu'au premier rendu, mais seulement quand un vrai chiffre existe.
+  const _tg=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
+  const mv=$("#mnMoney");
+  if(mv && !(typeof HIDE!=="undefined"&&HIDE) && !revKo() && tot.netMonth!=null) animateCount(mv,tot.netMonth*netRate()+_tg,v=>moneyPrecis(v,cur));
+  try{ majMornSolde(); }catch(e){}
+}
 function moneyOuTiret(v, f){ return revKo() ? "—" : f(v); }
 let COACH_TEXT="", COACH_ACTION="";
 // ✅ L'action du jour sortie du briefing : un clic la met dans tes tâches (tag
@@ -10934,6 +10982,8 @@ try{
 // à l'instant » rafraîchi par les autres appels — donc un chiffre périmé
 // présenté comme frais. Ajouté à la boucle comme loadCash/loadCharge.
 function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ load(); loadOM(); loadCash(); loadCharge(); loadJournal(); loadSms(); loadFanRadar(); loadGhosts(); loadPaieCumul(); if(typeof loadOnlyChat==="function") loadOnlyChat(); refreshEssentiel();
+  // Filet de sécurité : si l'écran du matin est resté ouvert, ses chiffres suivent.
+  try{ if(typeof majMorningChiffres==="function") majMorningChiffres(); }catch(e){}
   // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
   // échec — un redéploiement du cerveau au mauvais moment — verrouillait
   // l'écriture pour TOUTE la session, pendant que le reste de la page se
