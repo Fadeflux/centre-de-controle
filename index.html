@@ -3568,21 +3568,26 @@ function renderOnlyChat(){
     const parJour=Number(d.soldeConsoJour);
     if(!isFinite(parJour) || parJour<=0) return "";   // non mesuré -> on se tait
     const now=new Date(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-    const mesure=parJour*dim;
+    // ⚠️ CORRIGÉ : on comparait une mesure étendue à 30 JOURS à une formule
+    // calculée sur les revenus du mois À CE JOUR (5 jours le 5 du mois). L'écart
+    // annoncé était donc gonflé du rapport dim/jour — à son maximum le 1er du mois,
+    // nul le dernier. On compare désormais des $/JOUR, la seule base où les deux
+    // côtés parlent de la même période.
+    const jourDuMois=Math.max(1,now.getDate());
     // La formule du compte de résultat, avec les mêmes entrées que renderRenta.
     const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
     const ofNet=(Number(t.netMonth)||0)*netRate();
     const tgNet=Number(d.totalRevenue)||0;
     if(!(ofNet>0||tgNet>0)) return "";
     const formule=(typeof onlychatFee==="function")?onlychatFee(ofNet,tgNet):(ofNet*0.10+tgNet*0.15);
-    const ecart=mesure-formule;
-    if(!(ecart>formule*0.25)) return "";   // écart négligeable : rien à signaler
+    const formuleJour=formule/jourDuMois;          // ce que la formule facture, par jour
+    const ecartJour=parJour-formuleJour;
+    if(!(ecartJour>formuleJour*0.25)) return "";   // écart négligeable : rien à signaler
     return `<div class="sv-note" style="margin-top:8px;color:#facc15">⚠️ <b>Ce que l'IA te coûte vraiment.</b>
-      Ton compte de résultat lui facture <b>${tgMoney(Math.round(formule))}</b> ce mois (une formule).
-      Mais sur ton solde prépayé, elle prélève <b>${tgMoney(d.soldeConsoJour)} par jour</b> — soit
-      <b>${tgMoney(Math.round(mesure))}</b> sur un mois complet. Écart : <b>${tgMoney(Math.round(ecart))}</b>,
-      donc ton profit du mois est probablement <b>surestimé d'autant</b>.
-      <span style="opacity:.75">(Le coût par jour est mesuré sur les 7 derniers jours et étendu au mois : à vérifier sur ta facture OnlyChat avant d'en tirer une conclusion définitive.)</span></div>`;
+      Ton compte de résultat lui facture l'équivalent de <b>${tgMoney(formuleJour)} par jour</b> (une formule sur tes revenus).
+      Sur ton solde prépayé, elle prélève <b>${tgMoney(parJour)} par jour</b> (mesuré).
+      Écart : <b>${tgMoney(ecartJour)} par jour</b>, soit <b>~${tgMoney(Math.round(ecartJour*dim))} sur un mois</b> de profit probablement surestimé.
+      <div style="margin-top:4px;opacity:.75">⚠️ À confirmer sur ta facture avant d'en tirer une conclusion : le coût/jour est mesuré sur 7 jours, et ce solde finance l'IA sur <b>Telegram ET OnlyFans</b> — il n'est donc pas imputable au seul Telegram. Ton abonnement fixe peut aussi y passer, alors qu'il est déjà compté dans « Dépenses d'outils ».</div></div>`;
   })();
   const soldeLigne=(d.solde!=null)
     ? `<div class="oc-solde${soldeBas?" bas":""}" title="Solde prépayé qui finance l'IA de vente — à zéro elle s'arrête (seuil d'alerte : ${seuilSolde} $)">💳 Solde : <b>${tgMoney(d.solde)}</b>${jrsTxt}${soldeBas?" ⚠️ recharge bientôt":""}</div>`
@@ -8134,8 +8139,17 @@ function renderCac(){
     if(!(outils>0) || !(sm>0)){
       return `<div class="cac-intro" style="margin-top:10px;color:var(--muted)">ℹ️ Ce tableau compare la valeur d'un abonné à sa <b>paie seule</b> (${moneyPrecis(tarif,"$")}). Tes <b>outils</b> coûtent en plus, tous les mois — renseigne-les dans « Dépenses d'outils » et je te dirai le <b>vrai</b> seuil sous lequel un abonné te fait perdre de l'argent.</div>`;
     }
-    const parSub=outils/sm, tot=tarif+parSub;
-    return `<div class="cac-intro" style="margin-top:10px;color:#facc15">⚠️ <b>Un abonné ne te coûte pas ${moneyPrecis(tarif,"$")}, mais ${moneyPrecis(tot,"$")}</b> — ${moneyPrecis(tarif,"$")} de paie + ${moneyPrecis(parSub,"$")} d'outils, répartis sur tes <b>${fmtInt(sm)}</b> abonnés de ce mois. <b>En dessous de ${moneyPrecis(tot,"$")} de valeur nette, un abonné te fait perdre de l'argent.</b> <span style="opacity:.75">(Les outils tournent même sans abonné : plus tu en ramènes, plus cette part baisse.)</span></div>`;
+    // ⚠️ CORRIGÉ : `outils` est un coût de MOIS COMPLET, `subsMonth` le cumul du
+    // mois À CE JOUR. Diviser 30 jours de charges par 5 jours d'abonnés gonflait
+    // la part outils du rapport dim/jour (jusqu'à ×6 en début de mois) — assez
+    // pour faire passer des VA parfaitement rentables sous le seuil, donc pour
+    // provoquer exactement la mauvaise décision de paie que ce bloc doit éviter.
+    // On rapporte les abonnés au mois COMPLET, au rythme actuel.
+    const jourDuMois=Math.max(1,new Date().getDate());
+    const dimMois=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+    const smProj=sm*dimMois/jourDuMois;
+    const parSub=outils/smProj, tot=tarif+parSub;
+    return `<div class="cac-intro" style="margin-top:10px;color:#facc15">⚠️ <b>Un abonné ne te coûte pas ${moneyPrecis(tarif,"$")}, mais ${moneyPrecis(tot,"$")}</b> — ${moneyPrecis(tarif,"$")} de paie + ${moneyPrecis(parSub,"$")} d'outils, répartis sur les <b>~${fmtInt(smProj)}</b> abonnés que tu feras ce mois à ton rythme actuel (${fmtInt(sm)} en ${jourDuMois} jour${jourDuMois>1?"s":""}). <b>En dessous de ${moneyPrecis(tot,"$")} de valeur nette, un abonné te fait perdre de l'argent.</b> <span style="opacity:.75">(Les outils tournent même sans abonné : plus tu en ramènes, plus cette part baisse.)</span></div>`;
   })();
 
   // ⚖️ PAYER AU MÉRITE — simulation, rien n'est appliqué.
@@ -8145,7 +8159,12 @@ function renderCac(){
   // ⚠️ Un VA sans LTV mesurée est EXCLU de la simulation, jamais compté à 0.
   const merite=(function(){
     const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
-    const ok=vas.filter(v=>v && v.ltv!=null && Number(v.subs)>0);
+    // ⚠️ Plancher d'effectif : une LTV mesurée sur 2 abonnés n'est pas une règle.
+    // Le bloc « cohorte » applique déjà ce seuil (15) ; celui-ci ne le faisait pas et
+    // proposait un tarif individuel calibré sur n=2.
+    const MIN_SUBS_TARIF=15;
+    const ok=vas.filter(v=>v && v.ltv!=null && Number(v.subs)>=MIN_SUBS_TARIF);
+    const tropPeu=vas.filter(v=>v && v.ltv!=null && Number(v.subs)>0 && Number(v.subs)<MIN_SUBS_TARIF).length;
     if(!(tarif>0) || ok.length<2) return "";
     const totSubs=ok.reduce((a,v)=>a+Number(v.subs),0);
     const totValeur=ok.reduce((a,v)=>a+Number(v.subs)*Number(v.ltv),0);
@@ -8167,7 +8186,7 @@ function renderCac(){
       <div class="cac-intro">Tu paies <b>${moneyPrecis(tarif,"$")}</b> à tout le monde, alors qu'un abonné vaut de <b>${moneyPrecis(Math.min.apply(null,ok.map(v=>Number(v.ltv))),"$")}</b> à <b>${moneyPrecis(Math.max.apply(null,ok.map(v=>Number(v.ltv))),"$")}</b> selon qui l'amène. Aujourd'hui tu reverses <b>${Math.round(part*100)} %</b> de ce qu'un abonné rapporte. Deux façons de différencier, sur cette quinzaine :</div>
       ${lignes}
       <div class="cac-intro" style="margin-top:8px">À <b>budget égal</b>, tu paies toujours <b>${moneyPrecis(totPaie,"$")}</b> — mais l'argent va vers ceux qui amènent des abonnés qui payent. <b>Sans baisser personne</b>, tu paierais <b>${moneyPrecis(coutB,"$")}</b>, soit <b>${moneyPrecis(coutB-totPaie,"$")} de plus</b>.</div>
-      <div class="cac-intro" style="opacity:.8">⚠️ Ce sont des chiffres, pas une recommandation : baisser la paie de quelqu'un a un coût humain que ce tableau ne voit pas. Et la valeur d'un abonné bouge d'une quinzaine à l'autre — regarde-la sur plusieurs avant de changer un tarif.${exclus>0?` ${exclus} VA sans valeur mesurée ${exclus>1?"sont exclus":"est exclu"} de ce calcul.`:""}</div>
+      <div class="cac-intro" style="opacity:.8">⚠️ Ce sont des chiffres, pas une recommandation : baisser la paie de quelqu'un a un coût humain que ce tableau ne voit pas. Et la valeur d'un abonné bouge d'une quinzaine à l'autre — regarde-la sur plusieurs avant de changer un tarif.${exclus>0?` ${exclus} VA sans valeur mesurée ${exclus>1?"sont exclus":"est exclu"}.`:""}${tropPeu>0?` ${tropPeu} VA écarté${tropPeu>1?"s":""} aussi : moins de ${MIN_SUBS_TARIF} abonnés sur la quinzaine, trop peu pour fixer un tarif.`:""}</div>
     </details>`;
   })();
   body.innerHTML=`<div class="cac-intro">Quinzaine ${escapeHtml(d.curLabel||"")} — ce que tu paies pour chaque abonné ramené, comparé à ce qu'un abonné de ce VA rapporte (LTV <b>nette</b>, après commission OnlyFans — même base que le coût, qui est du cash réel). Les moins rentables en haut.</div>${rows}`
