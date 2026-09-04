@@ -2828,7 +2828,11 @@ function render(data){
   // Hors monde Noctra, le profit n'est pas « 0 » : il est HORS PÉRIMÈTRE → null
   // (→ « — »), sinon on affichait « Profit du mois : 0 $ » comme une mesure.
   const pf = inWorld(toolById("noctra-finance")) ? gg("noctra-finance","profitMonth") : null;
-  tiles.push(`<div class="tile"><div class="lbl">Profit du mois</div><div class="val">${tiret(pf,fmtMoney)}</div></div>`);
+  // ⚠️ Le panneau « Rentabilité du mois » affiche AUSSI un « Profit », calculé
+  // ici même à partir d'OnlyMonster. Celui-ci vient d'un AUTRE outil (Noctra
+  // Finance) : même mot, deux sources, donc deux montants qui n'ont aucune raison
+  // de coïncider. On nomme la source au lieu de laisser croire à une erreur.
+  tiles.push(`<div class="tile"><div class="lbl" title="Chiffre venu de Noctra Finance (ta compta). Le panneau « Rentabilité du mois » en calcule un autre à partir d'OnlyMonster : les deux n'ont pas le même périmètre, c'est normal qu'ils diffèrent.">Profit du mois <i style="opacity:.6;font-style:normal">· Noctra Finance</i></div><div class="val">${tiret(pf,fmtMoney)}</div></div>`);
   { const sumHtml=tiles.join(""); const s=$("#summary"); if(s && s._lastHtml!==sumHtml){ s.innerHTML=sumHtml; s._lastHtml=sumHtml; } }
   { const sumEl=$("#summary"); if(sumEl && !sumEl.dataset.anim && (typeof HIDE==="undefined"||!HIDE) && typeof animateCount==="function"){ sumEl.dataset.anim="1"; sumEl.querySelectorAll(".tile:not(.hero) .val").forEach(el=>{ const raw=el.textContent; const neg=/[-−]/.test(raw); const num=parseInt(raw.replace(/[^\d]/g,""),10); if(!isNaN(num)&&num>0){ const val=neg?-num:num; const isMoney=/\$/.test(raw); animateCount(el,val,v=>{ v=Math.round(v); return isMoney? v.toLocaleString("fr-FR")+" $" : v.toLocaleString("fr-FR"); }); } }); } }
 
@@ -4795,7 +4799,7 @@ function renderCohortes(){
       +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
       +`<div class="co-facts">`
       +`<div>Dépense moy. 30 j : <b>${money(dr.avgRecent)}</b> (${coMoisNom(dr.moisRecent)}) vs ${money(dr.avgPrec)} (${coMoisNom(dr.moisPrec)}) → <b>${dr.delta>=0?"+":""}${money(dr.delta)}</b></div>`
-      +`<div>Cause : ${facteur}. Effet mix ${money(dr.mixEffect)} · effet taux ${money(dr.rateEffect)}.</div>`
+      +`<div>Cause : ${facteur}.<br><span style="opacity:.8">${money(dr.mixEffect)} vient du fait que ce ne sont pas les mêmes VA qui amènent les fans ce mois-ci · ${money(dr.rateEffect)} vient du fait que chaque VA convertit mieux ou moins bien qu'avant.</span></div>`
       +`<div>Baleine : le plus gros fan pèse ${String(dr.whaleRecent).replace(".",",")} % (vs ${String(dr.whalePrec).replace(".",",")} %) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
       +`</div></div>`;
   } else if(d.soloDrivers && d.soloDrivers.perSrc && d.soloDrivers.perSrc.length){
@@ -6421,7 +6425,7 @@ function renderRenta(){
     <div class="rn-line"><span>− Coûts des outils</span><span class="rn-v neg">−${money(coutOutils)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     ${ocFee>0?`<div class="rn-line"><span>− Commission OnlyChat (10 % OF + 15 % Telegram)</span><span class="rn-v neg">−${money(ocFee)}</span></div>`:""}
-    <div class="rn-line rn-total"><span>= Profit net estimé (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
+    <div class="rn-line rn-total"><span>= Profit net estimé ici, à partir d'OnlyMonster (avant part modèle)</span><span class="rn-v ${profitReel>=0?'pos':'neg'}">${profitReel>=0?'':'−'}${money(Math.abs(profitReel))}</span></div>
     ${taxLines}
     <div class="rn-tax-set">🧾 Mettre de côté pour impôts/charges : <input type="number" id="taxRate" min="0" max="60" step="1" value="${TAX}" inputmode="numeric"> % <button class="mn-act-btn" id="taxSave">OK</button></div>
     <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNetMois())}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut OnlyFans → ${money(projNet*netRate())} net${projTg>0?" + "+money(projTg)+" Telegram projeté":""})</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
