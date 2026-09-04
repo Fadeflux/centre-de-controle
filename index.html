@@ -4087,7 +4087,22 @@ async function loadJournal(){
 function fmtCur(v){ return HIDE ? "••• $" : ((v==null || !isFinite(Number(v))) ? "—" : fmtMoney(v)); }
 /* ---------- cahier de paie ---------- */
 let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=[];
-function curPeriod(){ const n=new Date(); return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+(n.getDate()<=15?"A":"B"); }
+// ⚠️ Le navigateur est à Paris (UTC+2 l'été), le serveur en heure métier (UTC+1) :
+// entre 00 h et 01 h du 1er ou du 16, le navigateur est déjà au jour suivant et le
+// serveur non. La quinzaine écrite dans le cahier de paie ne correspondait alors
+// pas à celle que le serveur calcule — le paiement n'était pas reconnu.
+// RÈGLE : une date qui sert à lire ou écrire une donnée SERVEUR vient du SERVEUR.
+// `OM_DATA.today` est déjà envoyé à chaque rafraîchissement.
+function jourServeur(){
+  try{
+    const t=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.today)?String(OM_DATA.today):"";
+    if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  }catch(e){}
+  // Repli : la date LOCALE (jamais toISOString, qui est de l'UTC).
+  const n=new Date();
+  return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");
+}
+function curPeriod(){ const j=jourServeur(); return j.slice(0,7)+"-"+(Number(j.slice(8,10))<=15?"A":"B"); }
 function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x.period===p); }
 // ⚠️ On n'envoie PLUS toute la liste : elle écrasait le cahier côté serveur, et
 // un paiement fait entre-temps (paie au cumul, autre onglet, 2e instance)
@@ -6391,11 +6406,20 @@ function caNetMois(){
 // panneaux plus bas « projection 8 750 $ » — même mois, même mot « net ».
 // Ici : prévision intelligente si le serveur en donne une, sinon au rythme du
 // mois ; convertie en net et augmentée du Telegram (déjà net), comme caNetMois.
+// ⚠️ `new Date().getDate()` est le jour du NAVIGATEUR. Le 1er du mois entre 00 h
+// et 01 h (Paris l'été), il dit « jour 1 » alors que le serveur est encore au 30 ou
+// 31 : on divisait un mois COMPLET par 1, d'où des projections multipliées par 30.
+// `jourDuMoisServeur()` suit la même règle que jourServeur().
+function jourDuMoisServeur(){ return Number(jourServeur().slice(8,10))||1; }
+function joursDuMoisServeur(){
+  const j=jourServeur(), y=Number(j.slice(0,4)), m=Number(j.slice(5,7));
+  return new Date(y, m, 0).getDate();
+}
 function projBrutOF(){
   const om=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}), t=om.totals||{};
   const F=(om.forecast&&om.forecast.net&&Number(om.forecast.net.value))?Number(om.forecast.net.value):null;
   if(F!=null) return F;
-  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const day=jourDuMoisServeur(), dim=joursDuMoisServeur();
   const nm=Number(t.netMonth)||0;
   return day>0 ? (nm/day*dim) : nm;
 }
@@ -6405,7 +6429,7 @@ function projBrutOF(){
 // projetait déjà le Telegram) sortait SUPÉRIEURE à la projection de CA.
 function tgProjMois(){
   const tg=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
-  const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const day=jourDuMoisServeur(), dim=joursDuMoisServeur();
   return day>0 ? (tg/day*dim) : tg;
 }
 function projNetMois(){ return projBrutOF()*netRate()+tgProjMois(); }
@@ -6653,7 +6677,10 @@ function renderSplit(){
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
-  const wKey="ccn_split_w_"+new Date().toISOString().slice(0,7);
+  // ⚠️ Clé en UTC : le 1er du mois entre 00 h et 02 h, tout montant tapé ici était
+  // écrit sous le mois PRÉCÉDENT et disparaissait à 02 h. C'est un champ d'argent,
+  // en mémoire locale, sans aucune trace.
+  const wKey="ccn_split_w_"+((typeof jourServeur==="function")?jourServeur():new Date().toISOString()).slice(0,7);
   let w={}; try{ w=JSON.parse(localStorage.getItem(wKey)||"{}"); }catch(e){}
   const wMe=Number(w.me)||0, wOther=Number(w.other)||0;
   panel.style.display="block";
@@ -8203,8 +8230,11 @@ function renderCac(){
     // pour faire passer des VA parfaitement rentables sous le seuil, donc pour
     // provoquer exactement la mauvaise décision de paie que ce bloc doit éviter.
     // On rapporte les abonnés au mois COMPLET, au rythme actuel.
-    const jourDuMois=Math.max(1,new Date().getDate());
-    const dimMois=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+    // Même règle : le jour vient du SERVEUR. Le 1er entre 00 h et 01 h, le navigateur
+    // disait « jour 1 » et le seuil de rentabilité tombait à 0,66 $ au lieu de ~1,20 $ :
+    // tous les VA passaient pour rentables, sur l'écran qui sert à décider de la paie.
+    const jourDuMois=Math.max(1,jourDuMoisServeur());
+    const dimMois=joursDuMoisServeur();
     const smProj=sm*dimMois/jourDuMois;
     const parSub=outils/smProj, tot=tarif+parSub;
     return `<div class="cac-intro" style="margin-top:10px;color:#facc15">⚠️ <b>Un abonné ne te coûte pas ${moneyPrecis(tarif,"$")}, mais ${moneyPrecis(tot,"$")}</b> — ${moneyPrecis(tarif,"$")} de paie + ${moneyPrecis(parSub,"$")} d'outils, répartis sur les <b>~${fmtInt(smProj)}</b> abonnés que tu feras ce mois à ton rythme actuel (${fmtInt(sm)} en ${jourDuMois} jour${jourDuMois>1?"s":""}). <b>En dessous de ${moneyPrecis(tot,"$")} de valeur nette, un abonné te fait perdre de l'argent.</b> <span style="opacity:.75">(Les outils tournent même sans abonné : plus tu en ramènes, plus cette part baisse.)</span></div>`;
@@ -8282,7 +8312,13 @@ function renderSources(L){
 
 // 🆚 #7 COMPARAISON SUR MESURE : deux plages de dates au choix → CA + subs.
 // À la DEMANDE (le calcul interroge OnlyMonster), pas au refresh auto.
-function _dateShift(days){ const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+// ⚠️ setDate/getDate sont LOCAUX, toISOString est UTC : mélangés, les quatre dates
+// par défaut du comparateur reculaient d'un jour entier chaque nuit entre 00 h et
+// 02 h. On croyait comparer les 7 derniers jours, hier était exclu en silence.
+function _dateShift(days){
+  const d=new Date(); d.setDate(d.getDate()+days);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
 let COMPARE_DATA=null;
 async function loadCompare(a1,a2,b1,b2){
   if(!TOKEN) return; const res=$("#cmpRes");
