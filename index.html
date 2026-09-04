@@ -223,6 +223,15 @@
     /* Croix « supprimer » : ~13×23 px au doigt, dont deux sur des lignes d'ARGENT
        (une dépense fixe, une recette Telegram). */
     .co-del,.tg-del,.al-del,.ti-del{min-width:38px;min-height:38px;padding:8px}
+    /* Ces trois-là portent l'info nécessaire pour INTERPRÉTER le chiffre du dessus
+       (détail du socle, libellé d'une tuile Telegram) : pas de la décoration. */
+    .cc-hint{font-size:12px;color:var(--muted)}
+    .oc-stat span{font-size:12px}
+    /* Le <summary> est le SEUL élément qui ouvre la simulation de paie. */
+    .mn-hist summary{min-height:38px;padding:9px 0}
+    /* Grille 2x2 stable : sinon le retour à la ligne tombe ailleurs sur chaque
+       VA et on ne peut plus lire « à budget égal » en colonne pour comparer. */
+    .cac-cells>span{flex:1 1 46%}
     /* Radar fans : 5 enfants dont 4 incompressibles — le nom du fan tombait à
        ~80 px et se coupait en « Fan #4… ». */
     .fr-row{flex-wrap:wrap}
@@ -1296,6 +1305,11 @@
   .om-rec-w{margin-top:6px;font-size:11.5px;color:#facc15}
   .omv-rank{width:18px;color:var(--faint);font-size:12px;text-align:center;flex-shrink:0}
   .omv-va{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Même mise en page, mais SANS le comportement cliquable : ces libellés ne
+     correspondent à aucune fiche VA, et `.omv-va` est captée par un écouteur
+     global qui tente d'en ouvrir une (clic sans effet, et sans message).
+     Pas de `nowrap` ici : ces libellés sont longs et doivent pouvoir se replier. */
+  .omv-lbl{flex:1;font-weight:500;min-width:0;overflow-wrap:anywhere}
   .omv-s{color:var(--muted);white-space:nowrap}
   .omv-r{font-weight:600;white-space:nowrap;min-width:60px;text-align:right}
   .omv-l{color:var(--faint);font-size:12px;white-space:nowrap;min-width:66px;text-align:right}
@@ -1990,6 +2004,7 @@
 <div class="banner" id="banner"></div>
 
 <div class="alert" id="alert"></div>
+<div id="cookieAlerte" style="display:none"></div>
 
 <div class="daily" id="daily"></div>
 
@@ -2348,7 +2363,7 @@
   <div class="pair-row">
     <div class="panel-box" id="conv" style="display:none">
       <div class="pb-head">🎯 Conversion : clics → abonnés</div>
-<div id="cookieAlerte" style="display:none"></div><div id="convBody"></div>
+<div id="convBody"></div>
     </div>
     <div class="panel-box" id="sources" style="display:none">
       <div class="pb-head">🔗 Qualité de tes sources (par lien)</div>
@@ -3103,6 +3118,10 @@ function rerenderMoney(){
    // appelés que dans loadAll). Après un clic sur 🙈 — le moment où l'on tend son
    // écran à quelqu'un — ils gardaient leurs montants en clair POUR TOUJOURS.
    typeof renderTgVa==="function"?renderTgVa:null, typeof renderIaHumain==="function"?renderIaHumain:null,
+   // ⚠️ renderRachat AUSSI : le bloc « payé vs rapporté » ajouté aujourd'hui montre
+   // trois montants par ligne, et son seul appelant est la boucle de loadOM — donc
+   // jusqu'à 60 s en clair après un clic sur 🙈. Même oubli que renderTgVa plus haut.
+   typeof renderRachat==="function"?renderRachat:null,
    function(){ renderPaie(LAST); }]
     .forEach(f=>{ try{ if(typeof f==="function") f(); }catch(e){} });
 }
@@ -6034,13 +6053,17 @@ function renderOM(){
     //    subsTotalReel - subsTotal, invisible jusqu'ici.
     const autres=(traces!=null&&perso!=null)?Math.max(0,traces-equipe-perso):null;
     const sansLien=(reel!=null&&traces!=null)?Math.max(0,reel-traces):null;
-    const li=(lbl,val,aide)=>`<div class="omv-row"><span class="omv-rank"></span><span class="omv-va" title="${aide||""}">${lbl}</span><span class="omv-s">${val!=null?fmtInt(val)+" sub"+(val>1?"s":""):"—"}</span><span class="omv-r"></span><span class="omv-l"></span><span class="omv-m"></span><span class="omv-roi"></span></div>`;
+    // `omv-lbl` et pas `omv-va` : `.omv-va` est captée par un écouteur global qui
+    // ouvre la fiche d'un VA — sur « TOTAL réel » ou « Venus seuls » le clic ne
+    // faisait RIEN, sans le moindre message. Et plus de spans vides : leurs
+    // largeurs planchers (260 px) poussaient des lignes fantômes sur mobile.
+    const li=(lbl,val,aide)=>`<div class="omv-row"><span class="omv-rank"></span><span class="omv-lbl" title="${aide||""}">${lbl}</span><span class="omv-s">${val!=null?fmtInt(val)+" sub"+(val>1?"s":""):"—"}</span></div>`;
     return `<div class="om-hors-head">🧮 D'où viennent TOUS tes abonnés (depuis le début)</div>`
       +li("Ton équipe (VA payés)", equipe, "Somme des abonnés amenés par les VA du classement ci-dessus.")
       +li("Tes comptes perso (Bot + Clhoe)", perso, "Jamais payés : tout ce qu'ils rapportent est de la marge.")
       +(autres!=null&&autres>0?li("Autres liens", autres, "Rattachés à un lien de tracking, mais à personne de la liste (ancien VA, lien non nommé)."):"")
       +li("Venus seuls (sans lien)", sansLien, "Abonnés arrivés sans passer par un lien de tracking : ni l'équipe ni les bots ne les ont amenés.")
-      +`<div class="omv-row" style="border-top:1px solid var(--line);font-weight:600"><span class="omv-rank">Σ</span><span class="omv-va">TOTAL réel</span><span class="omv-s">${reel!=null?fmtInt(reel)+" sub"+(reel>1?"s":""):"—"}</span><span class="omv-r"></span><span class="omv-l"></span><span class="omv-m"></span><span class="omv-roi"></span></div>`
+      +`<div class="omv-row" style="border-top:1px solid var(--line);font-weight:600"><span class="omv-rank">Σ</span><span class="omv-lbl">TOTAL réel</span><span class="omv-s">${reel!=null?fmtInt(reel)+" sub"+(reel>1?"s":""):"—"}</span></div>`
       +(sansLien!=null&&reel>0?`<div class="sv-note" style="margin-top:6px">💡 <b>${Math.round(sansLien/reel*100)} %</b> de tes abonnés sont venus <b>sans lien de tracking</b> — personne n'est payé pour eux, et ils n'apparaissent dans aucun classement.</div>`:"")
       +(reel==null?`<div class="sv-note" style="margin-top:6px">⚠️ Le total réel n'a pas pu être mesuré (un compte n'a pas répondu) — ce n'est pas zéro.</div>`:"");
   })();
@@ -7994,7 +8017,11 @@ function renderProxy(){
     ? `<div class="sv-note" style="margin-top:8px;color:#f87171">⚠️ Ton proxy résidentiel est à sec — ton scraping de vues Instagram va se figer. Vérifie l'abonnement/les identifiants du proxy.</div>`
     : has4gMort
       ? `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent par le résidentiel. Le 4G (secours) est à sec, mais ce n'est pas bloquant.</div>`
-      : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`;
+      : ((d&&d.sante&&d.sante.capReached)
+          // Le bandeau de plafond dit « tes vues ne sont plus rafraîchies » : ce
+          // « ✅ tout va bien » le contredisait, collé juste en dessous.
+          ? ""
+          : `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent bien par ces IP.</div>`);
   // ⚠️ PLAFOND QUOTIDIEN. Le serveur envoie `sante.capReached` (+ le compteur) :
   // une fois atteint, le scraping passe en mode dégradé et les vues Instagram ne
   // sont PLUS rafraîchies jusqu'au lendemain. Ce drapeau n'était lu nulle part :
@@ -9432,6 +9459,11 @@ async function loadCookie(){
   }catch(e){}
 }
 function renderCookie(){
+  // ⚠️ Ce bandeau vivait DANS le panneau Conversion — qui se masque quand il n'a
+  // pas de données. Or ces données viennent des liens de tracking GetMySocial,
+  // c'est-à-dire la source qui MEURT quand le cookie expire : l'alerte se cachait
+  // exactement dans le cas de panne qu'elle doit signaler. Elle est maintenant
+  // dans le bandeau d'alertes du haut, qui ne dépend d'aucun panneau.
   const el=$("#cookieAlerte"); if(!el) return;
   const d=COOKIE_DATA, j=(d&&d.jours!=null)?Number(d.jours):null;
   // Absent = on ne sait pas : on n'affiche rien plutôt qu'un faux « tout va bien ».
