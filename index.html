@@ -3077,6 +3077,13 @@ async function doLogin(){
   // ce que l'utilisateur voit correspond enfin à ce que le serveur autorise.
   // (Jusqu'ici, la vue associé n'était qu'un habillage : l'API répondait tout à
   // tout le monde, il suffisait de l'appeler directement.)
+  // ⚠️ LE RÔLE N'ÉTAIT MÉMORISÉ NULLE PART. Il vivait en variable locale de
+  // `doLogin`, à côté de `ccn_token`, `ccn_who` et `ccn_name` qui, eux, sont
+  // écrits. La vue associé ne s'appliquait donc **qu'au moment du login** : le
+  // jeton survivant au rechargement, l'associée restait connectée sans jamais
+  // repasser par ici, et rien ne remettait la vue. Un clic sur « Quitter »
+  // suffisait à tout découvrir — définitivement.
+  if(role){ try{ localStorage.setItem("ccn_role", role); }catch(e){} }
   if(role==="associe"){
     localStorage.setItem("ccn_assoc","1");
     try{ if(typeof applyAssoc==="function") applyAssoc(); }catch(e){}
@@ -11034,6 +11041,12 @@ async function doRestore(file){
 { const rb=$("#restore"), rf=$("#restoreFile"); if(rb&&rf){ rb.onclick=()=>rf.click(); rf.onchange=()=>{ const f=rf.files&&rf.files[0]; if(f) doRestore(f); rf.value=""; }; } }
 
 /* ---------- 👥 #10 vue associé (présentation lecture seule) ---------- */
+// Un compte ASSOCIÉ (le rôle rendu par le serveur à la connexion) n'a pas le droit
+// de quitter la vue associé. Toi, si. Sans jeton, on ne conclut rien.
+function estCompteAssocie(){
+  try{ return TOKEN && localStorage.getItem("ccn_role") === "associe"; }
+  catch(e){ return false; }
+}
 function applyAssoc(){
   const on=localStorage.getItem("ccn_assoc")==="1";
   document.body.classList.toggle("assoc-mode", on);
@@ -11058,7 +11071,17 @@ function applyAssoc(){
   let b=$("#assocBanner");
   if(on){
     if(!b){ b=document.createElement("div"); b.id="assocBanner"; b.innerHTML=`👥 <b>Vue associé</b> — lecture seule, chiffres sensibles masqués <button id="assocExit">Quitter</button>`; document.body.appendChild(b);
-      const ex=b.querySelector("#assocExit"); if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_assoc","0"); applyAssoc(); }; }
+      // ⚠️ LE BOUTON « QUITTER » ÉTAIT OFFERT À L'ASSOCIÉE ELLE-MÊME. Un clic et
+      // tout revenait : CA, marges, profit, partage, paie de chaque VA, Telegram,
+      // comptes perso — et ça ne se remettait JAMAIS, même après rechargement.
+      // Sur un navigateur neuf, `ccn_hide` n'existe pas, donc le repli remettait
+      // aussi tous les montants en clair. La vue associé n'était pas une
+      // protection, c'était une politesse.
+      // Le bouton reste pour TOI (tu l'utilises pour vérifier ce qu'elle voit) ;
+      // pour un compte associé, il n'existe plus.
+      const ex=b.querySelector("#assocExit");
+      if(estCompteAssocie()){ if(ex) ex.remove(); }
+      else if(ex) ex.onclick=()=>{ localStorage.setItem("ccn_assoc","0"); applyAssoc(); }; }
   } else if(b){ b.remove(); }
   try{ if(typeof refreshSecnav==="function") refreshSecnav(); }catch(e){}
   // Recale la mise en page tout de suite (demi-colonnes vides sinon jusqu'au
@@ -11070,6 +11093,17 @@ function applyAssoc(){
   try{ if(typeof refreshPrintSummary==="function") refreshPrintSummary(); }catch(e){}
 }
 { const b=$("#assocView"); if(b) b.onclick=()=>{ const on=localStorage.getItem("ccn_assoc")==="1"; localStorage.setItem("ccn_assoc", on?"0":"1"); applyAssoc(); if(!on && typeof toast==="function") toast("👥 Vue associé activée","Chiffres sensibles masqués. Clique « Quitter » pour revenir."); }; }
+// ⚠️ AU CHARGEMENT, la vue associé se REMET pour un compte associé — quoi qu'il
+// y ait dans ce navigateur. C'est ce qui manquait : le rôle n'était consulté qu'au
+// login, donc un rechargement (ou un « Quitter ») laissait tout découvert pour de
+// bon. On force aussi le mode discret : sur un navigateur neuf, `ccn_hide` n'existe
+// pas et les montants sortaient en clair.
+if(estCompteAssocie()){
+  try{
+    localStorage.setItem("ccn_assoc","1");
+    if(localStorage.getItem("ccn_hide")!=="1"){ localStorage.setItem("ccn_hide","1"); HIDE=true; }
+  }catch(e){}
+}
 applyAssoc();
 
 /* ---------- 🩺 #14 diagnostic santé complet ---------- */
