@@ -2699,8 +2699,13 @@ const TOOLS = [
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"caMonth",l:"CA du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
+  // ⚠️ `comptesActifs` AJOUTÉ le 05/09. La carte annonçait « 128 comptes bloqués »
+  // sans jamais dire SUR COMBIEN : impossible de savoir si c'est 128 sur 1000
+  // (ennuyeux) ou 128 sur 170 (le parc est mort). Le worker renvoie le chiffre
+  // depuis toujours dans `/hub/stats`, la carte ne le demandait pas.
+  // Mesuré ce jour-là : 40 actifs, 128 bloqués, 811 alertes jamais lues.
   { id:"noctra-ig-worker", world:"noctra", cat:"Noctra", name:"Publication IG", icon:"▶", openUrl:"https://noctra-ig-worker-production.up.railway.app",
-    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesActifs",l:"Comptes qui peuvent publier",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesATraiter",l:"Alertes à traiter (graves, 48 h)",f:fmtInt}] },
   { id:"noctra-tw-worker", world:"noctra", cat:"Noctra", name:"Twitter", icon:"𝕏", openUrl:"https://noctra-tw-worker-production.up.railway.app",
     metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesNonLues",l:"Alertes",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
@@ -2738,7 +2743,7 @@ const DEMO = {
   "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]},vas:[{va:"Welzy",subs:120,pay:60},{va:"Prince",subs:88,pay:44},{va:"Yohan",subs:66,pay:33}]},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
-  "noctra-ig-worker":{status:"online",metrics:{postsJour:9,comptesKo:0,alertesNonLues:0},prev:{postsJour:7},series:{postsJour:[4,7,9,12,10,8,9]}},
+  "noctra-ig-worker":{status:"online",metrics:{postsJour:9,comptesActifs:12,comptesKo:0,alertesATraiter:0},prev:{postsJour:7},series:{postsJour:[4,7,9,12,10,8,9]}},
   "noctra-tw-worker":{status:"online",metrics:{postsJour:6,comptesKo:0,alertesNonLues:0},prev:{postsJour:5},series:{postsJour:[3,5,6,8,7,5,6]}},
   "onlymonster":{status:"online",metrics:{revMonth:2870,revPeriod:1240},prev:{revMonth:2510}},
   "sms":{status:"online",metrics:{diddysms:38,getatext:8}},
