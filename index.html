@@ -3095,7 +3095,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
+    loadPaieRoles, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -3176,12 +3176,16 @@ function rerenderMoney(){
 let TODOS = lsJSON("ccn_todos",[]);
 let todoSyncT = null;
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+// Même verrou que RULES / DECISIONS / VANOTES / COSTS / REMINDERS : la liste
+// part ENTIÈRE au serveur, donc cocher une case avant la fin de
+// `loadTodosFromBrain` effaçait toutes les tâches saisies sur un autre appareil.
+let TODOS_LOADED=false, TODOS_DIRTY=false;
 function saveTodos(){
   localStorage.setItem("ccn_todos", JSON.stringify(TODOS));
-  if(TOKEN && HUB_URL){
-    clearTimeout(todoSyncT);
-    todoSyncT = setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:TODOS})}).catch(()=>{}); }, 600);
-  }
+  if(!(TOKEN && HUB_URL)) return;
+  if(!TODOS_LOADED){ TODOS_DIRTY=true; return; }
+  clearTimeout(todoSyncT);
+  todoSyncT = setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:TODOS})}).catch(()=>{}); }, 600);
 }
 function renderTodos(){
   const done = TODOS.filter(t=>t.d).length;
@@ -3197,15 +3201,31 @@ $("#todoInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ addTodo(e.t
 $("#todoList").addEventListener("click",e=>{
   const tg=e.target.closest("[data-toggle]"), dl=e.target.closest("[data-del]");
   if(tg){ const i=+tg.getAttribute("data-toggle"); if(TODOS[i]){ TODOS[i].d=!TODOS[i].d; saveTodos(); renderTodos(); } }
-  else if(dl){ const i=+dl.getAttribute("data-del"); TODOS.splice(i,1); saveTodos(); renderTodos(); }
+  else if(dl){
+    // ⚠️ La croix ✕ est à côté de la case à cocher, et la suppression était
+    // immédiate, définitive et SANS retour possible — la tâche part aussi du
+    // serveur à la seconde suivante. On nomme ce qu'on efface.
+    const i=+dl.getAttribute("data-del");
+    const t=TODOS[i]; if(!t) return;
+    if(!confirm("Supprimer \u00ab "+String(t.t).slice(0,80)+" \u00bb ?\n\nC'est d\u00e9finitif, sur tous tes appareils.")) return;
+    TODOS.splice(i,1); saveTodos(); renderTodos();
+  }
 });
 async function loadTodosFromBrain(){
-  if(!TOKEN || !HUB_URL) return;
+  if(!TOKEN || !HUB_URL){ TODOS_LOADED=true; return; }
   try{
     const r = await fetch(HUB_BASE+"/api/hub/notes",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
     if(!r.ok) return;
     const j = await r.json();
-    if(Array.isArray(j.notes)){ TODOS = j.notes; localStorage.setItem("ccn_todos",JSON.stringify(TODOS)); renderTodos(); }
+    if(Array.isArray(j.notes)){
+      const srv=j.notes;
+      // Reprise : les tâches ajoutées pendant que le serveur était muet.
+      if(TODOS_DIRTY){ const vus=new Set(srv.map(x=>x&&x.t)); TODOS.forEach(x=>{ if(x&&!vus.has(x.t)) srv.unshift(x); }); }
+      TODOS = srv; localStorage.setItem("ccn_todos",JSON.stringify(TODOS));
+      TODOS_LOADED=true;
+      if(TODOS_DIRTY){ TODOS_DIRTY=false; saveTodos(); }
+      renderTodos();
+    }
   }catch(e){}
 }
 renderTodos();
@@ -3231,7 +3251,12 @@ $("#rappels").addEventListener("click",e=>{ const b=e.target.closest("[data-rap]
 renderRappels();
 
 /* ---------- dépenses d'outils ---------- */
-let COSTS = lsJSON("ccn_costs",[]), COSTS_LOADED=false;
+// ⚠️ `COSTS_DIRTY` manquait alors que ses trois sœurs (RULES, DECISIONS,
+// VANOTES) l'ont : le verrou `if(!COSTS_LOADED) return;` empêchait bien
+// l'écrasement du serveur, mais une dépense tapée pendant la panne n'était
+// JAMAIS repoussée ensuite — `COSTS=j.outils` l'écrasait à la reprise. La
+// dépense disparaît donc du total, de la rentabilité et de la prévision.
+let COSTS = lsJSON("ccn_costs",[]), COSTS_LOADED=false, COSTS_DIRTY=false;
 function saveCosts(){
   localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
   // On pousse aussi au cerveau : c'est lui qui tourne 24h/24 et qui pourra te
@@ -3240,7 +3265,7 @@ function saveCosts(){
   // lecture serveur n'a pas réussi, on garde tout en local et on ne POSTe RIEN,
   // sinon un ajout fait avant la fin de loadCosts écrase la liste du serveur.
   if(typeof TOKEN!=="undefined" && TOKEN){
-    if(!COSTS_LOADED) return;
+    if(!COSTS_LOADED){ COSTS_DIRTY=true; return; }
     fetch(HUB_BASE+"/api/hub/tool-costs",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({outils:COSTS})}).catch(()=>{});
   }
 }
@@ -3258,8 +3283,16 @@ async function loadCosts(){
     // sur le PC, puis le prochain saveCosts() les renvoyait au serveur —
     // exactement la résurrection que ce bloc prétendait empêcher.
     if(Array.isArray(j.outils)){
-      COSTS=j.outils; localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
+      const srv=j.outils;
+      // Rattrapage : ce qui a été saisi pendant que le serveur était muet.
+      // On compare sur le nom + le montant, faute d'identifiant sur ces lignes.
+      if(COSTS_DIRTY){
+        const vus=new Set(srv.map(x=>x&&(String(x.n||"")+"|"+String(x.m||""))));
+        COSTS.forEach(x=>{ if(x&&!vus.has(String(x.n||"")+"|"+String(x.m||""))) srv.push(x); });
+      }
+      COSTS=srv; localStorage.setItem("ccn_costs", JSON.stringify(COSTS));
       COSTS_LOADED=true;
+      if(COSTS_DIRTY){ COSTS_DIRTY=false; saveCosts(); }
       renderCosts(); if(typeof renderRenta==="function") renderRenta();
     // 1re fois SEULEMENT : le serveur n'a jamais rien stocké (clé absente).
     } else if(j.outils==null){ COSTS_LOADED=true; if(COSTS.length) saveCosts(); }
@@ -3316,7 +3349,12 @@ function addCost(){
 }
 $("#costAmount").addEventListener("keydown",e=>{ if(e.key==="Enter") addCost(); });
 $("#costName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#costAmount").focus(); });
-$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){ if(!confirm("Supprimer ce coût fixe ?")) return; COSTS.splice(+d.getAttribute("data-cdel"),1); saveCosts(); renderCosts(); renderRenta(); if(typeof toast==="function") toast("🗑️ Supprimé","Coût fixe retiré."); } });
+$("#costsList").addEventListener("click",e=>{ const d=e.target.closest("[data-cdel]"); if(d){
+  // On nomme ce qu'on efface : la ligne disparaît aussi du serveur, donc de la
+  // marge, de la rentabilité et de la prévision, sur tous les appareils.
+  const _i=+d.getAttribute("data-cdel"), _c=COSTS[_i]; if(!_c) return;
+  if(!confirm("Supprimer « "+String(_c.n||"?").slice(0,60)+" » ("+moneyClair(Number(_c.m)||0)+(_c.every&&_c.every!=="mois"?(" / "+_c.every):" / mois")+") ?\n\nC'est définitif, sur tous tes appareils, et ça change la marge affichée.")) return;
+  COSTS.splice(_i,1); saveCosts(); renderCosts(); renderRenta(); if(typeof toast==="function") toast("🗑️ Supprimé","Coût fixe retiré."); } });
 renderCosts();
 
 /* ---------- Revenus Telegram (saisie manuelle) ---------- */
@@ -4279,7 +4317,22 @@ function renderPaie(data){
 }
 $("#paieBody").addEventListener("click",e=>{
   const pb=e.target.closest("[data-pay]"); if(pb){ payVa(pb.getAttribute("data-pay"), pb.getAttribute("data-amt")); return; }
-  const ub=e.target.closest("[data-unpay]"); if(ub){ if(confirm("Annuler ce paiement ?")) unpayVa(ub.getAttribute("data-unpay")); return; }
+  const ub=e.target.closest("[data-unpay]"); if(ub){
+    // ⚠️ « Annuler ce paiement ? » ne disait NI QUI, NI COMBIEN, NI QUELLE
+    // quinzaine — alors que le bouton est sur une ligne parmi dix, que le
+    // panneau se reconstruit tout seul, et que l'annulation DÉCLENCHE un message
+    // au VA (« le versement n'est finalement pas parti »). Se tromper de ligne,
+    // c'est dire à quelqu'un qu'il n'a pas été payé alors qu'il l'a été.
+    // Le bouton « Payer », lui, nomme déjà tout (VA, subs, prime, total).
+    const _va=ub.getAttribute("data-unpay");
+    const _p=(typeof curPeriod==="function")?curPeriod():"";
+    const _l=(PAYMENTS||[]).filter(x=>x&&x.va===_va&&x.period===_p)[0];
+    const _mt=(_l&&_l.amount!=null)?(" de "+moneyClair(Number(_l.amount)||0)):"";
+    if(confirm("Annuler le paiement de "+_va+_mt+(_p?(" (quinzaine "+_p+")"):"")+" ?\n\n"
+      +"Le bot va lui ÉCRIRE que le versement n'est finalement pas parti."
+      +(_l?"":"\n\n⚠️ Je ne retrouve pas la ligne de ce versement : vérifie que c'est bien celui-là."))) unpayVa(_va);
+    return;
+  }
 });
 $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
@@ -4331,12 +4384,56 @@ let PCUMUL=null, PCUMUL_HIST=null;
 function pcRoleList(k){ try{ const a=JSON.parse(localStorage.getItem(k)||"[]"); return Array.isArray(a)?a.filter(x=>typeof x==="string"):[]; }catch(_){ return []; } }
 function pcRoleSave(k,a){ try{ localStorage.setItem(k, JSON.stringify(a)); }catch(_){} }
 let MANAGERS=pcRoleList("ccn_managers"), LEADERS=pcRoleList("ccn_leaders");
+// ⚠️ CES DEUX LISTES DÉCIDENT D'UNE PAIE, et elles vivaient dans le
+// `localStorage` d'UN SEUL navigateur. Elles ne décorent pas : elles décident si
+// la case « part manager » est MÊME AFFICHÉE sur la ligne du VA (voir
+// renderPaieCumul). Payer depuis le téléphone, ou depuis un PC où les rôles
+// n'avaient jamais été basculés, c'était donc verser la paie SANS la part
+// manager — et rien ne le signalait, puisque la case n'existait pas à l'écran.
+// Le cahier de paie garde la trace du montant versé : l'écart ne se rattrape pas.
+// Elles passent maintenant par le serveur, avec le même verrou de lecture que
+// les autres listes (RULES / COSTS / REMINDERS / TODOS).
+let ROLES_LOADED=false, ROLES_DIRTY=false;
+async function loadPaieRoles(){
+  if(!TOKEN){ ROLES_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/paie-roles",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    // « absent ≠ liste vide » : `null` veut dire « le serveur n'a jamais rien
+    // stocké ». On lui envoie alors ce qu'on a en local, une fois.
+    if(j.managers===null && j.leaders===null){
+      ROLES_LOADED=true;
+      if(MANAGERS.length||LEADERS.length) savePaieRoles();
+      return;
+    }
+    const sm=Array.isArray(j.managers)?j.managers:[], sl=Array.isArray(j.leaders)?j.leaders:[];
+    if(ROLES_DIRTY){
+      MANAGERS.forEach(v=>{ if(sm.indexOf(v)<0) sm.push(v); });
+      LEADERS.forEach(v=>{ if(sl.indexOf(v)<0) sl.push(v); });
+    }
+    MANAGERS=sm; LEADERS=sl;
+    pcRoleSave("ccn_managers",MANAGERS); pcRoleSave("ccn_leaders",LEADERS);
+    ROLES_LOADED=true;
+    if(ROLES_DIRTY){ ROLES_DIRTY=false; savePaieRoles(); }
+    if(typeof renderPaieCumul==="function" && PCUMUL) renderPaieCumul();
+  }catch(e){}
+}
+function savePaieRoles(){
+  pcRoleSave("ccn_managers",MANAGERS); pcRoleSave("ccn_leaders",LEADERS);
+  if(!TOKEN) return;
+  if(!ROLES_LOADED){ ROLES_DIRTY=true; return; }
+  fetch(HUB_BASE+"/api/hub/paie-roles",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({managers:MANAGERS,leaders:LEADERS})})
+    .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Rôle NON enregistré","Il ne vaut que sur cet appareil. Depuis un autre écran, la part manager ne sera pas proposée au paiement.");
+                if(!r.ok) ROLES_DIRTY=true; })
+    .catch(()=>{ ROLES_DIRTY=true; if(typeof toast==="function") toast("⚠️ Rôle NON enregistré","Pas de réseau : il ne vaut que sur cet appareil."); });
+}
 // Migration ONE-SHOT : ancien manager UNIQUE (ccn_manager_va) → liste des managers,
 // puis on SUPPRIME l'ancienne clé. Sinon, retirer ce VA du rôle le ressuscitait à
 // chaque rechargement (la migration le ré-ajoutait de force).
 { const old=(localStorage.getItem("ccn_manager_va")||"").trim();
   if(old){ if(MANAGERS.indexOf(old)<0){ MANAGERS.push(old); pcRoleSave("ccn_managers",MANAGERS); } try{ localStorage.removeItem("ccn_manager_va"); }catch(_){} } }
-function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(va); else list.splice(i,1); pcRoleSave(key,list); }
+function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(va); else list.splice(i,1); pcRoleSave(key,list); savePaieRoles(); }
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
 // les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
 function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
@@ -9789,7 +9886,10 @@ function addDecision(){
   saveDecisions(); renderDecisions();
   if(typeof toast==="function") toast("📓 Décision notée","Je te montrerai son effet sur le CA.");
 }
-{ const b=$("#decisionsBody"); if(b) b.addEventListener("click",e=>{ const d=e.target.closest("[data-djdel]"); if(d){ if(!confirm("Supprimer cette décision du journal ?")) return; DECISIONS=DECISIONS.filter(x=>x.id!==d.getAttribute("data-djdel")); saveDecisions(); renderDecisions(); if(typeof toast==="function") toast("🗑️ Supprimé","Décision retirée du journal."); } }); }
+{ const b=$("#decisionsBody"); if(b) b.addEventListener("click",e=>{ const d=e.target.closest("[data-djdel]"); if(d){
+  const _id=d.getAttribute("data-djdel"), _dj=(DECISIONS||[]).find(x=>x&&x.id===_id); if(!_dj) return;
+  if(!confirm("Supprimer la décision « "+String(_dj.text||"").slice(0,70)+" » du journal ?\n\nLe journal sert à relire POURQUOI un choix a été fait : effacée, la raison ne revient pas.")) return;
+  DECISIONS=DECISIONS.filter(x=>x.id!==_id); saveDecisions(); renderDecisions(); if(typeof toast==="function") toast("🗑️ Supprimé","Décision retirée du journal."); } }); }
 
 // 🎯 CONVERSION clics → abonnés (source : tracking links OnlyMonster, aucun
 // outil externe). On affiche AUSSI la valeur d'un abonné à côté du taux : c'est
@@ -10578,8 +10678,42 @@ function playChime(){ const ac=audioCtx(); if(!ac) return; if(ac.state==="suspen
   [[659.25,0],[783.99,0.15],[1046.5,0.3]].forEach(([f,t])=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const s=ac.currentTime+t; g.gain.setValueAtTime(0,s); g.gain.linearRampToValueAtTime(0.5,s+0.02); g.gain.exponentialRampToValueAtTime(0.001,s+0.45); o.start(s); o.stop(s+0.5); });
 }
 function toast(title, body){ const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>${escapeHtml(title)}</b>${body?`<div>${escapeHtml(body)}</div>`:""}`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; setTimeout(kill,8000); t.onclick=kill; }
-function saveReminders(){ localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS)); if(TOKEN){ clearTimeout(RM_SAVE_T); RM_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/reminders",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({reminders:REMINDERS})}).catch(()=>{}); },500); } }
-async function loadReminders(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/reminders",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.reminders)){ REMINDERS=j.reminders; localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS)); } } }catch(e){} } renderReminders(); }
+// ⚠️ LE SEUL ÉCRASEMENT QUI SE PRODUIT SANS AUCUN GESTE HUMAIN.
+// `saveReminders` renvoie la LISTE ENTIÈRE, et `tickClock` — qui tourne toutes
+// les 5 secondes — l'appelle dès qu'un rappel sonne (il note `firedDate`).
+// Donc : le serveur est injoignable au chargement (redéploiement, réveil
+// Railway) → `loadReminders` échoue en silence → REMINDERS reste ce qu'il y a
+// dans CE navigateur → au premier rappel qui sonne, cette liste part au serveur
+// et ÉCRASE celle des autres appareils. Personne n'a rien tapé, rien cliqué.
+// Même verrou que RULES / DECISIONS / VANOTES / COSTS, avec la reprise
+// (`_DIRTY`) pour ne pas perdre ce qui a été ajouté pendant la panne.
+let REMINDERS_LOADED=false, REMINDERS_DIRTY=false;
+function saveReminders(){
+  localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS));
+  if(!TOKEN) return;
+  if(!REMINDERS_LOADED){ REMINDERS_DIRTY=true; return; }
+  clearTimeout(RM_SAVE_T);
+  RM_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/reminders",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({reminders:REMINDERS})}).catch(()=>{}); },500);
+}
+async function loadReminders(){
+  if(!TOKEN){ REMINDERS_LOADED=true; renderReminders(); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/reminders",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){
+      const j=await r.json();
+      if(Array.isArray(j.reminders)){
+        // Reprise : les rappels créés pendant que le serveur était muet ne
+        // doivent pas disparaître quand il revient.
+        const srv=j.reminders;
+        if(REMINDERS_DIRTY){ const vus=new Set(srv.map(x=>x&&x.id)); REMINDERS.forEach(x=>{ if(x&&!vus.has(x.id)) srv.push(x); }); }
+        REMINDERS=srv; localStorage.setItem("ccn_reminders",JSON.stringify(REMINDERS));
+        REMINDERS_LOADED=true;
+        if(REMINDERS_DIRTY){ REMINDERS_DIRTY=false; saveReminders(); }
+      }
+    }
+  }catch(e){}
+  renderReminders();
+}
 function renderReminders(){
   const who=$("#rmWho"); if(who && !who.dataset.filled){ who.innerHTML=`<option value="moi">pour ${escapeHtml(NAMES.moi)}</option><option value="other">pour ${escapeHtml(NAMES.other)}</option>`; who.dataset.filled="1"; }
   const list=REMINDERS.slice().sort((a,b)=>(a.at||"").localeCompare(b.at||""));
@@ -10604,7 +10738,10 @@ function tmTick(){ const left=TM_END-Date.now(), d=$("#tmDisp"); if(left<=0){ cl
 function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_END=Date.now()+min*60000; if(TM_INT) clearInterval(TM_INT); const a=audioCtx(); if(a&&a.state==="suspended") a.resume(); TM_INT=setInterval(tmTick,250); tmTick(); }
 { const a=$("#rmAdd"); if(a) a.onclick=addReminder; }
 { const t=$("#rmText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addReminder(); }); }
-{ const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){ if(!confirm("Supprimer ce rappel ?")) return; REMINDERS=REMINDERS.filter(x=>x.id!==d.getAttribute("data-rmdel")); saveReminders(); renderReminders(); if(typeof toast==="function") toast("🗑️ Supprimé","Rappel retiré."); } }); }
+{ const l=$("#rmList"); if(l) l.addEventListener("click",e=>{ const d=e.target.closest("[data-rmdel]"); if(d){
+  const _id=d.getAttribute("data-rmdel"), _r=(REMINDERS||[]).find(x=>x&&x.id===_id); if(!_r) return;
+  if(!confirm("Supprimer le rappel « "+String(_r.text||"").slice(0,60)+" » ("+(_r.at||"")+") ?")) return;
+  REMINDERS=REMINDERS.filter(x=>x.id!==_id); saveReminders(); renderReminders(); if(typeof toast==="function") toast("🗑️ Supprimé","Rappel retiré."); } }); }
 { const b=$("#tmStart"); if(b) b.onclick=tmStart; }
 renderReminders(); tickClock(); setInterval(tickClock, 5000);
 
@@ -11817,6 +11954,12 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof DECISIONS_LOADED!=="undefined" && !DECISIONS_LOADED) loadDecisions();
     if(typeof VANOTES_LOADED!=="undefined" && !VANOTES_LOADED) loadVaNotes();
     if(typeof COSTS_LOADED!=="undefined" && !COSTS_LOADED) loadCosts();
+    // Les rappels et les tâches partent eux aussi en LISTE ENTIÈRE : tant que la
+    // lecture serveur n'a pas réussi, leur écriture est retenue (drapeaux
+    // *_DIRTY). Sans ce réessai, le verrou ne se lèverait plus de la session.
+    if(typeof REMINDERS_LOADED!=="undefined" && !REMINDERS_LOADED) loadReminders();
+    if(typeof TODOS_LOADED!=="undefined" && !TODOS_LOADED) loadTodosFromBrain();
+    if(typeof ROLES_LOADED!=="undefined" && !ROLES_LOADED) loadPaieRoles();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -11852,6 +11995,43 @@ setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
 // celle-ci non : elle reconstruisait tout le résumé d'impression chaque minute,
 // à vide, même en arrière-plan sur mobile (batterie) et même déconnecté.
 setInterval(()=>{ try{ if(pageCachee() || !TOKEN) return; refreshPrintSummary(); }catch(e){} }, REFRESH_MS);
+
+// 🚪 QUITTER LA PAGE AVEC DE L'ARGENT TAPÉ ET NON ENVOYÉ.
+// ⚠️ Rien n'avertissait. Deux situations, toutes deux silencieuses :
+//   • des montants tapés dans le panneau de paie (prime / part manager / part
+//     team leader) sans avoir cliqué « Payer » : ils ne sont NULLE PART, ni en
+//     local ni au serveur — ces cases n'existent que dans le rendu ;
+//   • une liste modifiée pendant que le serveur était muet (drapeaux *_DIRTY) :
+//     elle est bien en local, mais ne partira au serveur qu'à la prochaine
+//     lecture réussie — qui n'aura pas lieu si on ferme l'onglet.
+// Le navigateur n'affiche ce garde-fou que si l'on a interagi avec la page, et
+// il impose son propre texte : on ne peut pas dire QUOI est en attente. On ne
+// le déclenche donc QUE quand il y a vraiment quelque chose à perdre, sinon il
+// devient un bruit qu'on apprend à ignorer.
+function _argentEnAttente(){
+  try{
+    // 1) Des montants tapés dans le panneau de paie, jamais versés.
+    var saisi = false;
+    document.querySelectorAll("#pcumulBody .pc-prime, #pcumulBody .pc-manager, #pcumulBody .pc-leader")
+      .forEach(function(el){ if(el && String(el.value||"").trim() !== "" && Number(el.value) > 0) saisi = true; });
+    if(saisi) return true;
+    // 2) Une liste en attente d'envoi au serveur.
+    if(typeof RULES_DIRTY     !== "undefined" && RULES_DIRTY)     return true;
+    if(typeof DECISIONS_DIRTY !== "undefined" && DECISIONS_DIRTY) return true;
+    if(typeof VANOTES_DIRTY   !== "undefined" && VANOTES_DIRTY)   return true;
+    if(typeof COSTS_DIRTY     !== "undefined" && COSTS_DIRTY)     return true;
+    if(typeof REMINDERS_DIRTY !== "undefined" && REMINDERS_DIRTY) return true;
+    if(typeof TODOS_DIRTY     !== "undefined" && TODOS_DIRTY)     return true;
+    if(typeof ROLES_DIRTY     !== "undefined" && ROLES_DIRTY)     return true;
+  }catch(e){}
+  return false;
+}
+window.addEventListener("beforeunload", function(e){
+  if(!_argentEnAttente()) return;             // rien en attente : on ne dérange pas
+  e.preventDefault();
+  e.returnValue = "";                          // exigé par les navigateurs
+  return "";
+});
 </script>
 </body>
 </html>
