@@ -3321,8 +3321,36 @@ renderCosts();
 
 /* ---------- Revenus Telegram (saisie manuelle) ---------- */
 let TGREV = lsJSON("ccn_tgrev",[]); if(!Array.isArray(TGREV)) TGREV=[];
-function saveTgrev(){ localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})}).catch(()=>{}); } }
-async function loadTgrev(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); } } }catch(e){} } renderTgrev(); }
+// ⚠️ DE L'ARGENT SAISI À LA MAIN, envoyé en LISTE ENTIÈRE avec un
+// `.catch(()=>{})`. Deux défauts, tous deux silencieux :
+//   1. si la lecture serveur n'a pas encore réussi, `TGREV` vaut ce qu'il y a
+//      dans CE navigateur (souvent []) — et le premier ajout ÉCRASE tout ce que
+//      le serveur avait. C'est le même verrou que RULES/DECISIONS/VANOTES ont
+//      déjà (`_LOADED`) et qui manquait ici.
+//   2. `fetch` ne rejette PAS sur 401/500 : le toast « revenu ajouté »
+//      s'affichait même quand rien n'était parti.
+// `savePayments` montre le bon motif : on le copie.
+let TGREV_LOADED = false;
+function saveTgrev(){
+  localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV));
+  if(!TOKEN) return;
+  if(!TGREV_LOADED){
+    if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Les revenus du serveur ne sont pas encore chargés : envoyer maintenant les EFFACERAIT. Recharge la page et refais la saisie.");
+    return;
+  }
+  fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})})
+    .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Telegram NON enregistré","Le serveur n'a pas pu écrire. Ta saisie n'existe que sur cet appareil — refais l'opération."); })
+    .catch(()=>{ if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Pas de réseau : rien n'est parti au serveur."); });
+}
+async function loadTgrev(){
+  if(TOKEN){
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}});
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); TGREV_LOADED=true; } }
+    }catch(e){}
+  } else { TGREV_LOADED=true; }   // sans jeton, rien n'est envoyé de toute façon
+  renderTgrev();
+}
 function tgMonthKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 // `model` optionnel : filtre sur un modèle précis (utilisé par le tuile "Net du
 // mois" quand on regarde un modèle en particulier) ; omis/"all" = tous modèles.
@@ -4336,7 +4364,47 @@ async function loadPaieCumul(){
   renderPaieCumul();
   return ok;
 }
+// ⚠️ LE RAFRAÎCHISSEMENT DE 60 s VIDAIT LES CASES D'ARGENT.
+// `renderPaieCumul` reconstruit tout le panneau, et les champs prime / manager /
+// team leader n'ont AUCUN attribut `value=` : ils repartent VIDES. Le scénario
+// est banal — on tape 50 dans « prime », on scrolle vérifier un chiffre, le tic
+// passe, on revient et on clique « Payer » : le VA touche 150 $ au lieu de 200 $,
+// et la confirmation ne mentionne aucune prime puisqu'elle vaut 0.
+// PIRE : le bouton « reprendre » pose `data-primeids` sur la case. La
+// reconstruction détruit cet attribut — donc même en retapant le montant à la
+// main, le serveur n'apprend jamais que la prime Discord est réglée : elle reste
+// affichée comme due et peut être payée UNE SECONDE FOIS.
+// Le geste de bascule de rôle, lui, sauvegarde/restaure déjà (« sans ça,
+// basculer un rôle effaçait une saisie en cours »). Le chemin des 60 s n'avait
+// rien. On réutilise donc la même mécanique, extraite ici.
+function pcEchapper(v){ return (window.CSS&&CSS.escape)?CSS.escape(v):String(v).replace(/["\\]/g,"\\$&"); }
+function pcLireSaisies(){
+  const saved={};
+  document.querySelectorAll("#pcumulBody .pv-row").forEach(r=>{
+    const b=r.querySelector("[data-pcpay]"); if(!b) return;
+    const g=s=>{ const el=r.querySelector(s); return el?el.value:undefined; };
+    const pe=r.querySelector(".pc-prime");
+    saved[b.getAttribute("data-pcpay")]={
+      p:g(".pc-prime"), m:g(".pc-manager"), l:g(".pc-leader"),
+      // L'attribut qui dit QUELLES primes Discord sont reprises : sans lui,
+      // elles ne sont jamais marquées réglées.
+      ids:pe?(pe.getAttribute("data-primeids")||""):"",
+    };
+  });
+  return saved;
+}
+function pcRestaurerSaisies(saved){
+  Object.keys(saved||{}).forEach(va=>{
+    const b=document.querySelector('#pcumulBody [data-pcpay="'+pcEchapper(va)+'"]'); if(!b) return;
+    const r=b.closest(".pv-row"), st=saved[va];
+    const setv=(sel,val)=>{ if(val==null||val==="") return; const el=r.querySelector(sel); if(el) el.value=val; };
+    setv(".pc-prime",st.p); setv(".pc-manager",st.m); setv(".pc-leader",st.l);
+    if(st.ids){ const pe=r.querySelector(".pc-prime"); if(pe) pe.setAttribute("data-primeids",st.ids); }
+  });
+}
 function renderPaieCumul(){
+  // On mémorise ce qui est tapé AVANT de reconstruire, et on le remet après.
+  const _saisies = pcLireSaisies();
   const box=$("#paiecumul"); if(!box) return;
   const d=PCUMUL, vas=(d&&Array.isArray(d.vas))?d.vas:[];
   if(!vas.length){ box.style.display="none"; return; }
@@ -4457,6 +4525,9 @@ function renderPaieCumul(){
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}</span><span class="pv-note"></span></div>`
     + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
+  // … et on remet ce qui était tapé. C'est ici que se joue la différence entre
+  // « Layla touche 200 $ » et « Layla touche 150 $ ».
+  pcRestaurerSaisies(_saisies);
 }
 $("#pcumulBody").addEventListener("click", async e=>{
   // 🎁 « reprendre » : recopie la prime Discord dans la case prime de la ligne.
@@ -4481,15 +4552,15 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const role=e.target.closest("[data-role]");
   if(role){
     const rva=role.getAttribute("data-va"), which=role.getAttribute("data-role");
-    // Préserve les montants déjà tapés (prime/manager/leader) : sans ça, basculer un
-    // rôle re-rendait tout le panneau et effaçait une saisie en cours sur une autre ligne.
-    const _esc=v=>(window.CSS&&CSS.escape)?CSS.escape(v):String(v).replace(/["\\]/g,"\\$&");
-    const saved={};
-    document.querySelectorAll("#pcumulBody .pv-row").forEach(r=>{ const b=r.querySelector("[data-pcpay]"); if(!b) return; const g=s=>{ const el=r.querySelector(s); return el?el.value:undefined; }; saved[b.getAttribute("data-pcpay")]={p:g(".pc-prime"),m:g(".pc-manager"),l:g(".pc-leader")}; });
+    // Cette bascule sauvegardait déjà les montants — mais sa version en ligne
+    // OUBLIAIT `data-primeids` : basculer un rôle après avoir cliqué « reprendre »
+    // gardait le montant à l'écran et perdait le lien avec les primes Discord, qui
+    // repassaient donc « à verser » après avoir été payées. `renderPaieCumul`
+    // fait maintenant le travail tout seul (mêmes fonctions, `data-primeids`
+    // compris) : on le laisse faire.
     if(which==="mgr") pcToggleRole(MANAGERS,"ccn_managers",rva);
     else if(which==="lead") pcToggleRole(LEADERS,"ccn_leaders",rva);
     renderPaieCumul();
-    Object.keys(saved).forEach(va=>{ const b=document.querySelector('#pcumulBody [data-pcpay="'+_esc(va)+'"]'); if(!b) return; const r=b.closest(".pv-row"), s=saved[va]; const setv=(sel,val)=>{ if(val==null||val==="") return; const el=r.querySelector(sel); if(el) el.value=val; }; setv(".pc-prime",s.p); setv(".pc-manager",s.m); setv(".pc-leader",s.l); });
     return;
   }
   const pay=e.target.closest("[data-pcpay]");
@@ -8244,10 +8315,25 @@ function renderRailway(){
     const val=parseFloat(($("#rwBill")||{}).value); if(!(val>=0)) return;
     b.disabled=true; b.textContent="⏳";
     try{
-      await fetch(HUB_BASE+"/api/hub/railway-bill",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({montant:val})});
+      // ⚠️ `fetch` NE REJETTE PAS sur 401 / 403 / 500 : la réponse arrive, elle
+      // dit juste non. Sans test de `r.ok`, le toast « 💵 Facture enregistrée — la
+      // répartition par projet est maintenant exacte » s'affichait MÊME quand le
+      // serveur avait refusé l'écriture. Or c'est ce montant qui sert à calculer
+      // la part d'infra dans la marge : on croyait avoir corrigé une estimation
+      // fausse, et on continuait à décider dessus. Le compte associé, en lecture
+      // seule depuis la séparation des jetons, reçoit précisément un 403 ici.
+      const r=await fetch(HUB_BASE+"/api/hub/railway-bill",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({montant:val})});
+      if(!r.ok){
+        b.disabled=false; b.textContent="Enregistrer";
+        if(typeof toast==="function") toast("⚠️ Facture NON enregistrée","Le serveur a refusé (code "+r.status+"). Le pourcentage d'infra affiché reste une ESTIMATION — ne décide pas dessus.");
+        return;
+      }
       await loadRailway();
       if(typeof toast==="function") toast("💵 Facture enregistrée","La répartition par projet est maintenant exacte.");
-    }catch(e){ b.disabled=false; b.textContent="Enregistrer"; }
+    }catch(e){
+      b.disabled=false; b.textContent="Enregistrer";
+      if(typeof toast==="function") toast("⚠️ Facture NON enregistrée","Pas de réseau : rien n'est parti au serveur.");
+    }
   };
 }
 // 🛰️ PROXY : tes proxies (4G + résidentiel) répondent-ils, et quelle IP tu
