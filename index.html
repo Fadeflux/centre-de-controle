@@ -4426,7 +4426,17 @@ function renderPaieCumul(){
   const partiBanner = nbPartis>0
     ? `<div class="sv-note" style="border-left:3px solid #f87171;margin-bottom:8px">⚠️ <b>${nbPartis} VA parti${nbPartis>1?"s":""}</b> ${nbPartis>1?"ont":"a"} encore un <b>solde à verser</b>. ${nbPartis>1?"Ils apparaissent":"Il apparaît"} ci-dessous jusqu'au versement, puis ${nbPartis>1?"disparaissent":"disparaît"} tout seul.</div>`
     : "";
-  const mgrSel=perimeBanner+partiBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
+  // ⚠️ Un lien RENOMMÉ gonfle le cumul, donc la somme à verser : le bot suit les
+  // liens par leur libellé, l'ancien et le nouveau s'ADDITIONNENT. Le détecteur
+  // prévenait par DM Discord — mais un DM se rate, et ça n'apparaîtrait nulle part
+  // ICI, sur l'écran où l'on clique « Payer ».
+  // (On ne corrige PAS le cumul : soustraire subs_seed a été testé en prod le
+  //  25/08 et mettait les 9 VA à ~0. On détecte, on ne corrige pas.)
+  const ren = d && d.renommage;
+  const renomBanner = ren
+    ? `<div class="sv-note" style="border-left:3px solid #f87171;margin-bottom:8px">⚠️ <b>Lien renommé détecté</b> ${ren.ageJours===0?"aujourd'hui":(ren.ageJours===1?"hier":"il y a "+ren.ageJours+" jours")} (${escapeHtml(String(ren.jour))}). Tant que l'ancien libellé reste en base, <b>l'ancien et le nouveau s'additionnent</b> dans le cumul : les montants ci-dessous peuvent être <b>gonflés</b>. Vérifie avant de verser.</div>`
+    : "";
+  const mgrSel=perimeBanner+renomBanner+partiBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
