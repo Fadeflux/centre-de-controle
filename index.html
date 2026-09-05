@@ -847,7 +847,10 @@
   .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:18px 0 0}
   .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
-  .pcumul-base{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+  .pc-prime-att{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#c4b5fd;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.35);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.pc-prime-take{font:inherit;font-size:10px;font-weight:700;color:#0b1020;background:#a78bfa;border:0;border-radius:4px;padding:1px 6px;cursor:pointer}
+.pc-prime-take:hover{background:#c4b5fd}
+.pcumul-base{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
   .pcumul-warn{color:var(--warn,#c88);font-size:11.5px}
   .pcumul-tip{font-size:11.5px;line-height:1.5;color:var(--muted);margin:10px 0 4px}
   .pay-h-n{color:var(--muted);font-size:11.5px;text-align:right}
@@ -4308,6 +4311,19 @@ function renderPaieCumul(){
     }
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
+    // ⚠️ Une prime posée depuis Discord n'apparaît PAS dans le montant ci-contre :
+    // ce sont deux registres séparés (of_bonuses côté Discord, hub_pay_history ici).
+    // Elle était donc structurellement oubliée au moment du virement. On l'affiche,
+    // on ne l'ajoute PAS toute seule — sinon double paie le jour où il l'a déjà tapée.
+    // Le bouton « reprendre » la recopie dans la case prime, c'est lui qui décide.
+    let primeBadge="";
+    if(v.primesMt){
+      const det=(v.primes||[]).map(pr=>{
+        const dd=new Date(pr.ts||0), ok=!isNaN(dd.getTime());
+        return pcMoney(pr.montant)+(pr.raison?(" · "+escapeHtml(pr.raison)):"")+(ok?(" · "+dd.toLocaleDateString("fr-FR")):"");
+      }).join(" | ");
+      primeBadge=`<span class="pc-prime-att" title="Enregistrée(s) sur Discord depuis ton dernier versement à ${nom} : ${det}. Ce montant n'est PAS compris dans le chiffre à côté.">🎁 prime Discord ${pcMoney(v.primesMt)} <button class="pc-prime-take" data-pctake="${nom}" data-mt="${v.primesMt}" title="Recopier ce montant dans la case prime">reprendre</button></span>`;
+    }
     // Cases de rôle : un montant EN PLUS, uniquement si le VA a le rôle (👔/🧭).
     const mgrInput=isMgr?`<label class="pc-field"><span>👔</span><input class="pc-manager" type="number" min="0" step="any" inputmode="decimal" placeholder="manager" title="Part manager pour ${nom} — s'ajoute à sa paie"></label>`:"";
     const leadInput=isLead?`<label class="pc-field"><span>🧭</span><input class="pc-leader" type="number" min="0" step="any" inputmode="decimal" placeholder="leader" title="Part team leader pour ${nom} — s'ajoute à sa paie"></label>`:"";
@@ -4319,7 +4335,7 @@ function renderPaieCumul(){
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row pcumul-row ${nouveaux>0?"":"pv-done"}">${nameCell}`
       +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
-      +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${actions}</div>`;
+      +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${primeBadge}${actions}</div>`;
   }).join("");
   // 👔🧭 Rappel : les rôles se règlent par les boutons 👔 (manager) / 🧭 (team
   // leader) sur chaque ligne — plusieurs possibles. Un rôle actif ajoute une case
@@ -4329,7 +4345,14 @@ function renderPaieCumul(){
   const perimeBanner = (d && d._perime)
     ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Chiffres pas à jour</b> — le serveur n'a pas répondu au dernier rafraîchissement. Ce tableau date de la dernière lecture réussie : <b>ne paie pas sur cette base</b>, clique 🔄 pour réessayer.</div>`
     : "";
-  const mgrSel=perimeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
+  // Absent ≠ 0 : si la lecture des primes a échoué, on le DIT au lieu de laisser
+  // croire qu'il n'y en a aucune — c'est l'écran où il envoie l'argent.
+  const primeBanner = (d && d.primesKo)
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Primes illisibles</b> — impossible de vérifier s'il reste des primes posées sur Discord (${escapeHtml(String(d.primesKo))}). Ce tableau ne prouve donc PAS qu'il n'y en a pas.</div>`
+    : (Number(d&&d.primesTotal)>0
+      ? `<div class="sv-note" style="border-left:3px solid #a78bfa;margin-bottom:8px">🎁 <b>${pcMoney(Number(d.primesTotal))} de primes</b> enregistrées sur Discord depuis tes derniers versements — <b>elles ne sont PAS dans les montants ci-dessous</b>. Clique « reprendre » sur une ligne pour l'ajouter à son versement.</div>`
+      : "");
+  const mgrSel=perimeBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
@@ -4345,6 +4368,16 @@ function renderPaieCumul(){
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
 }
 $("#pcumulBody").addEventListener("click", async e=>{
+  // 🎁 « reprendre » : recopie la prime Discord dans la case prime de la ligne.
+  // On n'écrit rien et on ne pré-remplit pas tout seul : geste explicite = zéro
+  // risque de payer deux fois une prime déjà versée à la main.
+  const take=e.target.closest("[data-pctake]");
+  if(take){
+    const row=take.closest(".pv-row"), inp=row?row.querySelector(".pc-prime"):null;
+    if(inp){ inp.value=String(Number(take.getAttribute("data-mt"))||0); inp.focus(); }
+    else toast("Ce VA n'a aucun abonné à payer pour l'instant — la prime seule ne se verse pas ici.");
+    return;
+  }
   // 👔/🧭 Bascule de rôle (manager / team leader) — plusieurs possibles.
   const role=e.target.closest("[data-role]");
   if(role){
