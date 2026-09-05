@@ -3043,10 +3043,12 @@ async function doLogin(){
   const user=($("#pwUser")?$("#pwUser").value.trim().toLowerCase():""), input=$("#pw").value.trim();
   if(!input){ $("#pwErr").textContent="Entre ton mot de passe."; return; }
   const go=$("#pwGo"); go.disabled=true; go.textContent="…"; $("#pwErr").textContent="";
-  let tok="", who=null, name="", motif="";
+  let tok="", who=null, name="", motif="", role=null;
   try{
+    // `role` : le serveur dit maintenant s'il s'agit du patron ou d'un compte
+    // associé. Avant, tout le monde recevait le MÊME jeton tout-puissant.
     const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:user, password:input})});
-    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; if(!who){ who=whoFromUser(j.username||user); } } }
+    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; role=j.role||null; if(!who){ who=whoFromUser(j.username||user); } } }
     // ⚠️ Dire la VÉRITÉ sur la cause. Avant, toute panne (trop de tentatives,
     // cerveau injoignable, coupure réseau) s'affichait « mot de passe
     // incorrect » : on cherchait un problème de mot de passe qui n'existait pas,
@@ -3060,6 +3062,23 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ localStorage.setItem("ccn_name",name); }   // CURRENT_USER retiré : écrit, jamais lu
+  // ⚠️ Le serveur REFUSE désormais Telegram, la paie et toute écriture à un
+  // compte associé (403). Sans ça, l'écran tenterait ces appels et afficherait
+  // des pannes là où il s'agit d'un refus normal. On bascule donc en vue associé
+  // TOUT DE SUITE : les panneaux concernés sont masqués, les montants aussi, et
+  // ce que l'utilisateur voit correspond enfin à ce que le serveur autorise.
+  // (Jusqu'ici, la vue associé n'était qu'un habillage : l'API répondait tout à
+  // tout le monde, il suffisait de l'appeler directement.)
+  if(role==="associe"){
+    localStorage.setItem("ccn_assoc","1");
+    try{ if(typeof applyAssoc==="function") applyAssoc(); }catch(e){}
+  } else if(role==="admin" && localStorage.getItem("ccn_assoc")==="1"){
+    // Navigateur partagé : si l'associée s'est connectée ici avant, la vue
+    // associé serait restée active pour le patron, qui verrait la moitié de son
+    // tableau de bord masquée sans comprendre pourquoi.
+    localStorage.setItem("ccn_assoc","0");
+    try{ if(typeof applyAssoc==="function") applyAssoc(); }catch(e){}
+  }
   closeGate(); load(); loadTodosFromBrain(); loadJournal(); loadAll();
 }
 /* 🔁 UN SEUL point d'entrée pour TOUT charger — utilisé au DÉMARRAGE comme à la
