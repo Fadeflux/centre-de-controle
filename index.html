@@ -2705,10 +2705,10 @@ const TOOLS = [
   // depuis toujours dans `/hub/stats`, la carte ne le demandait pas.
   // Mesuré ce jour-là : 40 actifs, 128 bloqués, 811 alertes jamais lues.
   { id:"noctra-ig-worker", world:"noctra", cat:"Noctra", name:"Publication IG", icon:"▶", openUrl:"https://noctra-ig-worker-production.up.railway.app",
-    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesActifs",l:"Comptes qui peuvent publier",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesATraiter",l:"Alertes à traiter (graves, 48 h)",f:fmtInt}] },
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesActifs",l:"Comptes qui peuvent publier",f:fmtInt},{k:"comptesTotal",l:"Comptes au total",f:fmtInt},{k:"comptesPlanifies",l:"Comptes planifiés (qui publient vraiment)",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesATraiter",l:"Alertes à traiter (graves, 48 h)",f:fmtInt}] },
   // Mêmes colonnes que la carte IG : « X bloqués » sans « sur combien » ne dit rien.
   { id:"noctra-tw-worker", world:"noctra", cat:"Noctra", name:"Twitter", icon:"𝕏", openUrl:"https://noctra-tw-worker-production.up.railway.app",
-    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesActifs",l:"Comptes qui peuvent publier",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesATraiter",l:"Alertes à traiter (graves, 48 h)",f:fmtInt}] },
+    metrics:[{k:"postsJour",l:"Posts aujourd'hui",f:fmtInt},{k:"comptesActifs",l:"Comptes qui peuvent publier",f:fmtInt},{k:"comptesTotal",l:"Comptes au total",f:fmtInt},{k:"comptesKo",l:"Comptes bloqués (ne publient plus)",f:fmtInt},{k:"alertesATraiter",l:"Alertes à traiter (graves, 48 h)",f:fmtInt}] },
   { id:"onlymonster",      world:"noctra", cat:"Noctra", name:"OnlyMonster", icon:"◎", openUrl:"https://onlymonster.ai", external:true,
     metrics:[{k:"revMonth",l:"Revenus du mois",f:fmtMoney},{k:"revPeriod",l:"Revenus quinzaine",f:fmtMoney}] },
   // ⚠️ `ext:true` sur les 2 liens : DiddySMS renvoie `frame-ancestors 'none'` +
