@@ -4181,9 +4181,17 @@ function renderPaie(data){
   // la fin. « total » = dû à cet instant ; on projette sur les jours restants
   // pour anticiper la sortie de trésorerie (pas de surprise le jour de la paie).
   let prevPaie="";
-  { const now=new Date(), d=now.getDate();
+  { // ⚠️ Le jour venait du NAVIGATEUR (Paris, UTC+2) alors que le métier est en
+    // UTC+1. Le 16 à 00 h 30, le navigateur dit « 16 » et bascule en quinzaine B
+    // avec 1 jour écoulé, pendant que le serveur est encore au 15 avec la
+    // quinzaine A TERMINÉE. Résultat : « à ce rythme tu paieras 15 000 $ » pour
+    // 1 000 $ de réel — un facteur QUINZE sur une ligne de trésorerie. Même
+    // mécanique le 1er entre 00 h et 01 h. `jourServeur()` existe pour ça et
+    // `curPeriod()` l'utilise déjà pour le cahier de paie.
+    const jS=(typeof jourServeur==="function")?jourServeur():"";
+    const d=(typeof jourDuMoisServeur==="function")?jourDuMoisServeur():new Date().getDate();
     const dansA=(d<=15), joursEcoules=dansA?d:(d-15);
-    const finMois=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const finMois=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
     const joursTotal=dansA?15:(finMois-15);
     if(joursEcoules>0 && joursTotal>joursEcoules && total>0){
       const proj=Math.round(total/joursEcoules*joursTotal);
@@ -5221,11 +5229,22 @@ function renderGoal(data){
     // La prévision serveur est en BRUT OnlyFans → même conversion que `current`
     // (net + Telegram), sinon la « prévision fin de mois » serait sur une autre
     // échelle que le chiffre courant juste au-dessus.
-    const toNet=(bruteOF)=>(Number(bruteOF)||0)*_netR + _tgMois;  // centimes gardés (moneyPrecis arrondit à l'affichage)
-    const now=new Date(), day=now.getDate(), dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-    const projFin=FG?toNet(FG.value):(day>0&&current>0?Math.round(current/day*dim):null);
-    if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(toNet(FG.value))}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(toNet(FG.low))} – ${fmt(toNet(FG.high))})</span>`:""}</div>`; }
-    else if(day>0 && current>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(Math.round(current/day*dim))}</b> fin de mois</div>`; }
+    // ⚠️ DEUX « prévision fin de mois » DIFFÉRENTES sur le même écran.
+    // Ici on ajoutait le Telegram DÉJÀ ENCAISSÉ (`_tgMois`) à une prévision de
+    // FIN DE MOIS ; le panneau « Objectif du mois », juste en dessous, passe par
+    // `projNetMois()` qui ajoute le Telegram PROJETÉ. Écart typique : 1 200 $
+    // entre deux encadrés voisins, pour le même mois et le même mot.
+    // Pire : le verdict rouge « En danger » se déclenchait sur le chiffre bas,
+    // pendant que le panneau du dessous disait « ✅ Au rythme actuel, tu y es ».
+    // Une seule source : projNetMois(), comme partout ailleurs.
+    const _projNet=(typeof projNetMois==="function")?projNetMois():null;
+    const _tgProj=(typeof tgProjMois==="function")?(Number(tgProjMois())||0):_tgMois;
+    const toNet=(bruteOF)=>(Number(bruteOF)||0)*_netR + _tgProj;   // Telegram PROJETÉ des deux côtés
+    const day=(typeof jourDuMoisServeur==="function")?jourDuMoisServeur():new Date().getDate();
+    const dim=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+    const projFin=(_projNet!=null&&_projNet>0)?_projNet:(FG?toNet(FG.value):(day>0&&current>0?Math.round(current/day*dim):null));
+    if(FG){ proj=`<div class="goal-proj">🧠 Prévision : <b>${fmt(projFin)}</b> fin de mois${FG.low!=null?` <span style="opacity:.75">(${fmt(toNet(FG.low))} – ${fmt(toNet(FG.high))})</span>`:""}</div>`; }
+    else if(projFin!=null && projFin>0){ proj=`<div class="goal-proj">🔮 À ce rythme : <b>${fmt(projFin)}</b> fin de mois</div>`; }
     // 👥 Le serveur prédit AUSSI le nombre d'abonnés de fin de mois, avec la même
     // méthode que la prévision d'argent. Il n'était affiché nulle part : l'objectif
     // d'abonnés se pilotait donc à l'aveugle, alors que le chiffre existe.
@@ -8035,7 +8054,17 @@ function renderRailway(){
   const net=Number((om.totals||{}).netMonth)||0;
   const outils=(typeof COSTS!=="undefined"&&Array.isArray(COSTS))?COSTS.reduce((a,c)=>a+coutMensuel(c),0):0;   // la cle est `m` (pas `amount`) : avec `amount` le total valait toujours 0
   const totalOutils=d.total+outils;
-  const pourCent = net>0 ? (totalOutils/net*100) : null;
+  // ⚠️ Numérateur = la facture et les abonnements d'un MOIS COMPLET.
+  // Dénominateur = le CA depuis le 1er. Le 2 du mois, l'écran annonçait
+  // « 76 % de ton CA » pour une réalité de 2,5 % ; au jour 6, « 12,7 % ».
+  // Le ratio était faux d'un facteur (jours du mois / jour courant), juste
+  // uniquement le dernier jour. On compare deux MOIS COMPLETS : les charges
+  // telles quelles, le CA projeté à fin de mois.
+  const _jm=(typeof jourDuMoisServeur==="function")?Math.max(1,jourDuMoisServeur()):1;
+  const _dm=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():30;
+  const netProjete = net>0 ? (net/_jm*_dm) : 0;
+  const pourCent = netProjete>0 ? (totalOutils/netProjete*100) : null;
+  const pourCentPartiel = (_jm < _dm);
   const gros=actifs[0];
   const v=d.video;
   const blocVideo = v ? `<div class="sv-note" style="margin-top:10px">
@@ -8047,7 +8076,7 @@ function renderRailway(){
     <div class="sv-note">
       ${reel
         ? `Facture du mois : <b>${money(d.total)}</b>${outils>0?` + <b>${money(outils)}</b> d'autres outils = <b>${money(totalOutils)}</b>`:""}.
-           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1).replace(".",",")} %</b> de ton CA brut du mois.`:""}
+           ${pourCent!=null?`Ça représente <b>${pourCent.toFixed(1).replace(".",",")} %</b> de ton CA brut du mois${pourCentPartiel?` <span class="ob-sub">(charges du mois complet / CA projeté à fin de mois — on n'est qu'au jour ${_jm}/${_dm})</span>`:""}.`:""}
            ${gros?`<br><b>${escapeHtml(gros.projet)}</b> pèse ${gros.part!=null?gros.part:"?"} % de la facture.`:""}`
         : `⚠️ Railway ne me donne pas de montant facturé, et son estimation d'usage varie trop d'un appel à l'autre pour être prise pour de l'argent.
            Ce qui est fiable, c'est la <b>part de chaque projet</b> ci-dessus.
@@ -9608,11 +9637,22 @@ function renderRachat(){
   // dit au lieu d'afficher un point bas qui passerait pour un mauvais résultat.
   const courbe=(d.courbe||[]).map(x=>`<div class="sv-row"><span class="sv-name">sous ${x.j} jour${x.j>1?"s":""}</span>`
     +`<span class="sv-cell">${x.pct==null?`<span style="opacity:.55">pas assez de recul (${x.base} fans)</span>`:`<b>${String(x.pct).replace(".",",")} %</b> ont racheté <span style="opacity:.6">(sur ${x.base})</span>`}</span></div>`).join("");
+  // ⚠️ L'en-tête dit « ce que vaut VRAIMENT un de ses abonnés » et on affichait
+  // du BRUT : `delaiDollar.vas[].valeurMoy` est une somme de transactions, la
+  // commission OnlyFans n'en est pas déduite. +25 % sur ce qu'il encaisse
+  // réellement. Le bloc « payé vs rapporté » du MÊME panneau, lui, applique
+  // netRate (ligne « rapporte » plus bas) : les deux se contredisaient à
+  // quelques centimètres d'écart. Et les seuils de couleur étaient calés sur des
+  // valeurs brutes : un VA à 4,50 brut = 3,60 net, sous le seuil rouge de 4,
+  // était colorié « moyen » — celui que ce panneau existe pour signaler.
+  const _nr=(typeof netRate==="function")?netRate():0.80;
+  const valNet=v=>(v.valeurMoy==null?null:Math.round(Number(v.valeurMoy)*_nr*100)/100);
   const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null&&v.pctRachat!=null).map(v=>{   // sans le 2e test : « null % rachètent »
-    const cls=v.valeurMoy==null?"mid":(v.valeurMoy>=6?"good":(v.valeurMoy<4?"bad":"mid"));
+    const vn=valNet(v);
+    const cls=vn==null?"mid":(vn>=6?"good":(vn<4?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
       +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
-      +`<span class="sv-part ${cls}">${v.valeurMoy!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(v.valeurMoy).replace(".",",")+" "+cur):"—"}</span></div>`;
+      +`<span class="sv-part ${cls}" title="Net de la commission OnlyFans — ce qui te reste réellement par abonné (brut : ${v.valeurMoy!=null?String(v.valeurMoy).replace(".",","):"—"} ${cur})">${vn!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(vn).replace(".",",")+" "+cur):"—"}</span></div>`;
   }).join("");
   // 🕵️ Détecteur de FAUX ABONNÉS : un VA qui amène du volume mais dont presque
   // personne ne paie ET dont la valeur moyenne est quasi nulle = soit du trafic de
@@ -9638,14 +9678,14 @@ function renderRachat(){
       const lignes=flag.map(v=>`<div class="sv-row"><span class="sv-name">⚠️ ${escapeHtml(v.va)}</span>`
         +`<span class="sv-cell"><b>${v.arrives}</b> abonnés amenés, seulement <b>${v.payeurs}</b> ont payé `
         +`(<b>${String(v.pctPayeur).replace(".",",")} %</b> vs médiane équipe ${String(med).replace(".",",")} %) · `
-        +`valeur/abonné ${v.valeurMoy!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(v.valeurMoy).replace(".",",")+" "+cur):"—"}</span></div>`).join("");
+        +`valeur/abonné ${valNet(v)!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(valNet(v)).replace(".",",")+" "+cur):"—"} net</span></div>`).join("");
       suspects=`<div class="sv-head" style="margin-top:12px;color:#facc15">🕵️ Abonnés suspects — à vérifier</div>${lignes}`
         +`<div class="sv-note" style="color:#facc15">Ces VA amènent du volume mais <b>presque personne ne paie</b> et la valeur par abonné est quasi nulle. Deux explications : <b>trafic de mauvaise qualité</b>, ou <b>faux abonnés</b> (self-subs pour gonfler le classement). 👉 Ouvre <b>🔗 Sources</b> et regarde d'où viennent ces abonnés : s'ils sortent tous du <b>même lien</b> ou sont arrivés <b>en rafale le même jour</b> sans jamais payer, c'est le signe des faux. Ce panneau n'est visible que par toi.</div>`;
     }
   }
   $("#rachatBody").innerHTML=tuiles+delai
     +`<div class="sv-head" style="margin-top:12px">Au bout de combien de temps ils rachètent</div>${courbe}`
-    +(vas?`<div class="sv-head" style="margin-top:12px">Par VA · ce que vaut vraiment un de ses abonnés</div>${vas}`:"")
+    +(vas?`<div class="sv-head" style="margin-top:12px">Par VA · ce que vaut vraiment un de ses abonnés <span class="ob-sub">(net de commission)</span></div>${vas}`:"")
     +(function(){
       // 💰 PAYÉ vs RAPPORTÉ, sur la même cohorte d'abonnés.
       // `valeurMoy` = dépense moyenne des fans ARRIVÉS sur la fenêtre — c'est du
