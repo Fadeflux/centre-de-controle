@@ -4374,7 +4374,7 @@ function renderPaieCumul(){
         const dd=new Date(pr.ts||0), ok=!isNaN(dd.getTime());
         return pcMoney(pr.montant)+(pr.raison?(" · "+escapeHtml(pr.raison)):"")+(ok?(" · "+dd.toLocaleDateString("fr-FR")):"");
       }).join(" | ");
-      primeBadge=`<span class="pc-prime-att" title="Enregistrée(s) sur Discord depuis ton dernier versement à ${nom} : ${det}. Ce montant n'est PAS compris dans le chiffre à côté.">🎁 prime Discord ${pcMoney(v.primesMt)} <button class="pc-prime-take" data-pctake="${nom}" data-mt="${v.primesMt}" title="Recopier ce montant dans la case prime">reprendre</button></span>`;
+      primeBadge=`<span class="pc-prime-att" title="Enregistrée(s) sur Discord depuis ton dernier versement à ${nom} : ${det}. Ce montant n'est PAS compris dans le chiffre à côté.">🎁 prime Discord ${pcMoney(v.primesMt)} <button class="pc-prime-take" data-pctake="${nom}" data-mt="${v.primesMt}" data-ids="${(v.primes||[]).map(x=>x.id).filter(Boolean).join(',')}" title="Recopier ce montant dans la case prime">reprendre</button></span>`;
     }
     // Cases de rôle : un montant EN PLUS, uniquement si le VA a le rôle (👔/🧭).
     const mgrInput=isMgr?`<label class="pc-field"><span>👔</span><input class="pc-manager" type="number" min="0" step="any" inputmode="decimal" placeholder="manager" title="Part manager pour ${nom} — s'ajoute à sa paie"></label>`:"";
@@ -4402,7 +4402,7 @@ function renderPaieCumul(){
   const primeBanner = (d && d.primesKo)
     ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Primes illisibles</b> — impossible de vérifier s'il reste des primes posées sur Discord (${escapeHtml(String(d.primesKo))}). Ce tableau ne prouve donc PAS qu'il n'y en a pas.</div>`
     : (Number(d&&d.primesTotal)>0
-      ? `<div class="sv-note" style="border-left:3px solid #a78bfa;margin-bottom:8px">🎁 <b>${pcMoney(Number(d.primesTotal))} de primes</b> enregistrées sur Discord depuis tes derniers versements — <b>elles ne sont PAS dans les montants ci-dessous</b>. Clique « reprendre » sur une ligne pour l'ajouter à son versement.</div>`
+      ? `<div class="sv-note" style="border-left:3px solid #a78bfa;margin-bottom:8px">🎁 <b>${pcMoney(Number(d.primesTotal))} de primes</b> posées sur Discord et <b>pas encore réglées</b> — <b>elles ne sont PAS dans les montants ci-dessous</b>. Clique « reprendre » sur une ligne pour l'ajouter au versement : elle sera alors marquée réglée. Sinon elle restera affichée ici (elle ne se perd plus toute seule).</div>`
       : "");
   const mgrSel=perimeBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
@@ -4426,7 +4426,15 @@ $("#pcumulBody").addEventListener("click", async e=>{
   const take=e.target.closest("[data-pctake]");
   if(take){
     const row=take.closest(".pv-row"), inp=row?row.querySelector(".pc-prime"):null;
-    if(inp){ inp.value=String(Number(take.getAttribute("data-mt"))||0); inp.focus(); }
+    if(inp){
+      inp.value=String(Number(take.getAttribute("data-mt"))||0);
+      // On retient QUELLES primes sont reprises : au versement, elles seront
+      // marquées réglées côté serveur. Celles qu'on ne reprend pas restent
+      // affichées au prochain passage — c'est voulu : une prime ne disparaît
+      // plus parce que le temps a passé, mais parce qu'elle a été versée.
+      inp.setAttribute("data-primeids", take.getAttribute("data-ids")||"");
+      inp.focus();
+    }
     else toast("Ce VA n'a aucun abonné à payer pour l'instant — la prime seule ne se verse pas ici.");
     return;
   }
@@ -4459,13 +4467,19 @@ $("#pcumulBody").addEventListener("click", async e=>{
     const prime=primeEl?Math.max(0,Number(primeEl.value)||0):0;
     const manager=mgrEl?Math.max(0,Number(mgrEl.value)||0):0;
     const leader=leadEl?Math.max(0,Number(leadEl.value)||0):0;
+    // Les primes REPRISES via le bouton « reprendre » (leurs identifiants).
+    // Elles seront marquées réglées côté serveur — mais SEULEMENT si une prime
+    // est effectivement versée : si la case a été vidée, on ne règle rien.
+    const primesReglees=(prime>0 && primeEl && primeEl.getAttribute("data-primeids"))
+      ? String(primeEl.getAttribute("data-primeids")).split(",").map(x=>parseInt(x,10)).filter(x=>x>0)
+      : [];
     const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime+manager+leader)*100)/100;
     const extra=(prime>0||manager>0||leader>0);
     // Confirmation d'un VERSEMENT réel → montants toujours lisibles.
     if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
-      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader})});
+      const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, primesReglees})});
       const j=await r.json();
       if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")+(j.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); }
       else if(j && j.saut && j.detail){
@@ -4477,7 +4491,7 @@ ${j.detail}
 
 Confirmer quand même le paiement de ${va} ?`)){
           try{
-            const r2=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, confirmer_saut:true})});
+            const r2=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, primesReglees, confirmer_saut:true})});
             const j2=await r2.json();
             // Mêmes avertissements que la branche normale : cette branche-ci les
             // perdait tous (contrôle anti-saut, historique) alors que c'est justement
