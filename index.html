@@ -4367,7 +4367,14 @@ function renderPaieCumul(){
       const dc=new Date(v.cahier.ts||0), okc=!isNaN(dc.getTime());
       badgeCahier=`<span class="pc-cahier" title="Un versement de ${pcMoneyClair(v.cahier.montant)} pour ${nom} est noté dans le cahier${okc?" le "+dc.toLocaleDateString("fr-FR"):""}, en dehors de ce bouton. Ce panneau ne lit que le repère de paie : si ce versement couvrait déjà ces abonnés, payer ici les facturerait une SECONDE fois.">⚠️ déjà noté au cahier ${pcMoney(v.cahier.montant)}</span>`;
     }
-    const badgeParti=v.parti?`<span class="pc-parti" title="Ce VA a quitté l'équipe. Il reste ici tant que son solde n'est pas versé ; il disparaîtra tout seul après.">parti · solde à verser</span>`:"";
+    // Un VA parti sans repère de paie n'est PAS une dette connue : on dit
+    // « base ? » plutôt que d'annoncer un solde qu'on ne sait pas calculer.
+    const partiDu=v.parti && ((Number(v.nouveaux)||0)>0 || (Number(v.primesMt)||0)>0);
+    const badgeParti=v.parti
+      ? (partiDu
+        ? `<span class="pc-parti" title="Ce VA a quitté l'équipe et il reste quelque chose à lui verser. Il disparaîtra tout seul une fois payé.">parti · solde à verser</span>`
+        : `<span class="pc-parti" style="color:#cbd5e1;background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.35)" title="Ce VA a quitté l'équipe et n'a pas de repère de paie : impossible de dire ce qu'on lui doit. Ce n'est pas zéro, c'est inconnu.">parti · base non définie</span>`)
+      : "";
     const nameCell=`<span class="pv-va">${nom}${badgeParti}${badgeCahier}${roleBtns}</span>`;
     if(v.unpaid){
       return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
@@ -4422,7 +4429,7 @@ function renderPaieCumul(){
       : "");
   // Bandeau si un VA parti attend encore son argent : c'est le cas où l'oubli
   // était garanti (plus de ticket, plus de tableau, plus de rappel).
-  const nbPartis=vas.filter(v=>v.parti).length;
+  const nbPartis=vas.filter(v=>v.parti && ((Number(v.nouveaux)||0)>0 || (Number(v.primesMt)||0)>0)).length;
   const partiBanner = nbPartis>0
     ? `<div class="sv-note" style="border-left:3px solid #f87171;margin-bottom:8px">⚠️ <b>${nbPartis} VA parti${nbPartis>1?"s":""}</b> ${nbPartis>1?"ont":"a"} encore un <b>solde à verser</b>. ${nbPartis>1?"Ils apparaissent":"Il apparaît"} ci-dessous jusqu'au versement, puis ${nbPartis>1?"disparaissent":"disparaît"} tout seul.</div>`
     : "";
