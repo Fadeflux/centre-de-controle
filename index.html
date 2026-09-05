@@ -12018,7 +12018,14 @@ function _argentEnAttente(){
     // 2) Une liste en attente d'envoi au serveur.
     if(typeof RULES_DIRTY     !== "undefined" && RULES_DIRTY)     return true;
     if(typeof DECISIONS_DIRTY !== "undefined" && DECISIONS_DIRTY) return true;
-    if(typeof VANOTES_DIRTY   !== "undefined" && VANOTES_DIRTY)   return true;
+    // ⚠️ `VANOTES_DIRTY` est un **Set**, pas un booléen, contrairement à ses
+    // trois sœurs. Un Set VIDE est truthy : ce test renvoyait donc TOUJOURS
+    // vrai, et l'avertissement de fermeture se déclenchait sur une page où
+    // rien n'était en attente — exactement le bruit qu'on apprend à ignorer,
+    // et qui rend le vrai avertissement inutile. Constaté en direct sur le
+    // site publié : `_argentEnAttente()` valait `true` dès l'écran de
+    // connexion. C'est sa TAILLE qui compte.
+    if(typeof VANOTES_DIRTY   !== "undefined" && VANOTES_DIRTY && VANOTES_DIRTY.size > 0) return true;
     if(typeof COSTS_DIRTY     !== "undefined" && COSTS_DIRTY)     return true;
     if(typeof REMINDERS_DIRTY !== "undefined" && REMINDERS_DIRTY) return true;
     if(typeof TODOS_DIRTY     !== "undefined" && TODOS_DIRTY)     return true;
