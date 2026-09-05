@@ -858,7 +858,9 @@
   .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:18px 0 0}
   .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
-  .pc-prime-att{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#c4b5fd;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.35);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .pc-cahier{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.pc-parti{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fca5a5;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.pc-prime-att{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#c4b5fd;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.35);border-radius:6px;padding:2px 7px;white-space:nowrap}
 .pc-prime-take{font:inherit;font-size:10px;font-weight:700;color:#0b1020;background:#a78bfa;border:0;border-radius:4px;padding:1px 6px;cursor:pointer}
 .pc-prime-take:hover{background:#c4b5fd}
 .pcumul-base{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
@@ -4352,7 +4354,21 @@ function renderPaieCumul(){
     const roleBtns=v.unpaid?"":`<span class="pc-roles">`
       +`<button class="pc-role ${isMgr?"on":""}" data-role="mgr" data-va="${nom}" title="Manager — part manager en plus (clique pour activer/désactiver)">👔</button>`
       +`<button class="pc-role ${isLead?"on":""}" data-role="lead" data-va="${nom}" title="Team leader — part leader en plus (clique pour activer/désactiver)">🧭</button></span>`;
-    const nameCell=`<span class="pv-va">${nom}${roleBtns}</span>`;
+    // ⚠️ Un VA PARTI reste ici tant qu'on lui doit quelque chose. Avant,
+    // l'archiver le faisait disparaître de sa propre paie — et des quatre autres
+    // écrans en même temps : plus personne ne disait qu'on lui devait son dernier
+    // cumul. Il sortira de lui-même une fois soldé.
+    // ⚠️ Il existe DEUX façons de marquer payé, et une seule fait avancer le
+    // repère de paie. Si un versement a été noté à la main dans le cahier depuis le
+    // dernier clic « Payer », ce panneau affiche quand même le dû — c'est
+    // exactement le moment où l'on repaie les mêmes abonnés. On le dit AVANT.
+    let badgeCahier="";
+    if(v.cahier){
+      const dc=new Date(v.cahier.ts||0), okc=!isNaN(dc.getTime());
+      badgeCahier=`<span class="pc-cahier" title="Un versement de ${pcMoneyClair(v.cahier.montant)} pour ${nom} est noté dans le cahier${okc?" le "+dc.toLocaleDateString("fr-FR"):""}, en dehors de ce bouton. Ce panneau ne lit que le repère de paie : si ce versement couvrait déjà ces abonnés, payer ici les facturerait une SECONDE fois.">⚠️ déjà noté au cahier ${pcMoney(v.cahier.montant)}</span>`;
+    }
+    const badgeParti=v.parti?`<span class="pc-parti" title="Ce VA a quitté l'équipe. Il reste ici tant que son solde n'est pas versé ; il disparaîtra tout seul après.">parti · solde à verser</span>`:"";
+    const nameCell=`<span class="pv-va">${nom}${badgeParti}${badgeCahier}${roleBtns}</span>`;
     if(v.unpaid){
       return `<div class="pv-row">${nameCell}<span class="pv-subs">${fmtInt(v.cumul)} subs</span><span class="pv-pay pcumul-warn">perso</span><span class="pv-note">0 paie</span></div>`;
     }
@@ -4404,7 +4420,13 @@ function renderPaieCumul(){
     : (Number(d&&d.primesTotal)>0
       ? `<div class="sv-note" style="border-left:3px solid #a78bfa;margin-bottom:8px">🎁 <b>${pcMoney(Number(d.primesTotal))} de primes</b> posées sur Discord et <b>pas encore réglées</b> — <b>elles ne sont PAS dans les montants ci-dessous</b>. Clique « reprendre » sur une ligne pour l'ajouter au versement : elle sera alors marquée réglée. Sinon elle restera affichée ici (elle ne se perd plus toute seule).</div>`
       : "");
-  const mgrSel=perimeBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
+  // Bandeau si un VA parti attend encore son argent : c'est le cas où l'oubli
+  // était garanti (plus de ticket, plus de tableau, plus de rappel).
+  const nbPartis=vas.filter(v=>v.parti).length;
+  const partiBanner = nbPartis>0
+    ? `<div class="sv-note" style="border-left:3px solid #f87171;margin-bottom:8px">⚠️ <b>${nbPartis} VA parti${nbPartis>1?"s":""}</b> ${nbPartis>1?"ont":"a"} encore un <b>solde à verser</b>. ${nbPartis>1?"Ils apparaissent":"Il apparaît"} ci-dessous jusqu'au versement, puis ${nbPartis>1?"disparaissent":"disparaît"} tout seul.</div>`
+    : "";
+  const mgrSel=perimeBanner+partiBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
@@ -4476,7 +4498,12 @@ $("#pcumulBody").addEventListener("click", async e=>{
     const subsPart=Number(amt)||0, totalPay=Math.round((subsPart+prime+manager+leader)*100)/100;
     const extra=(prime>0||manager>0||leader>0);
     // Confirmation d'un VERSEMENT réel → montants toujours lisibles.
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`)) return;
+    // Dernier moment utile pour le dire : juste avant d'envoyer l'argent.
+    const ligneCahier=(function(){
+      const b=row?row.querySelector(".pc-cahier"):null;
+      return b?`\n\n⚠️ ATTENTION : un versement pour ${va} est déjà noté dans le cahier depuis ton dernier clic << Payer >>.\nSi c'était pour ces mêmes abonnés, tu vas payer DEUX FOIS.`:"";
+    })();
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`+ligneCahier)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, primesReglees})});
