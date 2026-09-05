@@ -3095,7 +3095,7 @@ async function doLogin(){
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
-    loadPaieRoles, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
+    loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
     loadDigest, loadVaSante, loadCohortes, loadObjGoal, loadObjHistory,
@@ -7018,7 +7018,59 @@ function renderRenta(){
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × ${Math.round(netRate()*100)} % (${pctComm()} OnlyFans). Pas de frais Skrill chez Noctra. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
   { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
 }
+// ⚠️ `ccn_split` (le %) et `ccn_split_w_<AAAA-MM>` (« déjà pris ») vivaient
+// uniquement dans le localStorage d'UN navigateur. Ce sont des montants d'argent
+// réellement sortis : effacer les données du site, changer de machine ou passer
+// sur le téléphone, et l'on ne sait plus ce qu'on a déjà pris — le panneau
+// annonce alors un « reste » trop élevé, sans rien signaler. Même verrou de
+// lecture que les autres listes (RULES / COSTS / REMINDERS / TODOS / RÔLES).
+let SPLIT_LOADED=false, SPLIT_DIRTY=false;
+function splitMoisCle(){ return ((typeof jourServeur==="function")?jourServeur():new Date().toISOString()).slice(0,7); }
+function splitRetraitsLocaux(){
+  // Les retraits vivaient en une clé localStorage PAR MOIS : on les rassemble.
+  const out={};
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i); if(!k || k.indexOf("ccn_split_w_")!==0) continue;
+      const mois=k.slice(12); if(!/^\d{4}-\d{2}$/.test(mois)) continue;
+      const v=JSON.parse(localStorage.getItem(k)||"{}");
+      out[mois]={me:Number(v.me)||0, other:Number(v.other)||0};
+    }
+  }catch(e){}
+  return out;
+}
+async function loadSplit(){
+  if(!TOKEN){ SPLIT_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/split",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    // « absent ≠ tout à zéro » : `null` = le serveur n'a jamais rien stocké.
+    // On lui envoie alors ce qu'on a en local, une fois.
+    if(j.pct===null && j.retraits===null){ SPLIT_LOADED=true; saveSplit(); return; }
+    if(j.pct!=null) localStorage.setItem("ccn_split", String(j.pct));
+    const srv=j.retraits||{}, loc=splitRetraitsLocaux();
+    // Reprise : un montant saisi pendant que le serveur était muet ne disparaît pas.
+    if(SPLIT_DIRTY) Object.keys(loc).forEach(m=>{ if(srv[m]==null) srv[m]=loc[m]; });
+    Object.keys(srv).forEach(m=>{ try{ localStorage.setItem("ccn_split_w_"+m, JSON.stringify(srv[m])); }catch(e){} });
+    SPLIT_LOADED=true;
+    if(SPLIT_DIRTY){ SPLIT_DIRTY=false; saveSplit(); }
+    renderSplit();
+  }catch(e){}
+}
+function saveSplit(){
+  if(!TOKEN) return;
+  if(!SPLIT_LOADED){ SPLIT_DIRTY=true; return; }
+  const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
+  fetch(HUB_BASE+"/api/hub/split",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({pct:pct, retraits:splitRetraitsLocaux()})})
+    .then(r=>{ if(!r.ok){ SPLIT_DIRTY=true; if(typeof toast==="function") toast("⚠️ Partage NON enregistré","Il ne vaut que sur cet appareil : depuis un autre écran, le « reste à prendre » sera faux."); } })
+    .catch(()=>{ SPLIT_DIRTY=true; if(typeof toast==="function") toast("⚠️ Partage NON enregistré","Pas de réseau : il ne vaut que sur cet appareil."); });
+}
 function renderSplit(){
+  // Ce qui est en train d'être tapé survit à la reconstruction : `renderSplit`
+  // est dans `rerenderMoney` (mode discret, rafraîchissement), et `onchange` ne
+  // se déclenche qu'à la sortie du champ.
+  const _sw={me:($("#spWme")||{}).value, other:($("#spWother")||{}).value, pct:($("#spPct")||{}).value};
   const panel=$("#split"); if(!panel) return;
   if(!OM_DATA){ panel.style.display="none"; return; }
   // ⛔ Revenus muets : pas de partage sur un profit inconnu (il vaudrait 0/négatif).
@@ -7056,9 +7108,14 @@ function renderSplit(){
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameOther)} <span class="sp-pct">${100-pct}%</span></div><div class="sp-v">${money(partOther)}</div></div>
     <div class="sp-sub">déjà pris <input class="sp-w" id="spWother" type="number" inputmode="numeric" value="${wOther}"> ${cur} · reste <b>${money(partOther-wOther)}</b></div>
     <div class="sp-ctrl">Part ${escapeHtml(nameMe)} : <input id="spPct" type="number" min="0" max="100" value="${pct}">% <span class="sp-note">du profit du mois (${money(profit)}, avant part modèle)</span></div>`;
-  const setW=()=>{ localStorage.setItem(wKey,JSON.stringify({me:Number($("#spWme").value)||0,other:Number($("#spWother").value)||0})); renderSplit(); };
+  // … et on remet ce qui était en cours de saisie.
+  { const a=$("#spWme"), b=$("#spWother"), c=$("#spPct");
+    if(a && _sw.me!=null && _sw.me!=="") a.value=_sw.me;
+    if(b && _sw.other!=null && _sw.other!=="") b.value=_sw.other;
+    if(c && _sw.pct!=null && _sw.pct!=="") c.value=_sw.pct; }
+  const setW=()=>{ localStorage.setItem(wKey,JSON.stringify({me:Number($("#spWme").value)||0,other:Number($("#spWother").value)||0})); saveSplit(); renderSplit(); };
   { const a=$("#spWme"); if(a) a.onchange=setW; } { const b=$("#spWother"); if(b) b.onchange=setW; }
-  { const p=$("#spPct"); if(p) p.onchange=()=>{ localStorage.setItem("ccn_split",String(Math.min(100,Math.max(0,parseInt(p.value,10)||50)))); renderSplit(); }; }
+  { const p=$("#spPct"); if(p) p.onchange=()=>{ localStorage.setItem("ccn_split",String(Math.min(100,Math.max(0,parseInt(p.value,10)||50)))); saveSplit(); renderSplit(); }; }
 }
 // ⛔ LES CHIFFRES DE DÉMO NE SERVENT QU'À LA VITRINE (pas de cerveau configuré).
 // Ils ne doivent JAMAIS apparaître en cas de panne : ce sont des montants
@@ -11960,6 +12017,7 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof REMINDERS_LOADED!=="undefined" && !REMINDERS_LOADED) loadReminders();
     if(typeof TODOS_LOADED!=="undefined" && !TODOS_LOADED) loadTodosFromBrain();
     if(typeof ROLES_LOADED!=="undefined" && !ROLES_LOADED) loadPaieRoles();
+    if(typeof SPLIT_LOADED!=="undefined" && !SPLIT_LOADED) loadSplit();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -12030,6 +12088,7 @@ function _argentEnAttente(){
     if(typeof REMINDERS_DIRTY !== "undefined" && REMINDERS_DIRTY) return true;
     if(typeof TODOS_DIRTY     !== "undefined" && TODOS_DIRTY)     return true;
     if(typeof ROLES_DIRTY     !== "undefined" && ROLES_DIRTY)     return true;
+    if(typeof SPLIT_DIRTY     !== "undefined" && SPLIT_DIRTY)     return true;
   }catch(e){}
   return false;
 }
