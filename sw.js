@@ -33,8 +33,34 @@ self.addEventListener('fetch', function (e) {
   // celui du navigateur.
   if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
     e.respondWith((async function () {
+      // ⚠️ ON ATTENDAIT LE RESEAU SANS AUCUNE LIMITE DE TEMPS. Le repli sur le
+      // cache n'existait que dans le `catch`, c'est-a-dire uniquement quand la
+      // requete ECHOUE. Or une connexion lente-mais-vivante n'echoue pas : elle
+      // traine. Dans un taxi, un parking, le metro — une barre de reseau — Andre
+      // ouvre l'icone Noctra pour verifier un montant avant de payer un VA, et
+      // reste sur un ecran vide pendant que 955 Ko se trainent, alors qu'une
+      // copie hors-ligne est disponible immediatement.
+      // On fait donc une COURSE : si le reseau n'a pas repondu en 2,5 s et qu'on
+      // a une copie, on sert la copie TOUT DE SUITE. La requete reseau continue
+      // en fond et met le cache a jour pour la fois d'apres.
+      const copie = await caches.match('./index.html');
       try {
-        const net = await fetch(req, { cache: 'no-store' });
+        const reseau = fetch(req, { cache: 'no-store' });
+        if (copie) {
+          const gagnant = await Promise.race([
+            reseau.then(function (r) { return { r: r }; }).catch(function () { return null; }),
+            new Promise(function (ok) { setTimeout(function () { ok('lent'); }, 2500); }),
+          ]);
+          if (gagnant === 'lent') {
+            // Le reseau traine : on sert la copie, et on laisse la requete finir.
+            reseau.then(function (r) {
+              if (r && r.ok) caches.open(CACHE).then(function (c) { c.put('./index.html', r.clone()).catch(function () {}); });
+            }).catch(function () {});
+            return copie;
+          }
+          if (gagnant === null) return copie;   // le reseau a echoue : la copie
+        }
+        const net = await reseau;
         // Ne mettre en cache QUE des reponses valides : une panne passagere de
         // GitHub Pages (500) ou une page d'erreur (404) devenait sinon le repli
         // hors-ligne, et le dashboard s'ouvrait sur cette page d'erreur tant
@@ -42,7 +68,7 @@ self.addEventListener('fetch', function (e) {
         if (net && net.ok) { const c = await caches.open(CACHE); c.put('./index.html', net.clone()).catch(function () {}); }
         return net;
       } catch (err) {
-        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+        return copie || (await caches.match('./')) || Response.error();
       }
     })());
     return;

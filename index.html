@@ -7865,7 +7865,47 @@ function b64ToU8(base64){
   for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
   return out;
 }
-if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+// ⚠️ UNE PWA LAISSÉE OUVERTE NE SAVAIT JAMAIS QU'UNE NOUVELLE VERSION EXISTAIT.
+// L'enregistrement était posé une fois, sans `reg.update()`, sans écoute de
+// `controllerchange`, et sans `updateViaCache:'none'` (le fichier sw.js lui-même
+// pouvait donc venir du cache HTTP de GitHub Pages, max-age=600).
+// Déroulé réel : un correctif d'argent est déployé à 14 h. À 16 h, André reprend
+// son iPhone ; la PWA Noctra est encore ouverte en arrière-plan depuis le matin.
+// iOS la REPREND — pas de navigation, donc pas de requête HTML, donc pas de
+// nouveau code. La boucle de 60 s remplit l'écran de chiffres frais avec l'ANCIEN
+// calcul, et rien ne le dit. Ce dépôt reçoit plusieurs correctifs d'argent par
+// jour : c'est un vrai problème, pas une hypothèse.
+// On ne recharge PAS tout seul : André peut être en train de taper une prime.
+// On le lui propose.
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(function(reg){
+    // On redemande au serveur s'il y a du neuf : au réveil, et toutes les 15 min.
+    const verifier=function(){ try{ reg.update(); }catch(e){} };
+    setInterval(verifier, 15*60*1000);
+    document.addEventListener("visibilitychange", function(){ if(!document.hidden) verifier(); });
+  }).catch(function(){});
+  // Un nouveau service worker a pris la main = du code neuf est disponible.
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    if(window.__majProposee) return; window.__majProposee=true;
+    try{
+      let b=document.getElementById("majDispo");
+      if(!b){
+        b=document.createElement("div"); b.id="majDispo";
+        b.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:9999;"
+          +"background:#1c1d26;border:1px solid #3a3b4a;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;"
+          +"font-size:13px;color:#e7e7ee;box-shadow:0 8px 24px rgba(0,0,0,.45);max-width:92vw";
+        document.body.appendChild(b);
+      }
+      const enAttente=(typeof _argentEnAttente==="function" && _argentEnAttente());
+      b.innerHTML='<span>✨ Nouvelle version disponible'
+        + (enAttente ? ' — <b>tu as de l’argent tapé non envoyé</b>, envoie-le d’abord' : '')
+        + '</span><button id="majGo" style="font:inherit;font-weight:600;background:#a78bfa;color:#0b1020;border:0;border-radius:8px;padding:7px 12px;cursor:pointer;min-height:38px">Recharger</button>'
+        + '<button id="majNon" style="font:inherit;background:none;border:0;color:#9a9ab0;cursor:pointer;min-height:38px">Plus tard</button>';
+      document.getElementById("majGo").onclick=function(){ location.reload(); };
+      document.getElementById("majNon").onclick=function(){ b.remove(); };
+    }catch(e){}
+  });
+}
 if(("PushManager" in window) && ("Notification" in window)){ $("#push").style.display="inline-flex"; }
 
 /* ---------- installation sur l'écran d'accueil ---------- */
