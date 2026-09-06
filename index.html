@@ -6699,7 +6699,10 @@ function renderOM(){
     // pour qu'on comprenne d'un coup d'oeil pourquoi la marge n'est pas « brut − paie ».
     const _mNet=(v.rev==null)?null:v.rev*netRate();
     const _mPay=v.unpaid?0:((Number(v.subs)||0)*prixSub());   // paie EXACTE (subs × prix), pas déduite : rev est arrondi côté serveur
-    const margeTip=(ko||v.marge==null||v.rev==null)?"":` title="${omMoney(v.rev,cur)} générés (brut) − ${pctComm()} OnlyFans = ${moneyPrecis(_mNet,cur)} net · − ${moneyPrecis(_mPay,cur)} de paie VA → ${moneyPrecis(v.marge,cur)} pour toi"`;
+    // L'infobulle partait du brut pour arriver au net ; la colonne étant
+    // désormais nette, elle part du net directement — sinon elle réintroduit
+    // dans une bulle le chiffre qu'on vient de retirer de l'écran.
+    const margeTip=(ko||v.marge==null||v.rev==null)?"":` title="${moneyPrecis(_mNet,cur)} net généré · − ${moneyPrecis(_mPay,cur)} de paie VA → ${moneyPrecis(v.marge,cur)} pour toi"`;
     // Objectif de subs DU MOIS (jauge). Le progrès affiché est `monthSubs` :
   // le libellé disait « quinzaine », la jauge paraissait donc ~2× meilleure.
     const goal=Number((VA_GOALS||{})[v.va])||0, prog=Number(v.monthSubs)||0;
@@ -6750,7 +6753,7 @@ function renderOM(){
         // semaine. Il reste sur la vue « Toujours ».
         +`</div>`;
     }
-    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r"${(ko||v.rev==null)?"":` title="Brut OnlyFans, AVANT les ${pctComm()} de commission. La LTV et la marge à droite sont NETTES."`}>${mnt(v.rev)}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}"${margeTip}>${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
+    return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span><span class="omv-s">${fmtInt(v.subs)} subs</span><span class="omv-r"${(ko||v.rev==null)?"":` title="Ce que ce VA t'a rapporté, NET — après les ${pctComm()} de commission OnlyFans. Même unité que la LTV, la marge et le ROI à côté."`}>${mnt(v.rev==null?null:v.rev*netRate())}</span><span class="omv-l ${bad?'lo':''}">LTV ${ltvT(v.ltv)}</span><span class="omv-m ${(ko||v.marge==null)?'':(mp?'pos':'neg')}"${margeTip}>${(ko||v.marge==null)?"—":(mp?'+':'')+omMoney(v.marge,cur)}</span><span class="omv-roi ${roiCls}" title="Profit pour chaque 1$ versé au VA">${roiTxt}</span>${goalHtml}</div>`;}).join("")||`<div class="om-prep">${per!=="tout"?`Aucun VA n'a amené de sub ni encaissé ${escapeHtml(perInfo.court)}.`:"Aucun VA."}</div>`;
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   // Le bouton de tri : sur une fenêtre, « marge » n'existe pas -> deux choix.
   const triTxt = per!=="tout"
@@ -6780,10 +6783,12 @@ function renderOM(){
     // exactement l'écart que ce bloc est censé expliquer.
     if(!(t.horsVa&&t.horsVa[cle])||!(t.ancienVa&&t.ancienVa[cle])) return "";
     const hors=t.horsVa[cle], anc=t.ancienVa[cle];
-    // 💶 EN NET (choix d'André, 2026-09-06) : « je préfère le savoir en NET,
-    // c'est mieux ». C'est ce qui reste réellement, et c'est la base de toutes
-    // les décisions ailleurs dans la page. Le brut reste affiché en bas, pour
-    // pouvoir recouper avec ce qu'OnlyFans montre de son côté.
+    // 💶 TOUT EN NET, ET RIEN QUE LE NET (choix d'André, 2026-09-06 : « je veux
+    // pas le brut ici, je veux que le NET »). C'est ce qui lui reste réellement,
+    // et c'est déjà la base de toutes les décisions ailleurs dans la page.
+    // ⚠️ Ne pas « rendre service » en rappelant le brut quelque part : la demande
+    // est explicite, et deux unités dans un même bloc, c'est exactement ce qui
+    // faisait douter du chiffre.
     // ⚠️ L'ADDITION DOIT TOMBER JUSTE À L'ÉCRAN. `omMoney` arrondit au dollar :
     // convertir chaque ligne séparément pouvait donner 257 + 2 ≠ 259. On calcule
     // donc le NET de chaque poste, puis on DÉDUIT la part « rattachée à un VA »
@@ -6797,25 +6802,26 @@ function renderOM(){
     // petits postes, et on DÉDUIT la ligne principale de ces entiers-là. La somme
     // à l'écran est alors exacte par construction, quel que soit le montant.
     const _n=(v)=>Math.round((Number(v)||0)*netRate());
-    const brutNet=_n(brut), horsNet=_n(hors.rev), ancNet=_n(anc.rev);
-    const auxVaNet=brutNet-horsNet-ancNet;
+    const totalNet=_n(brut), horsNet=_n(hors.rev), ancNet=_n(anc.rev);
+    const auxVaNet=totalNet-horsNet-ancNet;
     const lignes=[
       `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVaNet,cur)}</b></div>`,
       (hors.rev? `<div class="om-rec-l"><span>Abonnés arrivés <b>sans lien de VA</b>${hors.payeurs?` · ${fmtInt(hors.payeurs)} fan${hors.payeurs>1?"s":""}`:""}</span><b>${omMoney(horsNet,cur)}</b></div>`:""),
       (anc.rev? `<div class="om-rec-l"><span>Comptes hors équipe (perso, hors classement)${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(ancNet,cur)}</b></div>`:""),
-      `<div class="om-rec-l tot"><span>Total <b>net</b> OnlyFans</span><b>${omMoney(brutNet,cur)}</b></div>`,
+      `<div class="om-rec-l tot"><span>Total <b>net</b> OnlyFans</span><b>${omMoney(totalNet,cur)}</b></div>`,
     ].join("");
     // Le pont vers la carte « 📅 Aujourd'hui » : net + Telegram.
     let pont="";
     if(cle==="today"){
       const net=brut*netRate();
       const tg=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
-      // Le pont expliquait brut → net ; maintenant que le tableau EST en net, il
-      // fait le chemin inverse : il rappelle le brut (celui qu'OnlyFans affiche,
-      // utile pour recouper) et ajoute le Telegram, comme la carte du jour.
+      // ⚠️ AUCUN MONTANT BRUT ICI. Décision d'André (06/09) : « je veux pas le
+      // brut ici, je veux que le NET ». Le brut n'est plus rappelé du tout — ce
+      // bloc ne parle que de ce qui lui reste, et le pont se contente de relier
+      // au chiffre de la carte du jour.
       pont=`<div class="om-rec-p">Sur ta carte du jour : <b>${moneyPrecis(net,cur)}</b> net OnlyFans`
         +(tg!=null?` · + Telegram <b>${tgMoney(tg)}</b> = <b>${moneyPrecis(net+tg,cur)}</b>`:` (+ Telegram)`)
-        +` <span class="ob-sub">— côté OnlyFans tu verras ${omMoney(brut,cur)} brut, avant les ${pctComm()} de commission</span></div>`;
+        +`</div>`;
     }
     const part=brut>0?Math.round(((hors.rev||0)+(anc.rev||0))/brut*100):0;
     return `<div class="om-rec"><div class="om-rec-h">🧾 D'où vient l'argent ${escapeHtml((OM_PERIODES.find(x=>x.k===cle)||{}).court||"")}</div>${lignes}${pont}`
@@ -6859,7 +6865,7 @@ function renderOM(){
     // En-tête = TOTAL ÉQUIPE (les 🔒 perso ne s'y ajoutent pas). Si seul le perso
     // a payé, en-tête neutre pour ne pas afficher « 0 $ par 0 abonné ».
     const tete=act.length
-      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste. Le brut est rappelé en bas du bloc, pour recouper avec OnlyFans."> · net · équipe</span>`
+      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste vraiment."> · net · équipe</span>`
       : `💸 Qui dépense aujourd'hui`;
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
       +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney((v.periodes.today.rev||0)*netRate(),cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
@@ -6867,15 +6873,16 @@ function renderOM(){
       +`<div class="om-spend-n">${noteBase}</div>`
       +rec+`</div>`;
   })();
-  // Rappel honnête : tout ici est du BRUT (avant les 20 % OnlyFans). La part
-  // modèle, elle, se calcule sur Noctra Finance.
-  // ⚠️ Formulation corrigée le 2026-08-24 : tout n'est PAS brut. La colonne
-  // « généré » l'est, mais LTV / marge / ROI sont désormais NETS (ils comparent
-  // de l'argent encaissé à une paie réellement versée). Le dire précisément
-  // évite de re-diviser mentalement un chiffre déjà net.
+  // 💶 TOUT CE TABLEAU EST EN NET (2026-09-06). « Généré » était la DERNIÈRE
+  // colonne en brut, au milieu de LTV / marge / ROI qui étaient déjà nets — et
+  // juste sous le panneau « Qui dépense aujourd'hui », lui aussi passé en net le
+  // même jour. Le même VA affichait donc deux montants différents sur le même
+  // écran : 321 $ ici, 257 $ juste au-dessus. C'est exactement ce qui fait douter
+  // d'un chiffre. Une seule unité partout, et la note le dit.
+  // La part modèle, elle, se calcule sur Noctra Finance.
   // 🏷️ Tarif de paie lisible, tel que le serveur le calcule (jamais en dur).
   const payTxt = (d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub";
-  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 <b>LTV</b> = tout ce qu'un abonné t'a rapporté <b>depuis son arrivée</b>, divisé par le nombre d'abonnés — c'est un total sur toute sa vie, <b>pas un montant par mois</b>.<br>La colonne <b>généré</b> est du <b>brut</b> ; la <b>LTV</b>, la <b>marge</b> et le <b>ROI</b> sont <b>nets</b> (après les ${pctComm()} OnlyFans).<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
+  const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 <b>LTV</b> = tout ce qu'un abonné t'a rapporté <b>depuis son arrivée</b>, divisé par le nombre d'abonnés — c'est un total sur toute sa vie, <b>pas un montant par mois</b>.<br>Tous les montants de ce tableau — <b>généré</b>, <b>LTV</b>, <b>marge</b>, <b>ROI</b> — sont <b>nets</b>, après les ${pctComm()} OnlyFans.<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // 🧾 Veilleur remboursements/rejets du mois (argent qui REPART). 0 aujourd'hui,
   // s'allume le jour où ça grimpe (fraude, fans mécontents). Source : totals.remboursements.
   const remb = d.totals && d.totals.remboursements;
@@ -6921,7 +6928,7 @@ function renderOM(){
         +`<span class="omv-rank">🔒</span>`
         +`<span class="omv-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir sa fiche">${escapeHtml(e.nom)}</span>`
         +`<span class="omv-s">${e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—"}</span>`
-        +`<span class="omv-r">${mnt(e.revTotal)}</span>`
+        +`<span class="omv-r">${mnt(e.revTotal==null?null:e.revTotal*netRate())}</span>`   // même colonne = même unité (net)
         +`<span class="omv-l">LTV ${ltvT(e.ltv)}</span>`
         +`<span class="omv-m ${marge!=null?'pos':''}">${marge!=null?"+"+omMoney(marge,cur):"—"}</span>`
         +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
@@ -6943,12 +6950,12 @@ function renderOM(){
         +`<span class="omv-rank">Σ</span>`
         +`<span class="omv-va">Total perso</span>`
         +`<span class="omv-s">${fmtInt(subs)} subs</span>`
-        +`<span class="omv-r">${omMoney(brut,cur)}</span>`
+        +`<span class="omv-r">${omMoney(brut*netRate(),cur)}</span>`   // même colonne = même unité (net)
         +`<span class="omv-l">LTV ${ltv!=null?moneyPrecis(ltv,cur):"—"}</span>`
         +`<span class="omv-m pos">+${omMoney(Math.round(net),cur)}</span>`
         +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
         +`</div>`
-        +`<div class="sv-note" style="margin-top:6px">💰 Tes deux comptes perso t'ont rapporté <b>${omMoney(Math.round(net),cur)} net</b> depuis le début (${omMoney(brut,cur)} brut, moins les ${pctComm()} d'OnlyFans) — et comme tu ne les paies pas, <b>tout est de la marge</b>.</div>`;
+        +`<div class="sv-note" style="margin-top:6px">💰 Tes deux comptes perso t'ont rapporté <b>${omMoney(Math.round(net),cur)} net</b> depuis le début (après les ${pctComm()} d'OnlyFans) — et comme tu ne les paies pas, <b>tout est de la marge</b>.</div>`;
     })() : "";
     // « — » muet sur TOUTE la ligne = on ne sait pas dire pourquoi. On distingue
     // « pas encore calculé » (le serveur le dit avec argentPret) de « pas de revenus ».
