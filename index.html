@@ -3370,8 +3370,12 @@ function renderCosts(){
   }).join("");
 }
 function addCost(){
-  const n=$("#costName").value.trim(), m=parseFloat(String($("#costAmount").value).replace(",","."));
-  if(!n || isNaN(m)) return;
+  const n=$("#costName").value.trim();
+  // Même règle que partout : « 1,250 » ne doit pas devenir 1,25 $/mois.
+  const _c=lireMontant($("#costAmount").value,{min:0,max:1000000,signeAutorise:false});
+  if(!n) return;
+  if(!_c.ok){ if(typeof toast==="function") toast("⚠️ Coût non enregistré",String(_c.erreur).replace(/\*\*/g,"")); return; }
+  const m=_c.valeur;
   const due=($("#costDue")||{}).value||"", every=(($("#costEvery")||{}).value)||"mois";
   // `every` doit être enregistré MÊME sans date d'échéance : sinon un « par an »
   // saisi sans échéance retombait silencieusement en mensuel dans les totaux.
@@ -4017,7 +4021,11 @@ function tgRefresh(){
   if(typeof refreshEssentiel==="function") try{ refreshEssentiel(); }catch(e){}
 }
 function addTgrev(){
-  const a=parseFloat(String($("#tgAmount").value).replace(",",".")), note=$("#tgNote").value.trim();
+  // ⚠️ `.replace(",",".")` transformait « 1,250 » en 1,25 : 1 248,75 $ évaporés
+  // sans un message. Même règle que le cerveau, et un montant ambigu est REFUSÉ.
+  const _tg=lireMontant($("#tgAmount").value,{min:0,max:1000000,signeAutorise:false});
+  if(!_tg.ok){ if(typeof toast==="function") toast("⚠️ Montant non enregistré",String(_tg.erreur).replace(/\*\*/g,"")); return; }
+  const a=_tg.valeur, note=$("#tgNote").value.trim();
   const subs=parseInt(String($("#tgSubs").value).replace(/[^0-9]/g,""),10)||0;
   const model=($("#tgModel")&&$("#tgModel").value)||"";
   if(!a || a<=0) return;
@@ -4256,7 +4264,32 @@ function savePayments(delta){ localStorage.setItem("ccn_payments",JSON.stringify
   fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(corps)})
     .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Paie NON enregistrée","Le serveur n'a pas pu écrire le cahier de paie. Le VA restera « à payer » — refais l'opération."); })
     .catch(()=>{ if(typeof toast==="function") toast("⚠️ Paie NON enregistrée","Pas de réseau : rien n'est parti au serveur. Refais l'opération une fois reconnecté."); }); } }
-async function loadPayments(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.payments)){ PAYMENTS=j.payments; localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); } } }catch(e){} } renderPaie(LAST); }
+// ⚠️ LE CAHIER DE PAIE N'ETAIT LU QU'UNE FOIS, AU DEMARRAGE.
+// `loadPayments` n'apparaissait que dans `loadAll()`, appele au chargement de la
+// page et apres une reconnexion — jamais dans la boucle de 60 s. Deux consequences,
+// toutes deux invisibles :
+//   1. TU PAIES DEUX FOIS. Paiement fait a 9 h depuis le telephone ; le PC, ouvert
+//      depuis 8 h, montre encore « Payer » a 11 h. Et il a l'air parfaitement frais :
+//      le panneau s'est redessine 180 fois entre-temps (render() toutes les 60 s),
+//      seul le CONTENU de PAYMENTS date de l'ouverture.
+//   2. SI LA LECTURE RATE, TOUT LE MONDE REDEVIENT « A PAYER ». `if(r.ok)` sans
+//      `else`, `catch(e){}` vide : un 502 pendant un redeploiement laissait
+//      PAYMENTS a [] (telephone neuf) pour TOUTE la session, avec un bouton
+//      « Payer » actif sur des VA deja payes et « 0/9 payes » en bas.
+// Le serveur, lui, refuse deja de repondre n'importe quoi : il renvoie un 503
+// « cahier de paie illisible — ne rien enregistrer » exprES pour ce cas. On le jetait.
+let PAYMENTS_LOADED=false;
+async function loadPayments(){
+  if(TOKEN){
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+      if(r.ok){ const j=await r.json();
+        if(Array.isArray(j.payments)){ PAYMENTS=j.payments; PAYMENTS_LOADED=true;
+          try{ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); }catch(e){} } }
+    }catch(e){}
+  } else { PAYMENTS_LOADED=true; }      // mode demo : rien a lire, rien a payer
+  renderPaie(LAST);
+}
 function payVa(va, amount){ if(isPaid(va)) return;
   const ligne={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6), va, amount:Number(amount)||0, period:curPeriod(), ts:Date.now()};
   PAYMENTS.unshift(ligne); savePayments({ajout:ligne}); renderPaie(LAST);
@@ -4311,10 +4344,15 @@ function renderPaie(data){
     // dans « x/N payés » (sinon le compteur ne peut jamais atteindre son total).
     // Paie INCONNUE (null) ≠ 0 : pas de bouton « Payer » (il enregistrerait 0 et
     // marquerait le VA payé). On le signale au lieu d'inventer un montant.
+    // ⚠️ « Je n'ai pas pu lire qui a deja ete paye » n'est PAS « personne n'a ete
+    // paye ». Tant que le cahier n'est pas lu, on retire le bouton : proposer
+    // « Payer » sur une ligne deja payee, c'est un second virement reel.
+    const _cahierKo = (typeof TOKEN!=="undefined" && TOKEN && typeof PAYMENTS_LOADED!=="undefined" && !PAYMENTS_LOADED);
     const btn = v.unpaid ? `<span class="pv-note">perso · 0 paie</span>`
       : (paid ? `<button class="pv-paid" data-unpay="${escapeHtml(v.va)}" title="Annuler le paiement">✅ Payé</button>`
-        : (v.pay==null ? `<span class="pv-note" title="Montant non calculé — je ne l'invente pas">paie inconnue</span>`
-          : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`));
+        : (_cahierKo ? `<span class="pv-note" title="Le cahier de paie n'a pas pu être lu — je ne sais pas si ce VA a déjà été payé">cahier non lu</span>`
+          : (v.pay==null ? `<span class="pv-note" title="Montant non calculé — je ne l'invente pas">paie inconnue</span>`
+            : `<button class="pv-pay-btn" data-pay="${escapeHtml(v.va)}" data-amt="${Number(v.pay)||0}">Payer</button>`)));
     return `<div class="pv-row ${paid?"pv-done":""}"><span class="pv-va">${escapeHtml(v.va)}</span><span class="pv-subs">${fmtInt(v.subs)} subs</span><span class="pv-pay">${fmtCur(v.pay)}</span>${btn}</div>`;
   }).join("");
   const aPayer = vas.filter(v=>!v.unpaid);
@@ -4344,14 +4382,28 @@ function renderPaie(data){
   const noteInconnue = paieInconnue>0
     ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-top:8px">⚠️ <b>${paieInconnue} VA</b> ${paieInconnue>1?"ont":"a"} une <b>paie inconnue</b> (le serveur n'a pas pu la calculer). Le TOTAL ci-dessus ne ${paieInconnue>1?"les":"le"} compte <b>pas</b> — ce n'est pas zéro, c'est un trou.</div>`
     : "";
-  $("#paieBody").innerHTML = rows
+  const noteCahier = (typeof TOKEN!=="undefined" && TOKEN && typeof PAYMENTS_LOADED!=="undefined" && !PAYMENTS_LOADED)
+    ? `<div class="sv-note" style="border-left:3px solid #ef4444;margin-top:8px">🔴 <b>Cahier de paie non lu</b> — je n'ai pas pu savoir qui a déjà été payé. Ce n'est PAS « personne n'a été payé » : ne verse rien depuis cet écran tant que ça n'est pas revenu. Je réessaie tout seul chaque minute.</div>`
+    : "";
+  $("#paieBody").innerHTML = noteCahier + rows
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL</span><span class="pv-subs">${fmtInt(totalSubs)} subs</span><span class="pv-pay">${fmtCur(total)}${paieInconnue>0?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note">${paidCount}/${aPayer.length} payés</span></div>`
     + noteInconnue
     + prevPaie
     + `<details class="pay-hist"><summary>📜 Historique de paie</summary><div class="pay-h-list">${hist}</div></details>`;
 }
 $("#paieBody").addEventListener("click",e=>{
-  const pb=e.target.closest("[data-pay]"); if(pb){ payVa(pb.getAttribute("data-pay"), pb.getAttribute("data-amt")); return; }
+  const pb=e.target.closest("[data-pay]"); if(pb){
+    // ⚠️ « Payer » DECLENCHAIT un versement ET un message Discord au VA sans la
+    // moindre confirmation — alors que « Annuler » juste en dessous en demande une.
+    // Le panneau se reconstruit tout seul toutes les 60 s : les lignes se decalent
+    // sous le doigt, et sur telephone le tap tombe sur le voisin. On nomme donc
+    // QUI, COMBIEN et QUELLE quinzaine, exactement comme l'annulation.
+    const _va=pb.getAttribute("data-pay"), _amt=Number(pb.getAttribute("data-amt"))||0;
+    const _p=(typeof curPeriod==="function")?curPeriod():"";
+    if(!confirm("Payer "+_va+" "+((typeof moneyClair==="function")?moneyClair(_amt):(_amt+" $"))
+      +(_p?(" (quinzaine "+_p+")"):"")+" ?\n\nLe bot va lui ÉCRIRE que sa paie est partie.")) return;
+    pb.disabled=true;                     // pas de second tap pendant l'envoi
+    payVa(_va, _amt); return; }
   const ub=e.target.closest("[data-unpay]"); if(ub){
     // ⚠️ « Annuler ce paiement ? » ne disait NI QUI, NI COMBIEN, NI QUELLE
     // quinzaine — alors que le bouton est sur une ligne parmi dix, que le
@@ -4517,7 +4569,7 @@ function pcLireSaisies(){
     const g=s=>{ const el=r.querySelector(s); return el?el.value:undefined; };
     const pe=r.querySelector(".pc-prime");
     saved[b.getAttribute("data-pcpay")]={
-      p:g(".pc-prime"), m:g(".pc-manager"), l:g(".pc-leader"),
+      p:g(".pc-prime"), m:g(".pc-manager"), l:g(".pc-leader"),   // texte brut : relu par lireMontant au versement
       // L'attribut qui dit QUELLES primes Discord sont reprises : sans lui,
       // elles ne sont jamais marquées réglées.
       ids:pe?(pe.getAttribute("data-primeids")||""):"",
@@ -4600,11 +4652,11 @@ function renderPaieCumul(){
       primeBadge=`<span class="pc-prime-att" title="Enregistrée(s) sur Discord depuis ton dernier versement à ${nom} : ${det}. Ce montant n'est PAS compris dans le chiffre à côté.">🎁 prime Discord ${pcMoney(v.primesMt)} <button class="pc-prime-take" data-pctake="${nom}" data-mt="${v.primesMt}" data-ids="${(v.primes||[]).map(x=>x.id).filter(Boolean).join(',')}" title="Recopier ce montant dans la case prime">reprendre</button></span>`;
     }
     // Cases de rôle : un montant EN PLUS, uniquement si le VA a le rôle (👔/🧭).
-    const mgrInput=isMgr?`<label class="pc-field"><span>👔</span><input class="pc-manager" type="number" min="0" step="any" inputmode="decimal" placeholder="manager" title="Part manager pour ${nom} — s'ajoute à sa paie"></label>`:"";
-    const leadInput=isLead?`<label class="pc-field"><span>🧭</span><input class="pc-leader" type="number" min="0" step="any" inputmode="decimal" placeholder="leader" title="Part team leader pour ${nom} — s'ajoute à sa paie"></label>`:"";
+    const mgrInput=isMgr?`<label class="pc-field"><span>👔</span><input class="pc-manager" type="text" inputmode="decimal" placeholder="manager" title="Part manager pour ${nom} — s'ajoute à sa paie"></label>`:"";
+    const leadInput=isLead?`<label class="pc-field"><span>🧭</span><input class="pc-leader" type="text" inputmode="decimal" placeholder="leader" title="Part team leader pour ${nom} — s'ajoute à sa paie"></label>`:"";
     // Barre d'actions sur SA PROPRE ligne (flex-basis:100%) → carte nette.
     const actions = (nouveaux>0)
-      ? `<div class="pc-actions"><label class="pc-field"><span>+</span><input class="pc-prime" type="number" min="0" step="any" inputmode="decimal" placeholder="prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA."></label>`
+      ? `<div class="pc-actions"><label class="pc-field"><span>+</span><input class="pc-prime" type="text" inputmode="decimal" placeholder="prime" title="Prime à ajouter (optionnel) — s'ajoute au versement du VA."></label>`
         +mgrInput+leadInput
         +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}"${pcPerime?' disabled title="Chiffres pas à jour — le montant réel peut être différent. Clique 🔄 avant de payer."':''}>${pcPerime?"⚠️ Chiffres à rafraîchir":"Payer "+pcMoney(montant)}</button></div>`
       : `<span class="pv-note">à jour ✓</span>`;
@@ -4706,9 +4758,27 @@ $("#pcumulBody").addEventListener("click", async e=>{
     const primeEl=row?row.querySelector(".pc-prime"):null;
     const mgrEl=row?row.querySelector(".pc-manager"):null;
     const leadEl=row?row.querySelector(".pc-leader"):null;
-    const prime=primeEl?Math.max(0,Number(primeEl.value)||0):0;
-    const manager=mgrEl?Math.max(0,Number(mgrEl.value)||0):0;
-    const leader=leadEl?Math.max(0,Number(leadEl.value)||0):0;
+    // ⚠️ `Number(el.value)||0` valait 0 pour TOUTE saisie illisible — y compris
+    // « 137,50 » tapé au clavier français, que l'ancien `type="number"` rendait
+    // comme une chaîne VIDE. La prime disparaissait sans un mot. On lit avec la
+    // règle commune, et une saisie qu'on ne sait pas lire ARRÊTE le versement.
+    const _lus=[["prime",primeEl],["part manager",mgrEl],["part team leader",leadEl]].map(function(t){
+      const el=t[1]; if(!el) return {ok:true,valeur:0};
+      const brut=String(el.value||"").trim();
+      if(!brut) return {ok:true,valeur:0};                 // case vide = pas de prime
+      const r=lireMontant(brut,{min:0,max:100000,signeAutorise:false});
+      if(!r.ok) r.quoi=t[0];
+      return r;
+    });
+    const _ko=_lus.filter(function(r){ return !r.ok; })[0];
+    if(_ko){
+      alert("Je n'arrive pas à lire la "+_ko.quoi+" : "+String(_ko.erreur).replace(/\*\*/g,"")
+        +"\n\nRIEN n'a été versé. Corrige la case et recommence.");
+      return;
+    }
+    const prime=Math.max(0,_lus[0].valeur||0);
+    const manager=Math.max(0,_lus[1].valeur||0);
+    const leader=Math.max(0,_lus[2].valeur||0);
     // Les primes REPRISES via le bouton « reprendre » (leurs identifiants).
     // Elles seront marquées réglées côté serveur — mais SEULEMENT si une prime
     // est effectivement versée : si la case a été vidée, on ne règle rien.
@@ -6019,6 +6089,104 @@ function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*netRate()).t
 // sous-titre de la carte : « ••• · après 20 % OnlyFans · brut 12,45 $ ». Le chiffre
 // masqué était donc lisible sur la même ligne. Et ce n'est pas qu'une question de
 // confort : la vue ASSOCIÉ force HIDE=true — c'est par là que passe la confidentialité.
+// ═══════════════════════════════════════════════════════════════════════════
+// 💵 LIRE UN MONTANT TAPÉ À LA MAIN — copie EXACTE de la règle du cerveau
+// (stats-tracker/src/utils/montant.js). Les deux côtés doivent lire pareil.
+//
+// ⚠️ MESURÉ DANS LE NAVIGATEUR LE 2026-09-06 : les cases de prime, de part
+// manager et de part team leader sont des `<input type="number">`. Sur un
+// clavier de téléphone FRANÇAIS, le pavé décimal propose une VIRGULE — et un
+// `type="number"` refuse la virgule : `.value` devient la chaîne VIDE.
+//   input.value = "137,50"  ->  .value === ""  ->  Number("")||0  ->  0
+//   input.value = "1 250"   ->  .value === ""  ->  Number("")||0  ->  0
+// La prime partait donc à 0 $, SANS un mot : la fenêtre de confirmation
+// n'affichait aucune ligne « + prime », ce qui ressemble à un versement sans
+// prime plutôt qu'à une erreur de saisie.
+//
+// Les deux autres saisies d'argent de la page avaient chacune leur variante,
+// toutes deux fausses : `parseFloat(String(v).replace(",","."))` transforme
+// « 1,250 » en 1,25 — soit 1 248,75 $ évaporés sans le moindre message.
+//
+// La règle ne DEVINE jamais un montant ambigu : « 1,000 » vaut mille en
+// français et un en anglais. Sur de l'argent, un refus lisible vaut mieux
+// qu'un facteur 1000.
+var ESPACES = /[\s   ]/g;   // espace, insécable, fine insécable
+
+/**
+ * @param {string} txt   ce que la personne a tapé
+ * @param {object} opts  { min, max, signeAutorise }
+ * @returns {{ok:boolean, valeur:number, erreur:string}}
+ */
+function lireMontant(txt, opts) {
+  opts = opts || {};
+  var s = String(txt == null ? '' : txt).replace(ESPACES, '').trim();
+  if (!s) return { ok: false, valeur: null, erreur: 'Montant vide.' };
+
+  // Symboles monétaires et lettres collées au nombre : « 50$ », « 50 USD ».
+  s = s.replace(/[$€£]/g, '').replace(/(usd|eur|dollars?|euros?)$/i, '');
+
+  var negatif = /^-/.test(s);
+  if (negatif && opts.signeAutorise === false) {
+    return { ok: false, valeur: null, erreur: 'Montant négatif refusé ici.' };
+  }
+  s = s.replace(/^[+-]/, '');
+
+  if (!/^[0-9.,]+$/.test(s)) {
+    return { ok: false, valeur: null, erreur: 'Montant illisible : « ' + String(txt).slice(0, 30) + ' ». Écris seulement des chiffres, ex. 150 ou 150.50.' };
+  }
+
+  var virgules = (s.match(/,/g) || []).length;
+  var points = (s.match(/\./g) || []).length;
+
+  if (virgules && points) {
+    // Les deux : le DERNIER des deux est le séparateur décimal, l'autre groupe
+    // les milliers. « 1.234,50 » → 1234.50 ; « 1,234.50 » → 1234.50.
+    var dernierV = s.lastIndexOf(','), dernierP = s.lastIndexOf('.');
+    if (dernierV > dernierP) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (virgules === 1) {
+    var apres = s.split(',')[1] || '';
+    var avant = s.split(',')[0] || '';
+    if (apres.length === 3 && /^[0-9]{1,3}$/.test(avant)) {
+      // ⚠️ LE CAS AMBIGU. « 1,000 » = mille (FR) ou un (EN) ? On ne tranche pas
+      // sur de l'argent : c'est exactement ce silence qui transformait un malus
+      // de 1 000 $ en 1 $.
+      return {
+        ok: false, valeur: null,
+        erreur: '« ' + String(txt).trim() +' » est ambigu : ça peut vouloir dire ' +
+          Number(avant + apres).toLocaleString('fr-FR') + ' ou ' + avant + ',' + apres.slice(0, 2) + '. ' +
+          'Réécris-le sans séparateur de milliers — par exemple ' + (avant + apres) + ' ou ' + avant + '.' + apres.slice(0, 2) + '. ' +
+          '**Rien n\'a été enregistré.**',
+      };
+    }
+    s = s.replace(',', '.');
+  } else if (virgules > 1) {
+    s = s.replace(/,/g, '');            // « 1,234,567 » : que des milliers
+  } else if (points > 1) {
+    s = s.replace(/\./g, '');           // « 1.234.567 » : idem, à la française
+  }
+
+  var v = Number(s);
+  if (!isFinite(v)) {
+    return { ok: false, valeur: null, erreur: 'Montant illisible : « ' + String(txt).slice(0, 30) + ' ».' };
+  }
+  if (negatif) v = -v;
+  v = Math.round(v * 100) / 100;
+
+  var abs = Math.abs(v);
+  if (opts.min != null && abs < opts.min) {
+    return { ok: false, valeur: null, erreur: 'Montant trop petit (' + v + ') — le minimum est ' + opts.min + '.' };
+  }
+  if (opts.max != null && abs > opts.max) {
+    return {
+      ok: false, valeur: null,
+      erreur: 'Montant trop élevé (' + v.toFixed(2) + ') — la limite est ' + opts.max + '. ' +
+        '**Rien n\'a été enregistré.** Si c\'est voulu, fais-le en plusieurs fois.',
+    };
+  }
+  return { ok: true, valeur: v, erreur: null };
+}
+// ═══════════════════════════════════════════════════════════════════════════
 function ltvBrutTxt(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 // 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
 // chiffres d'argent ? 🟢 à jour · 🟡 partiel (un compte muet → minimums) · 🔴 argent
@@ -12140,6 +12308,10 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
   // rafraîchissait normalement, ce qui rendait la panne invisible.
   try{ if(typeof loadHorsEquipe==="function") loadHorsEquipe(); }catch(e){}
   try{ if(typeof loadCookie==="function") loadCookie(); }catch(e){}
+  // ⚠️ Le cahier de paie n'était lu QU'AU DÉMARRAGE : payer depuis le téléphone
+  // laissait le PC afficher « Payer » sur la même ligne pendant des heures — et le
+  // panneau paraissait frais puisqu'il se redessinait chaque minute.
+  try{ if(typeof loadPayments==="function") loadPayments(); }catch(e){}
   // Le bandeau de fiabilité se redessine à CHAQUE tour, même quand rien n'a bougé :
   // son texte (« il y a 4 min », « perdue depuis 20 min ») doit vieillir tout seul,
   // sinon il reste figé sur la dernière phrase qu'il a écrite.
@@ -12215,8 +12387,22 @@ function _argentEnAttente(){
   try{
     // 1) Des montants tapés dans le panneau de paie, jamais versés.
     var saisi = false;
+    // ⚠️ `Number(el.value) > 0` ne marche plus depuis que ces cases sont en
+    // `type="text"` (il le fallait : un `type="number"` rendait une chaîne VIDE
+    // pour « 137,50 » tapé au clavier français). `Number("137,50")` vaut NaN, et
+    // `NaN > 0` est faux : l'avertissement « tu as de l'argent tapé non versé »
+    // ne serait plus jamais sorti pour une saisie à la virgule — c'est-à-dire
+    // pour la façon normale de taper en France. On lit avec la règle commune.
     document.querySelectorAll("#pcumulBody .pc-prime, #pcumulBody .pc-manager, #pcumulBody .pc-leader")
-      .forEach(function(el){ if(el && String(el.value||"").trim() !== "" && Number(el.value) > 0) saisi = true; });
+      .forEach(function(el){
+        if(!el) return;
+        var brut = String(el.value||"").trim();
+        if(brut === "") return;
+        // Une saisie ILLISIBLE compte aussi comme « en attente » : partir en la
+        // laissant, c'est la perdre — et c'est justement le cas qu'on veut signaler.
+        var r = (typeof lireMontant === "function") ? lireMontant(brut, {signeAutorise:false}) : null;
+        if(!r || !r.ok || (Number(r.valeur) || 0) > 0) saisi = true;
+      });
     if(saisi) return true;
     // 2) Une liste en attente d'envoi au serveur.
     if(typeof RULES_DIRTY     !== "undefined" && RULES_DIRTY)     return true;
