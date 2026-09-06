@@ -6244,6 +6244,26 @@ function lireMontant(txt, opts) {
   return { ok: true, valeur: v, erreur: null };
 }
 // ═══════════════════════════════════════════════════════════════════════════
+// 🏆 LA BASE COMMUNE DE TOUS LES PODIUMS.
+// ⚠️ Quatre endroits classaient les VA, et deux le faisaient autrement :
+//   • l'image partagée (l.~7777) filtrait bien `!unpaid` et triait sur les subs
+//     DU MOIS — c'est la référence, avec le commentaire « perso exclu, sinon
+//     l'image partagée classait le #1… » ;
+//   • l'état des lieux imprimable (l.~7813) ne filtrait RIEN : un compte perso de
+//     l'opérateur (marqué `unpaid`, jamais payé — « Bot », « Clhoe ») pouvait
+//     être sacré « Meilleur VA du mois » sur une feuille qu'on imprime et qu'on
+//     montre ;
+//   • la « Revue de la SEMAINE » (l.~9627) ne triait même pas : elle décernait
+//     🥇🥈🥉 dans l'ordre du serveur, sur `v.subs` = les abonnés CUMULÉS DEPUIS
+//     TOUJOURS. Un VA à 1 200 abonnés à vie mais 4 ce mois-ci passait devant
+//     celui qui en a amené 60.
+// Une seule fonction, donc l'écart ne peut plus se réintroduire.
+function podiumVas(vas, n){
+  return (Array.isArray(vas) ? vas : [])
+    .filter(v => v && !v.unpaid && (Number(v.monthSubs) || 0) > 0)
+    .sort((a, b) => (Number(b.monthSubs) || 0) - (Number(a.monthSubs) || 0))
+    .slice(0, n || 3);
+}
 function ltvBrutTxt(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 // 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
 // chiffres d'argent ? 🟢 à jour · 🟡 partiel (un compte muet → minimums) · 🔴 argent
@@ -6757,8 +6777,46 @@ function renderOM(){
 }
 // ---------- Objectif par VA (jauge dans le classement) ----------
 let VA_GOALS={};
-async function loadVaGoals(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-goals",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); VA_GOALS=j.goals||{}; if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM(); } }catch(e){} }
-async function saveVaGoals(){ if(!TOKEN) return; try{ await fetch(HUB_BASE+"/api/hub/va-goals",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goals:VA_GOALS})}); }catch(e){} }
+// ⚠️ LE PREMIER OBJECTIF FIXÉ EFFAÇAIT CEUX DE TOUS LES AUTRES VA.
+// `loadVaGoals` n'avait AUCUN drapeau, contrairement à ses neuf sœurs (RULES,
+// DECISIONS, VANOTES, COSTS, REMINDERS, TODOS, ROLES, SPLIT, GOAL) : si la
+// lecture ratait — un redéploiement du cerveau dure ~40 s — `VA_GOALS` restait
+// `{}`, et `saveVaGoals` poussait ce `{}` augmenté du seul objectif qu'on venait
+// de saisir. La liste complète du serveur était remplacée par une entrée.
+// Et rien ne réessayait : la lecture n'avait lieu qu'au démarrage.
+let VAGOALS_LOADED=false, VAGOALS_DIRTY=false;
+async function loadVaGoals(){
+  if(!TOKEN){ VAGOALS_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-goals",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){
+      const j=await r.json();
+      const srv=j.goals||{};
+      // Reprise : un objectif saisi pendant que le serveur était muet ne doit pas
+      // disparaître au moment où il revient. On garde le nôtre pour ces VA-là.
+      if(VAGOALS_DIRTY){ Object.keys(VA_GOALS||{}).forEach(function(k){ srv[k]=VA_GOALS[k]; }); }
+      VA_GOALS=srv; VAGOALS_LOADED=true;
+      if(VAGOALS_DIRTY) saveVaGoals();
+      if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM();
+    }
+  }catch(e){}
+}
+async function saveVaGoals(){
+  if(!TOKEN) return;
+  // ⚠️ SANS CE REFUS, LE PREMIER OBJECTIF EFFAÇAIT TOUS LES AUTRES. On pousse la
+  // liste ENTIÈRE : si on ne l'a jamais lue, on pousse une liste presque vide.
+  if(!VAGOALS_LOADED){
+    VAGOALS_DIRTY=true;
+    if(typeof toast==="function") toast("⚠️ Objectif gardé sur cet appareil",
+      "Je n'ai pas encore pu lire les objectifs du serveur : les envoyer maintenant effacerait ceux des autres VA. Je réessaie tout seul chaque minute.");
+    return;
+  }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-goals",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goals:VA_GOALS})});
+    if(r && r.ok) VAGOALS_DIRTY=false;
+    else { VAGOALS_DIRTY=true; if(typeof toast==="function") toast("⚠️ Objectif NON enregistré","Il ne vaut que sur cet appareil — l'autre écran affichera l'ancien."); }
+  }catch(e){ VAGOALS_DIRTY=true; if(typeof toast==="function") toast("⚠️ Objectif NON enregistré","Pas de réseau : rien n'est parti au serveur."); }
+}
 // 🪄 #8 objectif SUGGÉRÉ pour un VA : son rythme des 4 dernières semaines
 // (VASANTE.weeks) projeté sur le mois, +10 % d'ambition, arrondi à 5.
 // null si pas assez d'historique (< 10 subs sur 4 semaines).
@@ -7772,7 +7830,7 @@ function buildPrintSummary(){
   const netMois=(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,cur);
   const subsMois=(tot.subsMonth!=null)?String(tot.subsMonth):"—";
   const dateStr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  const topVa=(om&&Array.isArray(om.vas)&&om.vas.length)?om.vas.slice().sort((a,b)=>(Number(b.monthSubs)||0)-(Number(a.monthSubs)||0))[0]:null;
+  const topVa=podiumVas(om&&om.vas,1)[0]||null;   // perso exclu : cette feuille s'imprime et se montre
   // ⚠️ On réutilise la VRAIE file d'actions (déjà agrégée et triée par gravité)
   // au lieu des 2 signaux de CAT_ALERTS : l'imprimé listait des NOMS DE
   // CATÉGORIES (« 👥 Équipe (VA) ») au lieu de problèmes, et pouvait annoncer
@@ -8955,8 +9013,19 @@ function renderCash(){
       +`<div class="cash-line"><span>⏳ En attente de versement</span><b>${cur(d.attente)}</b></div>`
       +(d.tresoPartiel?`<div class="cash-sub">⚠️ lecture partielle — c'est un minimum</div>`:"");
   }
+  // ⚠️ LE PANNEAU DISAIT « JE NE SAIS PAS », PUIS RÉPONDAIT QUAND MÊME.
+  // Quand le cahier de paie est illisible, le serveur renvoie honnêtement
+  // `resteRetard: null` — mais il calcule ensuite `totalASortir` avec
+  // `(resteRetard || 0)` (cashFlow.js:145), donc en comptant l'arriéré INCONNU
+  // comme ZÉRO. `apresPaie` en découle. Résultat à l'écran, deux lignes sous le
+  // « je ne sais pas » : « Total à sortir bientôt 1 200 $ » et « 🟢 Après avoir
+  // tout payé, il te resterait 800 $ » — un feu vert calculé sur une dette qu'on
+  // vient d'admettre ne pas connaître. C'est exactement la règle « absent ≠ 0 »
+  // enfreinte DANS le panneau qui l'énonce.
   let verdict="";
-  if(d.apresPaie!=null){
+  if(retardKo){
+    verdict=`<div class="cash-verdict bad">🟡 <b>Impossible de dire</b> s'il te restera de quoi tout payer : l'arriéré de la quinzaine passée n'a pas pu être lu, et il n'est donc pas compté dans le total ci-dessus. Rafraîchis, ou vérifie « Paie au cumul » avant de te verser quoi que ce soit.</div>`;
+  } else if(d.apresPaie!=null){
     const ok=Number(d.apresPaie)>=0;
     verdict=`<div class="cash-verdict ${ok?'ok':'bad'}">${ok
       ?`🟢 Après avoir tout payé, il te resterait <b>${cur(d.apresPaie)}</b>.`
@@ -8964,7 +9033,9 @@ function renderCash(){
   }
   body.innerHTML=`<div class="cash-pay">📅 Prochaine paie : <b>${fmtJourFr(d.payday)}</b></div>`
     +`<div class="cash-block"><div class="cash-h">À payer</div>${enCoursHtml}${retardHtml}`
-    +`<div class="cash-line total"><span>Total à sortir bientôt</span><b>${cur(d.totalASortir)}</b></div></div>`
+    +`<div class="cash-line total"><span>Total à sortir bientôt</span><b>${cur(d.totalASortir)}${retardKo?' <span class="ob-sub">+ ?</span>':''}</b></div>`
+    +(retardKo?`<div class="cash-sub">⚠️ <b>au moins</b> ce montant : l'arriéré de la quinzaine passée n'a pas pu être lu et n'est PAS compté dedans.</div>`:"")
+    +`</div>`
     +`<div class="cash-block"><div class="cash-h">Ce que tu as / attends</div>${tresoHtml}</div>${verdict}`
     +`<div class="bp-since" style="margin-top:8px"><button class="mn-act-btn" id="cashRefresh" style="padding:6px 12px">🔄 Rafraîchir</button>${d.maj?` <span style="color:var(--faint);font-size:11px">à jour ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   const rb=$("#cashRefresh"); if(rb) rb.onclick=async()=>{
@@ -9573,7 +9644,9 @@ function openRevue(){
     const diff=s7-p7, up=diff>=0, pct=p7>0?Math.round(diff/p7*100):null;
     caBloc=`<div class="rv-stat"><div class="rv-l">CA des 7 derniers jours</div><div class="rv-v">${money(Math.round(s7*NET))} net <span style="opacity:.65">(${money(s7)} brut)</span></div><div class="rv-chg ${up?'pos':'neg'}">${up?'▲':'▼'} ${pct!=null?(up?'+':'−')+Math.abs(pct)+' %':''} vs 7 jours d'avant</div></div>`;
   }
-  const topVa=(d.vas||[]).slice(0,3).map((v,i)=>`${["🥇","🥈","🥉"][i]} ${escapeHtml(v.va)} (${v.subs} subs)`).join(" · ")||"—";
+  // ⚠️ Ni tri, ni filtre, et `v.subs` = abonnés CUMULÉS DEPUIS TOUJOURS dans un
+  // panneau intitulé « Revue de la SEMAINE ». On passe par la base commune.
+  const topVa=podiumVas(d.vas,3).map((v,i)=>`${["🥇","🥈","🥉"][i]} ${escapeHtml(v.va)} (${Number(v.monthSubs)||0} subs ce mois)`).join(" · ")||"—";
   const mov=[];
   if(typeof OPP_FLAGS!=="undefined"&&OPP_FLAGS.length) mov.push(`🚀 En hausse : <b>${OPP_FLAGS.slice(0,3).map(f=>escapeHtml(f.va)).join(", ")}</b>`);
   if(typeof DECROCHE_FLAGS!=="undefined"&&DECROCHE_FLAGS.length) mov.push(`📉 En baisse : <b>${DECROCHE_FLAGS.slice(0,3).map(f=>escapeHtml(f.va)).join(", ")}</b>`);
@@ -12452,6 +12525,14 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof ROLES_LOADED!=="undefined" && !ROLES_LOADED) loadPaieRoles();
     if(typeof SPLIT_LOADED!=="undefined" && !SPLIT_LOADED) loadSplit();
     if(typeof GOAL_LOADED!=="undefined" && !GOAL_LOADED) loadRingGoal();
+    // ⚠️ TGREV avait bien son verrou d'écriture (`saveTgrev` refuse d'envoyer
+    // tant que la lecture n'a pas réussi — sans ça, la saisie ÉCRASERAIT les
+    // revenus du serveur), mais RIEN ne le levait : un seul 502 au chargement
+    // bloquait la saisie des revenus Telegram pour toute la session, et le seul
+    // remède proposé était « recharge la page ».
+    if(typeof TGREV_LOADED!=="undefined" && !TGREV_LOADED) loadTgrev();
+    // Idem pour les objectifs par VA (voir loadVaGoals).
+    if(typeof VAGOALS_LOADED!=="undefined" && !VAGOALS_LOADED) loadVaGoals();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -12461,13 +12542,28 @@ setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_M
 // reste se rafraîchissait à côté -- et la « cohérence » certifiait « tu peux
 // décider sur ces chiffres » sans avoir revu aucun des chiffres actuels.
 // Cadence plus lente que la boucle principale : ce sont des appels lourds.
-setInterval(function(){
+// ⚠️ CES PANNEAUX N'ÉTAIENT PAS RATTRAPÉS AU RÉVEIL DU TÉLÉPHONE. iOS gèle les
+// minuteries d'une page en arrière-plan : téléphone posé à 9 h, repris à 12 h,
+// `visibilitychange` rappelait `boucleRafraichissement()` — les chiffres d'argent
+// se remettaient à jour en 2 secondes et le bandeau du haut repassait au vert
+// « à jour ». Mais Cohérence, Trésorerie, CAC, Décrochage et Conversion, eux,
+// affichaient toujours 9 h, sans le dire. Le pire est Cohérence, qui certifie
+// « tu peux décider sur ces chiffres » — sur des chiffres qu'il n'a pas revus.
+// `loadProxy` et `loadIncidents` n'étaient dans AUCUNE boucle : le panneau proxy
+// figeait un « ✅ tes vues remontent bien » de 8 h même une fois le plafond
+// atteint, et le journal des pannes ne voyait jamais une panne commencée après
+// l'ouverture de la page.
+function boucleLente(){
   if(pageCachee() || $("#gate").classList.contains("show")) return;
   [ "loadTresorerie","loadCoherence","loadSanteComptes","loadCac",
-    "loadDecroche","loadConversion","loadHours" ].forEach(function(n){
+    "loadDecroche","loadConversion","loadHours","loadProxy" ].forEach(function(n){
     try{ if(typeof window[n]==="function") window[n](); }catch(e){}
   });
-}, REFRESH_MS*5);
+  // loadIncidents prend un paramètre : sans `true`, c'est une simple lecture du
+  // cache serveur (pas un nouveau diagnostic).
+  try{ if(typeof loadIncidents==="function") loadIncidents(); }catch(e){}
+}
+setInterval(boucleLente, REFRESH_MS*5);
 // Retour sur l'onglet : on rafraîchit tout de suite plutôt que d'attendre le
 // prochain tic — les chiffres sont donc à jour au moment précis où on les
 // regarde. (Garde-fou : pas plus d'un rafraîchissement toutes les 5 s, pour
@@ -12478,6 +12574,12 @@ document.addEventListener('visibilitychange', function(){
   if(Date.now() - _dernierReveil < 5000) return;
   _dernierReveil = Date.now();
   try{ boucleRafraichissement(); if(typeof syncTasks==="function") syncTasks(); }catch(e){}
+  // Les panneaux lourds aussi : sans ça, ils gardaient les chiffres d'avant la
+  // mise en veille pendant que tout le reste repassait au vert. Garde-fou propre
+  // (2 min) pour qu'un aller-retour entre onglets ne relance pas 8 appels lourds.
+  try{
+    if(Date.now() - (window._dernierLent||0) > 120000){ window._dernierLent=Date.now(); boucleLente(); }
+  }catch(e){}
 });
 setTimeout(()=>{ refreshEssentiel(); refreshPrintSummary(); }, 3500);
 // ⚠️ Safari iOS n'émet PAS `beforeprint` : sans ce rafraîchissement régulier,
