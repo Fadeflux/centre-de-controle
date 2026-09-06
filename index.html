@@ -5523,8 +5523,8 @@ function renderGoal(data){
     $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
       + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.affiche}</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
              :`<div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`);
-    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); } };
-    const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); GOAL_CELEBRATED=false; renderGoal(LAST); };
+    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
     return;
   }
   const isRev = GOAL.type==="rev";
@@ -7099,6 +7099,46 @@ function splitRetraitsLocaux(){
     }
   }catch(e){}
   return out;
+}
+// ⚠️ L'OBJECTIF DE L'ANNEAU NE VIVAIT QUE DANS CE NAVIGATEUR.
+// Il pilote la couronne du haut ET, quand il est de type « revenus », tout le
+// panneau « Objectif du mois » (« même que l'anneau ») : le but, le pourcentage,
+// le reste, et le nombre de subs à trouver réparti par VA. Le téléphone et le PC
+// affichaient donc DEUX objectifs différents pour le même mois, chacun persuadé
+// d'avoir le bon — et vider les données du navigateur l'effaçait sans un mot.
+let GOAL_LOADED=false, GOAL_DIRTY=false;
+async function loadRingGoal(){
+  if(!TOKEN){ GOAL_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/ring-goal",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;                       // on RÉESSAIE au prochain tour (voir la boucle)
+    const j=await r.json();
+    // « absent ≠ pas d'objectif » : `null` = le serveur n'a jamais rien reçu. On lui
+    // pousse alors ce qu'on a en local, une seule fois, pour ne pas perdre l'existant.
+    if(j.type===null && j.value===null){ GOAL_LOADED=true; if(GOAL) saveRingGoal(); return; }
+    if(j.type && j.value>0){
+      const avant=GOAL?JSON.stringify(GOAL):"";
+      GOAL={type:j.type,value:Number(j.value)};
+      try{ localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); }catch(e){}
+      if(avant!==JSON.stringify(GOAL)){ GOAL_CELEBRATED=false;
+        try{ if(typeof renderGoal==="function"&&typeof LAST!=="undefined") renderGoal(LAST); }catch(e){}
+        try{ if(typeof renderOM==="function") renderOM(); }catch(e){} }
+    }
+    GOAL_LOADED=true;
+    // Un objectif fixé pendant que le serveur était muet ne doit pas se perdre.
+    if(GOAL_DIRTY) saveRingGoal();
+  }catch(e){}
+}
+async function saveRingGoal(){
+  if(!TOKEN) return;
+  if(!GOAL || !GOAL.type || !(Number(GOAL.value)>0)) return;   // « effacer » reste local
+  GOAL_DIRTY=true;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/ring-goal",{method:"POST",
+      headers:{"x-hub-token":TOKEN,"content-type":"application/json"},
+      body:JSON.stringify({type:GOAL.type,value:Number(GOAL.value)})});
+    if(r.ok) GOAL_DIRTY=false;
+  }catch(e){}
 }
 async function loadSplit(){
   if(!TOKEN){ SPLIT_LOADED=true; return; }
@@ -12122,6 +12162,7 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof TODOS_LOADED!=="undefined" && !TODOS_LOADED) loadTodosFromBrain();
     if(typeof ROLES_LOADED!=="undefined" && !ROLES_LOADED) loadPaieRoles();
     if(typeof SPLIT_LOADED!=="undefined" && !SPLIT_LOADED) loadSplit();
+    if(typeof GOAL_LOADED!=="undefined" && !GOAL_LOADED) loadRingGoal();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
