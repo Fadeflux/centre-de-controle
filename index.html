@@ -2942,8 +2942,14 @@ function nextAction(data, live){
   if(!IS_LIVE) return {icon:"🔑", text:"Connecte-toi pour activer tes vrais chiffres", urgent:true};
   const off = live.filter(t=>(data[t.id]||{}).status==="offline");
   if(off.length) return {icon:"🔧", text:`Répare ${off[0].name} — hors ligne`, urgent:true};
-  const d=new Date(), day=d.getDate();
-  if(day===15 || day===lastDayOfMonth(d.getFullYear(),d.getMonth())) return {icon:"💰", text:"C'est jour de paie — paye tes VA", urgent:true};
+  // ⚠️ `new Date().getDate()` est le jour de PARIS, alors que la quinzaine qu'il
+  // déclenche est découpée sur le fuseau MÉTIER (UTC+1 fixe). Le 15 à 00 h 30
+  // heure de Paris — donc le 14 à 23 h 30 côté métier — ce rappel sortait
+  // « c'est jour de paie » une journée entière trop tôt, en tête de la file
+  // d'actions et marqué urgent.
+  const day=(typeof jourDuMoisServeur==="function")?jourDuMoisServeur():new Date().getDate();
+  const dernier=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():lastDayOfMonth(new Date().getFullYear(),new Date().getMonth());
+  if(day===15 || day===dernier) return {icon:"💰", text:"C'est jour de paie — paye tes VA", urgent:true};
   const t = TODOS.find(x=>!x.d);
   if(t) return {icon:"📝", text:t.t, urgent:false};
   return {icon:"✅", text:"Tout est à jour — rien d'urgent", urgent:false};
@@ -3269,7 +3275,12 @@ renderTodos();
 /* ---------- rappels récurrents ---------- */
 function lastDayOfMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
 function activeRappels(){
-  const d=new Date(), day=d.getDate(), wd=d.getDay(), last=lastDayOfMonth(d.getFullYear(),d.getMonth());
+  // ⚠️ Même correction qu'au-dessus : le jour du mois et la fin de mois viennent
+  // du fuseau MÉTIER, pas de l'horloge de Paris. Le jour de la SEMAINE, lui,
+  // reste celui du navigateur : c'est bien le lundi d'André qui compte.
+  const d=new Date(), wd=d.getDay();
+  const day=(typeof jourDuMoisServeur==="function")?jourDuMoisServeur():d.getDate();
+  const last=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():lastDayOfMonth(d.getFullYear(),d.getMonth());
   const r=[];
   if(day===15 || day===last) r.push("💰 Jour de paie — payer les VA (quinzaine)");
   if(day===1) r.push("🗓️ Nouveau mois — vérifier objectifs et dépenses");
@@ -3302,7 +3313,17 @@ function saveCosts(){
   // sinon un ajout fait avant la fin de loadCosts écrase la liste du serveur.
   if(typeof TOKEN!=="undefined" && TOKEN){
     if(!COSTS_LOADED){ COSTS_DIRTY=true; return; }
-    fetch(HUB_BASE+"/api/hub/tool-costs",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({outils:COSTS})}).catch(()=>{});
+    // ⚠️ `.catch(()=>{})` ET `r.ok` JAMAIS LU. La fenêtre de confirmation promet
+    // pourtant noir sur blanc « c'est définitif, sur tous tes appareils, et ça
+    // change la marge affichée », puis le toast dit « 🗑️ Supprimé ». Un 401
+    // (jeton périmé) ou un tunnel coupé : le coût reste en base, la marge
+    // affichée sur les AUTRES écrans reste fausse, et rien ne le dit.
+    // Même remède que saveTgrev et savePayments, déjà corrigés pour ça.
+    fetch(HUB_BASE+"/api/hub/tool-costs",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({outils:COSTS})})
+      .then(r=>{ if(!r.ok){ COSTS_DIRTY=true;
+        if(typeof toast==="function") toast("⚠️ Coût NON enregistré","La marge affichée sur tes autres écrans est donc fausse — refais l'opération."); } })
+      .catch(()=>{ COSTS_DIRTY=true;
+        if(typeof toast==="function") toast("⚠️ Coût NON enregistré","Pas de réseau : rien n'est parti au serveur."); });
   }
 }
 // Au chargement : on récupère la liste du cerveau (elle fait foi entre appareils).
@@ -4275,12 +4296,30 @@ let PAYMENTS = lsJSON("ccn_payments",[]); if(!Array.isArray(PAYMENTS)) PAYMENTS=
 // pas à celle que le serveur calcule — le paiement n'était pas reconnu.
 // RÈGLE : une date qui sert à lire ou écrire une donnée SERVEUR vient du SERVEUR.
 // `OM_DATA.today` est déjà envoyé à chaque rafraîchissement.
+// Le fuseau MÉTIER de l'argent : UTC+1 FIXE, volontairement sans changement
+// d'heure, pour qu'une période de paie ne bouge jamais sous les pieds. C'est le
+// même que `OF_SUBS_TZ` côté cerveau. À ne pas confondre avec l'heure française
+// (UTC+2 l'été), qui est celle du NAVIGATEUR.
+const TZ_METIER = "Africa/Porto-Novo";
 function jourServeur(){
+  // ⚠️ ON CALCULE LA DATE MÉTIER, ON NE LA CROIT PLUS SUR PAROLE.
+  // Avant : on prenait `OM_DATA.today`, un champ TRANSPORTÉ. Or le cerveau sert
+  // un CACHE et ne le remplace que si son calcul réussit : quand il plante en
+  // boucle, l'API répond 200 avec l'ANCIEN instantané — donc l'ancien `today`.
+  // Toute la quinzaine de paie en dépendait, sans le moindre contrôle de
+  // fraîcheur. Et le repli était pire : la date du NAVIGATEUR, c'est-à-dire
+  // Paris — entre minuit et 1 h du matin l'été, on est encore la veille côté
+  // métier, et le rappel « c'est jour de paie » sortait une journée trop tôt.
+  // Le navigateur sait calculer cette date exactement, avec la même règle que le
+  // serveur. On le fait donc ici, et `OM_DATA.today` ne sert plus que de secours.
+  try{
+    return new Intl.DateTimeFormat("en-CA",{timeZone:TZ_METIER,
+      year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  }catch(e){}
   try{
     const t=(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.today)?String(OM_DATA.today):"";
     if(/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
   }catch(e){}
-  // Repli : la date LOCALE (jamais toISOString, qui est de l'UTC).
   const n=new Date();
   return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");
 }
@@ -5337,20 +5376,43 @@ async function loadObjGoal(){
   try{ const r=await fetch(HUB_BASE+"/api/hub/obj-goal",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); OBJ_GOAL=Number(j.goal)||0; OBJ_MONTH_GOAL=Number(j.monthGoal)||0; localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL)); } }catch(e){}
   renderObjMois();
 }
+// ⚠️ « 🎯 OBJECTIF FIXÉ — 15 000 $ CE MOIS » S'AFFICHAIT SANS QUE LA RÉPONSE DU
+// SERVEUR SOIT LUE UNE SEULE FOIS, et l'envoi n'était même pas attendu. 3G
+// faible, jeton expiré, ou compte associé en lecture seule (403) : le message de
+// succès sortait quand même, et l'objectif revenait en douce à l'ancien au
+// rechargement — sans que personne comprenne pourquoi.
+// Rend `true` seulement si le serveur a confirmé.
 async function saveObjGoal(g){
   OBJ_GOAL=Math.max(0,Math.round(Number(g)||0));
   localStorage.setItem("ccn_obj_goal",String(OBJ_GOAL));
   renderObjMois();
-  if(TOKEN){ try{ await fetch(HUB_BASE+"/api/hub/obj-goal",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goal:OBJ_GOAL})}); }catch(e){} }
+  if(!TOKEN) return true;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/obj-goal",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goal:OBJ_GOAL})});
+    if(r && r.ok) return true;
+    if(typeof toast==="function") toast("⚠️ Objectif NON enregistré","Il ne vaut que sur cet appareil — ton autre écran affichera l'ancien.");
+    return false;
+  }catch(e){
+    if(typeof toast==="function") toast("⚠️ Objectif NON enregistré","Pas de réseau : rien n'est parti au serveur.");
+    return false;
+  }
 }
 { const b=$("#objEdit"); if(b) b.onclick=()=>{
     const cur=OBJ_GOAL>0?String(OBJ_GOAL):"";
     const v=prompt("Ton objectif de CA du mois, en $ (montant BRUT OnlyFans — le panneau l'affiche ensuite converti en NET, comme l'anneau du haut) ?\n\nLaisse VIDE pour revenir à l'objectif automatique.",cur);
     if(v===null) return;
-    const s=String(v).replace(/[^0-9]/g,"");
-    if(s===""){ saveObjGoal(0); if(typeof toast==="function") toast("🎯 Objectif","Retour à l'objectif automatique."); return; }
-    const g=parseInt(s,10); if(isNaN(g)){ return; }
-    saveObjGoal(g); if(typeof toast==="function") toast("🎯 Objectif fixé",g.toLocaleString("fr-FR")+" $ ce mois.");
+    // ⚠️ `replace(/[^0-9]/g,"")` EFFAÇAIT LE SÉPARATEUR : « 3 000,50 » devenait
+    // « 300050 », soit un objectif de 300 050 $ — et toutes les barres,
+    // projections et pastilles du mois avec. C'est exactement le défaut déjà
+    // documenté côté cerveau (src/utils/montant.js), qui vit maintenant ici aussi.
+    if(String(v).trim()===""){ saveObjGoal(0); if(typeof toast==="function") toast("🎯 Objectif","Retour à l'objectif automatique."); return; }
+    const _o=lireMontant(v,{min:1,max:100000000,signeAutorise:false});
+    if(!_o.ok){ if(typeof toast==="function") toast("⚠️ Objectif non enregistré",String(_o.erreur).replace(/\*\*/g,"")); return; }
+    const g=Math.round(_o.valeur);
+    // On n'annonce le succès qu'APRÈS confirmation du serveur.
+    saveObjGoal(g).then(function(okS){
+      if(okS && typeof toast==="function") toast("🎯 Objectif fixé",g.toLocaleString("fr-FR")+" $ ce mois.");
+    });
   }; }
 
 /* ---------- 🩺 #6/#9/#16 santé des VA (fetch /api/hub/va-sante) ---------- */
