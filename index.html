@@ -10135,16 +10135,25 @@ function essTuilesCatalogue(){
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   const st=((typeof LAST!=="undefined"&&LAST&&LAST["stats-tracker"])||{}).metrics||{};
   const oc=(typeof ONLYCHAT_DATA!=="undefined"&&ONLYCHAT_DATA)||null;
+  // ⚠️ CES TUILES VIENNENT DE QUATRE SOURCES, SOUS UNE SEULE PASTILLE DE
+  // FRAÎCHEUR — qui ne mesure QUE celle d'OnlyMonster (`omMesureAt()` lit
+  // `OM_DATA.maj`). « Ce qu'il te resterait après la paie » vient de CASH_DATA
+  // (et c'est une tuile PAR DÉFAUT), « Telegram ce mois » et « Solde OnlyChat »
+  // d'ONLYCHAT_DATA, « À payer » et « Subs quinzaine » du flux principal. Une
+  // source muette depuis des heures s'affichait donc sous « à jour il y a 2 min ».
+  // On n'invente pas d'horodatage là où il n'y en a pas : on nomme la source, et
+  // on marque la tuile quand cette source n'a pas répondu.
+  const dispo={om:!!om, cash:!!(cd&&!cd.error), oc:!!oc, st:!!(st&&Object.keys(st).length)};
   return [
     // moneyPrecis (2 décimales) : la somme OF (arrondi × 0,78) + Telegram (exact)
     // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
-    {k:"netmois", l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
-    {k:"subsauj", l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
-    {k:"apres",   l:"Ce qu'il te resterait après la paie (estimé)", v:(cd&&!cd.error&&cd.apresPaie!=null)?("~"+money(cd.apresPaie)):"—"},
-    {k:"tg",      l:"Telegram ce mois",   v:(oc&&oc.totalRevenue!=null)?tgMoney(oc.totalRevenue):(tgM>0?tgMoney(tgM):"—")},
-    {k:"ocsolde", l:"Solde OnlyChat",     v:(oc&&oc.solde!=null)?(tgMoney(oc.solde)+(oc.soldeJoursRestants!=null?" · ~"+oc.soldeJoursRestants+" j":"")):"—"},
-    {k:"apayer",  l:"À payer si tu soldais la quinzaine",v:(st.aPayer!=null)?money(st.aPayer):"—"},
-    {k:"subsq",   l:"Subs quinzaine",     v:(st.subsQuinzaine!=null)?String(st.subsQuinzaine):"—"},
+    {k:"netmois", src:"om", ok:dispo.om, l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
+    {k:"subsauj", src:"om", ok:dispo.om, l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
+    {k:"apres", src:"cash", ok:dispo.cash,   l:"Ce qu'il te resterait après la paie (estimé)", v:(cd&&!cd.error&&cd.apresPaie!=null)?("~"+money(cd.apresPaie)):"—"},
+    {k:"tg", src:"oc", ok:dispo.oc,      l:"Telegram ce mois",   v:(oc&&oc.totalRevenue!=null)?tgMoney(oc.totalRevenue):(tgM>0?tgMoney(tgM):"—")},
+    {k:"ocsolde", src:"oc", ok:dispo.oc, l:"Solde OnlyChat",     v:(oc&&oc.solde!=null)?(tgMoney(oc.solde)+(oc.soldeJoursRestants!=null?" · ~"+oc.soldeJoursRestants+" j":"")):"—"},
+    {k:"apayer", src:"st", ok:dispo.st,  l:"À payer si tu soldais la quinzaine",v:(st.aPayer!=null)?money(st.aPayer):"—"},
+    {k:"subsq", src:"st", ok:dispo.st,   l:"Subs quinzaine",     v:(st.subsQuinzaine!=null)?String(st.subsQuinzaine):"—"},
   ];
 }
 const ESS_TUILES_DEFAUT=["netmois","subsauj","apres"];
@@ -10158,9 +10167,13 @@ function renderEssentiel(){
   const h=new Date().getHours(), hi=h<6?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
   const cat=essTuilesCatalogue(), choix=essTuilesChoisies();
   const tuiles=cat.filter(t=>choix.includes(t.k));
-  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> ${fraicheur(omMesureAt())}<button class="ess-cfg" id="essCfg" title="Choisir les chiffres affichés ici">✎</button></div>`
+  hero.innerHTML=`<div class="ess-greet">${hi} 👋 <span class="ess-date">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</span> <span title="Fraîcheur de la mesure OnlyMonster. Les tuiles venant d'une AUTRE source (trésorerie, OnlyChat, suivi des subs) portent leur propre marqueur ⏳ quand elle n'a pas répondu.">${fraicheur(omMesureAt())}</span><button class="ess-cfg" id="essCfg" title="Choisir les chiffres affichés ici">✎</button></div>`
     +`<div class="ess-figs">`
-    +tuiles.map(t=>`<div class="ess-fig"><div class="ess-fl">${t.l}</div><div class="ess-fv">${t.v}</div></div>`).join("")
+    +tuiles.map(t=>{
+        const muet=(t.ok===false);
+        const nomSrc={om:"OnlyMonster",cash:"le calcul de trésorerie",oc:"OnlyChat",st:"le suivi des subs"}[t.src]||"cette source";
+        return `<div class="ess-fig"><div class="ess-fl">${t.l}${muet?` <span title="${nomSrc} n'a pas répondu — ce chiffre n'est pas mesuré, et la fraîcheur affichée en haut ne le concerne pas" style="color:#facc15">⏳</span>`:""}</div><div class="ess-fv">${t.v}</div></div>`;
+      }).join("")
     +`</div>`;
   { const b=$("#essCfg"); if(b) b.onclick=openEssCfg; }
   wrap.style.display="block";
