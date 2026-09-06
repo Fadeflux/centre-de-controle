@@ -6748,20 +6748,42 @@ function renderOM(){
     // exactement l'écart que ce bloc est censé expliquer.
     if(!(t.horsVa&&t.horsVa[cle])||!(t.ancienVa&&t.ancienVa[cle])) return "";
     const hors=t.horsVa[cle], anc=t.ancienVa[cle];
-    const auxVa=Math.round((brut-(hors.rev||0)-(anc.rev||0))*100)/100;
+    // 💶 EN NET (choix d'André, 2026-09-06) : « je préfère le savoir en NET,
+    // c'est mieux ». C'est ce qui reste réellement, et c'est la base de toutes
+    // les décisions ailleurs dans la page. Le brut reste affiché en bas, pour
+    // pouvoir recouper avec ce qu'OnlyFans montre de son côté.
+    // ⚠️ L'ADDITION DOIT TOMBER JUSTE À L'ÉCRAN. `omMoney` arrondit au dollar :
+    // convertir chaque ligne séparément pouvait donner 257 + 2 ≠ 259. On calcule
+    // donc le NET de chaque poste, puis on DÉDUIT la part « rattachée à un VA »
+    // du total net — la somme affichée est exacte par construction.
+    // ⚠️ L'ARRONDI REVIENT À L'AFFICHAGE, PAS AU CALCUL. `omMoney` arrondit au
+    // dollar : convertir chaque poste puis l'arrondir séparément donne « 40 + 2 »
+    // sous un total de « 41 ». Mesuré : 7 900 combinaisons fausses entre 50 $ et
+    // 4 000 $. Calculer la ligne principale au centime AVANT l'arrondi ne change
+    // rien — c'est l'arrondi lui-même qui décale.
+    // On raisonne donc sur les ENTIERS AFFICHÉS : on arrondit le total et les
+    // petits postes, et on DÉDUIT la ligne principale de ces entiers-là. La somme
+    // à l'écran est alors exacte par construction, quel que soit le montant.
+    const _n=(v)=>Math.round((Number(v)||0)*netRate());
+    const brutNet=_n(brut), horsNet=_n(hors.rev), ancNet=_n(anc.rev);
+    const auxVaNet=brutNet-horsNet-ancNet;
     const lignes=[
-      `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVa,cur)}</b></div>`,
-      (hors.rev? `<div class="om-rec-l"><span>Abonnés arrivés <b>sans lien de VA</b>${hors.payeurs?` · ${fmtInt(hors.payeurs)} fan${hors.payeurs>1?"s":""}`:""}</span><b>${omMoney(hors.rev,cur)}</b></div>`:""),
-      (anc.rev? `<div class="om-rec-l"><span>Comptes hors équipe (perso, hors classement)${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(anc.rev,cur)}</b></div>`:""),
-      `<div class="om-rec-l tot"><span>Total brut OnlyFans</span><b>${omMoney(brut,cur)}</b></div>`,
+      `<div class="om-rec-l"><span>Rattaché à un VA du classement</span><b>${omMoney(auxVaNet,cur)}</b></div>`,
+      (hors.rev? `<div class="om-rec-l"><span>Abonnés arrivés <b>sans lien de VA</b>${hors.payeurs?` · ${fmtInt(hors.payeurs)} fan${hors.payeurs>1?"s":""}`:""}</span><b>${omMoney(horsNet,cur)}</b></div>`:""),
+      (anc.rev? `<div class="om-rec-l"><span>Comptes hors équipe (perso, hors classement)${(anc.vas&&anc.vas.length)?` · ${escapeHtml(anc.vas.join(", "))}`:""}</span><b>${omMoney(ancNet,cur)}</b></div>`:""),
+      `<div class="om-rec-l tot"><span>Total <b>net</b> OnlyFans</span><b>${omMoney(brutNet,cur)}</b></div>`,
     ].join("");
     // Le pont vers la carte « 📅 Aujourd'hui » : net + Telegram.
     let pont="";
     if(cle==="today"){
       const net=brut*netRate();
       const tg=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
-      pont=`<div class="om-rec-p">Sur ta carte du jour tu vois le <b>net</b> : ${omMoney(brut,cur)} − ${pctComm()} = <b>${moneyPrecis(net,cur)}</b>`
-        +(tg!=null?` · + Telegram <b>${tgMoney(tg)}</b> = <b>${moneyPrecis(net+tg,cur)}</b>`:` (+ Telegram)`)+`</div>`;
+      // Le pont expliquait brut → net ; maintenant que le tableau EST en net, il
+      // fait le chemin inverse : il rappelle le brut (celui qu'OnlyFans affiche,
+      // utile pour recouper) et ajoute le Telegram, comme la carte du jour.
+      pont=`<div class="om-rec-p">Sur ta carte du jour : <b>${moneyPrecis(net,cur)}</b> net OnlyFans`
+        +(tg!=null?` · + Telegram <b>${tgMoney(tg)}</b> = <b>${moneyPrecis(net+tg,cur)}</b>`:` (+ Telegram)`)
+        +` <span class="ob-sub">— côté OnlyFans tu verras ${omMoney(brut,cur)} brut, avant les ${pctComm()} de commission</span></div>`;
     }
     const part=brut>0?Math.round(((hors.rev||0)+(anc.rev||0))/brut*100):0;
     return `<div class="om-rec"><div class="om-rec-h">🧾 D'où vient l'argent ${escapeHtml((OM_PERIODES.find(x=>x.k===cle)||{}).court||"")}</div>${lignes}${pont}`
@@ -6795,20 +6817,20 @@ function renderOM(){
         .filter(e=>e&&e.rev>0).sort((a,b)=>b.rev-a.rev);
       if(!arr.length) return {chips:"",tot:0,n:0};
       const chips=`<span class="om-spend-perso-lbl" title="Tes comptes perso, hors équipe">🔒 Perso :</span>`
-        +arr.map(e=>`<span class="om-spend-c perso he-va" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe) — voir sa fiche"><b>${escapeHtml(e.nom)}</b> ${omMoney(e.rev,cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`).join("");
+        +arr.map(e=>`<span class="om-spend-c perso he-va" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe) — voir sa fiche"><b>${escapeHtml(e.nom)}</b> ${omMoney((e.rev||0)*netRate(),cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`).join("");
       return {chips:chips,tot:arr.reduce((a,e)=>a+(e.rev||0),0),n:arr.length};
     })();
-    const noteBase=`Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>.`
+    const noteBase=`Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.`
       +(persoBloc.n?` Les <b>🔒 perso</b> (Bot, Clhoe) sont tes comptes à toi — montrés à part, jamais dans le total de l'équipe.`:"");
     // Ni équipe ni perso n'a encaissé : on le DIT, au lieu d'un « 0 $ par 0 abonné ».
     if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
     // En-tête = TOTAL ÉQUIPE (les 🔒 perso ne s'y ajoutent pas). Si seul le perso
     // a payé, en-tête neutre pour ne pas afficher « 0 $ par 0 abonné ».
     const tete=act.length
-      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag"> · brut · équipe</span>`
+      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste. Le brut est rappelé en bas du bloc, pour recouper avec OnlyFans."> · net · équipe</span>`
       : `💸 Qui dépense aujourd'hui`;
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
-      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney(v.periodes.today.rev,cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
+      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney((v.periodes.today.rev||0)*netRate(),cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
       +persoBloc.chips
       +`<div class="om-spend-n">${noteBase}</div>`
       +rec+`</div>`;
