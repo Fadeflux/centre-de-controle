@@ -1030,7 +1030,22 @@
   /* Le bump à 38 px avait été posé sur les champs mais PAS sur les boutons :
      « Payer » et son annulation — deux actions d'ARGENT — restaient à ~30 px,
      collés aux champs de 38 px. */
-  @media (max-width:640px){ .pc-prime,.pc-manager,.pc-leader{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} .pv-pay-btn,.pv-paid{min-height:44px;padding:10px 14px} }
+  @media (max-width:640px){ .pc-prime,.pc-manager,.pc-leader{ min-height:38px; width:84px; } .pc-actions .pv-pay-btn{margin-left:0} .pv-pay-btn,.pv-paid{min-height:44px;padding:10px 14px}
+    /* ⚠️ MESURÉ À 375 px : le bouton « reprendre » d'une prime Discord faisait
+       60 × 17 px. Un pouce couvre ~45 px. Le rater n'est pas anodin : André
+       renonce, tape la prime À LA MAIN dans la case — et comme `data-primeids`
+       n'a alors pas été posé, la prime n'est PAS marquée réglée côté serveur.
+       Elle réapparaît au prochain passage et peut être versée une DEUXIÈME fois.
+       Un bouton trop petit qui coûte de l'argent n'est pas un détail de confort. */
+    .pc-prime-take{min-height:38px;padding:8px 12px;font-size:12px}
+    .pc-prime-att{white-space:normal}
+    /* Les croix des trois écrans plein écran (briefing, soir, revue) faisaient
+       28 × 22 px, collées à 10 px d'un bouton 🔊 qui, lui, LIT LES CHIFFRES À
+       VOIX HAUTE. Viser la croix et déclencher la lecture à côté d'une VA, c'est
+       la fuite la plus bête possible. */
+    .mn-close{min-width:44px;min-height:44px;padding:0}
+    .mn-top>div{gap:14px}
+  }
   /* 👔/🧭 bascules de rôle : gris/estompé si inactif, coloré si actif (= badge). */
   .pc-roles{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
   .pc-role{font-size:12px;line-height:1;padding:2px 5px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer;opacity:.4;filter:grayscale(1);transition:.12s}
@@ -8461,6 +8476,16 @@ function addCoachAction(btn){
 function speakText(t){
   try{
     if(!window.speechSynthesis || !t) return;
+    // ⚠️ LA VOIX NE RESPECTAIT PAS LE MODE DISCRET. Le bouton 🔊 est à 10 px du ✕
+    // sur les écrans plein écran, et fait 22 px de haut au téléphone : viser la
+    // croix et déclencher la lecture est facile. Or André active 🙈 précisément
+    // quand quelqu'un peut voir son écran — et le téléphone se mettait alors à
+    // LIRE À VOIX HAUTE le CA du mois et les montants par VA. Masquer l'écran
+    // sans masquer le son, c'est ne rien masquer.
+    if(typeof HIDE!=="undefined" && HIDE){
+      if(typeof toast==="function") toast("🙈 Mode discret","La lecture à voix haute est coupée tant qu'il est actif — elle dirait les montants tout haut.");
+      return;
+    }
     let spoken=false;
     const doSpeak=()=>{ if(spoken) return; spoken=true; const u=mkUtter(t); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); };
     const vs=window.speechSynthesis.getVoices();
@@ -10731,8 +10756,15 @@ function renderNoteJour(){
   // Telegram réellement à zéro en prétendant que les chiffres « manquaient ».
   const tgLu=(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null);
   comp.push({nom:"Telegram lisible",pts:tgLu?10:0,max:10,pb:tgLu?null:"les chiffres Telegram n'ont pas pu être lus"});
-  const cv=(typeof COH_DATA!=="undefined"&&COH_DATA)?COH_DATA.verdict:null;
-  comp.push({nom:"Les additions tombent juste",pts:cv==="ok"?20:(cv==="oeil"?12:(cv==="grave"?0:8)),max:20,pb:cv==="ok"?null:(cv==="grave"?"des chiffres se CONTREDISENT — ne décide pas dessus":(cv==="oeil"?"des écarts à surveiller":"contrôle pas encore passé"))});
+  // ⚠️ LA PANNE NOTAIT MIEUX QUE L'ABSENCE. Un contrôle EN PANNE garde le verdict
+  // « ok » de ce matin dans COH_DATA -> 20/20 et « Tout est en ordre — tu peux
+  // décider sur ces chiffres ». Un contrôle qui n'a JAMAIS tourné vaut, lui,
+  // 8/20. La note récompensait donc la panne, exactement dans le cas où elle
+  // devait alerter. `_perime` (posé par loadCoherence quand la lecture échoue)
+  // rend ce cas visible : on le traite comme « pas passé », pas comme « ok ».
+  const cohPerime=(typeof COH_DATA!=="undefined"&&COH_DATA)?!!COH_DATA._perime:false;
+  const cv=(typeof COH_DATA!=="undefined"&&COH_DATA&&!cohPerime)?COH_DATA.verdict:null;
+  comp.push({nom:"Les additions tombent juste",pts:cv==="ok"?20:(cv==="oeil"?12:(cv==="grave"?0:8)),max:20,pb:cv==="ok"?null:(cv==="grave"?"des chiffres se CONTREDISENT — ne décide pas dessus":(cv==="oeil"?"des écarts à surveiller":(cohPerime?"le contrôle n'a pas pu être rejoué — ce n'est PAS « tout va bien »":"contrôle pas encore passé")))});
   const sc=(typeof SANTEC_DATA!=="undefined"&&SANTEC_DATA)?SANTEC_DATA:null;
   if(!sc){
     // ⚠️ Sans données, nEt=nPo=0 donnait 15/15 SANS aucun problème listé : la

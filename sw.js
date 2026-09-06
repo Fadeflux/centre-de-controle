@@ -82,7 +82,21 @@ self.addEventListener('push', function (e) {
   try { d = e.data ? e.data.json() : {}; } catch (err) {}
   var title = d.title || 'Centre de contrôle';
   var body = d.body || '';
-  e.waitUntil(self.registration.showNotification(title, { body: body, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cc-alert' }));
+  // ⚠️ TOUTES LES ALERTES PORTAIENT LA MEME ETIQUETTE « cc-alert ». Sur un
+  // telephone, deux notifications de meme `tag` se REMPLACENT. Un redeploiement
+  // qui fait tomber 3 outils envoie 3 pushes en moins d'une seconde : la 1re
+  // s'affiche et fait vibrer, la 2e REMPLACE la 1re — et sans `renotify`, elle
+  // ne fait NI son NI vibration — la 3e remplace la 2e, toujours en silence.
+  // Andre voit une seule ligne dans son tiroir et croit a un seul incident.
+  // On rend l'etiquette unique par evenement ; `renotify` garantit que chaque
+  // alerte se signale vraiment. Le regroupement volontaire reste possible : un
+  // `tag` explicite dans la charge utile est respecte.
+  var etiquette = d.tag || ('cc-' + String(d.source || '') + '-' + String(title).slice(0, 40)
+    + '-' + String(d.ts || Date.now()));
+  e.waitUntil(self.registration.showNotification(title, {
+    body: body, icon: 'icon-192.png', badge: 'icon-192.png',
+    tag: etiquette, renotify: true,
+  }));
 });
 
 self.addEventListener('notificationclick', function (e) {
