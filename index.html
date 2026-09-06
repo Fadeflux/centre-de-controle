@@ -2022,6 +2022,7 @@
       <button class="btn" id="restore" title="Restaurer une sauvegarde" style="display:none">♻️</button>
       <button class="btn" id="assocView" title="Vue associé (lecture seule)" style="display:none">👥</button>
       <button class="btn" id="diag" title="Diagnostic santé complet" style="display:none">🩺</button>
+      <button class="btn" id="logout" title="Se déconnecter de cet appareil" style="display:none">🚪</button>
       <button class="btn" id="monthReport" title="Rapport du mois (image à partager/archiver)" style="display:none">📄</button>
       <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" />
       <button class="btn" id="voix" title="🔊 Écouter ma voix" style="display:none">🔊</button>
@@ -11321,11 +11322,56 @@ function toggleConvo(){
 }
 { const b=$("#askConvo"); if(b) b.onclick=toggleConvo; }
 
+/* ---------- 🚪 SE DÉCONNECTER ----------
+   ⚠️ IL N'Y AVAIT AUCUNE DÉCONNEXION. `ccn_token` était écrit au premier login
+   (l. ~3091) et JAMAIS effacé : pas une ligne de `removeItem` dans tout le
+   fichier. Le « Quitter » du bandeau ne fait que sortir de la vue associé.
+   Conséquence : prêter son téléphone trente secondes à une VA, c'est lui donner
+   le CA global, les marges, la paie de tout le monde et Telegram. Perdre le
+   téléphone, c'est pareil. Et si le jeton fuite, rien ne permet de le retirer de
+   l'appareil.
+   On efface donc le jeton ET ce que la page garde de sensible en local. Les
+   réglages d'affichage (ordre des panneaux, zoom, onglet actif) restent : ils ne
+   disent rien de l'argent, et les réenregistrer à chaque connexion serait pénible.
+   Les listes en attente d'envoi sont vérifiées AVANT : partir avec de l'argent
+   tapé et non envoyé, c'est le perdre. */
+const _CLES_SENSIBLES = ["ccn_token","ccn_role","ccn_who","ccn_name",
+  "ccn_payments","ccn_costs","ccn_tgrev","ccn_va_notes","ccn_decisions","ccn_rules",
+  "ccn_lastdata","ccn_split","ccn_assoc","ccn_assoc_prevhide","ccn_manager_va",
+  "ccn_goal","ccn_obj_goal","ccn_onlychat_goal","ccn_tax_rate","ccn_reminders","ccn_todos"];
+function seDeconnecter(){
+  try{
+    if(typeof _argentEnAttente==="function" && _argentEnAttente()){
+      if(!confirm("⚠️ Tu as de l'argent tapé qui n'est PAS encore parti au serveur.\n\n"
+        +"Si tu te déconnectes maintenant, il est perdu.\n\nSe déconnecter quand même ?")) return;
+    }
+    if(!confirm("Se déconnecter de cet appareil ?\n\n"
+      +"Il faudra retaper le mot de passe pour revoir tes chiffres. "
+      +"À faire si tu prêtes ce téléphone, ou sur un ordinateur qui n'est pas le tien.")) return;
+    _CLES_SENSIBLES.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+    // Les montants du partage sont stockés par mois : ccn_split_w_2026-09, etc.
+    // On parcourt avec l'API standard `length` / `key(i)` — `Object.keys` marche
+    // sur le localStorage d'un navigateur, mais ce n'est pas le contrat de Storage.
+    // On collecte AVANT de supprimer : retirer une clé pendant qu'on énumère
+    // décale les index et en laisse passer une sur deux.
+    try{
+      var aVider=[];
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k && k.indexOf("ccn_split_w_")===0) aVider.push(k);
+      }
+      aVider.forEach(function(k){ localStorage.removeItem(k); });
+    }catch(e){}
+  }catch(e){}
+  location.reload();
+}
+{ const b=$("#logout"); if(b) b.onclick=seDeconnecter; }
+
 /* ---------- menu paramètres (désencombre l'entête) ---------- */
 {
   const menu=$("#settingsMenu"), btn=$("#settingsBtn");
   if(menu && btn){
-    ["morn","eve","coachmem","accueil","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest"].forEach(id=>{
+    ["morn","eve","coachmem","accueil","widget","install","card","rank","monthReport","fontsize","panels","reorder","hide","tv","diag","backup","autobackups","restore","assocView","voix","pushtest","logout"].forEach(id=>{
       const b=document.getElementById(id); if(!b) return;
       b.style.display="inline-flex";
       const row=document.createElement("div"); row.className="settings-row"; row.setAttribute("data-for", id);
