@@ -1202,6 +1202,19 @@
   .rm-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px}
   .dt-yearly{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:2px 0 12px;cursor:pointer}
   .dt-yearly input{width:16px;height:16px;accent-color:var(--acc);cursor:pointer}
+  /* ⚠️ MESURÉ à 375 px dans le vrai DOM : ces quatre commandes tombent sous 32 px
+     de haut, pour un pouce qui en couvre ~45. La case « chaque année » faisait
+     13 × 16 px, et « 💾 Enregistrer mes infos » — un bouton pleine largeur —
+     seulement 23 px de haut. Rater une case à cocher fait rater un anniversaire
+     de VA ; rater le bouton d'enregistrement fait perdre la saisie.
+     Corrigé au TÉLÉPHONE seulement : sur écran large, la compacité est un choix. */
+  @media (max-width:640px){
+    .dt-yearly{padding:6px 0}
+    .dt-yearly input{width:22px;height:22px}
+    #dtText{min-height:42px}
+    .np-mic{min-height:38px;min-width:44px;padding:6px 12px}
+    #dmSave{min-height:44px}
+  }
   .dt-yr{font-size:11px;font-weight:700;color:var(--acc-ink);white-space:nowrap}
   .rm-row.dt-today{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
   .rm-row.dt-today .rm-who{color:var(--acc)}
