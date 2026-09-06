@@ -5526,6 +5526,24 @@ async function saveObjGoal(g){
   }
 }
 { const b=$("#objEdit"); if(b) b.onclick=()=>{
+    // ⚠️ DEUX OBJECTIFS POUR LE MEME MOIS, ET CELUI QU'ON TAPE EST INVISIBLE.
+    // Quand l'anneau du haut porte un objectif de type « revenus », le panneau
+    // affiche CELUI-LA (`suitAnneau` -> `goalN = ringGoal`) et ignore OBJ_GOAL.
+    // Mais ce bouton enregistrait quand meme OBJ_GOAL cote serveur — ou il
+    // pilote les notifications. Andre tapait « 15 000 », lisait « 🎯 Objectif
+    // fixe — 15 000 $ ce mois », et le panneau continuait d'afficher 10 000 :
+    // deux verites pour le meme mois, et les alertes suivaient celle qu'il ne
+    // voyait pas. On le lui dit, et on l'envoie au bon endroit.
+    const _anneau=(typeof GOAL!=="undefined" && GOAL && GOAL.type==="rev" && Number(GOAL.value)>0)?Number(GOAL.value):null;
+    if(_anneau!=null){
+      alert("Ce panneau suit deja l'objectif de l'anneau du haut : "
+        + ((typeof money==="function")?money(_anneau):(_anneau+" $")) + " net."
+        + "\n\nSi tu fixes un objectif ici, il ne s'affichera nulle part — mais il "
+        + "servira quand meme aux alertes du serveur. Deux objectifs differents pour "
+        + "le meme mois, c'est la meilleure facon de se tromper."
+        + "\n\nPour le changer : clique sur l'anneau, en haut de la page.");
+      return;
+    }
     const cur=OBJ_GOAL>0?String(OBJ_GOAL):"";
     const v=prompt("Ton objectif de CA du mois, en $ (montant BRUT OnlyFans — le panneau l'affiche ensuite converti en NET, comme l'anneau du haut) ?\n\nLaisse VIDE pour revenir à l'objectif automatique.",cur);
     if(v===null) return;
