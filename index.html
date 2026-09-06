@@ -4,6 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0d13" />
+<!-- 🛡️ Filet de securite sous l'echappement fait a la main. Il y a 197 innerHTML
+     dans cette page ; le jour ou UN seul laisse passer une valeur non echappee (un
+     pseudo de fan, une note de manager, un nom de modele), le code injecte lit le
+     jeton de paie dans localStorage et peut appeler l'API de versement depuis la
+     page elle-meme, avec le bon jeton et la bonne origine — sans rien afficher.
+     `script-src 'self' 'unsafe-inline'` : la page a tout son JS en ligne, on ne
+     peut donc pas interdire l'inline sans la reecrire ; mais on ferme le reste —
+     aucun script EXTERNE, aucun <base>, aucun <object>, et les appels reseau
+     limites au cerveau. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://stats-tracker-prive-production.up.railway.app https://stats-tracker.up.railway.app; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" />
 <title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
@@ -2831,7 +2841,7 @@ function cardHTML(t, data){
   // de SMS). Un bouton par destination, ce qui remplit aussi la carte quand elle
   // s'étire sur toute la largeur.
   const multi = Array.isArray(t.links) && t.links.length
-    ? t.links.map(l=>`<a class="open" href="${escapeHtml(l.u)}" ${l.ext?"":`data-openurl="${escapeHtml(l.u)}" data-openid="${escapeHtml(t.id+"-"+l.n)}" data-openname="${escapeHtml(l.n)}"`} target="_blank" rel="noopener">${escapeHtml(l.n)}</a>`).join("")
+    ? t.links.map(l=>`<a class="open" href="${escapeHtml(hrefSur(l.u))}" ${l.ext?"":`data-openurl="${escapeHtml(l.u)}" data-openid="${escapeHtml(t.id+"-"+l.n)}" data-openname="${escapeHtml(l.n)}"`} target="_blank" rel="noopener">${escapeHtml(l.n)}</a>`).join("")
     : "";
   const foot = t.build
     ? `<div class="card-foot"><span class="pill">à venir</span></div>`
@@ -3905,7 +3915,7 @@ function renderOcRelance(){
     const quand=(f.jours==null)?"date inconnue":(f.jours===0?"actif aujourd'hui":(f.jours===1?"actif hier":"vu il y a "+f.jours+" j"));
     const l=lib[f.segment]||{};
     return `<div class="ocr-row">
-      <a class="ocr-nom" href="${escapeHtml(f.lien)}" target="_blank" rel="noopener">${qui}</a>
+      <a class="ocr-nom" href="${escapeHtml(hrefSur(f.lien))}" target="_blank" rel="noopener">${qui}</a>
       <span class="ocr-meta">${escapeHtml(f.modele)} · ${quand}${f.scriptsTotal?` · ${f.scriptsEnvoyes}/${f.scriptsTotal} scripts`:""}${f.robotActif?"":' · <b style="color:#f87171">robot éteint</b>'}</span>
       <span class="ocr-seg">${escapeHtml(l.titre||f.segment)}${f.verdict?`<br><span class="ocr-vb ocr-v-${escapeHtml(f.verdict)}">${escapeHtml(((d.verdicts||{})[f.verdict]||{}).titre||f.verdict)}</span>`:""}</span>
     </div>`;
@@ -4147,10 +4157,10 @@ function renderLeaks(){
     const st=l.status||"new";
     let actions;
     if(st==="ignored") actions=`<button class="al-leak-act" data-alreopen="${escapeHtml(l.id)}">Rouvrir</button>`;
-    else if(st==="repost") actions=`<a class="al-leak-act prim" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">🚩 Signaler</a><button class="al-leak-act" data-alremoved="${escapeHtml(l.id)}">✓ Traité</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
+    else if(st==="repost") actions=`<a class="al-leak-act prim" href="${escapeHtml(hrefSur(l.url))}" target="_blank" rel="noopener">🚩 Signaler</a><button class="al-leak-act" data-alremoved="${escapeHtml(l.id)}">✓ Traité</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else if(st==="sent"||st==="removed") actions=`<button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
     else actions=`<button class="al-leak-act prim" data-aldmca="${escapeHtml(l.id)}">📤 DMCA</button><button class="al-leak-act" data-alignore="${escapeHtml(l.id)}">Ignorer</button>`;
-    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${escapeHtml(st)}">${escapeHtml(stLabel[st]||st)}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(l.url||"#")}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
+    return `<div class="al-leak"><div class="al-leak-body"><div class="al-leak-top"><span class="al-badge ${escapeHtml(st)}">${escapeHtml(stLabel[st]||st)}</span> ${escapeHtml(l.model||"?")}</div><a class="al-leak-url" href="${escapeHtml(hrefSur(l.url))}" target="_blank" rel="noopener">${escapeHtml(l.url||"")}</a><div class="al-leak-meta">${escapeHtml(l.source||"web")}${l.ts?` · ${relTime(l.ts)}`:""}${l.dmcaTo?` · abuse: ${escapeHtml(l.dmcaTo)}`:""}${l.dmcaTs?` · DMCA ${relTime(l.dmcaTs)}`:""}</div></div><div class="al-leak-actions">${actions}</div></div>`;
   }).join("");
 }
 function addWatch(){
@@ -4233,7 +4243,7 @@ function renderShortcuts(){
   $("#scGrid").innerHTML = SHORTCUTS.map((s,i)=>`<div class="sc-card">
     <button class="sc-star ${s.r?"on":""}" data-scstar="${i}" title="Dans ma routine" aria-label="Routine">${s.r?"★":"☆"}</button>
     <span class="sc-name">${escapeHtml(s.n)}</span>
-    <a class="sc-open" href="${escapeHtml(s.u)}" target="_blank" rel="noopener">Ouvrir</a>
+    <a class="sc-open" href="${escapeHtml(hrefSur(s.u))}" target="_blank" rel="noopener">Ouvrir</a>
     <button class="sc-del" data-scdel="${i}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 function addShortcut(){ const n=$("#scName").value.trim(), u=normUrl($("#scUrl").value); if(!n||!u) return; SHORTCUTS.push({n:n,u:u,r:false}); saveShortcuts(); renderShortcuts(); $("#scName").value=""; $("#scUrl").value=""; $("#scName").focus(); }
@@ -4250,7 +4260,7 @@ $("#scRoutine").onclick = ()=>{
   const isMobile = matchMedia("(max-width:600px)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   if(!isMobile){ routine.forEach(s=>window.open(s.u,"_blank","noopener")); return; }
   // iPhone bloque les window.open en boucle → on affiche une liste, chaque tap ouvre un onglet
-  const links = routine.map(s=>`<a class="rt-open" href="${escapeHtml(s.u)}" target="_blank" rel="noopener">${escapeHtml(s.n)} <span>↗</span></a>`).join("");
+  const links = routine.map(s=>`<a class="rt-open" href="${escapeHtml(hrefSur(s.u))}" target="_blank" rel="noopener">${escapeHtml(s.n)} <span>↗</span></a>`).join("");
   setBanner(`<b>🚀 Ta routine du matin</b> — appuie sur chaque lien pour l'ouvrir :<div class="rt-openwrap">${links}</div>`);
 };
 renderShortcuts();
@@ -4793,6 +4803,14 @@ function renderPaieCumul(){
   const mgrSel=perimeBanner+renomBanner+partiBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
+  // ⚠️ LE TOTAL COMPTAIT 0 $ POUR UN VA SANS REPÈRE DE PAIE. Côté serveur :
+  // `aPayer = (baseSubs != null && !unpaid) ? costFor(nouveaux) : 0`. Un VA dont
+  // la base n'est pas définie contribue donc EXACTEMENT zéro au total — alors que
+  // sa ligne affiche « base ? », c'est-à-dire « je ne sais pas », pas « rien ».
+  // André lit « TOTAL à payer 850 $ », prépare 850 $, et il en doit davantage.
+  // Le panneau voisin (Fiche de paie) traite déjà ce cas avec un « + ? » et une
+  // note jaune : on fait pareil, pour que les deux racontent la même chose.
+  const sansBase=vas.filter(v=>!v.unpaid && v.base==null);
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
     const dt=new Date(h.ts||0), okd=!isNaN(dt.getTime());
     return `<div class="pay-h-row"><span>${escapeHtml(h.va||"")}</span>`
@@ -4801,7 +4819,10 @@ function renderPaieCumul(){
       +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span></div>`;
   }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
   $("#pcumulBody").innerHTML = mgrSel + rows
-    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}</span><span class="pv-note"></span></div>`
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}${sansBase.length?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note"></span></div>`
+    + (sansBase.length
+      ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-top:8px">⚠️ <b>${sansBase.length} VA</b> ${sansBase.length>1?"n'ont":"n'a"} pas de repère de paie (${sansBase.slice(0,4).map(v=>escapeHtml(v.va)).join(", ")}${sansBase.length>4?"…":""}) : ${sansBase.length>1?"ils comptent":"il compte"} <b>0 $</b> dans le total ci-dessus. Ce n'est pas « rien à payer » — clique « Définir la base » sur ${sansBase.length>1?"leurs lignes":"sa ligne"}.</div>`
+      : "")
     + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
   // … et on remet ce qui était tapé. C'est ici que se joue la différence entre
@@ -4910,12 +4931,12 @@ Confirmer quand même le paiement de ${va} ?`)){
             // celle où l'on force un paiement malgré une alerte.
             if(j2&&j2.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")+(j2.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); return; }
             alert("Erreur : "+((j2&&(j2.detail||j2.error))||"inconnue"));
-          }catch(err){ alert("Réseau : "+err.message); }
+          }catch(err){ alerteVersementIncertain(va); }
         }
         pay.disabled=false; pay.textContent=old;
       }
       else { alert("Erreur : "+((j&&(j.detail||j.error))||"inconnue")); pay.disabled=false; pay.textContent=old; }
-    }catch(err){ alert("Réseau : "+err.message); pay.disabled=false; pay.textContent=old; }
+    }catch(err){ alerteVersementIncertain(va); pay.textContent="⏳ à vérifier"; }   // on NE réarme PAS le bouton
     return;
   }
   const base=e.target.closest("[data-pcbase]");
@@ -4932,7 +4953,14 @@ Confirmer quand même le paiement de ${va} ?`)){
       const j=await r.json();
       if(j&&j.ok){ if(typeof toast==="function") toast("✎ Base corrigée",`${va} → ${subs} subs`); await loadPaieCumul(); }
       else alert("Erreur : "+((j&&j.error)||"inconnue"));
-    }catch(err){ alert("Réseau : "+err.message); }
+    }catch(err){
+      // Ce site-ci n'est PAS un versement : c'est la correction du repère de
+      // paie. Le message doit dire ce qui est vraiment incertain — et rejouer
+      // une base est sans danger (on écrit une valeur absolue, pas un écart).
+      alert("Le serveur n'a pas répondu." + "\n\n"
+        + "Je ne sais pas si la base de " + va + " a été enregistrée." + "\n\n"
+        + "Appuie sur 🔄 et regarde sa ligne : si elle affiche encore « base ? », recommence.");
+    }
     return;
   }
 });
@@ -6320,6 +6348,31 @@ function lireMontant(txt, opts) {
 //     TOUJOURS. Un VA à 1 200 abonnés à vie mais 4 ce mois-ci passait devant
 //     celui qui en a amené 60.
 // Une seule fonction, donc l'écart ne peut plus se réintroduire.
+// ⚠️ « Réseau : Failed to fetch » — OU PIRE, « Unexpected token '<', "<!DOCTYPE"…
+// is not valid JSON » — S'AFFICHAIT À UN OPÉRATEUR NON TECHNIQUE, au moment
+// précis où il a besoin de savoir UNE chose : est-ce que l'argent est parti ?
+// Et c'est bien une incertitude, pas un échec : le serveur peut avoir COMMIS le
+// versement (avancé le repère de paie, inscrit le cahier) et la réponse s'être
+// perdue en route. Le bouton était pourtant réactivé — un second clic payait
+// deux fois. On dit donc l'incertitude, on donne le geste, et on ne réarme pas.
+function alerteVersementIncertain(va){
+  alert("Le serveur n'a pas répondu." + "\n\n"
+    + "Je ne sais PAS si le versement" + (va ? (" de " + va) : "") + " est parti ou non." + "\n\n"
+    + "NE RE-CLIQUE PAS sur « Payer » : ça paierait peut-être une deuxième fois." + "\n\n"
+    + "Appuie sur 🔄 pour recharger, puis regarde la ligne de ce VA : si le versement "
+    + "est passé, elle portera la mention du cahier de paie.");
+}
+// 🔗 UN LIEN N'EST PAS QU'UNE CHAÎNE ÉCHAPPÉE.
+// `escapeHtml` neutralise les guillemets — on ne peut donc pas sortir de
+// l'attribut — mais il ne regarde PAS le SCHÉMA. Un `javascript:...` reste un
+// `javascript:...` : le navigateur l'exécute au clic, avec le jeton de paie à
+// portée de `localStorage`. Or ces liens viennent de l'extérieur : URL d'une
+// fuite trouvée par le veilleur, lien de fan renvoyé par OnlyChat, raccourci
+// enregistré. On exige donc http/https, et rien d'autre.
+function hrefSur(u){
+  const t=String(u==null?"":u).trim();
+  return /^https?:\/\//i.test(t) ? t : "#";
+}
 function podiumVas(vas, n){
   return (Array.isArray(vas) ? vas : [])
     .filter(v => v && !v.unpaid && (Number(v.monthSubs) || 0) > 0)
