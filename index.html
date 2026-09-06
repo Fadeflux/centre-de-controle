@@ -7711,8 +7711,26 @@ function majFraicheurOM(){
       of.innerHTML=fraicheur(omMesureAt());
   }catch(e){}
 }
+// ⚠️ AUCUN GARDE-FOU CONTRE LES APPELS CONCURRENTS SUR LE CHARGEUR D'ARGENT.
+// `load()` en a un depuis longtemps (« évite les appels concurrents ») ; `loadOM`,
+// qui porte les revenus, n'en avait pas — alors qu'il est appelé de TROIS
+// endroits qui se chevauchent : la boucle de 60 s, le retry `_omRetry` à 25 s, et
+// le réveil de l'onglet. Or la page le dit elle-même : le cerveau peut mettre
+// « 1 à 2 minutes » à recalculer.
+// Déroulé : T+0 le tic lance loadOM, sa réponse (l'ANCIEN instantané) met 95 s ;
+// T+25 le retry en lance un 2e ; T+60 le tic un 3e, qui répond à T+70 avec des
+// chiffres FRAIS ; à T+95 la réponse du PREMIER arrive et ÉCRASE les frais.
+// Deux protections : un verrou, et un refus d'appliquer une mesure plus ancienne
+// que celle déjà affichée (ceinture et bretelles — le verrou seul ne protège pas
+// d'une réponse hors séquence si le verrou vient d'être relâché).
+let OM_LOADING=false;
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
+  if(OM_LOADING) return;
+  OM_LOADING=true;
+  try{ return await _loadOM(); } finally{ OM_LOADING=false; }
+}
+async function _loadOM(){
   // ⚠️ `OM_DATA` sert de sentinelle « j'ai de vraies données » (`if(!OM_DATA)
   // omIndispo(...)`), mais il contient les chiffres de DÉMO tant qu'on n'est pas
   // connecté. Une fois le jeton posé, si le cerveau ne répond pas, la sentinelle
@@ -7733,6 +7751,15 @@ async function loadOM(){
       $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
       if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
       majFraicheurOM(); return; }
+    // Refus d'un retour en arrière : une réponse plus ANCIENNE que ce qui est déjà
+    // à l'écran ne doit pas l'écraser. (`maj` = l'heure de MESURE côté cerveau.)
+    try{
+      const _av=(OM_DATA&&Number(OM_DATA.maj))||0, _nv=Number(j.data&&j.data.maj)||0;
+      if(_av && _nv && _nv < _av){
+        console.warn("[OM] réponse plus ancienne que l'affichage ("+new Date(_nv).toISOString()+" < "+new Date(_av).toISOString()+") — ignorée");
+        omSucces(); return;
+      }
+    }catch(e){}
     OM_DATA=j.data; OM_FETCHED_AT=Date.now(); omSucces();
     // ⚠️ CHAQUE rendu est isolé (2026-08-24). Avant, la vingtaine d'appels était
     // enchaînée sur une seule ligne dans le try de loadOM : un seul panneau qui
