@@ -6913,7 +6913,12 @@ function renderOM(){
   // d'un chiffre. Une seule unité partout, et la note le dit.
   // La part modèle, elle, se calcule sur Noctra Finance.
   // 🏷️ Tarif de paie lisible, tel que le serveur le calcule (jamais en dur).
-  const payTxt = (d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub";
+  // ⚠️ CE TARIF PERCAIT LE MODE DISCRET. Mesuré en exécutant la page : avec 🙈
+  // actif, tout le panneau passait à « ••• » sauf cette phrase, qui continuait
+  // d'annoncer « Tu paies le VA 0,50 $/sub ». C'est sa structure de coût — et la
+  // vue ASSOCIÉ force HIDE : c'est exactement ce que ce masquage doit couvrir.
+  const payTxt = (typeof HIDE!=="undefined" && HIDE) ? "•••"
+    : ((d.totals && d.totals.payLabel) ? String(d.totals.payLabel).replace(/\./g, ",") : "0,50 $/sub");
   const noteBrut = ko ? "" : `<div class="sv-note" style="margin-top:6px">💡 <b>LTV</b> = tout ce qu'un abonné t'a rapporté <b>depuis son arrivée</b>, divisé par le nombre d'abonnés — c'est un total sur toute sa vie, <b>pas un montant par mois</b>.<br>Tous les montants de ce tableau — <b>généré</b>, <b>LTV</b>, <b>marge</b>, <b>ROI</b> — sont <b>nets</b>, après les ${pctComm()} OnlyFans.<br>Tu paies le VA <b>${escapeHtml(payTxt)}</b> : la <b>marge</b> = net − sa paie, et le <b>ROI</b> = combien te rapporte chaque <b>1&nbsp;$</b> que tu lui verses (ex. ROI 16× = 16&nbsp;$ gagnés pour 1&nbsp;$ versé). Ta trésorerie complète est sur <b>Noctra Finance</b>.</div>`;
   // 🧾 Veilleur remboursements/rejets du mois (argent qui REPART). 0 aujourd'hui,
   // s'allume le jour où ça grimpe (fraude, fans mécontents). Source : totals.remboursements.
