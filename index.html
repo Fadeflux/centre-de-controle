@@ -5524,7 +5524,15 @@ function renderCohortes(){
   if(!d.cohorts||!d.cohorts.length){ box.style.display="none"; return; }
   box.style.display="block";
   const cur=d.currency||"$";
-  const money=v=>HIDE?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2})+" "+cur;
+  // ⚠️ CE PANNEAU AFFICHAIT DU BRUT, LES DEUX AUTRES DU NET, POUR LE MÊME VA.
+  // Toutes les valeurs d'argent d'ici sont des DÉPENSES DE FANS mesurées sur
+  // OnlyFans, donc du BRUT (avant la commission de 20 %). Or « À faire »
+  // (renderRecos) et la fiche VA affichent exactement le même chiffre en NET, et
+  // l'étiquettent « net ». André lisait donc « Yohan 3,40 $ » ici et
+  // « ses fans dépensent 2,72 $ net » deux panneaux plus bas — sans savoir lequel
+  // croire. On convertit au FORMATEUR, une fois, pour que rien ne puisse
+  // l'oublier (même principe que `fmtLtv`), et on l'étiquette.
+  const money=v=>HIDE?"•••":(Math.round((Number(v)||0)*netRate()*100)/100).toLocaleString("fr-FR",{maximumFractionDigits:2})+" "+cur;
   const coh=d.cohorts.map((c,i)=>{
     const prev=d.cohorts[i-1];
     const arr=prev?(c.avg>prev.avg?`<span class="co-up">▲</span>`:c.avg<prev.avg?`<span class="co-dn">▼</span>`:""):"";
@@ -5539,7 +5547,7 @@ function renderCohortes(){
     why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi ils dépensent ${sens} ce mois</div>`
       +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
       +`<div class="co-facts">`
-      +`<div>Dépense moy. 30 j : <b>${money(dr.avgRecent)}</b> (${coMoisNom(dr.moisRecent)}) vs ${money(dr.avgPrec)} (${coMoisNom(dr.moisPrec)}) → <b>${dr.delta>=0?"+":""}${money(dr.delta)}</b></div>`
+      +`<div>Dépense moy. 30 j (net) : <b>${money(dr.avgRecent)}</b> (${coMoisNom(dr.moisRecent)}) vs ${money(dr.avgPrec)} (${coMoisNom(dr.moisPrec)}) → <b>${dr.delta>=0?"+":""}${money(dr.delta)}</b></div>`
       +`<div>Cause : ${facteur}.<br><span style="opacity:.8">${money(dr.mixEffect)} vient du fait que ce ne sont pas les mêmes VA qui amènent les fans ce mois-ci · ${money(dr.rateEffect)} vient du fait que chaque VA convertit mieux ou moins bien qu'avant.</span></div>`
       +`<div>Baleine : le plus gros fan pèse ${String(dr.whaleRecent).replace(".",",")} % (vs ${String(dr.whalePrec).replace(".",",")} %) · médiane ${money(dr.medianRecent)}${dr.whaleRecent>=50?" ⚠️ un gros fan tire la moyenne":""}</div>`
       +`</div></div>`;
@@ -5547,7 +5555,7 @@ function renderCohortes(){
     // Pas encore 2 mois à comparer : on explique qui tire la moyenne vers le haut/bas.
     const sd=d.soloDrivers;
     const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${String(p.share).replace(".",",")} %</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("");
-    why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi la dépense moyenne est de ${money(sd.avg)}</div>`
+    why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi la dépense moyenne (net) est de ${money(sd.avg)}</div>`
       +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
       +`<div class="co-facts">${rows}<div>Médiane ${money(sd.median)} · plus gros fan ${String(sd.whale).replace(".",",")} %${sd.whale>=50?" ⚠️ un gros fan tire la moyenne":""}</div></div>`
       +`<div class="cc-hint">Pas encore 2 mois d'historique pour comparer — dès qu'un mois complet s'ajoute, tu verras l'évolution.</div></div>`;
@@ -5564,7 +5572,7 @@ function renderCohortes(){
     // tronqué de `quality` : sinon la moyenne est biaisée haut → des VA corrects
     // étaient faussement marqués « à coacher ⚠️ ».
     const teamAvg=(COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):(totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0);
-    qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j)</div>`
+    qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j, <b>net</b>)</div>`
       +d.quality.slice(0,8).map(q=>{
         const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&q.va!=="(inconnu)";
         return `<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}${low?' <span class="cc-low" title="Fans à faible dépense — à coacher sur le ciblage">⚠️</span>':''}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`;
@@ -5933,7 +5941,43 @@ const TK_PRIO_RANK = {h:0,n:1,b:2};
 function tkTabLabel(k){ if(k==="general") return "🌐 Générale"; return (k===WHO?"📋 ":"👤 ")+NAMES[k]; }
 function tkName(k){ if(k==="general") return "Générale"; return NAMES[k]+(k===WHO?" (moi)":""); }
 const REPEAT_MS={day:864e5,week:6048e5,quinzaine:1296e6}, REPEAT_LBL={day:"chaque jour",week:"chaque semaine",quinzaine:"chaque quinzaine"};
-function tkReconcile(){ let ch=false; const now=Date.now(); TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{ if(x.repeat && !x.del && x.done && x.doneTs && (now-x.doneTs>=(REPEAT_MS[x.repeat]||864e5))){ x.done=false; x.doneTs=0; x.ts=now; x.upd=now; ch=true; } }); }); return ch; }
+// ⚠️ UNE TÂCHE « CHAQUE JOUR » NE SE ROUVRAIT PAS AU CHANGEMENT DE JOUR, MAIS
+// 24 H APRÈS LE CLIC. La récurrence était une DURÉE écoulée, pas un changement de
+// date. Coche « 💰 Payer les VA » lundi à 09 h 40 : mardi à 08 h 15 elle est
+// toujours barrée « ✓ fait » (22 h 35 écoulées seulement). Or on est mardi, et
+// elle n'a pas été faite — André la voit cochée et passe à autre chose.
+// On compare donc des DATES : le jour métier pour « chaque jour », le numéro de
+// semaine pour « chaque semaine », la quinzaine pour « chaque quinzaine ».
+// `doneJour` est posé à la coche ; pour les tâches déjà cochées AVANT ce
+// correctif, on le reconstitue depuis `doneTs` — personne ne perd son état.
+function tkPeriodeDe(ts, repeat){
+  const d=new Date(ts||0);
+  const iso=(typeof jourServeur==="function" && ts>=Date.now()-6e4)
+    ? jourServeur()
+    : (d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"));
+  if(repeat==="week"){
+    // Numéro de semaine ISO : deux jours d'une même semaine donnent la même clé.
+    const t=new Date(Date.UTC(Number(iso.slice(0,4)),Number(iso.slice(5,7))-1,Number(iso.slice(8,10))));
+    const j=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-j);
+    const an=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+    return t.getUTCFullYear()+"-S"+Math.ceil(((t-an)/864e5+1)/7);
+  }
+  if(repeat==="quinzaine"){
+    return iso.slice(0,7)+(Number(iso.slice(8,10))<=15?"-Q1":"-Q2");
+  }
+  return iso;                       // « chaque jour » : la date métier
+}
+function tkReconcile(){
+  let ch=false; const now=Date.now();
+  TK_KEYS.forEach(k=>{ (TASKS[k]||[]).forEach(x=>{
+    if(!x.repeat || x.del || !x.done || !x.doneTs) return;
+    const faitLe=x.doneJour || tkPeriodeDe(x.doneTs, x.repeat);
+    if(faitLe !== tkPeriodeDe(now, x.repeat)){
+      x.done=false; x.doneTs=0; x.doneJour=""; x.ts=now; x.upd=now; ch=true;
+    }
+  }); });
+  return ch;
+}
 function tkNorm(){ ["moi","other","general"].forEach(k=>{ if(!Array.isArray(TASKS[k])) TASKS[k]=[]; }); }
 // 🧹 Seuil du « ménage » des tâches dormantes — UNE SEULE définition, utilisée
 // par l'affichage du bandeau ET par le bouton : deux seuils séparés finiraient
@@ -6163,7 +6207,7 @@ function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.f
 renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
-    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ if(it.repeat) it.doneTs=Date.now(); it.doneBy=(typeof WHO!=="undefined"?WHO:"moi"); it.doneAt=Date.now(); tkPop(); } else { it.doneTs=0; it.doneBy=""; it.doneAt=0; } it.upd=Date.now(); saveTasks(); renderTasks(); if(typeof renderDuo==="function") renderDuo(); } return; }
+    const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ try{ it.doneJour=tkPeriodeDe(Date.now(), it.repeat); }catch(e){} } else { it.doneJour=""; } if(it.done){ if(it.repeat) it.doneTs=Date.now(); it.doneBy=(typeof WHO!=="undefined"?WHO:"moi"); it.doneAt=Date.now(); tkPop(); } else { it.doneTs=0; it.doneBy=""; it.doneAt=0; } it.upd=Date.now(); saveTasks(); renderTasks(); if(typeof renderDuo==="function") renderDuo(); } return; }
     const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
     // 🧹 Ménage : solde d'un coup les tâches qui dorment depuis plus de 30 jours.
     // Même mécanisme que le ✕ (tombstone `del` + `upd`), donc la suppression se
@@ -7919,7 +7963,7 @@ function makeDayCard(){
   // ⛔ Cette image QUITTE le système (envoyée à l'associée, à l'équipe). Un « 0 $ »
   // gravé dedans est irrattrapable : sans revenus lus, on grave « — ».
   const arg=v=>revKo()?"—":money(v);
-  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["CA brut du mois",arg(tot.netMonth)],["À payer",(st.aPayer==null?"—":money(st.aPayer))]];
+  const stats=[["Subs aujourd'hui",(tot.subsDay!=null?String(tot.subsDay):"—")],["Subs quinzaine",(st.subsQuinzaine!=null?String(st.subsQuinzaine):"—")],["CA brut du mois",arg(tot.netMonth)],["À payer si tu soldais la quinzaine",(st.aPayer==null?"—":money(st.aPayer))]];
   const sy=290;
   for(let i=0;i<stats.length;i++){ const col=i%2,row=(i/2)|0,bx=80+col*480,by=sy+row*225; x.fillStyle="#141416"; roundRect(x,bx,by,440,195,24); x.fill(); x.fillStyle="#8a8a92"; x.font="600 29px Inter,Arial,sans-serif"; x.fillText(stats[i][0],bx+34,by+56); x.fillStyle="#fff"; x.font="bold 66px Inter,Arial,sans-serif"; x.fillText(stats[i][1],bx+34,by+146); }
   let vy=sy+2*225+70; x.fillStyle=acc; x.font="bold 40px Inter,Arial,sans-serif"; x.fillText("🏆 Top VA",80,vy);
@@ -8173,7 +8217,7 @@ function mnMoneyHtml(){
         <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${ajSplit}
-        ${(!ev&&st.aPayer!=null)?`<div class="mn-pay">💸 <b>${money(st.aPayer)}</b> à payer cette quinzaine</div>`:""}`;
+        ${(!ev&&st.aPayer!=null)?`<div class="mn-pay" title="Vue historique par quinzaine : subs de la quinzaine en cours × tarif + primes Discord, SANS tenir compte de ce qui a déjà été payé ni du repère de paie. Le montant que tu verses vraiment est celui de « Paie au cumul ».">💸 <b>${money(st.aPayer)}</b> à payer si tu soldais la quinzaine</div>`:""}`;
 }
 function renderMorning(){
   const ev=COACH_MODE==="evening";
