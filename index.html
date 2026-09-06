@@ -647,6 +647,16 @@
   body.assoc-mode #vamodel, body.assoc-mode #versus, body.assoc-mode #sources, body.assoc-mode #subval,
   body.assoc-mode #sim, body.assoc-mode #realloc, body.assoc-mode #split, body.assoc-mode #paie, body.assoc-mode #paiecumul,
   body.assoc-mode #objmois, body.assoc-mode #concentration, body.assoc-mode #cohortes, body.assoc-mode #recos,
+  /* ⚠️ AJOUTÉS le 05/09 — ils étaient restés visibles :
+     • #coherence écrit « attendu 12 480 · trouvé 12 355 · écart −125 » SANS passer
+       par aucun formateur d'argent : c'est le seul endroit du fichier où des
+       montants serveur sortent sans `money()` ni test de `HIDE` ;
+     • #classement porte « 🎭 Hors classement », d'où l'on ouvre la fiche de tes
+       comptes perso (Bot, Clhoe) — la fiche dit elle-même « visible seulement
+       ici et dans le serveur privé CEO » ;
+     • #rachat affiche le brut par fan dans une infobulle (attribut `title`),
+       que le masquage du texte visible ne couvre pas. */
+  body.assoc-mode #coherence, body.assoc-mode #classement, body.assoc-mode #rachat,
   body.assoc-mode #costs, body.assoc-mode #rw, body.assoc-mode #tgrev, body.assoc-mode #onlychat, body.assoc-mode #onlychatcoach, body.assoc-mode #fanradar,
   /* ⚠️ QUATRE PANNEAUX TELEGRAM OUBLIÉS DANS CETTE LISTE.
      #tgrev, #onlychat, #onlychatcoach et #fanradar y sont depuis le début, mais
@@ -2892,7 +2902,13 @@ function render(data){
   const tiret = (v,f)=> v==null ? "—" : f(v);
   const stInW = inWorld(toolById("stats-tracker"));
   const tiles = [`<div class="tile hero"><div class="lbl">Outils en ligne</div><div class="val">${onCount}<small>/ ${live.length}</small></div></div>`];
-  if(stInW){
+  // ⚠️ CES TUILES SONT EN HAUT DE PAGE, EN GRAND, ET N'ÉTAIENT PAS MASQUÉES.
+  // « À payer si tu soldais la quinzaine » = la masse salariale. « Subs équipe »
+  // passe par `fmtInt`, qui ne masque JAMAIS (contrairement à `fmtMoney`) : le
+  // volume d'abonnés de l'agence sortait en clair même en mode discret. Le
+  // panneau `#paie` est masqué en vue associé depuis toujours — son résumé en
+  // haut de page, non.
+  if(stInW && !document.body.classList.contains("assoc-mode")){
     tiles.push(`<div class="tile"><div class="lbl" title="Vue historique par quinzaine. Le montant que tu verses vraiment est celui de « Paie au cumul », plus bas.">À payer si tu soldais la quinzaine</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
     tiles.push(`<div class="tile"><div class="lbl" title="Abonnés amenés par tes VA sur la quinzaine en cours. À ne pas comparer avec « Subs du mois » du panneau OnlyMonster : période ET périmètre différents.">Subs équipe (cette quinzaine)</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
   }
@@ -2945,9 +2961,15 @@ function renderBrief(data, live, onCount, stInW){
   // que de la journée et de la quinzaine. Détail complet dans le Classement.
   { const _tt=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
     const _reel=(_tt.subsTotalReel!=null)?Number(_tt.subsTotalReel):null;
-    if(_reel!=null && !(typeof HIDE!=="undefined"&&HIDE)) s.push(`<b>${fmtInt(_reel)}</b> abonnés en tout`); }
+    if(_reel!=null && !(typeof HIDE!=="undefined"&&HIDE)
+       && !document.body.classList.contains("assoc-mode")) s.push(`<b>${fmtInt(_reel)}</b> abonnés en tout`); }
   if (subsDelta!=null && subsDelta!==0) s.push(subsDelta>0 ? `quinzaine <b>en hausse</b> (+${fmtInt(subsDelta)})` : `quinzaine <b>en baisse</b> (${fmtInt(subsDelta)})`);
-  if (stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
+  // ⚠️ Le montant à payer et le total d'abonnés n'ont rien à faire dans le
+  // bandeau que l'associée lit tous les jours. `fmtMoney` masque en mode
+  // discret, mais la vue associé n'est pas le mode discret : elle doit cacher
+  // ces lignes ENTIÈREMENT, pas les remplacer par des points.
+  const _assoc = document.body.classList.contains("assoc-mode");
+  if (!_assoc && stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
   s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
   const nTodo = TODOS.filter(t=>!t.d).length;
   if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
