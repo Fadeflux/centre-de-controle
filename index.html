@@ -3449,6 +3449,38 @@ function tgMonthTotal(model){
   }
   const mKey=tgMonthKey(Date.now()); return TGREV.filter(x=>tgMonthKey(x.ts)===mKey && (!model||model==="all"||(x.model||"")===model)).reduce((a,x)=>a+(Number(x.amount)||0),0);
 }
+// ⚠️ « TELEGRAM NON LU » N'EST PAS « TELEGRAM = 0 ».
+// `loadOnlyChat` lâche volontairement ONLYCHAT_DATA après 3 échecs d'affilée
+// (~3 min), pour « basculer sur la saisie manuelle ». Mais la saisie manuelle
+// (TGREV) est VIDE depuis qu'OnlyChat tourne : `tgMonthTotal()` retombe alors
+// sur sa dernière ligne et rend **0**. Tout le Telegram du mois disparaît donc
+// du profit, du partage entre associés et de l'objectif — sans un mot, et sans
+// que rien à l'écran ne distingue « il n'a rien rapporté » de « je n'ai pas pu
+// lire ». `tgTodayTotal()`, juste en dessous, applique pourtant déjà la règle de
+// la maison : « null si OnlyChat n'est pas branché — jamais un faux 0 ».
+// On ne change PAS ce que rend tgMonthTotal (une vingtaine d'appels font de
+// l'arithmétique dessus) : on expose l'incertitude, et les panneaux qui servent
+// à DÉCIDER la disent.
+function tgIncertain(){
+  try{
+    if(typeof TOKEN==="undefined" || !TOKEN) return false;               // démo
+    if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA
+       && ONLYCHAT_DATA.totalRevenue!=null) return false;                // lu, tout va bien
+    if(typeof ONLYCHAT_FAILS==="undefined" || ONLYCHAT_FAILS<3) return false;
+    // OnlyChat lâché après 3 échecs. Reste-t-il une saisie MANUELLE pour ce mois ?
+    // Si oui, ce montant fait foi et il n'y a pas d'incertitude à signaler.
+    if(typeof TGREV!=="undefined" && Array.isArray(TGREV) && typeof tgMonthKey==="function"){
+      const mk=tgMonthKey(Date.now());
+      if(TGREV.some(x=>x && tgMonthKey(x.ts)===mk && (Number(x.amount)||0)>0)) return false;
+    }
+    return true;
+  }catch(e){ return false; }
+}
+function tgBandeau(){
+  return tgIncertain()
+    ? `<div class="sv-note" style="border-left:3px solid #ef4444;margin-bottom:8px">🔴 <b>Telegram non lu</b> — OnlyChat ne répond plus. Ce chiffre est compté <b>sans le Telegram du mois</b> : c'est un <b>minimum</b>, pas la réalité. Ne décide pas d'un versement dessus, et si tu connais le montant, saisis-le dans « Revenus Telegram ».</div>`
+    : "";
+}
 // Montant Telegram AVEC les centimes — fmtCur/toLocaleString arrondissaient à
 // l'entier, ce qui pouvait faire passer un vrai montant (602,00 $) pour un
 // montant approximatif aux yeux de l'opérateur (« si non c'est faux »).
@@ -4324,7 +4356,25 @@ function unpayVa(va){
       else if(j && j.retireeDeLaFile) toast("↩️ Annulé à temps", va+" n'a jamais reçu le message de paie.");
     }).catch(()=>{});
 }
+function _assocVide(idPanneau, idCorps){
+  // ⚠️ EN VUE ASSOCIÉ, CES PANNEAUX ÉTAIENT SEULEMENT CACHÉS PAR DU CSS.
+  // `body.assoc-mode #paie{display:none}` masque la boîte, mais `renderPaie` la
+  // REMPLISSAIT quand même : le nom et la paie de chaque VA se retrouvaient dans
+  // la page, lisibles en deux gestes. Et `applyAssoc()` appelle explicitement
+  // `render(LAST)` en entrant dans la vue, donc le remplissage avait bien lieu.
+  // Cacher n'est pas protéger : on ne DESSINE plus, et on vide ce qui l'était.
+  // (Le serveur refuse aussi ces routes à l'associé depuis le 2026-09-06 —
+  //  hubJeton.js — mais le flux principal /api/hub porte encore vas[].pay :
+  //  la garde d'affichage reste nécessaire.)
+  try{
+    if(!document.body.classList.contains("assoc-mode")) return false;
+    var c=document.getElementById(idCorps); if(c) c.innerHTML="";
+    var b=document.getElementById(idPanneau); if(b) b.style.display="none";
+    return true;
+  }catch(e){ return false; }
+}
 function renderPaie(data){
+  if(_assocVide("paie","paieBody")) return;
   // ⚠️ En repli DÉMO, cette fiche affichait des montants inventés à côté de
   // VRAIS prénoms de VA, avec des boutons « Payer » actifs : on pouvait marquer
   // une paie (et déclencher le message au VA) sur des chiffres fictifs.
@@ -4587,6 +4637,7 @@ function pcRestaurerSaisies(saved){
   });
 }
 function renderPaieCumul(){
+  if(_assocVide("paiecumul","pcumulBody")) return;
   // On mémorise ce qui est tapé AVANT de reconstruire, et on le remet après.
   const _saisies = pcLireSaisies();
   const box=$("#paiecumul"); if(!box) return;
@@ -4617,7 +4668,11 @@ function renderPaieCumul(){
     let badgeCahier="";
     if(v.cahier){
       const dc=new Date(v.cahier.ts||0), okc=!isNaN(dc.getTime());
-      badgeCahier=`<span class="pc-cahier" title="Un versement de ${pcMoneyClair(v.cahier.montant)} pour ${nom} est noté dans le cahier${okc?" le "+dc.toLocaleDateString("fr-FR"):""}, en dehors de ce bouton. Ce panneau ne lit que le repère de paie : si ce versement couvrait déjà ces abonnés, payer ici les facturerait une SECONDE fois.">⚠️ déjà noté au cahier ${pcMoney(v.cahier.montant)}</span>`;
+      // ⚠️ `pcMoneyClair` est volontairement NON masqué (il sert aux textes à
+      // copier-coller). Dans une infobulle affichée à l'écran, il trahit le
+      // montant que la ligne masque juste à côté — un appui long le révèle sur
+      // téléphone. On repasse par `pcMoney`, qui respecte le mode discret.
+      badgeCahier=`<span class="pc-cahier" title="Un versement de ${pcMoney(v.cahier.montant)} pour ${nom} est noté dans le cahier${okc?" le "+dc.toLocaleDateString("fr-FR"):""}, en dehors de ce bouton. Ce panneau ne lit que le repère de paie : si ce versement couvrait déjà ces abonnés, payer ici les facturerait une SECONDE fois.">⚠️ déjà noté au cahier ${pcMoney(v.cahier.montant)}</span>`;
     }
     // Un VA parti sans repère de paie n'est PAS une dette connue : on dit
     // « base ? » plutôt que d'annoncer un solde qu'on ne sait pas calculer.
@@ -5251,6 +5306,7 @@ function renderObjMois(){
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
   const onTrack=FN>=goalN;
   $("#objmoisBody").innerHTML=`
+    ${(typeof tgBandeau==="function")?tgBandeau():""}
     <div class="ob-goal">🎯 Objectif : <b>${money(goalN)}</b> <span class="ob-sub">${suitAnneau?"🎯 même que l'anneau":(manuel?"✏️ fixé par toi":"auto")} · mois dernier ${money(netLastN)} · projection ${money(FN)}</span></div>
     <div class="ob-bar"><span style="width:${pct}%"></span><span class="ob-proj" style="left:${projPct}%" title="projection fin de mois"></span></div>
     <div class="ob-line">${money(netNow)} de <b>CA net</b> atteints · <b>${pct}%</b> · jour ${day}/${dim} <span class="ob-sub">(net : OnlyFans après −20 % + Telegram — même base que l'anneau du haut)</span></div>
@@ -7220,6 +7276,7 @@ function renderRenta(){
   }
   $("#renta").style.display="block";
   $("#rentaBody").innerHTML=`
+    ${(typeof tgBandeau==="function")?tgBandeau():""}
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> en ce moment (une source ne répond pas) : ce compte de résultat est un <b>minimum</b>, le vrai profit est un peu plus haut.</div>`:""}
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
     <div class="rn-line"><span>− Commission OnlyFans (${pctComm()})</span><span class="rn-v neg">−${money(commission)}</span></div>
@@ -7371,6 +7428,7 @@ function renderSplit(){
   const wMe=Number(w.me)||0, wOther=Number(w.other)||0;
   panel.style.display="block";
   $("#splitBody").innerHTML=`
+    ${(typeof tgBandeau==="function")?tgBandeau():""}
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> (une source ne répond pas) : le profit réparti ci-dessous est un <b>minimum</b>.</div>`:""}
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameMe)} <span class="sp-pct">${pct}%</span></div><div class="sp-v">${money(partMe)}</div></div>
     <div class="sp-sub">déjà pris <input class="sp-w" id="spWme" type="number" inputmode="numeric" value="${wMe}"> ${cur} · reste <b>${money(partMe-wMe)}</b></div>
@@ -10632,6 +10690,7 @@ async function loadCoherence(){
   }catch(e){}
 }
 function renderCoherence(){
+  if(_assocVide("coherence","coherenceBody")) return;
   const p=$("#coherence"); if(!p) return;
   const d=COH_DATA;
   if(!d){ p.style.display="none"; return; }
@@ -10648,10 +10707,22 @@ function renderCoherence(){
     $("#coherenceBody").innerHTML=`<div class="sv-note">✅ ${d.controles>1?`Les <b>${d.controles}</b> contrôles passent`:`Le <b>${d.controles}</b> contrôle passe`} : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
     try{ fixPairs(); }catch(e){} return;
   }
+  // ⚠️ LE SEUL ENDROIT DU FICHIER OÙ DES MONTANTS SORTAIENT SANS PASSER PAR LE
+  // MODE DISCRET. `x.attendu`, `x.obtenu` et `x.ecart` sont des DOLLARS : le
+  // contrôle « Addition de la fenêtre j30 » compare le brut encaissé du mois, et
+  // « Marge du mois » compare le net moins la paie. Mode discret activé, tout
+  // devenait « ••• » — sauf ce panneau, qui continuait d'afficher en clair
+  // « attendu 24 300 · trouvé 23 950 · écart −350 ». Et la vue ASSOCIÉ force
+  // HIDE : c'est par là que passe la confidentialité, pas par le confort visuel.
+  // `x.explication` peut citer un montant elle aussi : on la masque avec.
+  const cMoney=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":String(v);
   const rows=d.problemes.map(x=>{
     const grave=x.gravite==="grave";
+    const expl=(typeof HIDE!=="undefined"&&HIDE)
+      ? escapeHtml(String(x.quoi||"contrôle")) + " — détail masqué"
+      : escapeHtml(String(x.explication));
     return `<div class="sv-row"><span class="sv-name">${grave?"🔴":"👀"} ${escapeHtml(x.quoi)}</span>`
-      +`<span class="sv-cell">${escapeHtml(x.explication)}<div style="opacity:.65;margin-top:2px">attendu <b>${escapeHtml(String(x.attendu))}</b> · trouvé <b>${escapeHtml(String(x.obtenu))}</b> · écart <b>${escapeHtml((Number(x.ecart)>0?"+":"")+String(x.ecart))}</b></div></span></div>`;
+      +`<span class="sv-cell">${expl}<div style="opacity:.65;margin-top:2px">attendu <b>${escapeHtml(cMoney(x.attendu))}</b> · trouvé <b>${escapeHtml(cMoney(x.obtenu))}</b> · écart <b>${escapeHtml(cMoney((Number(x.ecart)>0?"+":"")+String(x.ecart)))}</b></div></span></div>`;
   }).join("");
   // On recompte les graves REELLEMENT affichés : se fier à `nbGraves` faisait
   // écrire « rien de grave » juste sous une ligne rouge si le champ manquait.
