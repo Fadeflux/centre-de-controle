@@ -5182,7 +5182,8 @@ function horsEquipeLigne(){
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
   const rows=ents.map(e=>{
     const subs=e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—";
-    const rev=e.revTotal!=null?money(e.revTotal)+" brut":"—";
+    // Même mesure que la colonne « généré » du classement : donc en net, comme elle.
+    const rev=e.revTotal!=null?money((Number(e.revTotal)||0)*netRate())+" net":"—";
     return `<div class="cl-row">
       <span class="cl-medal">🎭</span>
       <span class="cl-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir le détail">${escapeHtml(e.nom)}</span>
@@ -5235,7 +5236,7 @@ function openHorsEquipeCard(nom){
       // le ROI n'a aucun sens. On dit ce qui est vrai à la place.
       if(ko||v.revTotal==null) return "";
       if(!(Number(v.revTotal)>0)) return `<div class="va-verdict vv-ok">✅ Jamais payée — ses <b>${fmtInt(v.subsTotal||0)} abonnés</b> sont du <b>bonus</b> pur, sans aucun coût de paie. <span style="opacity:.7">Aucun revenu n'est rattaché à ses liens côté OnlyFans (0 $ enregistré, pas une donnée manquante).</span></div>`;
-      return `<div class="va-verdict vv-ok">✅ Jamais payée — les ${fmtInt(v.subsTotal||0)} abonnés et ${money(v.revTotal)} (brut) qu'elle a générés sont du <b>bonus</b> pur, sans aucun coût de paie.</div>`;
+      return `<div class="va-verdict vv-ok">✅ Jamais payée — les ${fmtInt(v.subsTotal||0)} abonnés et ${money((Number(v.revTotal)||0)*netRate())} (net) qu'elle a générés sont du <b>bonus</b> pur, sans aucun coût de paie.</div>`;
     })()}
     ${(function(){
       const rows=[];
@@ -5322,10 +5323,10 @@ function renderConcentration(){
       // `brutFenetre`, nommée brut ailleurs). Le pourcentage est juste (brut/brut) ;
       // seuls les montants étaient affichés nus. On les étiquette, comme le fait
       // déjà « Qui dépense aujourd'hui ».
-      +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money(t.montant)}</b> brut.</div>`
+      +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money((Number(t.montant)||0)*netRate())}</b> net.</div>`
       +bars
       +(gros?`<div style="margin-top:8px">${gros}</div>`:"")
-      +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money(c.total)} brut (avant commission OnlyFans). Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
+      +`<div class="cc-hint">${c.nbPayeurs} fans ont payé sur la période, pour ${money((Number(c.total)||0)*netRate())} net (après commission OnlyFans). Volontairement sans nom ni identifiant : c'est une mesure de risque, pas un fichier client.</div></div>`;
   })();
   if(!html2.trim()){ box.style.display="none"; return; }
   // 🏔️ LE SOCLE — « si j'arrête de recruter demain, il me reste combien ? »
@@ -6626,7 +6627,7 @@ function renderOM(){
         :((!surTout&&mL.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total de ${escapeHtml(OM_MODEL)} ÷ TOUS ses fans réels (${fmtInt(mL.fansReels)}), lien de VA ou pas — pas seulement les ${fmtInt(mL.subsTotal)} abonnés amenés par l'équipe.">ⓘ</span>`:"");
       return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
     })()}</div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net" title="Brut OnlyFans — la LTV et la marge en dessous sont NETTES">${mnt(d.models[m].net)}<span class="om-model-base"> brut</span></div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net" title="Net, après les ${pctComm()} de commission OnlyFans — même unité que la LTV et la marge en dessous">${mnt(d.models[m].net==null?null:d.models[m].net*netRate())}<span class="om-model-base"> net</span></div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
   // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
   // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
@@ -7286,7 +7287,7 @@ function renderVersus(){
   if(hist.length){
     const maxN=Math.max(1,...hist.map(h=>Math.max((h.byModel[VS_A]||{}).net||0,(h.byModel[VS_B]||{}).net||0)));
     barsHtml=`<div class="vs-legend"><span><i style="background:var(--acc)"></i>${escapeHtml(VS_A)}</span><span><i style="background:#e879f9"></i>${escapeHtml(VS_B)}</span></div>
-    <div class="vs-bars">${hist.map(h=>{ const na=(h.byModel[VS_A]||{}).net||0, nb=(h.byModel[VS_B]||{}).net||0; return `<div class="vs-m"><div class="vs-m-wrap"><div class="vs-bar a" style="height:${Math.max(2,Math.round(na/maxN*64))}px" title="${escapeHtml(VS_A)} ${money(na)} brut"></div><div class="vs-bar b" style="height:${Math.max(2,Math.round(nb/maxN*64))}px" title="${escapeHtml(VS_B)} ${money(nb)} brut"></div></div><div class="vs-m-lbl">${escapeHtml(h.month)}</div></div>`; }).join("")}</div>`;
+    <div class="vs-bars">${hist.map(h=>{ const na=(h.byModel[VS_A]||{}).net||0, nb=(h.byModel[VS_B]||{}).net||0; return `<div class="vs-m"><div class="vs-m-wrap"><div class="vs-bar a" style="height:${Math.max(2,Math.round(na/maxN*64))}px" title="${escapeHtml(VS_A)} ${money(na*netRate())} net"></div><div class="vs-bar b" style="height:${Math.max(2,Math.round(nb/maxN*64))}px" title="${escapeHtml(VS_B)} ${money(nb*netRate())} net"></div></div><div class="vs-m-lbl">${escapeHtml(h.month)}</div></div>`; }).join("")}</div>`;
   }
   // Verdict simple : qui rapporte le plus par sub + qui pousser. ⚠️ JAMAIS quand
   // les revenus sont muets/partiels : sinon on couronnait le modèle lisible face à
