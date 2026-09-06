@@ -5161,7 +5161,21 @@ function renderObjMois(){
   // les deux côtés sur le périmètre OnlyFans.
   const netNowOF=(Number(t.netMonth)||0)*netR;
   const revPerSub=subsMonth>0?netNowOF/subsMonth:((Number(t.ltv)||0)*netR);
-  const subsNeeded=revPerSub>0?Math.ceil(reste/revPerSub):null;
+  // ⚠️ L'AUTRE MOITIÉ DE LA DIVISION. On a mis le diviseur (`revPerSub`) sur le seul
+  // périmètre OnlyFans, mais pas le dividende : quand l'ANNEAU pilote l'objectif,
+  // `reste` est un manque net+Telegram, et on le divisait entièrement par le revenu
+  // d'un abonné OnlyFans — comme si Telegram n'allait plus rien rapporter du mois.
+  // Le nombre de subs à trouver était donc GONFLÉ, et le « chemin par VA » juste en
+  // dessous répartissait ce nombre trop haut entre les VA (objectifs intenables).
+  // On retire la part que Telegram apportera d'ici la fin du mois, au même rythme
+  // que celui utilisé partout ailleurs sur la page (projection linéaire jour/dim).
+  //   • objectif de l'ANNEAU : `reste` contient du Telegram → on le déduit.
+  //   • objectif PROPRE du panneau : `goalN` et `netNow` contiennent tous deux `tgM`,
+  //     qui s'annule dans la soustraction — `reste` est DÉJÀ purement OnlyFans, et y
+  //     retoucher sous-estimerait à son tour. D'où la condition `suitAnneau`.
+  const tgReste=(suitAnneau && day>0 && dim>day) ? Math.max(0, tgM*(dim-day)/day) : 0;
+  const resteOF=Math.max(0, reste-tgReste);
+  const subsNeeded=revPerSub>0?Math.ceil(resteOF/revPerSub):null;
   const vas=(Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0).sort((a,b)=>b.monthSubs-a.monthSubs);
   const totMs=vas.reduce((a,v)=>a+Number(v.monthSubs),0)||1;
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
@@ -6000,7 +6014,12 @@ function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)|
 // `netRate()` suit le taux annoncé par le serveur, cette constante non. Les
 // deux derniers usages ci-dessous sont passés à netRate() le 2026-08-24.
 function fmtLtv(v,cur){ return HIDE ? "•••" : ((Number(v)||0)*netRate()).toFixed(2).replace(".",",")+" "+(cur||"$"); }
-function ltvBrutTxt(v,cur){ return (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
+// ⚠️ CETTE FONCTION PERÇAIT LE MODE DISCRET. `fmtLtv` masque bien (« ••• »), mais
+// `ltvBrutTxt` rendait le montant EN CLAIR — et il s'affiche juste à côté, dans le
+// sous-titre de la carte : « ••• · après 20 % OnlyFans · brut 12,45 $ ». Le chiffre
+// masqué était donc lisible sur la même ligne. Et ce n'est pas qu'une question de
+// confort : la vue ASSOCIÉ force HIDE=true — c'est par là que passe la confidentialité.
+function ltvBrutTxt(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2).replace(".",",")+" "+(cur||"$"); }
 // 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
 // chiffres d'argent ? 🟢 à jour · 🟡 partiel (un compte muet → minimums) · 🔴 argent
 // indisponible. Masqué en mode démo/déconnecté (rien à certifier).
@@ -6015,6 +6034,13 @@ function renderDataHealth(){
   } else if(d.revenusPartiels || (d.totals&&d.totals.fenetresPartielles) || (d.modelesManquants&&d.modelesManquants.length)){
     const mm=(d.modelesManquants&&d.modelesManquants.length)?" ("+d.modelesManquants.join(", ")+")":"";
     cls="dh-amber"; txt="🟡 Chiffres partiels"+mm+" — ce sont des minimums";
+  } else if(typeof OM_ECHEC_DEPUIS!=="undefined" && OM_ECHEC_DEPUIS){
+    // La dernière lecture a ÉCHOUÉ : ce qui est à l'écran ne bouge plus. On le dit,
+    // au lieu de laisser un feu vert figé sur des chiffres qui vieillissent.
+    const mn=Math.floor((Date.now()-OM_ECHEC_DEPUIS)/60000);
+    const depuis=mn<1?"à l'instant":(mn<60?"depuis "+mn+" min":"depuis "+Math.round(mn/60)+" h");
+    cls=(mn>=10)?"dh-red":"dh-amber";
+    txt=(mn>=10?"🔴":"🟡")+" Connexion au cerveau perdue "+depuis+" — chiffres FIGÉS, ne décide pas dessus";
   } else {
     let fr="";
     { const _ma=omMesureAt(); if(_ma){ const m=Math.floor((Date.now()-_ma)/60000); fr=m<1?" · à l'instant":(m<60?" · il y a "+m+" min":" · vieux de "+Math.round(m/60)+" h"); } }
@@ -7169,6 +7195,17 @@ function omIndispo(msg){
 // plusieurs heures, pendant que le bandeau du haut, lui, vieillissait
 // correctement. Deux fraîcheurs contradictoires à l'écran, et la fausse était
 // celle collée aux chiffres.
+// ⚠️ LE BADGE DE FIABILITÉ MENTAIT EXACTEMENT QUAND IL COMPTAIT.
+// `renderDataHealth()` n'était appelé QUE depuis `renderOM()`, c'est-à-dire
+// uniquement quand la lecture avait RÉUSSI. Si le cerveau tombait (500, jeton
+// expiré, réseau coupé), la boucle 60 s réessayait en silence et le bandeau
+// gardait, mot pour mot, « 🟢 Chiffres à jour et complets · il y a 2 min » —
+// figé, pendant des heures. André décide de l'argent sur ce bandeau.
+// `OM_ECHEC_DEPUIS` = date du PREMIER échec d'affilée (0 = dernière lecture OK).
+let OM_ECHEC_DEPUIS=0;
+function omEchec(){ if(!OM_ECHEC_DEPUIS) OM_ECHEC_DEPUIS=Date.now();
+  try{ renderDataHealth(); }catch(e){} }
+function omSucces(){ OM_ECHEC_DEPUIS=0; }
 function majFraicheurOM(){
   try{ const of=$("#omFresh");
     if(of && typeof fraicheur==="function" && omMesureAt())
@@ -7188,15 +7225,16 @@ async function loadOM(){
   }
   try{
     const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
-    if(!r.ok){ if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); else majFraicheurOM(); return; }
+    if(!r.ok){ omEchec(); if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); else majFraicheurOM(); return; }
     const j=await r.json();
     // ⚠️ UN SEUL retry en vol : la boucle 60 s rappelle loadOM, et chaque appel
     // sans données planifiait son propre retry -> les chaînes s'empilaient
     // (N+1 boucles après N minutes) et matraquaient le serveur.
-    if(!j.data){ $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
+    if(!j.data){ omSucces();            // le cerveau a répondu : la liaison est saine
+      $("#om").style.display="block"; $("#omBody").innerHTML=`<div class="om-prep">Les chiffres OnlyMonster se préparent… (reviens dans ~1 min)</div>`;
       if(!window._omRetry) window._omRetry=setTimeout(()=>{ window._omRetry=null; loadOM(); },25000);
       majFraicheurOM(); return; }
-    OM_DATA=j.data; OM_FETCHED_AT=Date.now();
+    OM_DATA=j.data; OM_FETCHED_AT=Date.now(); omSucces();
     // ⚠️ CHAQUE rendu est isolé (2026-08-24). Avant, la vingtaine d'appels était
     // enchaînée sur une seule ligne dans le try de loadOM : un seul panneau qui
     // plantait (une donnée absente, un champ que le serveur n'envoie plus)
@@ -7218,7 +7256,7 @@ async function loadOM(){
      ["écran du matin",typeof majMorningChiffres==="function"?majMorningChiffres:null],
      ["essentiel",refreshEssentiel]]
       .forEach(([nom,fn])=>{ if(!fn) return; try{ fn(); }catch(err){ console.error("[panneau "+nom+"] "+(err&&err.message)); } });
-  }catch(e){ if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); else majFraicheurOM(); }
+  }catch(e){ omEchec(); if(!OM_DATA) omIndispo("Pas de connexion au cerveau."); else majFraicheurOM(); }
 }
 function launchOmApp(){ try{ window.location.href="omapp://open"; }catch(e){} }
 $("#om").addEventListener("click",e=>{
@@ -11288,7 +11326,7 @@ function openVaCard(vaName){
       ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):((typeof VA_GOALS!=="undefined"&&VA_GOALS)?"pas d'objectif fixé":"objectif en cours de chargement…"))}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
       ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*netRate()), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
-      ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après "+pctComm()+" OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies "+prixSub().toFixed(2).replace(".",",")+" $")}
+      ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après "+pctComm()+" OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies "+(HIDE?"•••":prixSub().toFixed(2).replace(".",",")+" $"))}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${(()=>{
         // ⚠️ CORRIGÉ le 2026-08-23 — la fiche affichait « Quinzaine 16 ·
@@ -12062,6 +12100,10 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
   // rafraîchissait normalement, ce qui rendait la panne invisible.
   try{ if(typeof loadHorsEquipe==="function") loadHorsEquipe(); }catch(e){}
   try{ if(typeof loadCookie==="function") loadCookie(); }catch(e){}
+  // Le bandeau de fiabilité se redessine à CHAQUE tour, même quand rien n'a bougé :
+  // son texte (« il y a 4 min », « perdue depuis 20 min ») doit vieillir tout seul,
+  // sinon il reste figé sur la dernière phrase qu'il a écrite.
+  try{ renderDataHealth(); }catch(e){}
   // ⚠️ Ces 3 stores n'étaient chargés QU'AU DÉMARRAGE (et au login) : un seul
   // échec — un redéploiement du cerveau au mauvais moment — verrouillait
   // l'écriture pour TOUTE la session, pendant que le reste de la page se
