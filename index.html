@@ -9842,7 +9842,16 @@ function renderAnomalies(){
         const z=(last-m)/sd;
         if(Math.abs(z)>=2.2 && Math.abs(last-m)>=Math.max(6,m*0.4)){
           const up=last>m;
-          ANOM_LIST.push({icon:up?"⚡":"🔻", sev:1, texte:`${escapeHtml(va)} : ${up?"pic":"chute"} soudain de subs — <b>${last}</b> cette quinzaine vs ~${Math.round(m)} d'habitude`, plain:`${va} : ${up?"pic":"chute"} soudain de subs — ${last} cette quinzaine vs ~${Math.round(m)} d'habitude`, jump:"decroche"});
+          // ⚠️ « CETTE QUINZAINE » DESIGNAIT UNE QUINZAINE TERMINEE. `slice(0,enCours)`
+          // exclut volontairement celle en cours (elle est partielle — le commentaire
+          // de la ligne 9730 le dit) : `last` est donc la derniere quinzaine COMPLETE,
+          // c'est-a-dire la PRECEDENTE. Le 3 septembre, Andre lisait « chute soudaine
+          // de subs — 11 cette quinzaine vs ~34 d'habitude » et croyait la quinzaine en
+          // cours en train de s'effondrer, alors qu'il s'agissait de celle d'avant.
+          // On NOMME la periode au lieu de la laisser deviner.
+          const _lbl=((VAQZ_DATA.labels||[])[enCours-1])||"";
+          const _per=_lbl?("sur "+escapeHtml(_lbl)):"sur la dernière quinzaine terminée";
+          ANOM_LIST.push({icon:up?"⚡":"🔻", sev:1, texte:`${escapeHtml(va)} : ${up?"pic":"chute"} soudain de subs — <b>${last}</b> ${_per} vs ~${Math.round(m)} d'habitude`, plain:`${va} : ${up?"pic":"chute"} soudain de subs — ${last} ${_lbl?("sur "+_lbl):"sur la dernière quinzaine terminée"} vs ~${Math.round(m)} d'habitude`, jump:"decroche"});
         }
       }
     });
@@ -10535,14 +10544,30 @@ function renderBusFactor(){
   const panel=$("#busfactor"), body=$("#busfactorBody"); if(!panel||!body) return;
   if(!TOKEN){ panel.style.display="none"; return; }
   panel.style.display="block";
-  const auto=[
-    "🤖 Le scraping des vues Instagram (en continu)",
-    "🔔 Les alertes Discord + notifs (revenus muets, proxy, SMS, règles…)",
-    "🛡️ La détection des fuites (radar anti-leak)",
-    "💰 La synchro du CA vers ton site finances (6h30)",
-    "🗂️ Le journal des incidents",
-    "🧠 Le coach du matin/soir"
+  // ⚠️ CE SCORE NE MESURAIT RIEN. `auto` était une liste de 6 chaînes CONSTANTES
+  // et `manuel` en comptait 3 à 5 : le résultat ne pouvait valoir que 67 %, 60 %
+  // ou 55 %. Et il BAISSAIT quand il y avait du travail en attente (une paie due
+  // ou des DMCA ajoutent une ligne à `manuel`) — jamais quand un automatisme
+  // TOMBAIT. Pire : `refreshEssentiel()` appelle `renderActions()` et
+  // `renderBusFactor()` dans le même souffle, si bien que le jour où le proxy
+  // meurt, l'alerte « le scraping ne remonte plus » s'affiche À CÔTÉ d'un score
+  // qui compte toujours « le scraping des vues » parmi les choses qui tournent.
+  // On rattache donc chaque ligne à un signal RÉEL, quand il en existe un.
+  const _outil=(id)=>((typeof LAST!=="undefined"&&LAST&&LAST[id])||{}).status;
+  const _pxKo=(typeof PROXY_DATA!=="undefined"&&PROXY_DATA&&PROXY_DATA.critique)?true:false;
+  const _autoDef=[
+    {t:"🤖 Le scraping des vues Instagram (en continu)", ko:_pxKo,
+     pourquoi:"les proxys sont en alerte : les vues ne remontent pas"},
+    {t:"🔔 Les alertes Discord + notifs (revenus muets, proxy, SMS, règles…)",
+     ko:_outil("stats-tracker")==="offline", pourquoi:"le cerveau est hors ligne"},
+    {t:"🛡️ La détection des fuites (radar anti-leak)", ko:false},
+    {t:"💰 La synchro du CA vers ton site finances (6h30)",
+     ko:_outil("finance")==="offline", pourquoi:"le site finances est hors ligne"},
+    {t:"🗂️ Le journal des incidents", ko:false},
+    {t:"🧠 Le coach du matin/soir", ko:false},
   ];
+  const autoKo=_autoDef.filter(x=>x.ko);
+  const auto=_autoDef.filter(x=>!x.ko).map(x=>x.t);
   const manuel=[];
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   if(cd&&!cd.error&&((Number(cd.projete)||0)>0||(Number(cd.resteRetard)||0)>0)) manuel.push({t:`Payer les VA (prochaine paie le ${(typeof fmtJourFr==="function"?fmtJourFr(cd.payday):cd.payday)})`, deleg:true});
@@ -10551,10 +10576,12 @@ function renderBusFactor(){
   manuel.push({t:"Répondre / relancer les VA (via leur ticket)", deleg:true});
   manuel.push({t:"Décider quoi couper ou pousser (décrochage, opportunités)", deleg:false});
   manuel.push({t:"Restaurer un proxy / renouveler un abonnement en panne", deleg:false});
+  // Le score ne compte plus que les automatismes qu'on n'a PAS vus tomber, et il
+  // porte un libellé qui dit ce qu'il compte (pas « tourne », qui affirme trop).
   const score=Math.round(auto.length/(auto.length+manuel.length)*100);
   const deleg=manuel.filter(m=>m.deleg).map(m=>m.t);
   body.innerHTML=`<div class="cac-intro">Ce qui tient sans toi, et ce qui casse si tu t'absentes. Plus le score est haut, plus ton agence tourne toute seule.</div>
-    <div class="bf-score"><div class="bf-score-v">${score} %</div><div class="bf-score-l">tourne en automatique</div></div>
+    <div class="bf-score"><div class="bf-score-v">${score} %</div><div class="bf-score-l">des tâches suivies sont automatisées${autoKo.length?` <span title="${autoKo.map(x=>x.t+" : "+(x.pourquoi||"en panne")).join(" · ").replace(/"/g,"&quot;")}" style="color:#f87171">· ${autoKo.length} en panne</span>`:""}</div></div>
     <div class="bf-h">🤖 Tourne tout seul (${auto.length})</div>${auto.map(a=>`<div class="bf-item ok">${a}</div>`).join("")}
     <div class="bf-h">✋ Dépend de toi (${manuel.length})</div>${manuel.map(m=>`<div class="bf-item"><span>${escapeHtml(m.t)}</span>${m.deleg?'<span class="bf-tag ok">délégable</span>':'<span class="bf-tag">toi seul</span>'}</div>`).join("")}
     <div class="bf-away">🏖️ <b>Si tu pars une semaine :</b> ${deleg.length?`délègue à Manon → ${deleg.map(t=>escapeHtml(t)).join(" ; ")}.`:"peu de choses bloquent."} ${nouv?`Les DMCA (${nouv}) `:"Les décisions stratégiques "}t'attendront à ton retour.</div>`;
