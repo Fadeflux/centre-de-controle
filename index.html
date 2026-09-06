@@ -9545,7 +9545,19 @@ function renderAnomalies(){
     const last=dn[dn.length-1], base=dn.slice(0,-1), m=_moy(base), sd=_ecart(base,m);
     if(sd>0 && m>0){
       const z=(last-m)/sd;
-      if(Math.abs(z)>=2.2 && Math.abs(last-m)>=m*0.35){
+      // ⚠️ UNE JOURNÉE AMPUTÉE N'EST PAS UNE CHUTE. Quand un modèle est illisible,
+      // le serveur pose `dailyNetPartiel` et la journée ne contient que ce qui a
+      // pu être lu — le graphe « CA par jour » l'affiche d'ailleurs (l.~12384).
+      // Ce détecteur, lui, l'ignorait : il criait « 📉 CA d'hier anormalement
+      // BAS » et poussait l'alerte dans la file d'actions, sur une journée
+      // simplement incomplète. Une détection statistique sur une mesure partielle
+      // ne mesure que la panne.
+      const _jourPartiel=!!(OM_DATA && (OM_DATA.dailyNetPartiel || OM_DATA.revenusPartiels));
+      if(_jourPartiel){
+        ANOM_LIST.push({icon:"🟡", sev:1,
+          texte:`CA d'hier <b>non mesuré en entier</b> (une source n'a pas répondu) — impossible de dire s'il est anormal`,
+          plain:"CA d'hier non mesuré en entier — impossible de dire s'il est anormal"});
+      } else if(Math.abs(z)>=2.2 && Math.abs(last-m)>=m*0.35){
         const up=last>m;
         // ⚠️ dailyNet[].v est du BRUT : deux montants bruts non étiquetés dans un
         // panneau d'alerte, alors que le graphe « CA par jour » affiche « X net · Y
@@ -10759,7 +10771,13 @@ async function loadCoherence(){
   if(!TOKEN) return;
   try{
     const r=await fetch(HUB_BASE+"/api/hub/coherence",{headers:{"x-hub-token":TOKEN}});
-    if(!r.ok) return;
+    // ⚠️ `if(!r.ok) return;` LAISSAIT LE VERDICT DE CE MATIN. Ce panneau est le
+    // seul qui écrive « Tu peux décider sur ces chiffres » : quand le contrôle
+    // tombe (500 côté serveur, schéma changé, base muette), il continuait de
+    // certifier des chiffres qu'il n'avait pas revus depuis l'ouverture de la
+    // page. Un contrôle en panne doit dire qu'il est en panne, pas répéter son
+    // dernier « tout va bien ».
+    if(!r.ok){ if(COH_DATA) COH_DATA._perime=true; try{ renderCoherence(); renderNoteJour(); }catch(e){} return; }
     const j=await r.json(); COH_DATA=j.data||null; renderCoherence(); try{renderNoteJour();}catch(e){}
   }catch(e){}
 }
@@ -10771,14 +10789,18 @@ function renderCoherence(){
   p.style.display="block";
   const et=$("#cohState");
   const V={ ok:["✅ tout concorde","good"], oeil:["👀 à regarder","mid"], grave:["🔴 ça ne colle pas","bad"], inconnu:["⏳ pas encore contrôlable","mid"] };
-  const v=V[d.verdict]||V.inconnu;
+  // Verdict PÉRIMÉ : la dernière lecture a échoué. On ne rejoue pas « ✅ ».
+  const v=d._perime ? ["⏳ contrôle non rejoué","mid"] : (V[d.verdict]||V.inconnu);
+  const notePerime=d._perime
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Le contrôle n'a pas pu être rejoué</b> — ce qui suit date de la dernière fois où il a réussi. Ne le lis pas comme une certification des chiffres d'aujourd'hui.</div>`
+    : "";
   if(et){ et.textContent=v[0]; et.className="cc-lvl "+v[1]; }
   if(d.verdict==="inconnu"){
-    $("#coherenceBody").innerHTML=`<div class="sv-note">${escapeHtml(d.raison||"Les chiffres ne sont pas encore calculés.")} — rien à contrôler pour l'instant. Ce n'est pas un problème.</div>`;
+    $("#coherenceBody").innerHTML=notePerime+`<div class="sv-note">${escapeHtml(d.raison||"Les chiffres ne sont pas encore calculés.")} — rien à contrôler pour l'instant. Ce n'est pas un problème.</div>`;
     try{ fixPairs(); }catch(e){} return;
   }
   if(!d.problemes||!d.problemes.length){
-    $("#coherenceBody").innerHTML=`<div class="sv-note">✅ ${d.controles>1?`Les <b>${d.controles}</b> contrôles passent`:`Le <b>${d.controles}</b> contrôle passe`} : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
+    $("#coherenceBody").innerHTML=notePerime+`<div class="sv-note">✅ ${d.controles>1?`Les <b>${d.controles}</b> contrôles passent`:`Le <b>${d.controles}</b> contrôle passe`} : la somme du classement retombe sur le total encaissé, la marge correspond à « net moins la paie », et le détail par modèle fait bien le total du mois. <b>Tu peux décider sur ces chiffres.</b></div>`;
     try{ fixPairs(); }catch(e){} return;
   }
   // ⚠️ LE SEUL ENDROIT DU FICHIER OÙ DES MONTANTS SORTAIENT SANS PASSER PAR LE
@@ -11107,6 +11129,13 @@ function renderPie(){
   // Les additionner tels quels gonflait la part OnlyFans et écrasait Telegram
   // dans le camembert ET dans le « Total généré ce mois ». On convertit l'OF en
   // net (× NET_RATE) comme le font déjà renderHistory et la tuile du haut.
+  // ⚠️ UN MODÈLE ILLISIBLE DISPARAISSAIT DU CAMEMBERT. Quand un compte répond 403
+  // (abonnement expiré) ou 429, le serveur met `net: null` et lève
+  // `revenusPartiels` — que renderOM et renderRenta signalent par un bandeau.
+  // Ici, `Number(null)||0` valait 0, puis `.filter(e=>e[1]>0)` le SUPPRIMAIT de
+  // la liste : le total était sous-estimé, les parts des autres gonflées, et
+  // rien ne le disait. « Je n'ai pas pu lire Zoe » n'est pas « Zoe a rapporté 0 ».
+  const _illisibles=Object.keys(models).filter(m=>models[m] && models[m].net==null);
   let entries=Object.keys(models).map(m=>[m,(Number(models[m].net)||0)*netRate()]).filter(e=>e[1]>0);
   // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans.
   // ⭐ Préfère ONLYCHAT_DATA (auto, à jour) à la saisie manuelle TGREV — sinon,
@@ -11139,7 +11168,10 @@ function renderPie(){
   const segs=entries.map((e,i)=>{ const len=e[1]/total*C, s=`<circle r="${R}" cx="70" cy="70" fill="none" stroke="${colors[i%colors.length]}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"/>`; off+=len; return s; }).join("");
   const legend=entries.map((e,i)=>`<div class="pie-lg"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-nm">${escapeHtml(e[0])}</span><span class="pie-v">${money(e[1])} · ${Math.round(e[1]/total*100)}%</span></div>`).join("");
   const head=`<div class="pie-total"><span>💰 Total encaissé <b>net</b> ce mois</span><b>${money(total)}</b></div>`;
-  $("#pieBody").innerHTML=head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+`<div class="pie-note">OnlyFans en <b>net</b>${tg>0?" + Telegram réunis":""}. Le détail par modèle reste au-dessus.</div>`;
+  const notePie=_illisibles.length
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>${_illisibles.map(escapeHtml).join(", ")}</b> n'a pas pu être lu : ce total est un <b>minimum</b> et les pourcentages ci-dessous sont donc trop hauts.</div>`
+    : "";
+  $("#pieBody").innerHTML=notePie+head+`<div class="pie-wrap"><svg viewBox="0 0 140 140" class="pie-svg" width="140" height="140">${segs}</svg><div class="pie-legend">${legend}</div></div>`+`<div class="pie-note">OnlyFans en <b>net</b>${tg>0?" + Telegram réunis":""}. Le détail par modèle reste au-dessus.</div>`;
 }
 
 /* ---------- démarrage ---------- */
