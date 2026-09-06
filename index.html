@@ -9323,6 +9323,21 @@ function renderCash(){
   else{
     tresoHtml=`<div class="cash-line"><span>💰 Dispo (retirable)</span><b>${cur(d.dispo)}</b></div>`
       +`<div class="cash-line"><span>⏳ En attente de versement</span><b>${cur(d.attente)}</b></div>`
+      // ⚠️ « À JOUR À L'INSTANT » PORTAIT SUR LE CALCUL, PAS SUR LA MESURE.
+      // `d.maj` est posé au moment où le serveur REFAIT le calcul ; mais le solde
+      // OnlyFans, lui, sort d'un cache de 15 min — et quand sa lecture échoue,
+      // l'ancien cache est resservi tel quel sous un HTTP 200, sans limite d'âge.
+      // Un solde de ce matin s'affichait donc « à jour à l'instant ».
+      // Le serveur transporte maintenant l'heure de la MESURE : on la montre dès
+      // qu'elle s'écarte franchement de celle du calcul.
+      +(function(){
+        const ma=Number(d.soldeMesureAt)||0;
+        if(!ma) return "";
+        const min=Math.floor((Date.now()-ma)/60000);
+        if(min<5) return "";
+        const age=min<60?("il y a "+min+" min"):("il y a "+Math.round(min/60)+" h");
+        return `<div class="cash-sub"${min>=60?' style="color:#facc15"':''}>${min>=60?"⚠️ ":""}solde mesuré ${age} — le reste de ce bloc vient d'être recalculé, mais pas lui.</div>`;
+      })()
       +(d.tresoPartiel?`<div class="cash-sub">⚠️ lecture partielle — c'est un minimum</div>`:"");
   }
   // ⚠️ LE PANNEAU DISAIT « JE NE SAIS PAS », PUIS RÉPONDAIT QUAND MÊME.
