@@ -5367,7 +5367,35 @@ function renderObjMois(){
   // FN = projection fin de mois : même helper que partout ailleurs (Telegram
   // projeté), sinon ce panneau annonçait une prévision plus basse que la carte
   // du matin et que la Rentabilité pour le même mois.
-  const goalN=suitAnneau?ringGoal:(goal*netR+tgM), FN=(typeof projNetMois==="function")?projNetMois():(F*netR+tgM), netLastN=netLast*netR;
+  // ⚠️ DEUX ASYMÉTRIES TELEGRAM DANS UNE MÊME LIGNE.
+  //
+  // 1. « mois dernier » était le SEUL montant de la ligne sans Telegram
+  //    (`netLast*netR`), à côté d'un objectif, d'un réalisé et d'une projection
+  //    qui l'incluent tous les trois. André lisait « objectif 12 000 · mois
+  //    dernier 8 900 · projection 11 200 » et en concluait « je suis au-dessus du
+  //    mois dernier » — en comparant deux choses différentes. Le Telegram du mois
+  //    précédent est pourtant connu : `tgHistMonth()` sait le rendre, et le
+  //    panneau « Mon année » s'en sert déjà.
+  //
+  // 2. Le verdict « au rythme actuel, tu y es » comparait `FN` (projection AVEC
+  //    le Telegram de FIN DE MOIS) à `goalN` (objectif propre du panneau, qui ne
+  //    porte que le Telegram DÉJÀ ENCAISSÉ). Le verdict était donc optimiste :
+  //    on créditait la projection d'un Telegram que l'objectif n'exigeait pas.
+  //    `pct` et `reste`, eux, DOIVENT rester sur le Telegram à date (`netNow` en
+  //    contient autant) — d'où deux variables au lieu d'une.
+  const goalN=suitAnneau?ringGoal:(goal*netR+tgM);
+  const FN=(typeof projNetMois==="function")?projNetMois():(F*netR+tgM);
+  // L'objectif tel qu'il sera À LA FIN DU MOIS : même périmètre que FN.
+  const tgProj=(typeof tgProjMois==="function")?(Number(tgProjMois())||0):tgM;
+  const goalFin=suitAnneau?ringGoal:(goal*netR+tgProj);
+  let netLastN=netLast*netR;
+  try{
+    if(typeof tgHistMonth==="function" && typeof tgMonthLabel==="function"){
+      const _p=new Date(); _p.setDate(15); _p.setMonth(_p.getMonth()-1);
+      const _tgPrec=Number(tgHistMonth(tgMonthLabel(_p)));
+      if(isFinite(_tgPrec)) netLastN+=_tgPrec;      // même périmètre que le reste de la ligne
+    }
+  }catch(e){}
   const pct=goalN>0?Math.min(100,Math.round(netNow/goalN*100)):0;
   const projPct=goalN>0?Math.min(100,Math.round(FN/goalN*100)):0;
   const reste=Math.max(0,goalN-netNow);
@@ -5397,7 +5425,8 @@ function renderObjMois(){
   const vas=(Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0).sort((a,b)=>b.monthSubs-a.monthSubs);
   const totMs=vas.reduce((a,v)=>a+Number(v.monthSubs),0)||1;
   const chemin=(subsNeeded!=null&&vas.length)?vas.slice(0,6).map(v=>{ const part=Math.round(subsNeeded*(Number(v.monthSubs)/totMs)); return part>0?`${escapeHtml(v.va)} ~${part}`:""; }).filter(Boolean).join(" · "):"";
-  const onTrack=FN>=goalN;
+  // On compare fin de mois à fin de mois (voir goalFin ci-dessus).
+  const onTrack=FN>=goalFin;
   $("#objmoisBody").innerHTML=`
     ${(typeof tgBandeau==="function")?tgBandeau():""}
     <div class="ob-goal">🎯 Objectif : <b>${money(goalN)}</b> <span class="ob-sub">${suitAnneau?"🎯 même que l'anneau":(manuel?"✏️ fixé par toi":"auto")} · mois dernier ${money(netLastN)} · projection ${money(FN)}</span></div>
