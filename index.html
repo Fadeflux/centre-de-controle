@@ -2991,8 +2991,21 @@ function nextAction(data, live){
 }
 function renderBrief(data, live, onCount, stInW){
   STREAK = computeStreak();
-  const off = live.length - onCount;
-  const meteo = off===0 ? "ok" : (off>=2 ? "bad" : "warn");
+  // ⚠️ TROIS COMPTAGES DIFFÉRENTS DU MÊME FAIT, DANS LE MÊME ÉCRAN.
+  // Ici : `live.length - onCount`, c'est-à-dire « tout ce qui n'est pas en
+  // ligne » — les `unknown` compris. La bannière rouge (#alert) et la file
+  // d'actions, elles, ne comptent QUE `status === "offline"`. Or le cerveau
+  // renvoie couramment `unknown` (cache IG périmé, Finance injoignable, revenus
+  // OnlyMonster illisibles). Résultat : « ⚠️ 3 outils hors ligne » juste
+  // au-dessus de « Tout est à jour — rien d'urgent ». Aucune des deux phrases
+  // n'était fausse ; elles ne parlaient simplement pas de la même chose.
+  // Et celle-ci ne NOMMAIT rien, alors que la bannière rouge nomme les siens.
+  // Une seule définition, et deux phrases distinctes qui NOMMENT.
+  const horsLigne = live.filter(t=>(data[t.id]||{}).status==="offline");
+  const muets = live.filter(t=>{ const st2=(data[t.id]||{}).status; return st2!=="online" && st2!=="offline"; });
+  const off = horsLigne.length;
+  // La météo tient compte des deux, mais un muet pèse moins qu'un mort.
+  const meteo = (off===0 && !muets.length) ? "ok" : (off>=2 ? "bad" : "warn");
   const st = data["stats-tracker"] || {};
   const subsDelta = (stInW && st.prev && st.metrics && st.metrics.subsQuinzaine!=null) ? st.metrics.subsQuinzaine - (st.prev.subsQuinzaine||0) : null;
   const today = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
@@ -3012,7 +3025,9 @@ function renderBrief(data, live, onCount, stInW){
   // ces lignes ENTIÈREMENT, pas les remplacer par des points.
   const _assoc = document.body.classList.contains("assoc-mode");
   if (!_assoc && stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
-  s.push(off===0 ? `tous tes outils tournent` : `<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b>`);
+  if(off) s.push(`<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b> : ${horsLigne.map(t=>escapeHtml(t.name)).join(", ")}`);
+  if(muets.length) s.push(`<b>❔ ${muets.length} muet${muets.length>1?"s":""}</b> : ${muets.map(t=>escapeHtml(t.name)).join(", ")} <span class="ob-sub">(pas de nouvelles — ce n'est pas « en panne », mais pas « ça va » non plus)</span>`);
+  if(!off && !muets.length) s.push(`tous tes outils tournent`);
   const nTodo = TODOS.filter(t=>!t.d).length;
   if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
   if (STREAK>0) s.push(`🔥 <b>${STREAK}</b> j${STREAK_GOAL?" 🎯":""}`);
@@ -5079,10 +5094,27 @@ function renderMeteo(){
 }
 /* ---------- 📊 #11 tes VRAIS jours forts (transactions réelles, 90 j) ---------- */
 let JOURSFORTS=null;
+// ⚠️ « REVIENS DANS QUELQUES MINUTES » ET ON NE REVENAIT JAMAIS.
+// Cote serveur, /api/hub/jours-forts lit un cache SYNCHRONE : tant que le job de
+// fond n'a pas tourne (redemarrage, reveil Railway), il repond
+// `{computing:true}`. Le panneau ecrivait alors « Analyse de tes ventes en
+// cours… reviens dans quelques minutes » — mais `loadJoursForts` n'etait appele
+// qu'une fois, au demarrage. Le message restait donc pour TOUTE la session, meme
+// une fois l'analyse prete depuis longtemps.
+// Deux voisins ont deja ce motif : loadOnlyChat (_ocComputingTimer) et
+// loadCohortes (COH_RETRY). On l'applique ici, avec un plafond d'essais pour ne
+// pas relancer indefiniment si le job de fond est vraiment casse.
+let JF_RETRY=0;
 async function loadJoursForts(){
   if(!TOKEN) return;
   try{ const r=await fetch(HUB_BASE+"/api/hub/jours-forts",{headers:{"x-hub-token":TOKEN}}); if(r.ok) JOURSFORTS=await r.json(); }catch(e){}
   try{ renderMeteo(); }catch(e){}
+  if(JOURSFORTS && JOURSFORTS.computing && JF_RETRY<8){
+    JF_RETRY++;
+    setTimeout(loadJoursForts, 30000);
+  } else if(JOURSFORTS && !JOURSFORTS.computing){
+    JF_RETRY=0;                      // prêt : on repart de zéro pour la prochaine fois
+  }
 }
 function jfHtml(){
   const d=JOURSFORTS;
