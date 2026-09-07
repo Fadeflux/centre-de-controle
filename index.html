@@ -7938,16 +7938,37 @@ function renderSplit(){
     ${(typeof tgBandeau==="function")?tgBandeau():""}
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> (une source ne répond pas) : le profit réparti ci-dessous est un <b>minimum</b>.</div>`:""}
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameMe)} <span class="sp-pct">${pct}%</span></div><div class="sp-v">${money(partMe)}</div></div>
-    <div class="sp-sub">déjà pris <input class="sp-w" id="spWme" type="number" inputmode="numeric" value="${wMe}"> ${cur} · reste <b>${money(partMe-wMe)}</b></div>
+    <div class="sp-sub">déjà pris <input class="sp-w" id="spWme" type="text" inputmode="decimal" value="${wMe}"> ${cur} · reste <b>${money(partMe-wMe)}</b></div>
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameOther)} <span class="sp-pct">${100-pct}%</span></div><div class="sp-v">${money(partOther)}</div></div>
-    <div class="sp-sub">déjà pris <input class="sp-w" id="spWother" type="number" inputmode="numeric" value="${wOther}"> ${cur} · reste <b>${money(partOther-wOther)}</b></div>
+    <div class="sp-sub">déjà pris <input class="sp-w" id="spWother" type="text" inputmode="decimal" value="${wOther}"> ${cur} · reste <b>${money(partOther-wOther)}</b></div>
     <div class="sp-ctrl">Part ${escapeHtml(nameMe)} : <input id="spPct" type="number" min="0" max="100" value="${pct}">% <span class="sp-note">du profit du mois (${money(profit)}, avant part modèle)</span></div>`;
   // … et on remet ce qui était en cours de saisie.
   { const a=$("#spWme"), b=$("#spWother"), c=$("#spPct");
     if(a && _sw.me!=null && _sw.me!=="") a.value=_sw.me;
     if(b && _sw.other!=null && _sw.other!=="") b.value=_sw.other;
     if(c && _sw.pct!=null && _sw.pct!=="") c.value=_sw.pct; }
-  const setW=()=>{ localStorage.setItem(wKey,JSON.stringify({me:Number($("#spWme").value)||0,other:Number($("#spWother").value)||0})); saveSplit(); renderSplit(); };
+  // ⚠️ TROISIÈME SAISIE D'ARGENT QUI NE PASSAIT PAS PAR `lireMontant`.
+  // C'étaient des `type="number"` lus en `Number(v)||0` — les deux pièges déjà
+  // corrigés ailleurs, sur le champ qui dit combien on a DÉJÀ SORTI de la
+  // caisse :
+  //   « 1 250 » ou « 137,50 » (virgule du clavier FR) -> .value vaut "" -> 0 ;
+  //   « 1.500 » -> accepté par le navigateur comme 1,5 -> 1,50 $ au lieu de 1500.
+  // Dans les deux cas « déjà pris » retombe à ~0, donc « reste » affiche la
+  // part ENTIÈRE comme encore disponible : on se reverse une seconde fois de
+  // l'argent déjà sorti, sans un mot. On refuse ce qui n'est pas lisible.
+  const setW=()=>{
+    const a=$("#spWme"), b=$("#spWother");
+    const lu=(el,qui)=>{
+      const t=String(el?el.value:"").trim();
+      if(t==="") return 0;                      // rien pris ce mois-ci : c'est un état légitime
+      const r=lireMontant(t,{signeAutorise:false});
+      if(!r.ok){ if(typeof toast==="function") toast("⚠️ « Déjà pris » non enregistré", qui+" : "+r.erreur.replace(/\*\*/g,"")); return null; }
+      return r.valeur;
+    };
+    const vMe=lu(a,"ta part"), vOther=lu(b,"la part de l'associé");
+    if(vMe===null || vOther===null){ renderSplit(); return; }   // on ne touche à RIEN
+    localStorage.setItem(wKey,JSON.stringify({me:vMe,other:vOther})); saveSplit(); renderSplit();
+  };
   { const a=$("#spWme"); if(a) a.onchange=setW; } { const b=$("#spWother"); if(b) b.onchange=setW; }
   { const p=$("#spPct"); if(p) p.onchange=()=>{ localStorage.setItem("ccn_split",String(Math.min(100,Math.max(0,parseInt(p.value,10)||50)))); saveSplit(); renderSplit(); }; }
 }
@@ -12106,7 +12127,47 @@ async function doRestore(file){
     const txt=await file.text(); const j=JSON.parse(txt);
     const data=(j&&j.data&&typeof j.data==="object")?j.data:(typeof j==="object"?j:null);
     if(!data){ if(typeof toast==="function") toast("⚠️ Fichier invalide",""); return; }
-    if(!confirm("Restaurer cette sauvegarde ? Tes réglages actuels (tâches, paie, objectifs…) seront REMPLACÉS par ceux du fichier.")) return;
+    // ⚠️ RESTAURER, C'EST REMETTRE LE CAHIER DE PAIE EN ARRIÈRE — et ça ne le
+    // disait pas. Le message parlait de « paie » mais jamais de QUELLE DATE
+    // vient le fichier. Restaurer une sauvegarde de trois semaines efface tous
+    // les paiements versés depuis : les VA concernés redeviennent « à payer »,
+    // et ce sont exactement les mêmes quinzaines qu'on repaie. Même chose pour
+    // les revenus Telegram saisis à la main.
+    // On NOMME donc la date, l'âge, et ce qui serait précisément perdu.
+    const _quand = (j && Number(j.ts)) ? new Date(Number(j.ts))
+                 : (file.lastModified ? new Date(file.lastModified) : null);
+    const _dateTxt = _quand ? _quand.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) : "date inconnue";
+    const _age = _quand ? Math.floor((Date.now()-_quand.getTime())/86400000) : null;
+    const _perdus = (cle, courant)=>{
+      try{
+        let brut = data[cle]; if(brut==null) return null;      // absent du fichier : on ne conclut rien
+        let arr = (typeof brut==="string") ? JSON.parse(brut) : brut;
+        if(arr && !Array.isArray(arr)) arr = arr.payments || arr.entries || arr.liste || null;
+        if(!Array.isArray(arr)) return null;
+        const vus = new Set(arr.map(x=>x && x.id));
+        return (courant||[]).filter(x=>x && !vus.has(x.id));
+      }catch(e){ return null; }                                 // illisible : on ne prétend pas savoir
+    };
+    const _pPaie = _perdus("hub_payments", (typeof PAYMENTS!=="undefined"&&Array.isArray(PAYMENTS))?PAYMENTS:[]);
+    const _pTg   = _perdus("hub_telegram_rev", (typeof TGREV!=="undefined"&&Array.isArray(TGREV))?TGREV:[]);
+    let _avert = "";
+    if(_pPaie && _pPaie.length){
+      const det = _pPaie.slice(0,6).map(x=>"   • "+(x.va||"?")+" — "+(Number(x.amount)||0)+" $"
+        + (x.ts?(" (le "+new Date(x.ts).toLocaleDateString("fr-FR")+")"):"")).join("\n");
+      _avert += "\n\n🔴 "+_pPaie.length+" PAIEMENT"+(_pPaie.length>1?"S":"")+" DÉJÀ VERSÉ"+(_pPaie.length>1?"S":"")+" VA DISPARAÎTRE du cahier :\n"
+             + det + (_pPaie.length>6?("\n   … et "+(_pPaie.length-6)+" autre(s)"):"")
+             + "\n\nCes VA redeviendront « à payer ». Si tu cliques Payer, tu les paies UNE SECONDE FOIS.";
+    } else if(_pPaie===null){
+      _avert += "\n\n⚠️ Je n'ai pas pu comparer les cahiers de paie : je ne peux pas te dire ce qui serait perdu.";
+    }
+    if(_pTg && _pTg.length){
+      const tot=_pTg.reduce((a,x)=>a+(Number(x.amount)||0),0);
+      _avert += "\n\n🔴 "+_pTg.length+" saisie(s) de revenu Telegram ("+Math.round(tot)+" $) disparaîtront aussi.";
+    }
+    if(!confirm("Restaurer la sauvegarde du "+_dateTxt
+      + (_age!=null ? " (il y a "+_age+" jour"+(_age>1?"s":"")+")" : "")+" ?\n\n"
+      + "Tes réglages actuels (tâches, paie, objectifs…) seront REMPLACÉS par ceux du fichier."
+      + _avert)) return;
     const r=await fetch(HUB_BASE+"/api/hub/config-import",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({data:data})});
     const res=await r.json().catch(()=>({}));
     if(r.ok&&res.ok){ if(typeof toast==="function") toast("♻️ Restauré",(res.restored||[]).length+" réglages restaurés. Rechargement…"); setTimeout(()=>location.reload(),1500); }
@@ -13281,6 +13342,14 @@ function _argentEnAttente(){
     if(typeof TODOS_DIRTY     !== "undefined" && TODOS_DIRTY)     return true;
     if(typeof ROLES_DIRTY     !== "undefined" && ROLES_DIRTY)     return true;
     if(typeof SPLIT_DIRTY     !== "undefined" && SPLIT_DIRTY)     return true;
+    // ⚠️ TROIS LISTES MANQUAIENT À L'APPEL — dont la seule qui porte de l'ARGENT.
+    // `seDeconnecter` efface `ccn_tgrev` (revenus Telegram tapés à la main) et
+    // `ccn_payments`. Or ce garde ne regardait aucun drapeau les concernant : on
+    // pouvait donc taper 800 $ de Telegram pendant que le serveur était muet,
+    // se déconnecter, et l'avertissement ne sortait pas. La saisie partait avec.
+    if(typeof TGREV_DIRTY     !== "undefined" && TGREV_DIRTY)     return true;
+    if(typeof VAGOALS_DIRTY   !== "undefined" && VAGOALS_DIRTY)   return true;
+    if(typeof LW_DIRTY        !== "undefined" && LW_DIRTY)        return true;
   }catch(e){}
   return false;
 }
