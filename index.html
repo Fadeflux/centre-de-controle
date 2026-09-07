@@ -5392,8 +5392,8 @@ function openHorsEquipeCard(nom){
     <div class="vacard-stats">
       ${stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
       ${stat("Abonnés au total", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
-      ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), (ko||v.revTotal==null)?"":"brut : "+money(v.revTotal))}
-      ${stat("Net CE MOIS", (ko||v.revMois==null)?"—":money((Number(v.revMois)||0)*NET), (ko||v.revMois==null)?"pas encore mesuré":"brut : "+money(v.revMois))}
+      ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), "")}
+      ${stat("Net CE MOIS", (ko||v.revMois==null)?"—":money((Number(v.revMois)||0)*NET), (ko||v.revMois==null)?"pas encore mesuré":"")}
       ${(v.revJour!=null&&!ko)?stat("Aujourd'hui", money((Number(v.revJour)||0)*NET), (v.payeursJour!=null?v.payeursJour+" payeur"+(v.payeursJour>1?"s":""):"")):""}
       ${stat("LTV (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur))}
       ${stat("Conversion "+((d&&d.convDays)||14)+" j", (c&&c.cvr!=null)?String(c.cvr).replace(".",",")+" %":"—", c?fmtInt(c.clics)+" clics → "+fmtInt(c.subs)+" subs":"")}
@@ -6063,11 +6063,38 @@ function renderGoal(data){
       if(!r.ok){ if(typeof toast==="function") toast("⚠️ Objectif non compris", r.erreur.replace(/\*\*/g,"")); return; }
       const v=Math.round(r.valeur);
       if(!(v>0)){ if(typeof toast==="function") toast("⚠️ Objectif non compris","Un objectif doit être plus grand que zéro."); return; }
-      GOAL={type:t,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
-    const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
+      GOAL={type:t,value:v,unite:(t==="rev"?"net":"subs")}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
+    const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value,unite:"net"}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
     return;
   }
   const isRev = GOAL.type==="rev";
+  // ⚠️ L'OBJECTIF A CHANGÉ D'UNITÉ SOUS LES PIEDS DE L'OPÉRATEUR.
+  // Avant le passage en net, il était comparé au CA BRUT ; il est désormais
+  // comparé à `caNetMois()` (net, Telegram compris). Un objectif tapé avant ce
+  // changement est donc ~25 % trop haut — la jauge paraît en retard sans que
+  // rien ne l'explique. Je ne convertis PAS tout seul : seul André sait quel
+  // chiffre il a tapé, et convertir en silence, c'est refaire l'erreur d'avant
+  // dans l'autre sens. On pose la question une fois, et on retient la réponse.
+  if(isRev && !GOAL.unite && Number(GOAL.value)>0){
+    const _v=Math.round(Number(GOAL.value)), _conv=Math.round(_v*((typeof netRate==="function")?netRate():0.8));
+    const _bandeau=`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:10px">
+      ⚠️ <b>Ton objectif de ${fmtInt(_v)} $ date d'avant le passage en net.</b>
+      Il est maintenant comparé à ton <b>net</b> (après les ${pctComm()} OnlyFans, Telegram compris).
+      Tu l'avais tapé en net ou en brut ?
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="act" id="goalUniteNet" style="margin:0">C'était déjà du net — garder ${fmtInt(_v)} $</button>
+        <button class="act" id="goalUniteBrut" style="margin:0">C'était du brut — passer à ${fmtInt(_conv)} $</button>
+      </div></div>`;
+    const _poser=(nv)=>{ GOAL={type:"rev",value:nv,unite:"net"}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST);
+      if(typeof toast==="function") toast("🎯 Objectif calé","Il vaut maintenant "+fmtInt(nv)+" $ net. La question ne reviendra plus."); };
+    setTimeout(function(){
+      const a=$("#goalUniteNet"), b2=$("#goalUniteBrut");
+      if(a) a.onclick=()=>_poser(_v);
+      if(b2) b2.onclick=()=>_poser(_conv);
+    },0);
+    // On l'affiche AU-DESSUS de la jauge, sans bloquer : la page reste utilisable.
+    var _prefixeUnite=_bandeau;
+  } else { var _prefixeUnite=""; }
   // ⚠️ Objectif en REVENUS + revenus illisibles = jauge à 0 % et « 0 $ » affiché,
   // ce qui se lit comme « tu n'as rien gagné ce mois-ci ». Absent ≠ zéro.
   if(isRev && typeof revKo==="function" && revKo()){
@@ -6136,7 +6163,7 @@ function renderGoal(data){
       }
     }
   }
-  $("#goalBody").innerHTML = `<div class="goal-wrap">
+  $("#goalBody").innerHTML = _prefixeUnite + `<div class="goal-wrap">
     <svg class="goal-ring" viewBox="0 0 120 120" width="118" height="118" aria-hidden="true">
       <circle cx="60" cy="60" r="52" fill="none" stroke="var(--line-2)" stroke-width="12"/>
       <circle cx="60" cy="60" r="52" fill="none" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${dash} ${Math.round(CIRC)}" transform="rotate(-90 60 60)"/>
@@ -6573,6 +6600,25 @@ function omMoney(v,cur){ return HIDE ? "•••" : Math.round(Number(v)||0).to
 // (précis) : l'arrondi masquait l'addition (389 + 55,50 affichait "445", pas
 // le vrai calcul). Reste inutilisé ailleurs dans le panneau OM (marge, LTV,
 // détail par modèle) — ces figures-là ne mélangent pas deux sources.
+// 💶 PLUS DE BRUT SOUS UN CHIFFRE NET (demande d'André, 2026-09-06 puis 07/09 :
+// « je veux pas le brut ici, je veux le NET »). Le sous-titre des tuiles servait
+// à deux choses : dire d'OÙ vient l'argent (OnlyFans + Telegram) et donner le
+// brut. On garde la première — c'est utile — dans la MÊME unité que le grand
+// chiffre juste au-dessus.
+// ⚠️ L'addition doit tomber juste à l'œil : on arrondit le total et la part
+// Telegram (déjà nette, jamais reconvertie), puis on DÉDUIT la part OnlyFans.
+// Deux arrondis indépendants donneraient un total qui ne colle pas à ses deux
+// morceaux — le genre d'écart d'un dollar qui fait douter de tout le tableau.
+// ⚠️ AU NIVEAU GLOBAL, pas dans renderOM : renderHistory s'en sert aussi, et
+// une fonction enfermée dans une autre n'aurait pas levé d'erreur — le
+// sous-titre serait simplement resté VIDE là-bas, sans que rien ne le dise.
+function sousTitreOrigine(brutOf, tg, cur, fmt){
+  const t=(Number(tg)||0);
+  if(!(t>0)) return "";                       // rien à ventiler : pas de sous-titre
+  const total=Math.round((Number(brutOf)||0)*netRate()+t);
+  const tgR=Math.round(t), ofR=total-tgR;
+  return `dont OnlyFans ${fmt(ofR,cur)} · Telegram ${fmt(tgR,cur)}`;
+}
 function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+(cur||"$"); }
 // ⚠️ CORRIGÉ le 2026-08-23 — TOUTES les LTV s'affichent désormais en NET.
 // Elles étaient en BRUT depuis le début, alors qu'André raisonne en net et paie
@@ -6836,7 +6882,7 @@ function renderOM(){
       : "");
   const netAvecTg=(ko||net==null)?"—":moneyPrecis((Number(net)||0)*netRate()+tgM,cur);
   const tiles=`<div class="om-tiles">
-    <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">brut OF : ${mnt(net)}${(!ko&&tgM>0)?` · + Telegram ${tgMoney(tgM)}`:""}</div></div>
+    <div class="tile"><div class="lbl">Net du mois (est.)${OM_MODEL!=="all"?" · "+escapeHtml(OM_MODEL):""}</div><div class="val">${netAvecTg} ${delta}</div><div class="tile-sub">${ko?"":sousTitreOrigine(net,tgM,cur,omMoney)}</div></div>
     <div class="tile"><div class="lbl">Subs du mois</div><div class="val">${fmtInt(subsMonth)}</div></div>
     ${(()=>{
       // ⚠️ CORRIGÉ le 2026-08-24 (captures d'André) : sur l'onglet d'un modèle,
@@ -7752,7 +7798,7 @@ function renderHistory(){
     const lab = HIDE ? "•••" : (inc ? "?" : (useSubs ? fmtInt(v) : (amp?"≥":"")+fmtK(v)));
     const detail = useSubs ? ""
       : (inc ? " · revenus NON MESURÉS ce mois-là (panne de lecture) — ce n'est pas un zéro"
-             : ` · ${omMoney(v,cur)} net (brut OF ${omMoney(m.net,cur)}${tgM>0?" · + Telegram "+omMoney(tgM,cur):""})`+(amp?" — lecture INCOMPLÈTE, c'est un minimum":""));
+             : ` · ${omMoney(v,cur)} net${tgM>0?" ("+sousTitreOrigine(m.net,tgM,cur,omMoney)+")":""}`+(amp?" — lecture INCOMPLÈTE, c'est un minimum":""));
     const cls = inc ? "unk" : (amp ? "part" : (rec?"rec":""));
     const hb  = inc ? 100 : Math.max(3,pct);   // inconnu = fantôme pleine hauteur, pas une barre basse
     return `<div class="hb"><div class="hb-bar-wrap"><div class="hb-bar ${cls}" style="height:${hb}%" title="${m.month} · ${fmtInt(m.subs)} subs${detail}"></div></div><div class="hb-val ${inc?'unk':(amp?'part':'')}">${lab}</div><div class="hb-lbl">${m.month}</div></div>`;
@@ -7823,7 +7869,9 @@ function renderHistory(){
   const tgAllTime=tgPast+tgHistMonth(curLbl);
   const genereNet=(typeof caNetTotal==="function")?caNetTotal():((tot.netTotal||0)*netRate()+tgAllTime);
   const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
-  const genereSub=(!revKo()&&!HIDE)?`<div class="tile-sub">brut OF : ${omMoney(tot.netTotal||0,cur)}${tgAllTime>0?" · + Telegram "+omMoney(tgAllTime,cur):""}</div>`:"";
+  // Même règle : le sous-titre dit d'OÙ vient l'argent, pas son brut.
+  const _origine=(!revKo()&&!HIDE)?sousTitreOrigine(tot.netTotal||0,tgAllTime,cur,omMoney):"";
+  const genereSub=_origine?`<div class="tile-sub">${_origine}</div>`:"";
   const cumul=`<div class="hb-cumul"><div class="hb-c"><div class="hb-c-v">${HIDE?"•••":fmtInt(tot.subsTotal||0)}</div><div class="hb-c-l">subs depuis le début</div></div><div class="hb-c"><div class="hb-c-v">${genereTot}</div><div class="hb-c-l">généré depuis le début (net, est.)</div>${genereSub}</div></div>`;
   $("#history").style.display="block";
   $("#historyBody").innerHTML=`${recordBanner}${cumul}<div class="hb-chart">${bars}</div><div class="hb-trend">${trend||"Pas encore assez d'historique."}</div>`;
@@ -8757,16 +8805,16 @@ function mnMoneyHtml(){
       const tgToday=(typeof tgTodayTotal==="function")?tgTodayTotal():null;
       const comboKnown=(ofTodayNet!=null && tgToday!=null);
       const totalToday=comboKnown?(ofTodayNet+tgToday):null;
-      // ⭐ Demande André (capture du 09/08) : le NET du jour EN GROS et le brut
-      // À CÔTÉ en plus petit — même hiérarchie que le chiffre du mois. Le brut
-      // remonte donc de la ligne « par source » vers le chiffre principal, et
-      // la ligne du dessous ne garde que la répartition OnlyFans/Telegram.
-      const ajBrut=(!revKo()&&nt!=null)?` <span class="t-sub">(${money(nt)} brut OF)</span>`:"";
-      const ajArgent=totalToday!=null?(moneyPrecis(totalToday,cur)+ajBrut):(revKo()?"—":(nt!=null?(money(nt*netRate()))+ajBrut:"—"));
+      // ⭐ Le 09/08, André demandait le net EN GROS et le brut à côté en petit.
+      // Le 06/09 puis le 07/09 il a tranché l'inverse : « je veux pas le brut,
+      // je veux le NET ». On retire donc le brut du chiffre du jour — la
+      // répartition OnlyFans/Telegram, elle, reste juste en dessous et suffit à
+      // savoir d'où vient l'argent.
+      const ajArgent=totalToday!=null?moneyPrecis(totalToday,cur):(revKo()?"—":(nt!=null?money(nt*netRate()):"—"));
       const ajSplit=comboKnown?`<div class="mn-today-split">sur OnlyFans : <b>${money(ofTodayNet)}</b> net · sur Telegram : <b>${tgMoney(tgToday)}</b></div>`:"";
       return `<div class="lbl">💰 Net du mois (est.)</div>
         <div class="big" id="mnMoney">${moneyOuTiret(netMois, v=>moneyPrecis(v,cur))}</div>
-        <div class="sub">brut OF : <b>${moneyOuTiret(tot.netMonth, money)}</b>${(!revKo()&&tgM>0)?" · + Telegram <b>"+tgMoney(tgM)+"</b>":""}${ev?"":" · ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
+        <div class="sub">${(!revKo()&&tgM>0)?sousTitreOrigine(tot.netMonth,tgM,cur,(x,c)=>"<b>"+money(x)+"</b>"):""}${(!revKo()&&tgM>0&&!ev)?" · ":""}${ev?"":"ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${ajSplit}
         ${(!ev&&st.aPayer!=null)?`<div class="mn-pay" title="Vue historique par quinzaine : subs de la quinzaine en cours × tarif + primes Discord, SANS tenir compte de ce qui a déjà été payé ni du repère de paie. Le montant que tu verses vraiment est celui de « Paie au cumul ».">💸 <b>${money(st.aPayer)}</b> à payer si tu soldais la quinzaine</div>`:""}`;
@@ -11284,7 +11332,7 @@ function renderRachat(){
     const cls=vn==null?"mid":(vn>=6?"good":(vn<4?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
       +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
-      +`<span class="sv-part ${cls}" title="Net de la commission OnlyFans — ce qui te reste réellement par abonné (brut : ${v.valeurMoy!=null?String(v.valeurMoy).replace(".",","):"—"} ${cur})">${vn!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(vn).replace(".",",")+" "+cur):"—"}</span></div>`;
+      +`<span class="sv-part ${cls}" title="Net de la commission OnlyFans — ce qui te reste réellement par abonné">${vn!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(vn).replace(".",",")+" "+cur):"—"}</span></div>`;
   }).join("");
   // 🕵️ Détecteur de FAUX ABONNÉS : un VA qui amène du volume mais dont presque
   // personne ne paie ET dont la valeur moyenne est quasi nulle = soit du trafic de
@@ -12590,13 +12638,13 @@ function openModelCard(modelName){
     // ⚠️ history.byModel[].net est du BRUT (comme la rangée modèles du panneau
     // OM, qui l'étiquette « brut ») : le mot « Net » était écrit sous du brut,
     // dans la fiche même où la tuile du haut affiche correctement le net.
-    bars=`<div class="ml-spark">${hist6.map(h=>{ const nb=Number(h.byModel[modelName].net)||0, nn=nb*netRate(); return `<span title="${escapeHtml(h.month)} : ${money(nn)} net (brut ${money(nb)})" style="height:${Math.max(6,Math.round(nb/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
+    bars=`<div class="ml-spark">${hist6.map(h=>{ const nb=Number(h.byModel[modelName].net)||0, nn=nb*netRate(); return `<span title="${escapeHtml(h.month)} : ${money(nn)} net" style="height:${Math.max(6,Math.round(nb/maxN*40))}px"></span>`; }).join("")}</div><div class="ppick-sub" style="text-align:center;margin-top:4px">Net par mois (6 derniers)</div>`;
   }
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🎭 ${escapeHtml(modelName)}</h3>
     <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(modelName)}, au même endroit.</div>
     <div class="vacard-stats">
-      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*netRate()+((typeof tgMonthTotal==="function")?tgMonthTotal(modelName):0)), ko?"":"brut OF "+money(m.net)+(partNet!=null?" · "+partNet+" % du CA":""))}
+      ${stat("Net du mois (est.)", ko?"—":money((Number(m.net)||0)*netRate()+((typeof tgMonthTotal==="function")?tgMonthTotal(modelName):0)), (ko||partNet==null)?"":partNet+" % du CA")}
       ${stat("Subs du mois", fmtInt(m.subs||0), partSubs!=null?partSubs+" % de tes subs":"")}
       ${stat("LTV (par abonné)", ko?"—":fmtLtv(m.ltv,cur))}
       ${stat("Marge du mois", ko?"—":money(m.marge), partMarge!=null?partMarge+" % de ta marge":"")}
@@ -12638,7 +12686,7 @@ function openVaCard(vaName){
     <div class="vacard-stats">
       ${stat("Abonnés ce mois", fmtInt(v.monthSubs||0), goal?("objectif "+fmtInt(goal))+(v.monthSubs>=goal?" ✅":""):((typeof VA_GOALS!=="undefined"&&VA_GOALS)?"pas d'objectif fixé":"objectif en cours de chargement…"))}
       ${stat("Abonnés au total", fmtInt(v.subs||0))}
-      ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*netRate()), (ko||v.rev==null)?"":"brut : "+money(v.rev))}
+      ${stat("Net généré (est.)", (ko||v.rev==null)?"—":money((Number(v.rev)||0)*netRate()), "")}
       ${stat("LTV nette (par abonné)", (ko||v.ltv==null)?"—":fmtLtv(v.ltv,cur), (ko||v.ltv==null)?"":"après "+pctComm()+" OnlyFans · brut "+ltvBrutTxt(v.ltv,cur)+" · tu paies "+(HIDE?"•••":prixSub().toFixed(2).replace(".",",")+" $"))}
       ${stat("Conversion 14 j", conv?((conv.cvr!=null?String(conv.cvr).replace(".",",")+" %":"—")):"—", conv?fmtInt(conv.clics)+" clics → "+fmtInt(conv.subs)+" subs":"")}
       ${(()=>{
