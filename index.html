@@ -2722,6 +2722,44 @@
 const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
 const HUB_BASE = HUB_URL.replace(/\/api\/hub$/, "");
 const REFRESH_MS = 60000;
+
+// ⚠️ EN VUE ASSOCIÉ, LA PAGE MARTELAIT CE QUE LE SERVEUR REFUSE — jusqu'à
+// s'auto-verrouiller. Depuis que le cerveau refuse ~60 routes à un compte
+// associé (403), le navigateur, lui, continuait de les appeler : `loadOM`,
+// `loadCash`, `loadPaieCumul`, `loadPayments`, `loadOnlyChat`, `loadHorsEquipe`,
+// `loadTgrev`, `loadFanRadar`… à CHAQUE tour de 60 s. Ça fait ~8 refus par
+// minute. Or le cerveau compte les refus par adresse IP et coupe à 25 par
+// quart d'heure (server.js, `limiteurEchecs`) : au bout d'environ trois
+// minutes, l'associée reçoit « Trop de tentatives refusées » sur TOUT — y
+// compris les panneaux qu'elle a le droit de voir. La sécurité posée le matin
+// se transformait en panne l'après-midi.
+//
+// On ne recopie PAS la liste des routes interdites ici : elle vit côté serveur,
+// et deux listes finissent toujours par diverger (c'est exactement comme ça que
+// les sept trous de ce matin sont nés). On RETIENT ce qui a été refusé — la
+// méthode ET le chemin, car un POST refusé n'interdit pas le GET du même
+// chemin — et on ne le redemande plus de la session. Le serveur reste seul
+// juge ; le navigateur se contente d'arrêter de frapper à une porte fermée.
+(function(){
+  var brut = window.fetch.bind(window);
+  var refusees = Object.create(null);
+  window._oublierRefus = function(){ refusees = Object.create(null); };
+  window.fetch = function(u, o){
+    var s, cle;
+    try{
+      s = (typeof u === "string") ? u : ((u && u.url) || "");
+      cle = ((o && o.method) || "GET").toUpperCase() + " " + s.split("?")[0];
+      if(refusees[cle]){
+        return Promise.resolve(new Response('{"error":"refusé pour ce compte"}',
+          { status: 403, headers: { "content-type": "application/json" } }));
+      }
+    }catch(e){ return brut(u, o); }
+    return brut(u, o).then(function(r){
+      try{ if(r && r.status === 403 && s.indexOf("/api/hub") >= 0) refusees[cle] = true; }catch(e){}
+      return r;
+    });
+  };
+})();
 // ⚡ AJOUTÉ le 2026-08-23 — ne rien demander au cerveau quand l'onglet n'est
 // PAS regardé. Mesuré : un onglet ouvert envoyait ~19 requêtes par minute
 // (la boucle de 60 s + le sync des tâches toutes les 8 s), soit ~1 100 par
@@ -12188,6 +12226,8 @@ function estCompteAssocie(){
 function applyAssoc(){
   const on=localStorage.getItem("ccn_assoc")==="1";
   document.body.classList.toggle("assoc-mode", on);
+  // On change de vue : ce qui avait été refusé ne l'est peut-être plus.
+  try{ if(typeof window._oublierRefus==="function") window._oublierRefus(); }catch(e){}
   // ⚠️ Les fiches (VA, modèle, hors-équipe) sont des SURCOUCHES créées à la
   // volée : elles ne sont dans aucune boucle et `rerenderMoney` ne les connaît
   // pas. Une fiche VA ouverte gardait donc « Tu le paies ~X $, ses abonnés te

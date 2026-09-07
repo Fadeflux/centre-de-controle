@@ -161,4 +161,39 @@ const V=verifie;
   V("saisie manuelle presente = pas d'alerte", f(true,0,null,[{ts:0,amount:900}])===false, "faux positif malgre une saisie manuelle");
 }
 
+
+// ================= 4) vue associe : on ne frappe plus a une porte fermee
+{
+  const i = src.indexOf("var brut = window.fetch.bind(window);");
+  if(i < 0) throw new Error("le filtre des routes refusees est ABSENT de ce fichier");
+  const deb = src.lastIndexOf("(function(){", i);
+  const fin = src.indexOf("})();", i) + 5;
+  const bloc = src.slice(deb, fin);
+
+  let appels = [];
+  const faux = { fetch: (u,o)=>{ appels.push(((o&&o.method)||"GET")+" "+u);
+      // le cerveau refuse les routes d argent a un compte associe
+      const interdit = /(onlymonster|payments|onlychat|cash)/.test(String(u));
+      return Promise.resolve(new Response("{}", {status: interdit?403:200})); } };
+  new Function("window","Response", bloc)(faux, Response);
+
+  // trois tours de boucle de 60 s, comme une page laissee ouverte
+  for(let tour=0; tour<3; tour++){
+    for(const r of ["/api/hub/onlymonster","/api/hub/payments","/api/hub/onlychat","/api/hub/cash","/api/hub/ghosts"]){
+      await faux.fetch("https://cerveau"+r);
+    }
+  }
+  const refuses = appels.filter(a=>/(onlymonster|payments|onlychat|cash)/.test(a)).length;
+  const permis  = appels.filter(a=>/ghosts/.test(a)).length;
+  V("un refus n est demande QU UNE FOIS (sinon le limiteur du cerveau coupe tout)",
+    refuses===4, refuses+" appels refuses partis au lieu de 4 : a 8 par minute, le limiteur (25/15 min) coupe la page de l associee en ~3 min");
+  V("ce qu elle a le droit de voir passe toujours", permis===3, permis+" appels au lieu de 3");
+
+  // un POST refuse ne doit pas condamner le GET du meme chemin
+  appels=[];
+  await faux.fetch("https://cerveau/api/hub/tasks", {method:"POST"});
+  const r2 = await faux.fetch("https://cerveau/api/hub/tasks");
+  V("un POST refuse n interdit pas le GET du meme chemin", appels.length===2, "le GET a ete etouffe par le refus du POST");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
