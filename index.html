@@ -6469,6 +6469,26 @@ function lireMontant(txt, opts) {
       };
     }
     s = s.replace(',', '.');
+  } else if (points === 1) {
+    // ⚠️ LE MÊME PIÈGE, CÔTÉ POINT — ET IL MANQUAIT (trouvé le 2026-09-06 par une
+    // contre-revue). La branche des virgules refusait bien « 1,000 » comme
+    // ambigu, mais « 1.000 » n'avait AUCUNE branche : il tombait dans le
+    // `Number(s)` final et valait **1**. Or « 1.500 » est une écriture française
+    // parfaitement courante pour mille cinq cents — et la fonction acceptait
+    // déjà « 1.234.567 » comme 1 234 567, donc elle reconnaît bien le point
+    // comme séparateur de milliers quand il y en a plusieurs.
+    // Une prime de 1 500 $ tapée « 1.500 » partait donc à 1,50 $, en silence.
+    // C'est EXACTEMENT le facteur 1000 que cette fonction existe pour empêcher.
+    var apP = s.split('.')[1] || '', avP = s.split('.')[0] || '';
+    if (apP.length === 3 && /^[0-9]{1,3}$/.test(avP)) {
+      return {
+        ok: false, valeur: null,
+        erreur: '« ' + String(txt).trim() + ' » est ambigu : ça peut vouloir dire ' +
+          Number(avP + apP).toLocaleString('fr-FR') + ' ou ' + avP + ',' + apP.slice(0, 2) + '. ' +
+          'Réécris-le sans séparateur de milliers — par exemple ' + (avP + apP) + ' ou ' + avP + '.' + apP.slice(0, 2) + '. ' +
+          '**Rien n’a été enregistré.**',
+      };
+    }
   } else if (virgules > 1) {
     s = s.replace(/,/g, '');            // « 1,234,567 » : que des milliers
   } else if (points > 1) {
