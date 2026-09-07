@@ -5466,12 +5466,16 @@ function renderConcentration(){
     const bars=c.paliers.map(x=>`<div class="cc-row"><span class="cc-va">Top ${x.n}</span>`
       +`<span class="cc-bar"><span style="width:${Math.min(100,x.pct)}%"></span></span>`
       +`<span class="cc-pct">${Math.round(x.pct)}%</span></div>`).join("");
-    const gros=(c.plusGros||[]).map((x,i)=>`<span class="om-spend-c" style="cursor:default">#${i+1} <b>${money(x.montant)}</b> <i>· ${x.va?escapeHtml(x.va):"aucun VA"}</i></span>`).join("");
+    // 💶 NET, comme les deux autres chiffres du bloc. Ces cinq montants SONT le
+    // total annonce juste au-dessus (cote cerveau, paliers[n=5].montant est leur
+    // somme exacte) : les laisser en brut donnait deux chiffres pour les mêmes
+    // cinq personnes, dans le même encadré, à trois centimètres l'un de l'autre.
+    const gros=(c.plusGros||[]).map((x,i)=>`<span class="om-spend-c" style="cursor:default">#${i+1} <b>${money((Number(x.montant)||0)*netRate())}</b> <i>· ${x.va?escapeHtml(x.va):"aucun VA"}</i></span>`).join("");
     return `<div class="cc-block"><div class="cc-title">🎲 Par CLIENT (dépenses sur 30 jours) <span class="cc-lvl">${niv[0]} ${niv[1]}</span></div>`
-      // ⚠️ Ces montants sont des dépenses de fans OnlyFans = du BRUT (même base que
-      // `brutFenetre`, nommée brut ailleurs). Le pourcentage est juste (brut/brut) ;
-      // seuls les montants étaient affichés nus. On les étiquette, comme le fait
-      // déjà « Qui dépense aujourd'hui ».
+      // ⚠️ Ces montants sont des dépenses de fans OnlyFans, donc du BRUT à la
+      // source. Tout ce bloc est converti en NET à l'affichage (2026-09-07) —
+      // total, détail des cinq, et note du bas — pour qu'on ne lise jamais deux
+      // unités côte à côte. Le pourcentage, lui, reste juste (brut/brut).
       +`<div class="cc-kpi">Si tes <b>${t.n} plus gros dépensiers</b> arrêtaient demain, tu perdrais <b>${String(t.pct).replace(".",",")}%</b> de ton chiffre sur 30 jours, soit <b>${money((Number(t.montant)||0)*netRate())}</b> net.</div>`
       +bars
       +(gros?`<div style="margin-top:8px">${gros}</div>`:"")
@@ -5501,13 +5505,27 @@ function renderConcentration(){
     const brut=(anc||0)+(hors||0)+dormant;
     if(!(brut>0)) return "";
     const net=brut*netRate(), pct=Math.round(brut/base*100);
+    // ⚠️ LE TOTAL ÉTAIT ANNONCÉ EN NET ET SON DÉTAIL LAISSÉ EN BRUT — dans le
+    // même encadré, la ligne du dessous étant littéralement la décomposition de
+    // celle du dessus. La phrase « Montants bruts » à la fin ne rattrapait rien :
+    // elle rendait juste l'écart officiel.
+    // L'addition doit tomber JUSTE sur le total affiché : on arrondit chaque
+    // poste, puis on pose l'écart d'arrondi sur le PLUS GROS poste existant —
+    // jamais sur un poste absent (ça ferait apparaître un « 0 $ » fantôme).
+    const netTot=Math.round(net);
+    let nHors=Math.round((hors||0)*netRate()), nAnc=Math.round((anc||0)*netRate()), nDorm=Math.round(dormant*netRate());
+    const _ecart=netTot-(nHors+nAnc+nDorm);
+    if(_ecart){
+      const _p=[["h",nHors,hors||0],["a",nAnc,anc||0],["d",nDorm,dormant||0]].filter(x=>x[2]>0).sort((x,y)=>y[1]-x[1]);
+      if(_p.length){ const k=_p[0][0]; if(k==="h") nHors+=_ecart; else if(k==="a") nAnc+=_ecart; else nDorm+=_ecart; }
+    }
     const morceaux=[];
-    if(hors) morceaux.push(`<b>${omMoney(hors,cur)}</b> d'abonnés venus <b>sans lien</b>`);
-    if(anc) morceaux.push(`<b>${omMoney(anc,cur)}</b> de tes <b>comptes perso</b>`);
-    if(dormant>0) morceaux.push(`<b>${omMoney(dormant,cur)}</b> d'abonnés déjà acquis (${nbDorm} VA qui n'en a ramené aucun ce mois-ci)`);
+    if(hors) morceaux.push(`<b>${omMoney(nHors,cur)}</b> d'abonnés venus <b>sans lien</b>`);
+    if(anc) morceaux.push(`<b>${omMoney(nAnc,cur)}</b> de tes <b>comptes perso</b>`);
+    if(dormant>0) morceaux.push(`<b>${omMoney(nDorm,cur)}</b> d'abonnés déjà acquis (${nbDorm} VA qui n'en a ramené aucun ce mois-ci)`);
     return `<div class="cc-block"><div class="cc-title">🏔️ Ton socle — ce qui tombe sans payer personne</div>`
       +`<div class="cc-kpi"><b>Au moins ${pct} %</b> de ton argent des 30 derniers jours (<b>${omMoney(Math.round(net),cur)}</b> net) arrive <b>sans que tu paies un VA pour</b>.</div>`
-      +`<div class="cc-hint">Le détail : ${morceaux.join(" · ")}. C'est un <b>plancher</b> : un VA actif encaisse aussi de ses anciens abonnés, et ça, on ne sait pas le séparer. Montants bruts, avant commission OnlyFans.</div></div>`;
+      +`<div class="cc-hint">Le détail : ${morceaux.join(" · ")}. C'est un <b>plancher</b> : un VA actif encaisse aussi de ses anciens abonnés, et ça, on ne sait pas le séparer. Tous ces montants sont <b>nets</b>, après commission OnlyFans.</div></div>`;
   })();
   $("#concentrationBody").innerHTML=html2+socle;
 }
@@ -8056,11 +8074,22 @@ function majFraicheurOM(){
 // Deux protections : un verrou, et un refus d'appliquer une mesure plus ancienne
 // que celle déjà affichée (ceinture et bretelles — le verrou seul ne protège pas
 // d'une réponse hors séquence si le verrou vient d'être relâché).
-let OM_LOADING=false;
+// ⚠️ UN VERROU QUI NE SE RELÂCHE PAS EST PIRE QUE PAS DE VERROU.
+// Le `finally` ne s'exécute que si la promesse RETOMBE. Un `fetch` peut ne
+// jamais retomber : iOS gèle l'onglet pendant une requête en vol (le cerveau
+// met « 1 à 2 minutes » à recalculer, c'est le moment exact où l'on pose son
+// téléphone), et au réveil la promesse reste suspendue. `OM_LOADING` reste
+// alors true POUR LA SESSION : chaque tour de 60 s ressort immédiatement sur
+// `if(OM_LOADING) return`, tous les panneaux d'argent gèlent — sous un bandeau
+// resté VERT, puisque plus rien n'échoue. Des chiffres de 9 h présentés comme
+// frais à 18 h.
+// Deux filets : on borne la requête (20 s), et le verrou lui-même EXPIRE au
+// bout de 45 s. Le second couvre le premier : peu importe pourquoi ça a pendu.
+let OM_LOADING=false, OM_LOADING_AT=0;
 async function loadOM(){
   if(!HUB_URL || !TOKEN){ OM_DATA=DEMO_OM; renderOM(); return; }
-  if(OM_LOADING) return;
-  OM_LOADING=true;
+  if(OM_LOADING && (Date.now()-OM_LOADING_AT) < 45000) return;
+  OM_LOADING=true; OM_LOADING_AT=Date.now();
   try{ return await _loadOM(); } finally{ OM_LOADING=false; }
 }
 async function _loadOM(){
@@ -8074,7 +8103,13 @@ async function _loadOM(){
     try{ renderSplit(); refreshEssentiel(); }catch(e){}
   }
   try{
-    const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    // Requête BORNÉE : sans ça, une requête qui ne retombe jamais garde le
+    // verrou ci-dessus (voir loadOM) et fige tous les panneaux d'argent.
+    const _ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+    const _to=_ctrl?setTimeout(function(){ try{ _ctrl.abort(); }catch(e){} },20000):null;
+    let r;
+    try{ r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store",signal:_ctrl?_ctrl.signal:undefined}); }
+    finally{ if(_to) clearTimeout(_to); }
     if(!r.ok){ omEchec(); if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); else majFraicheurOM(); return; }
     const j=await r.json();
     // ⚠️ UN SEUL retry en vol : la boucle 60 s rappelle loadOM, et chaque appel
@@ -8877,6 +8912,16 @@ function renderCoachMemInto(z){
       return;
     }
     const d=e.target.closest("[data-cmdel]"); if(!d) return;
+    // ⚠️ SUPPRESSION DÉFINITIVE CÔTÉ SERVEUR, SANS CONFIRMATION, sur une cible de
+    // ~11 px collée à deux boutons inoffensifs (⏳ prolonger, 📌 retenir). Au
+    // doigt, sur téléphone, le ✕ se touche à la place du 📌 — et la note est
+    // perdue : rien ne l'annule, elle ne réapparaît nulle part. Les autres
+    // suppressions de la page demandent toutes confirmation (revenu Telegram,
+    // modèle surveillé, VA archivé) ; celle-ci était la seule à ne rien demander.
+    const _txt=(d.closest(".cm-chip")||{}).textContent||"";
+    const _apercu=_txt.replace(/[🧠⏳📌✕]/g,"").replace(/\s+/g," ").trim().slice(0,90);
+    if(!confirm("Oublier définitivement cette note du coach ?" + (_apercu?("\n\n"+"« "+_apercu+" »"):"")
+      + "\n\n"+"Elle ne reviendra pas, et le coach n'en tiendra plus compte.")) return;
     try{
       await fetch(HUB_BASE+"/api/hub/coach-memoire?id="+encodeURIComponent(d.getAttribute("data-cmdel")),{method:"DELETE",headers:{"x-hub-token":TOKEN}});
       COACH_MEM=null; loadCoachMem();

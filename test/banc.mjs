@@ -196,4 +196,32 @@ const V=verifie;
   V("un POST refuse n interdit pas le GET du meme chemin", appels.length===2, "le GET a ete etouffe par le refus du POST");
 }
 
+
+// ================= 5) « Ton socle » : le detail doit ADDITIONNER le total
+// (une addition « juste par construction » m a deja trompe : on la mesure)
+{
+  const d = "const netTot=Math.round(net);";
+  const f = "if(_p.length){ const k=_p[0][0]; if(k===";
+  const i = src.indexOf(d); if(i<0) throw new Error("bloc du socle absent");
+  const j = src.indexOf("}", src.indexOf(f, i)) ;
+  const bloc = src.slice(i, src.indexOf("}", j+1)+1) + "; return {netTot,nHors,nAnc,nDorm};";
+  const calc = new Function("net","netRate","hors","anc","dormant", bloc);
+
+  const TAUX = 0.8;
+  let faux = 0, cas = 0, exemple = null;
+  const tirage = (n)=>Math.round(Math.random()*n*100)/100;
+  for(let k=0; k<200000; k++){
+    const hors = Math.random()<0.15 ? 0 : tirage(4000);
+    const anc  = Math.random()<0.25 ? 0 : tirage(3000);
+    const dorm = Math.random()<0.30 ? 0 : tirage(9000);
+    const brut = hors+anc+dorm; if(!(brut>0)) continue;
+    cas++;
+    const r = calc(brut*TAUX, ()=>TAUX, hors, anc, dorm);
+    const somme = (hors?r.nHors:0)+(anc?r.nAnc:0)+(dorm>0?r.nDorm:0);
+    if(somme !== r.netTot){ faux++; if(!exemple) exemple={hors,anc,dorm,somme,total:r.netTot}; }
+  }
+  V("le detail du socle additionne EXACTEMENT le total affiche ("+cas+" tirages)",
+    faux===0, faux+" cas faux, ex. "+JSON.stringify(exemple));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
