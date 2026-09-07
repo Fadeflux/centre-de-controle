@@ -7239,9 +7239,23 @@ function renderOM(){
     if(surModele){
       const aDesFenetres=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today);
       const aLaVentilation=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today&&v.periodes.today.parModele);
-      if(aDesFenetres && !aLaVentilation)
-        return `<div class="om-spend vide">💸 <b>Aujourd'hui · sur ${escapeHtml(OM_MODEL)}</b> — le détail par modèle se calcule côté serveur, il arrive d'ici une minute. Ce n'est <b>pas</b> zéro.</div>`;
+      if(aDesFenetres && !aLaVentilation){
+        // ⚠️ UNE PROMESSE QUI N'EXPIRE JAMAIS EST UN MENSONGE.
+        // « il arrive d'ici une minute » était réaffiché à l'identique à chaque
+        // rafraîchissement. Le 2026-09-07, le cerveau CALCULAIT la ventilation
+        // puis la jetait avant de l'envoyer : le message a donc promis une
+        // minute pendant une heure, et c'est lui qui a fait douter de tout le
+        // panneau. Au bout de 4 minutes, on cesse de promettre et on dit qu'il
+        // y a un vrai problème — comme partout ailleurs : mieux vaut « je ne
+        // sais pas » qu'une réponse rassurante et fausse.
+        if(!window._ventilAttenteDepuis) window._ventilAttenteDepuis=Date.now();
+        const _min=Math.floor((Date.now()-window._ventilAttenteDepuis)/60000);
+        return (_min>=4)
+          ? `<div class="om-spend vide" style="border-left-color:#facc15">💸 <b>Aujourd'hui · sur ${escapeHtml(OM_MODEL)}</b> — le détail par modèle <b>n'arrive pas</b> (${_min} min d'attente). Le cerveau ne l'envoie pas : ce n'est <b>pas</b> zéro, c'est une panne. Le total tous modèles reste juste sur l'onglet <b>Tout</b>.</div>`
+          : `<div class="om-spend vide">💸 <b>Aujourd'hui · sur ${escapeHtml(OM_MODEL)}</b> — le détail par modèle se calcule côté serveur, il arrive d'ici une minute. Ce n'est <b>pas</b> zéro.</div>`;
+      }
     }
+    if(surModele) window._ventilAttenteDepuis=0;   // elle est arrivée : on oublie l'attente
     const src=(d.vas||[]).filter(v=>pj(v));
     if(!src.length) return "";
     const act=src.filter(v=>pj(v).rev).sort((a,b)=>pj(b).rev-pj(a).rev);
