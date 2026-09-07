@@ -2833,7 +2833,7 @@ const TOOLS = [
   // proxies échoue : le solde disparaissait avec lui, au pire moment.
   // Ici il vit tout seul, à côté du solde OnlyChat. À zéro, le scraper n'a plus
   // de proxy et les vues Instagram se figent en silence.
-  { id:"proxy-solde",      world:"noctra", cat:"Noctra", name:"Forfait proxy", icon:"⛽", openUrl:"https://flameproxies.com", external:true,
+  { id:"proxy-solde",      world:"noctra", cat:"Noctra", name:"Proxy Residential FlameProxies", icon:"⛽", openUrl:"https://flameproxies.com", external:true,
     metrics:[{k:"go",l:"Data restante",f:v=>String(Math.round(Number(v)*10)/10).replace(".",",")+" Go"},
              {k:"jours",l:"Ça tient encore",f:v=>"~"+v+" j"}] },
 
@@ -6929,10 +6929,19 @@ function renderOM(){
   // filtreDispo=false -> message dédié.
   const filtreDispo = (OM_MODEL==="all") || !!(d.models && d.models[OM_MODEL] && Array.isArray(d.models[OM_MODEL].vas));
   const modeleObj = (OM_MODEL!=="all" && d.models)?d.models[OM_MODEL]:null;
-  const vaSource = filtreDispo ? ((OM_MODEL!=="all" && modeleObj)?modeleObj.vas:(d.vas||[])) : [];
+  // ⚠️ SUR UN ONGLET MODÈLE, LES PÉRIODES ÉTAIENT INTERDITES — parce que
+  // `d.models[X].vas` (le classement par modèle) ne porte pas de fenêtres. Or
+  // depuis le 2026-09-07 le flux principal `d.vas` ventile ses fenêtres par
+  // modèle : on peut donc répondre « sur Layla, sur 30 j, qui a encaissé ? ».
+  // ⚠️ CE QU'ON NE SAIT PAS, ET QU'ON N'INVENTERA PAS : la ventilation porte
+  // l'ARGENT et les PAYEURS, pas les SUBS AMENÉS. Sur un onglet modèle + une
+  // fenêtre, la colonne « subs amenés » n'existe donc pas — on l'enlève et on le
+  // dit, plutôt que d'afficher un 0 qui se lirait « il n'a ramené personne ».
+  const ventileDispo=(k)=>(d.vas||[]).some(v=>v&&v.periodes&&v.periodes[k]&&v.periodes[k].parModele&&v.periodes[k].parModele[OM_MODEL]);
+  const vaSourceTout = filtreDispo ? ((OM_MODEL!=="all" && modeleObj)?modeleObj.vas:(d.vas||[])) : [];
   // Argent inconnu sur ce modèle (repli sans API) : on trie par subs, pas par argent.
   const argFiltreKo = !!(modeleObj && modeleObj.revVentile===false);
-  let vas=vaSource.slice();
+  // (le vrai `vaSource` est choisi plus bas, une fois la fenêtre connue)
   // 📅 Fenêtre choisie. Deux garde-fous :
   //   • le détail par modèle n'a PAS de ventilation par fenêtre -> on force
   //     « Toujours » plutôt que d'afficher des colonnes vides (un 0 se lirait
@@ -6944,11 +6953,26 @@ function renderOM(){
   // boutons restaient actifs et un clic sur « 30 j » affirmait « Aucun VA n'a
   // amené de sub ni encaissé sur 30 jours » — un zéro énoncé en toutes lettres
   // là où rien n'avait été mesuré.
-  const dispoFenetre=(k)=>(OM_MODEL==="all") && vaSource.some(v=>v&&v.periodes&&v.periodes[k]);
+  const dispoFenetre=(k)=>(OM_MODEL==="all")
+    ? vaSourceTout.some(v=>v&&v.periodes&&v.periodes[k])
+    : ventileDispo(k);
   const perDispo = dispoFenetre(OM_PERIODE);
   const per = (OM_PERIODE!=="tout" && perDispo) ? OM_PERIODE : "tout";
   const perInfo = OM_PERIODES.find(x=>x.k===per) || OM_PERIODES[0];
-  const pOf=(v,k)=>((v&&v.periodes&&v.periodes[per])?(v.periodes[per][k]):null);
+  // Sur un onglet modèle + une fenêtre, la source devient le flux principal
+  // (le seul qui porte les fenêtres), filtré sur les VA qui ont encaissé sur CE
+  // modèle. Partout ailleurs, rien ne change.
+  const surModeleFenetre = (OM_MODEL!=="all" && per!=="tout");
+  const vaSource = surModeleFenetre
+    ? (d.vas||[]).filter(v=>v&&v.periodes&&v.periodes[per]&&v.periodes[per].parModele&&v.periodes[per].parModele[OM_MODEL])
+    : vaSourceTout;
+  let vas=vaSource.slice();
+  const pOf=(v,k)=>{
+    const bloc=(v&&v.periodes&&v.periodes[per])?v.periodes[per]:null; if(!bloc) return null;
+    if(!surModeleFenetre) return bloc[k];
+    const pm=bloc.parModele&&bloc.parModele[OM_MODEL]; if(!pm) return null;
+    return (k==="subs") ? null : pm[k];      // subs par modèle et par fenêtre : non mesuré
+  };
   // 📈 Tendance vs la MÊME durée juste avant. Trois cas distincts, et aucun
   // ne doit se déguiser en un autre :
   //   • pas de mesure précédente (30 j) -> rien du tout ;
@@ -6969,10 +6993,13 @@ function renderOM(){
     // cumul, pas au jour) : on ne trie que par argent dépensé ou par subs amenés.
     // ℹ️ L'explication du « de cash » vit dans une note VISIBLE (voir noteCash plus
     // bas) : sur téléphone, une infobulle au survol n'existe pas.
-    const parArgent = !ko && OM_SORT!=="subs";
+    // Sur un onglet modèle, les subs par fenêtre n'existent pas : on ne peut
+    // trier que par argent (trier sur une valeur absente = ordre au hasard).
+    const parArgent = surModeleFenetre || (!ko && OM_SORT!=="subs");
     vas.sort((a,b)=> parArgent ? ((pOf(b,"rev")||0)-(pOf(a,"rev")||0)) : ((pOf(b,"subs")||0)-(pOf(a,"subs")||0)));
     // Un VA à 0 sub ET 0 $ sur la fenêtre n'a rien fait : il encombre la liste.
     vas = vas.filter(v=>(pOf(v,"subs")||0)>0 || (pOf(v,"rev")||0)!==0);
+    if(surModeleFenetre) vas = vas.filter(v=>(pOf(v,"rev")||0)!==0);
   } else {
     // Tri : les VA au revenu/marge INCONNU (null) vont à la fin — sinon null→0 les
     // ferait passer pour « 0 gagné » et couler au bas comme les vrais 0 (absent≠0).
@@ -7019,19 +7046,25 @@ function renderOM(){
     // payé »). Ne PAS en déduire une LTV : diviser l'un par l'autre mélangerait
     // les deux populations — d'où l'absence volontaire de colonne LTV ici.
     if(per!=="tout"){
-      const ps=pOf(v,"subs")||0, pr=pOf(v,"rev"), pp=pOf(v,"payeurs");
+      const psBrut=pOf(v,"subs"), ps=psBrut||0, pr=pOf(v,"rev"), pp=pOf(v,"payeurs");
       const argKo = ko || pr==null;
+      // Sur un onglet modèle, les subs amenés ne sont pas ventilés par fenêtre :
+      // on n'affiche NI la colonne, NI la mention « anciens » (qui se déduit
+      // d'un nombre de subs qu'on n'a pas), NI la marge de trésorerie (qui se
+      // calcule sur ces subs). Mieux vaut trois colonnes justes que six dont
+      // trois inventées.
+      const subsMesures = !surModeleFenetre;
       const prc=(v.periodes&&v.periodes[per])?v.periodes[per].prec:null;
-      const tSubs=prc?tendance(ps,prc.subs):"", tRev=(prc&&!argKo)?tendance(pr,prc.rev):"";
+      const tSubs=(prc&&subsMesures)?tendance(ps,prc.subs):"", tRev=(prc&&!argKo&&!surModeleFenetre)?tendance(pr,prc.rev):"";
       return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span>`
-        +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}${tSubs}</span>`
+        +(subsMesures?`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}${tSubs}</span>`:"")
         // 💶 NET, comme la vue « Toujours » (2026-09-06). Cette colonne était la
         // dernière restée en BRUT : sur la MÊME LIGNE on lisait « 321 $ » (brut)
         // à côté de « +257 $ de cash » (calculé en net, juste en dessous) — deux
         // unités différentes pour le même VA, sans un mot. Et basculer de
         // « Toujours » à « 30 j » faisait grossir le chiffre de 25 % sans que
         // rien n'ait changé dans la réalité.
-        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris. NET, après les ${pctComm()} de commission OnlyFans (même unité que « de cash » à côté).">${argKo?"—":omMoney(Math.round(Number(pr)*netRate()),cur)}${tRev}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
+        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris. NET, après les ${pctComm()} de commission OnlyFans (même unité que « de cash » à côté).">${argKo?"—":omMoney(Math.round(Number(pr)*netRate()),cur)}${tRev}${(subsMesures&&ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
         +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
         // 💶 MARGE DE TRÉSORERIE sur la fenêtre — « il était rentable, l'est-il
         // ENCORE ? ». La colonne « marge » du mode « Toujours » porte sur toute la
@@ -7042,7 +7075,7 @@ function renderOM(){
         // encaissé (net) et le cash versé. Le tarif est plat (prixSub) ; si des
         // paliers arrivent un jour, ce calcul devient faux.
         +(function(){
-          if(argKo || pr==null) return "";
+          if(argKo || pr==null || !subsMesures) return "";
           const tarif=(typeof prixSub==="function")?Number(prixSub())||0:0;
           if(!(tarif>0)) return "";
           const paye=ps*tarif, net=Number(pr)*netRate(), m=net-paye;
@@ -7058,12 +7091,12 @@ function renderOM(){
   // Trier par argent n'a aucun sens quand l'argent est inconnu : on retombe sur les subs.
   // Le bouton de tri : sur une fenêtre, « marge » n'existe pas -> deux choix.
   const triTxt = per!=="tout"
-    ? ((ko||OM_SORT==="subs")?"par 👥 subs amenés":"par 💰 dépensé")
+    ? (surModeleFenetre ? "par 💰 dépensé" : ((ko||OM_SORT==="subs")?"par 👥 subs amenés":"par 💰 dépensé"))
     : ((ko||OM_SORT==="subs")?"par 👥 subs":(OM_SORT==="rev"?"par 💰 généré":"par 📈 marge"));
   const vaHead=`<div class="om-va-head">Classement des VA${OM_MODEL!=="all"?" · sur "+escapeHtml(OM_MODEL):""} <button id="omSort">${triTxt}</button></div>`;
   // 📅 Le sélecteur de fenêtre. Masqué quand un modèle est filtré : la ventilation
   // par fenêtre n'existe que sur « Tout » (voir perDispo).
-  const perBar = (OM_MODEL!=="all") ? "" :
+  const perBar =
     `<div class="om-per">${OM_PERIODES.map(x=>`<button class="om-per-b${x.k===per?" on":""}" data-omper="${x.k}"${(x.k==="tout"||dispoFenetre(x.k))?"":" disabled"}>${escapeHtml(x.t)}</button>`).join("")}</div>`
     + (!perDispo && OM_PERIODE!=="tout" ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ Le détail par période se calcule côté serveur — il apparaît d'ici quelques minutes. En attendant : « Toujours ».</div>` : "")
     + (perDispo && d.totals.fenetresPartielles ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⚠️ Un compte n'a pas répondu : les montants par période sont des <b>minimums</b>.</div>` : "");
@@ -7156,16 +7189,46 @@ function renderOM(){
   // vient chercher le matin. Un jour sans encaissement le dit franchement au
   // lieu de rester vide, pour qu'on distingue « rien » de « pas encore calculé ».
   const spendToday=(function(){
-    if(OM_MODEL!=="all" || ko) return "";
-    const src=(d.vas||[]).filter(v=>v&&v.periodes&&v.periodes.today);
+    if(ko) return "";
+    // 🎭 SUR UN ONGLET MODÈLE, CE PANNEAU DISPARAISSAIT PUREMENT ET SIMPLEMENT
+    // (`if(OM_MODEL!=="all") return ""`). C'est exactement là qu'André le
+    // cherchait : « sur Layla, qui m'a ramené des subs qui ont payé ? ». Le
+    // classement, lui, EST bien filtré sur le modèle — mais il montre le cumul
+    // depuis le début, pas qui a sorti la carte aujourd'hui.
+    // Le classement par modèle vient de `d.models[X].vas`, qui ne porte pas les
+    // fenêtres : on repart donc du flux principal `d.vas` et de la ventilation
+    // par modèle ajoutée le 2026-09-07.
+    const surModele = (OM_MODEL!=="all");
+    // `pj(v)` = la ligne « aujourd'hui » à lire pour ce VA : le total quand on est
+    // sur « Tout », la part du modèle choisi sinon. Un VA qui n'a rien encaissé
+    // sur CE modèle disparaît de la liste au lieu d'y figurer à 0.
+    const pj=(v)=>{
+      const t=(v&&v.periodes&&v.periodes.today)||null; if(!t) return null;
+      if(!surModele) return t;
+      const pm=t.parModele; if(!pm) return null;         // cerveau pas encore à jour : on n'invente pas
+      return pm[OM_MODEL] || null;
+    };
+    // Le cerveau met une minute à recalculer après un déploiement : tant que la
+    // ventilation n'est pas là, mieux vaut le DIRE que d'afficher un panneau vide
+    // qui se lirait comme « personne n'a payé sur Layla ».
+    if(surModele){
+      const aDesFenetres=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today);
+      const aLaVentilation=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today&&v.periodes.today.parModele);
+      if(aDesFenetres && !aLaVentilation)
+        return `<div class="om-spend vide">💸 <b>Aujourd'hui · sur ${escapeHtml(OM_MODEL)}</b> — le détail par modèle se calcule côté serveur, il arrive d'ici une minute. Ce n'est <b>pas</b> zéro.</div>`;
+    }
+    const src=(d.vas||[]).filter(v=>pj(v));
     if(!src.length) return "";
-    const act=src.filter(v=>v.periodes.today.rev).sort((a,b)=>b.periodes.today.rev-a.periodes.today.rev);
-    const tot=act.reduce((a,v)=>a+(v.periodes.today.rev||0),0);
+    const act=src.filter(v=>pj(v).rev).sort((a,b)=>pj(b).rev-pj(a).rev);
+    const tot=act.reduce((a,v)=>a+(pj(v).rev||0),0);
     // Un nombre de payeurs ABSENT n'est pas zéro : on somme les valeurs connues et
     // on retient si l'une manque, pour ne pas écrire « 492 $ par 0 abonné ».
     let nb=0, nbInconnu=false;
-    act.forEach(v=>{ const p=v.periodes.today.payeurs; if(p==null) nbInconnu=true; else nb+=p; });
-    const rec=reconcile("today");
+    act.forEach(v=>{ const p=pj(v).payeurs; if(p==null) nbInconnu=true; else nb+=p; });
+    // La réconciliation additionne TOUS les modèles : elle n'a aucun sens sur un
+    // onglet modèle, où elle annoncerait un total qui ne correspond à rien de ce
+    // qui est affiché au-dessus.
+    const rec=surModele?"":reconcile("today");
     // 🔒 PERSO (hors équipe : Bot / Clhoe) — leur dépense DU JOUR, montrée DANS
     // la rangée du haut « comme les autres » (demande d'André 29/08), mais
     // clairement marquée 🔒 et JAMAIS fondue dans le total d'équipe. Source = le
@@ -7174,8 +7237,12 @@ function renderOM(){
     // là où HORS_EQUIPE_DATA se charge à part et arrivait trop tard (ligne vide).
     const persoBloc=(function(){
       const pv=(d.totals&&d.totals.ancienVa&&d.totals.ancienVa.today&&d.totals.ancienVa.today.parVa)||{};
-      const arr=Object.keys(pv).map(raw=>({nom:pv[raw].display||raw,rev:pv[raw].rev,payeurs:pv[raw].payeurs,parModele:pv[raw].parModele}))
-        .filter(e=>e&&e.rev>0).sort((a,b)=>b.rev-a.rev);
+      const arr=Object.keys(pv).map(raw=>{
+          const e=pv[raw];
+          // Sur un onglet modèle, on ne montre que la part de CE modèle.
+          const src=surModele?((e.parModele||{})[OM_MODEL]||null):e;
+          return src?{nom:e.display||raw,rev:src.rev,payeurs:src.payeurs,parModele:surModele?null:e.parModele}:null;
+        }).filter(e=>e&&e.rev>0).sort((a,b)=>b.rev-a.rev);
       if(!arr.length) return {chips:"",tot:0,n:0};
       const chips=`<span class="om-spend-perso-lbl" title="Tes comptes perso, hors équipe">🔒 Perso :</span>`
         +arr.map(e=>{
@@ -7185,20 +7252,23 @@ function renderOM(){
         }).join("");
       return {chips:chips,tot:arr.reduce((a,e)=>a+(e.rev||0),0),n:arr.length};
     })();
-    const noteBase=`Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.`
+    const noteBase=`Argent dépensé aujourd'hui${surModele?` <b>sur ${escapeHtml(OM_MODEL)}</b>`:""} par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.`
       +(persoBloc.n?` Les <b>🔒 perso</b> (Bot, Clhoe) sont tes comptes à toi — montrés à part, jamais dans le total de l'équipe.`:"");
     // Ni équipe ni perso n'a encaissé : on le DIT, au lieu d'un « 0 $ par 0 abonné ».
-    if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
+    const surTitre=surModele?` · sur ${escapeHtml(OM_MODEL)}`:"";
+    if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui${surTitre}</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
     // En-tête = TOTAL ÉQUIPE (les 🔒 perso ne s'y ajoutent pas). Si seul le perso
     // a payé, en-tête neutre pour ne pas afficher « 0 $ par 0 abonné ».
     const tete=act.length
-      ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste vraiment."> · net · équipe</span>`
-      : `💸 Qui dépense aujourd'hui`;
+      ? `💸 Qui dépense aujourd'hui${surTitre} — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste vraiment."> · net · équipe</span>`
+      : `💸 Qui dépense aujourd'hui${surTitre}`;
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
       +act.map(v=>{
-        const t=v.periodes.today;
+        const t=pj(v);
         const haut=`<span class="om-spend-top"><b>${escapeHtml(v.va)}</b> ${omMoney((t.rev||0)*netRate(),cur)}${t.payeurs==null?"":` <i>· ${fmtInt(t.payeurs)} payeur${t.payeurs>1?"s":""}</i>`}</span>`;
-        const mods=ligneModeles(t.parModele,cur);
+        // Sur un onglet modèle, redire le modèle sous chaque nom serait du bruit :
+        // il est déjà dans le titre du panneau.
+        const mods=surModele?"":ligneModeles(t.parModele,cur);
         return `<span class="om-spend-c${mods?" avecmod":""}" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche">${haut}${mods}</span>`;
       }).join("")
       +persoBloc.chips
@@ -7236,11 +7306,16 @@ function renderOM(){
   // ⭐ Question d'André, 24/08 : « même si le VA m'a ramené des subs l'autre jour
   // et qu'ils ont payé aujourd'hui, tu mets combien j'ai généré grâce à lui même
   // si y'a écrit 0 subs ? » — oui, et c'est écrit noir sur blanc sous le tableau.
-  const recFenetre = (per==="tout"||ko) ? "" : reconcile(per);
+  // La réconciliation additionne TOUS les modèles : sur un onglet modèle elle
+  // annoncerait un total qui ne correspond à rien de ce qui est affiché.
+  const recFenetre = (per==="tout"||ko||surModeleFenetre) ? "" : reconcile(per);
   // Honnêteté sur 30 j : pas de flèche, et on dit pourquoi plutôt que de laisser
   // croire que la colonne « tendance » a été oubliée.
-  const notePrec = (per!=="j30"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">↔️ Pas de comparaison sur 30 jours : il faudrait remonter à 60 jours d'historique chez OnlyMonster, ce qui doublerait le temps de calcul. Les tendances sont disponibles sur <b>7 j</b>, <b>14 j</b> et <b>aujourd'hui</b>.</div>`;
-  const noteAnciens = (per==="tout"||ko) ? "" : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`;
+  const notePrec = (per!=="j30"||ko||surModeleFenetre) ? "" : `<div class="sv-note" style="margin-top:6px">↔️ Pas de comparaison sur 30 jours : il faudrait remonter à 60 jours d'historique chez OnlyMonster, ce qui doublerait le temps de calcul. Les tendances sont disponibles sur <b>7 j</b>, <b>14 j</b> et <b>aujourd'hui</b>.</div>`;
+  const noteAnciens = (per==="tout"||ko) ? ""
+    : (surModeleFenetre
+      ? `<div class="sv-note" style="margin-top:6px">🧮 <b>Sur ${escapeHtml(OM_MODEL)}, ${escapeHtml(perInfo.court)}</b> : ce que les abonnés amenés par chacun ont dépensé <b>chez ce modèle</b>, anciens compris, et combien d'entre eux ont réellement payé.<br>⚠️ Le nombre de <b>subs amenés</b> n'est pas ventilé par modèle sur une période — il n'est pas mesuré, donc il n'est pas affiché (un 0 se lirait « il n'a ramené personne »). Il reste juste, tous modèles confondus, sur l'onglet <b>Tout</b>.</div>`
+      : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`);
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
   // plutôt que le classement global sous un titre « sur Layla ».
   // 🔒 Bot / Chloé au MÊME format que les VA, pour comparer la rentabilité d'un
@@ -7341,7 +7416,7 @@ function renderOM(){
     : `<div class="om-prep">📊 Le détail « sur ${escapeHtml(OM_MODEL)} » se calcule côté serveur — recharge la page dans une minute.</div>`;
   // Argent non ventilable par modèle (repli sans API) : on le dit.
   // Note VISIBLE de la marge de trésorerie (l'infobulle ne s'affiche pas au doigt).
-  const noteCash = (per!=="tout" && !ko)
+  const noteCash = (per!=="tout" && !ko && !surModeleFenetre)
     ? `<div class="sv-note" style="margin-top:6px">💶 <b>« de cash »</b> = ce qui est entré ${escapeHtml(perInfo.court)}, <b>moins</b> ce que tu as versé au VA pour les abonnés qu'il a amenés pendant. C'est de la <b>trésorerie de la période</b>, pas la marge « depuis le début » : l'argent encaissé vient aussi d'abonnés qu'il avait amenés AVANT. Ne divise jamais les deux colonnes l'une par l'autre.</div>`
     : "";
   const noteArg = (filtreDispo && argFiltreKo)
