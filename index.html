@@ -6017,10 +6017,24 @@ function renderGoal(data){
     const enCours=$("#goalInput");
     if(enCours && (document.activeElement===enCours || (enCours.value||"").length)) return;
     const sg=suggestGoal();
-    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="number" inputmode="numeric" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus (mois)</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
+    $("#goalBody").innerHTML = `<div class="goal-row"><input id="goalInput" type="text" inputmode="decimal" placeholder="Objectif" /><select id="goalType" style="font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none"><option value="subs">Subs (quinzaine)</option><option value="rev">Revenus du mois — en NET</option></select><button class="act" id="goalSet" style="margin:0">Fixer</button></div>`
       + (sg?`<div class="goal-info">💡 Suggéré : <b>${sg.affiche}</b> — ${escapeHtml(sg.raison)}. <button class="act" id="goalSuggest" style="margin:6px 0 0;padding:5px 11px;font-size:12.5px">Utiliser</button></div>`
              :`<div class="goal-info">Fixe un objectif (subs de la quinzaine, ou revenus du mois) et suis ta progression.</div>`);
-    const b=$("#goalSet"); if(b) b.onclick=()=>{ const v=parseInt($("#goalInput").value,10); if(v>0){ GOAL={type:$("#goalType").value,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); } };
+    // ⚠️ `parseInt` s'arrête au premier caractère qu'il ne comprend pas, SANS
+    // rien dire : « 1.500 » devenait un objectif de **1 $**, et « 1 500 » (dans
+    // un `type="number"`) ne donnait rien du tout — le bouton « Fixer » ne
+    // faisait alors visiblement RIEN, ce qui se lit comme un bug de l'écran, pas
+    // comme une saisie refusée. Même règle que partout ailleurs : `lireMontant`.
+    // 💶 L'unité est désormais écrite dans le menu : cet objectif est comparé à
+    // `caNetMois()` (net, Telegram compris) depuis le passage en net.
+    const b=$("#goalSet"); if(b) b.onclick=()=>{
+      const t=$("#goalType").value, brut=String(($("#goalInput")||{}).value||"").trim();
+      if(!brut) return;
+      const r=lireMontant(brut,{signeAutorise:false});
+      if(!r.ok){ if(typeof toast==="function") toast("⚠️ Objectif non compris", r.erreur.replace(/\*\*/g,"")); return; }
+      const v=Math.round(r.valeur);
+      if(!(v>0)){ if(typeof toast==="function") toast("⚠️ Objectif non compris","Un objectif doit être plus grand que zéro."); return; }
+      GOAL={type:t,value:v}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
     const s=$("#goalSuggest"); if(s&&sg) s.onclick=()=>{ GOAL={type:"rev",value:sg.value}; localStorage.setItem("ccn_goal",JSON.stringify(GOAL)); saveRingGoal(); GOAL_CELEBRATED=false; renderGoal(LAST); };
     return;
   }
