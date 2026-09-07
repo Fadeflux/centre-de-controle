@@ -3492,23 +3492,38 @@ let TGREV = lsJSON("ccn_tgrev",[]); if(!Array.isArray(TGREV)) TGREV=[];
 //   2. `fetch` ne rejette PAS sur 401/500 : le toast « revenu ajouté »
 //      s'affichait même quand rien n'était parti.
 // `savePayments` montre le bon motif : on le copie.
-let TGREV_LOADED = false;
+let TGREV_LOADED = false, TGREV_DIRTY = false;
 function saveTgrev(){
   localStorage.setItem("ccn_tgrev", JSON.stringify(TGREV));
   if(!TOKEN) return;
   if(!TGREV_LOADED){
-    if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Les revenus du serveur ne sont pas encore chargés : envoyer maintenant les EFFACERAIT. Recharge la page et refais la saisie.");
+    // ⚠️ LE VERROU N'AVAIT AUCUNE SORTIE. Il refusait d'envoyer (à raison :
+    // sans la liste du serveur, l'envoi l'EFFACERAIT), mais la saisie restait
+    // AFFICHÉE dans la liste — puis, quand la lecture finissait par réussir,
+    // `TGREV=j.entries` l'effaçait sans un mot. L'opérateur voyait donc son
+    // revenu Telegram dans le tableau, puis ne le voyait plus, sans rien avoir
+    // fait. On garde la saisie et on la REJOUE dès que le serveur répond
+    // (même mécanique que les objectifs par VA : drapeau *_DIRTY).
+    TGREV_DIRTY = true;
+    if(typeof toast==="function") toast("⏳ Telegram en attente","Le serveur n'a pas encore répondu : ta saisie est gardée ici et partira toute seule dès qu'il répond (moins d'une minute). Laisse l'onglet ouvert.");
     return;
   }
   fetch(HUB_BASE+"/api/hub/telegram-rev",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({entries:TGREV})})
-    .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Telegram NON enregistré","Le serveur n'a pas pu écrire. Ta saisie n'existe que sur cet appareil — refais l'opération."); })
-    .catch(()=>{ if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Pas de réseau : rien n'est parti au serveur."); });
+    .then(r=>{ if(r.ok){ TGREV_DIRTY=false; return; } TGREV_DIRTY=true; if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Le serveur n'a pas pu écrire. Ta saisie n'existe que sur cet appareil — refais l'opération."); })
+    .catch(()=>{ TGREV_DIRTY=true; if(typeof toast==="function") toast("⚠️ Telegram NON enregistré","Pas de réseau : rien n'est parti au serveur."); });
 }
 async function loadTgrev(){
   if(TOKEN){
     try{
       const r=await fetch(HUB_BASE+"/api/hub/telegram-rev",{headers:{"x-hub-token":TOKEN}});
-      if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){ TGREV=j.entries; localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); TGREV_LOADED=true; } }
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j.entries)){
+        // Fusion, PAS écrasement : ce qui a été tapé pendant que le verrou tenait
+        // n'est pas encore chez le serveur — l'écraser le ferait disparaître.
+        const enAttente = TGREV_DIRTY ? TGREV.filter(x=>x && !j.entries.some(y=>y && y.id===x.id)) : [];
+        TGREV = enAttente.concat(j.entries);
+        localStorage.setItem("ccn_tgrev",JSON.stringify(TGREV)); TGREV_LOADED=true;
+        if(TGREV_DIRTY) saveTgrev();     // rejoue la saisie retenue ; le drapeau tombe si le serveur accepte
+      } }
     }catch(e){}
   } else { TGREV_LOADED=true; }   // sans jeton, rien n'est envoyé de toute façon
   renderTgrev();
@@ -3551,7 +3566,16 @@ function tgIncertain(){
     if(typeof TOKEN==="undefined" || !TOKEN) return false;               // démo
     if(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA
        && ONLYCHAT_DATA.totalRevenue!=null) return false;                // lu, tout va bien
-    if(typeof ONLYCHAT_FAILS==="undefined" || ONLYCHAT_FAILS<3) return false;
+    // ⚠️ LA PORTE QUE CE GARDE NE SURVEILLAIT PAS. Quand le serveur recalcule,
+    // il répond `{computing:true}` — compté comme un SUCCÈS (à raison : ce n'est
+    // pas une panne), donc `ONLYCHAT_FAILS` reste à 0. Mais `ONLYCHAT_DATA` reste
+    // null : `tgMonthTotal()` retombe sur la saisie manuelle, vide, et rend
+    // **0**. Résultat : tout le Telegram du mois à zéro, sans bandeau rouge,
+    // présenté comme certain. C'est exactement ce que ce garde existe pour
+    // empêcher. (`nonConfigure` est différent : là, la saisie manuelle EST la
+    // vérité, et vide veut bien dire zéro.)
+    const _calcul = (typeof ONLYCHAT_CALCUL!=="undefined" && ONLYCHAT_CALCUL);
+    if(!_calcul && (typeof ONLYCHAT_FAILS==="undefined" || ONLYCHAT_FAILS<3)) return false;
     // OnlyChat lâché après 3 échecs. Reste-t-il une saisie MANUELLE pour ce mois ?
     // Si oui, ce montant fait foi et il n'y a pas d'incertitude à signaler.
     if(typeof TGREV!=="undefined" && Array.isArray(TGREV) && typeof tgMonthKey==="function"){
@@ -3562,8 +3586,9 @@ function tgIncertain(){
   }catch(e){ return false; }
 }
 function tgBandeau(){
+  const _calc = (typeof ONLYCHAT_CALCUL!=="undefined" && ONLYCHAT_CALCUL);
   return tgIncertain()
-    ? `<div class="sv-note" style="border-left:3px solid #ef4444;margin-bottom:8px">🔴 <b>Telegram non lu</b> — OnlyChat ne répond plus. Ce chiffre est compté <b>sans le Telegram du mois</b> : c'est un <b>minimum</b>, pas la réalité. Ne décide pas d'un versement dessus, et si tu connais le montant, saisis-le dans « Revenus Telegram ».</div>`
+    ? `<div class="sv-note" style="border-left:3px solid #ef4444;margin-bottom:8px">🔴 <b>Telegram non lu</b> — ${_calc?"OnlyChat est en train de recalculer":"OnlyChat ne répond plus"}. Ce chiffre est compté <b>sans le Telegram du mois</b> : c'est un <b>minimum</b>, pas la réalité. Ne décide pas d'un versement dessus, et si tu connais le montant, saisis-le dans « Revenus Telegram ».</div>`
     : "";
 }
 // Montant Telegram AVEC les centimes — fmtCur/toLocaleString arrondissaient à
@@ -3584,6 +3609,9 @@ function tgTodayTotal(){
 // null tant que non configuré/injoignable — jamais un faux 0 affiché (règle
 // « je sais pas > chiffre faux »). Le panneau reste caché dans ce cas.
 let ONLYCHAT_DATA = null, ONLYCHAT_FAILS = 0;
+// « le serveur recalcule » : ni un succès ni une panne. Sans ce drapeau, cet
+// état passait pour un succès et faisait taire le bandeau (voir tgIncertain).
+let ONLYCHAT_CALCUL = false;
 async function loadOnlyChat(){
   if(!TOKEN) return;
   let ok=false;
@@ -3605,9 +3633,9 @@ async function loadOnlyChat(){
       // 20 min de recalcul = ~20 chaînes en parallèle matraquant le hub, jusqu'à
       // déclencher son rate-limit et re-faire disparaître Telegram. Même garde
       // que loadOM (_omRetry).
-      if(j && j.computing){ ok=true; if(!window._ocComputingTimer){ window._ocComputingTimer=setTimeout(function(){ window._ocComputingTimer=null; loadOnlyChat(); },8000); } }
-      else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; }
-      else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; }
+      if(j && j.computing){ ok=true; ONLYCHAT_CALCUL=true; if(!window._ocComputingTimer){ window._ocComputingTimer=setTimeout(function(){ window._ocComputingTimer=null; loadOnlyChat(); },8000); } }
+      else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; ONLYCHAT_CALCUL=false; }
+      else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; ONLYCHAT_CALCUL=false; }
       // sinon (réponse inattendue) : on ne touche à rien, compté comme échec plus bas
     }
   }catch(e){}
@@ -4173,8 +4201,37 @@ renderTgrev();
 /* ---------- Anti-Leak (surveillance fuites + DMCA) ---------- */
 let LEAKWATCH = lsJSON("ccn_leakwatch",[]); if(!Array.isArray(LEAKWATCH)) LEAKWATCH=[];
 let LEAKS = [];
-function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(LEAKWATCH)); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})}).catch(()=>{}); } }
-async function loadLeakwatch(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-watch",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.watch)){ LEAKWATCH=j.watch; localStorage.setItem("ccn_leakwatch",JSON.stringify(LEAKWATCH)); } } }catch(e){} } renderWatch(); }
+// ⚠️ DIXIÈME LISTE ENTIÈRE ENVOYÉE SANS VERROU DE LECTURE. Même motif que
+// RULES / DECISIONS / VANOTES / COSTS / TODOS / REMINDERS / TGREV : tant que la
+// lecture serveur n'a pas réussi, `LEAKWATCH` vaut ce qu'il y a dans CE
+// navigateur — souvent [] sur le téléphone. Ajouter un seul modèle envoyait
+// alors une liste d'UN, effaçant tous les modèles surveillés côté serveur : le
+// radar de fuites s'arrêtait de surveiller les autres, en silence, et l'écran
+// affichait la liste raccourcie comme si c'était la vérité.
+let LW_LOADED=false, LW_DIRTY=false;
+function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(LEAKWATCH));
+  if(!TOKEN) return;
+  if(!LW_LOADED){ LW_DIRTY=true; if(typeof toast==="function") toast("⏳ Surveillance en attente","Le serveur n'a pas encore répondu : l'envoyer maintenant effacerait les autres modèles surveillés. Ça partira tout seul dès qu'il répond.");
+    return; }
+  fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})})
+    .then(r=>{ LW_DIRTY = !r.ok; })
+    .catch(()=>{ LW_DIRTY=true; });
+}
+async function loadLeakwatch(){
+  if(TOKEN){
+    try{ const r=await fetch(HUB_BASE+"/api/hub/leak-watch",{headers:{"x-hub-token":TOKEN}});
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j.watch)){
+        // Fusion par nom : ce qui a été ajouté pendant le verrou n'est pas encore
+        // chez le serveur, l'écraser le ferait disparaître du radar.
+        const vus=new Set(j.watch.map(x=>x && (x.name||"")));
+        const enAttente = LW_DIRTY ? LEAKWATCH.filter(x=>x && !vus.has(x.name||"")) : [];
+        LEAKWATCH=j.watch.concat(enAttente);
+        localStorage.setItem("ccn_leakwatch",JSON.stringify(LEAKWATCH)); LW_LOADED=true;
+        if(LW_DIRTY) saveLeakwatch();
+      } } }catch(e){}
+  } else { LW_LOADED=true; }   // démo : rien à écraser
+  renderWatch();
+}
 async function loadLeaks(){ if(!TOKEN){ LEAKS=[]; renderLeaks(); return; } try{ const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; } }catch(e){} renderLeaks(); if(typeof renderActions==="function") renderActions(); }
 function renderWatch(){
   const list=$("#alList"); if(!list) return;
@@ -4394,7 +4451,10 @@ function isPaid(va){ const p=curPeriod(); return PAYMENTS.some(x=>x.va===va && x
 // entière. On envoie l'opération ({ajout} ou {retrait}), que le serveur applique
 // dans une transaction. `payments` reste envoyé en secours pour un serveur pas
 // encore à jour.
-function savePayments(delta){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); if(TOKEN){
+function savePayments(delta){ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS));
+  // Marque qu'une écriture a eu lieu : toute lecture déjà en vol est périmée.
+  try{ PAY_ECRITURES++; }catch(e){}
+  if(TOKEN){
   const corps = delta ? Object.assign({}, delta) : { payments: PAYMENTS };
   fetch(HUB_BASE+"/api/hub/payments",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(corps)})
     .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Paie NON enregistrée","Le serveur n'a pas pu écrire le cahier de paie. Le VA restera « à payer » — refais l'opération."); })
@@ -4414,14 +4474,40 @@ function savePayments(delta){ localStorage.setItem("ccn_payments",JSON.stringify
 // Le serveur, lui, refuse deja de repondre n'importe quoi : il renvoie un 503
 // « cahier de paie illisible — ne rien enregistrer » exprES pour ce cas. On le jetait.
 let PAYMENTS_LOADED=false;
+// ⚠️ LE VERROU D'ORDRE, SANS LEQUEL LA CORRECTION CI-DESSUS EN CRÉE UNE AUTRE.
+// Mettre `loadPayments` dans la boucle de 60 s a réparé le cahier périmé, mais a
+// ouvert une course : la lecture part à la seconde 0, l'opérateur clique
+// « Payer » à la seconde 1, la réponse arrive à la seconde 3 avec la photo du
+// cahier AVANT le paiement -- et `PAYMENTS=j.payments` efface la ligne qu'on
+// vient d'écrire. À l'écran, le bouton « Payer » redevient actif sur un VA
+// DÉJÀ PAYÉ (et `isPaid` ne bloque plus le second clic) : on repaie, et le VA
+// reçoit un SECOND « ta paie a été envoyée ». C'est exactement le double
+// paiement que ce bloc prétend empêcher.
+// Deux gardes : une seule lecture en vol, et toute écriture partie pendant la
+// lecture PÉRIME la réponse (la nôtre est plus récente que ce que le serveur
+// nous répond). Le serveur, lui, reçoit un DELTA (`{ajout}`/`{retrait}`) et non
+// la liste entière : rien n'est perdu de son côté, seul l'écran mentait.
+let PAY_EN_VOL=false, PAY_ECRITURES=0;
 async function loadPayments(){
   if(TOKEN){
+    if(PAY_EN_VOL) return;                 // pas deux lectures qui se doublent
+    PAY_EN_VOL=true;
+    const _ecrituresAuDepart=PAY_ECRITURES;
     try{
       const r=await fetch(HUB_BASE+"/api/hub/payments",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
       if(r.ok){ const j=await r.json();
-        if(Array.isArray(j.payments)){ PAYMENTS=j.payments; PAYMENTS_LOADED=true;
-          try{ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); }catch(e){} } }
+        if(Array.isArray(j.payments)){
+          // La lecture a réussi dans les deux cas : le cahier est lisible.
+          PAYMENTS_LOADED=true;
+          if(PAY_ECRITURES===_ecrituresAuDepart){
+            PAYMENTS=j.payments;
+            try{ localStorage.setItem("ccn_payments",JSON.stringify(PAYMENTS)); }catch(e){}
+          }
+          // sinon : on a payé pendant la lecture -> cette réponse est périmée,
+          // on garde notre état local. Le tour suivant relira le cahier complet.
+        } }
     }catch(e){}
+    finally{ PAY_EN_VOL=false; }
   } else { PAYMENTS_LOADED=true; }      // mode demo : rien a lire, rien a payer
   renderPaie(LAST);
 }
@@ -4739,10 +4825,22 @@ function pcRestaurerSaisies(saved){
     if(st.ids){ const pe=r.querySelector(".pc-prime"); if(pe) pe.setAttribute("data-primeids",st.ids); }
   });
 }
+// ⚠️ ORDRE : LIRE LES SAISIES AVANT TOUTE SORTIE ANTICIPÉE.
+// `_assocVide` VIDE #pcumulBody. Lire APRÈS lui renvoyait {} : passer en vue
+// associé (pour montrer un écran à l'associée) effaçait la prime en cours de
+// saisie — et surtout `data-primeids`, l'attribut qui dit QUELLES primes
+// Discord sont reprises. Sans lui, elles ne sont jamais marquées réglées :
+// elles réapparaissent comme dues et peuvent être versées UNE SECONDE FOIS.
+// C'est le bug décrit juste au-dessus, par une autre porte.
+// Le stock garde ce qui a été lu la dernière fois que le tableau existait ; il
+// n'est écrasé que par une lecture RÉELLE (un champ vidé à la main revient
+// vide, il ne ressuscite pas).
+let _PC_SAISIES={};
 function renderPaieCumul(){
+  const _lu = pcLireSaisies();
+  Object.keys(_lu).forEach(function(va){ _PC_SAISIES[va]=_lu[va]; });
   if(_assocVide("paiecumul","pcumulBody")) return;
-  // On mémorise ce qui est tapé AVANT de reconstruire, et on le remet après.
-  const _saisies = pcLireSaisies();
+  const _saisies = _PC_SAISIES;
   const box=$("#paiecumul"); if(!box) return;
   const d=PCUMUL, vas=(d&&Array.isArray(d.vas))?d.vas:[];
   if(!vas.length){ box.style.display="none"; return; }
@@ -6782,7 +6880,13 @@ function renderOM(){
       const tSubs=prc?tendance(ps,prc.subs):"", tRev=(prc&&!argKo)?tendance(pr,prc.rev):"";
       return `<div class="omv-row"><span class="omv-rank">${i+1}</span><span class="omv-va">${escapeHtml(v.va)}</span>`
         +`<span class="omv-s${(ps===0&&!argKo&&pr>0)?' vide':''}" title="Abonnés qu'il a amenés ${escapeHtml(perInfo.court)}">${fmtInt(ps)} sub${ps>1?"s":""} amené${ps>1?"s":""}${tSubs}</span>`
-        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris">${argKo?"—":omMoney(pr,cur)}${tRev}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
+        // 💶 NET, comme la vue « Toujours » (2026-09-06). Cette colonne était la
+        // dernière restée en BRUT : sur la MÊME LIGNE on lisait « 321 $ » (brut)
+        // à côté de « +257 $ de cash » (calculé en net, juste en dessous) — deux
+        // unités différentes pour le même VA, sans un mot. Et basculer de
+        // « Toujours » à « 30 j » faisait grossir le chiffre de 25 % sans que
+        // rien n'ait changé dans la réalité.
+        +`<span class="omv-r ${(!argKo&&pr>0)?'pos':''}" title="Dépensé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés — anciens compris. NET, après les ${pctComm()} de commission OnlyFans (même unité que « de cash » à côté).">${argKo?"—":omMoney(Math.round(Number(pr)*netRate()),cur)}${tRev}${(ps===0&&!argKo&&pr>0)?` <i class="omv-anc" title="Aucun nouveau sub sur la période : cet argent vient d'abonnés qu'il avait amenés avant. Il lui est bien compté.">anciens</i>`:""}</span>`
         +`<span class="omv-pay" title="Nombre de ses abonnés qui ont réellement payé ${escapeHtml(perInfo.court)}">${(pp==null)?"—":(pp>0?`💳 ${fmtInt(pp)} payeur${pp>1?"s":""}`:`<span class="omv-nopay">personne n'a payé</span>`)}</span>`
         // 💶 MARGE DE TRÉSORERIE sur la fenêtre — « il était rentable, l'est-il
         // ENCORE ? ». La colonne « marge » du mode « Toujours » porte sur toute la
@@ -6821,7 +6925,8 @@ function renderOM(){
   // 🧾 RÉCONCILIATION — pourquoi la carte du jour et le tableau ne disent pas
   // le même chiffre (question d'André le 24/08 : « 492,85 $ ne correspond pas »).
   // Trois écarts se cumulaient sans être nommés :
-  //   1. la carte est en NET (−20 % OnlyFans), le tableau en BRUT ;
+  //   1. la carte est en NET (−20 % OnlyFans), le tableau était en BRUT
+  //      (les deux sont en NET depuis le 2026-09-06 — cet écart-là est éteint) ;
   //   2. la carte inclut Telegram, le tableau non (rail séparé) ;
   //   3. tout l'argent n'est pas rattachable à un VA (fans sans lien, VA partis).
   // On affiche donc l'addition complète, pour que le compte tombe juste à l'œil.
@@ -7165,7 +7270,19 @@ function setVaGoal(va){
   const sug=suggestVaGoal(va);
   const v=prompt(`Objectif de subs DU MOIS pour ${va} :${sug?`\n\n💡 Suggestion d'après son rythme récent : ${sug}`:""}`, cur||sug||"");
   if(v===null) return;
-  const n=Math.round(Number(String(v).replace(",","."))||0);
+  // ⚠️ UNE FAUTE DE FRAPPE EFFAÇAIT L'OBJECTIF. `Number("5o")` (avec la lettre o)
+  // ou `Number("50 subs")` rendent NaN, `||0` en faisait 0, et 0 déclenchait le
+  // `delete`. On voulait passer l'objectif de 40 à 50 : il DISPARAISSAIT. Le
+  // classement affichait alors « 🎯 fixer un objectif » — indiscernable d'un VA
+  // qui n'en a jamais eu, et la jauge de progression du mois avec.
+  // Un champ vidé ou un 0 restent une demande claire de RETIRER l'objectif ;
+  // ce qui n'est pas lisible ne change RIEN et le dit.
+  const brut=String(v).trim().replace(/[\s  ]/g,"");
+  if(brut!=="" && !/^\d+([.,]\d+)?$/.test(brut)){
+    if(typeof toast==="function") toast("⚠️ Objectif non compris","« "+String(v).slice(0,20)+" » n'est pas un nombre. L'objectif de "+va+" n'a PAS été changé"+(cur?" (il reste à "+cur+")":"")+".");
+    return;
+  }
+  const n=brut===""?0:Math.round(Number(brut.replace(",","."))||0);
   if(n>0) VA_GOALS[va]=n; else delete VA_GOALS[va];
   saveVaGoals(); if(typeof OM_DATA!=="undefined"&&OM_DATA) renderOM();
 }
@@ -13056,6 +13173,8 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof TGREV_LOADED!=="undefined" && !TGREV_LOADED) loadTgrev();
     // Idem pour les objectifs par VA (voir loadVaGoals).
     if(typeof VAGOALS_LOADED!=="undefined" && !VAGOALS_LOADED) loadVaGoals();
+    // Idem pour la liste des modèles surveillés (voir loadLeakwatch).
+    if(typeof LW_LOADED!=="undefined" && !LW_LOADED) loadLeakwatch();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
