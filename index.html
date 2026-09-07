@@ -3237,7 +3237,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -7865,7 +7865,51 @@ function renderRenta(){
       return `<div class="rn-proj" style="margin-top:8px;font-size:12px">📅 <b>Mois dernier</b> : OF (brut) ${lmOF!=null?money(lmOF):"—"}${lmTg!=null?` · Telegram ${money(lmTg)}`:""}${(lmOF!=null&&lmTg!=null)?` <span style="opacity:.6">(pas la même base, ne pas additionner)</span>`:""}</div>`;
     })()}
     <div class="rn-proj" style="margin-top:8px;font-size:12px">ℹ️ Net estimé = brut × ${Math.round(netRate()*100)} % (${pctComm()} OnlyFans). Pas de frais Skrill chez Noctra. La <b>part modèle</b>, elle, se gère sur <b>Noctra Finance</b>.</div>`;
-  { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); localStorage.setItem("ccn_tax_rate",String(v)); renderRenta(); if(typeof toast==="function") toast("🧾 Provision impôts",v+" % mis de côté sur ton profit."); }; }
+  { const b=$("#taxSave"); if(b) b.onclick=()=>{ const v=Math.max(0,Math.min(60,Math.round(Number(($("#taxRate")||{}).value)||0))); saveTaxRate(v); renderRenta(); }; }
+}
+// 🧾 ⚠️ LE TAUX DE PROVISION D'IMPÔTS N'EXISTAIT QUE SUR L'APPAREIL.
+// Il vivait dans `ccn_tax_rate` (localStorage) et NULLE PART ailleurs — alors
+// que la clé serveur `hub_tax_rate` figure dans la liste de sauvegarde depuis le
+// 23/08. Deux pertes silencieuses :
+//   1. `seDeconnecter` efface `ccn_tax_rate` (il est dans _CLES_SENSIBLES) et la
+//      question posée ne parle que du mot de passe : le taux part sans un mot,
+//      et la ligne « Vraiment à toi » disparaît du P&L sans explication ;
+//   2. la sauvegarde promettait de le protéger et ne sauvegardait rien.
+// C'est un pourcentage, pas un montant : il ne dit rien du chiffre d'affaires.
+// Même mécanique que les autres réglages : on n'écrase pas le serveur tant
+// qu'on ne l'a pas lu, et une saisie faite pendant une panne est rejouée.
+let TAX_LOADED=false, TAX_DIRTY=false;
+async function loadTaxRate(){
+  if(!TOKEN){ TAX_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/tax-rate",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){
+      const j=await r.json();
+      TAX_LOADED=true;
+      // « absent ≠ 0 » : taux null = jamais réglé côté serveur. On garde alors
+      // ce que l'appareil connaît, et on le pousse pour ne plus le perdre.
+      if(j && j.taux!=null && !TAX_DIRTY){ try{ localStorage.setItem("ccn_tax_rate",String(j.taux)); }catch(e){} renderRenta(); }
+      else if(TAX_DIRTY || (j && j.taux==null)){
+        const local=Number(localStorage.getItem("ccn_tax_rate"));
+        if(isFinite(local) && local>0) saveTaxRate(local, true);
+        else TAX_DIRTY=false;
+      }
+    }
+  }catch(e){}
+}
+function saveTaxRate(v, silencieux){
+  const n=Math.max(0,Math.min(60,Math.round(Number(v)||0)));
+  try{ localStorage.setItem("ccn_tax_rate",String(n)); }catch(e){}
+  if(!TOKEN) return;
+  if(!TAX_LOADED){
+    TAX_DIRTY=true;
+    if(!silencieux && typeof toast==="function") toast("⏳ Provision en attente","Le serveur n'a pas encore répondu : ton taux est gardé ici et partira tout seul dès qu'il répond.");
+    return;
+  }
+  fetch(HUB_BASE+"/api/hub/tax-rate",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({taux:n})})
+    .then(r=>{ if(r.ok){ TAX_DIRTY=false; if(!silencieux && typeof toast==="function") toast("🧾 Provision impôts",n+" % mis de côté sur ton profit — enregistré."); return; }
+      TAX_DIRTY=true; if(typeof toast==="function") toast("⚠️ Provision NON enregistrée","Le taux ne vaut que sur cet appareil : une déconnexion le perdrait. Réessaie."); })
+    .catch(()=>{ TAX_DIRTY=true; if(typeof toast==="function") toast("⚠️ Provision NON enregistrée","Pas de réseau : rien n'est parti au serveur."); });
 }
 // ⚠️ `ccn_split` (le %) et `ccn_split_w_<AAAA-MM>` (« déjà pris ») vivaient
 // uniquement dans le localStorage d'UN navigateur. Ce sont des montants d'argent
@@ -13321,6 +13365,8 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof VAGOALS_LOADED!=="undefined" && !VAGOALS_LOADED) loadVaGoals();
     // Idem pour la liste des modèles surveillés (voir loadLeakwatch).
     if(typeof LW_LOADED!=="undefined" && !LW_LOADED) loadLeakwatch();
+    // Idem pour la provision d'impôts (voir loadTaxRate).
+    if(typeof TAX_LOADED!=="undefined" && !TAX_LOADED) loadTaxRate();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -13435,6 +13481,7 @@ function _argentEnAttente(){
     if(typeof TGREV_DIRTY     !== "undefined" && TGREV_DIRTY)     return true;
     if(typeof VAGOALS_DIRTY   !== "undefined" && VAGOALS_DIRTY)   return true;
     if(typeof LW_DIRTY        !== "undefined" && LW_DIRTY)        return true;
+    if(typeof TAX_DIRTY       !== "undefined" && TAX_DIRTY)       return true;
   }catch(e){}
   return false;
 }
