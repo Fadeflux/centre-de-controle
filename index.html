@@ -1368,6 +1368,13 @@
   .om-spend.vide{border-left-color:#3a3a42;color:var(--muted);font-size:13px}
   .om-spend-h{font-size:13.5px;font-weight:600;margin-bottom:8px}
   .om-spend-c{display:inline-flex;align-items:baseline;gap:5px;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:4px 9px;margin:0 6px 6px 0;font-size:12.5px;cursor:pointer;transition:.12s}
+  /* 🎭 Ventilation par modele SOUS le nom du VA. Une infobulle au survol
+     n'existe pas sur telephone : ca doit etre ecrit, pas survole. */
+  .om-spend-c.avecmod{flex-direction:column;align-items:flex-start;gap:2px}
+  .om-spend-c .om-spend-top{display:inline-flex;align-items:baseline;gap:5px}
+  .om-spend-mods{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:11px;color:var(--faint);line-height:1.35}
+  .om-spend-mods span{white-space:nowrap}
+  .om-spend-mods b{color:var(--muted);font-weight:600}
   .om-spend-c:hover{background:rgba(52,211,153,.18)}
   .om-spend-c i{color:var(--faint);font-style:normal;font-size:11.5px}
   .om-spend-c.perso{background:rgba(148,163,184,.10);border-color:rgba(148,163,184,.32)}
@@ -2820,6 +2827,15 @@ const TOOLS = [
   // SMS_DATA) — solde inconnu = « — », jamais un 0 inventé.
   { id:"onlychat-solde",   world:"noctra", cat:"Noctra", name:"Solde OnlyChat", icon:"💬", openUrl:"https://app.only-chat.ai", external:true,
     metrics:[{k:"solde",l:"Solde restant",f:fmtMoney},{k:"jours",l:"L'IA de vente tient encore",f:v=>"~"+v+" j"}] },
+  // ⛽ Solde du forfait proxy (FlameProxies) — demande d'André du 2026-09-07 :
+  // « le voir comme le solde OnlyChat ». La jauge existait déjà, mais ENFOUIE
+  // dans le panneau Proxy — et ce panneau se cache entièrement quand le ping des
+  // proxies échoue : le solde disparaissait avec lui, au pire moment.
+  // Ici il vit tout seul, à côté du solde OnlyChat. À zéro, le scraper n'a plus
+  // de proxy et les vues Instagram se figent en silence.
+  { id:"proxy-solde",      world:"noctra", cat:"Noctra", name:"Forfait proxy", icon:"⛽", openUrl:"https://flameproxies.com", external:true,
+    metrics:[{k:"go",l:"Data restante",f:v=>String(Math.round(Number(v)*10)/10).replace(".",",")+" Go"},
+             {k:"jours",l:"Ça tient encore",f:v=>"~"+v+" j"}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
@@ -2960,6 +2976,19 @@ function render(data){
     // nettoyage, un solde devenu inconnu laissait l'ANCIENNE valeur affichée
     // comme si elle était fraîche. Inconnu = carte à « — », pas un vieux chiffre.
     delete data["onlychat-solde"];
+  }
+  // ⛽ Carte « Forfait proxy » — même mécanique, mêmes règles.
+  // « Ça tient encore N jours » est MESURÉ (le cerveau compare deux relevés du
+  // compteur du fournisseur) : tant qu'il n'a pas assez de recul, la ligne reste
+  // à « — ». On n'invente pas une autonomie.
+  if(typeof PROXY_DATA_GB!=="undefined" && PROXY_DATA_GB && PROXY_DATA_GB.configured && PROXY_DATA_GB.gbRemaining!=null){
+    const g=PROXY_DATA_GB, reste=Number(g.gbRemaining)||0;
+    data["proxy-solde"]={status:"online",metrics:{go:reste,jours:(g.joursRestants!=null?g.joursRestants:null)}};
+    if(reste<=2) data["proxy-solde"].note="À sec — recharge MAINTENANT, sinon tes vues Instagram se figent";
+    else if(reste<=6) data["proxy-solde"].note="Bientôt à sec — pense à recharger";
+    else if(g.joursRestants!=null && g.joursRestants<=5) data["proxy-solde"].note="Il reste ~"+g.joursRestants+" jours à ce rythme";
+  } else {
+    delete data["proxy-solde"];
   }
   // Le catalogue d'outils est isolé : s'il explose, les TUILES D'ARGENT qui
   // suivent doivent quand même s'afficher (c'est ce qui manquait le plus à
@@ -7055,6 +7084,27 @@ function renderOM(){
       +(part>=25?`<div class="om-rec-w">⚠️ ${part} % de cet argent n'est rattaché à aucun VA du classement — c'est pour ça que la somme du tableau est plus basse que le total.</div>`:"")
       +`</div>`;
   };
+  // 🎭 « SUR QUEL MODÈLE ? » — demande d'André du 2026-09-07.
+  // Le panneau disait « Welzy 14 $ · 3 payeurs » sans jamais dire si c'était sur
+  // Zoe ou sur Layla. Un VA travaille souvent sur deux modèles : le total seul
+  // ne permet pas de savoir lequel marche, donc ni où le pousser, ni quel
+  // modèle porte vraiment son chiffre.
+  // Le cerveau ventile désormais le MÊME argent par modèle (le détail
+  // additionne exactement le total du VA — vérifié côté serveur). On l'écrit
+  // sous le nom plutôt qu'en infobulle : au doigt, un survol n'existe pas.
+  // Un modèle nommé « ? » = compte sans nom de modèle côté source. On le dit
+  // au lieu de le répartir au hasard ou de le faire disparaître.
+  function ligneModeles(pm, cur){
+    if(!pm) return "";
+    const ks=Object.keys(pm).filter(k=>pm[k] && (Number(pm[k].rev)||0)!==0)
+      .sort((a,b)=>(Number(pm[b].rev)||0)-(Number(pm[a].rev)||0));
+    if(!ks.length) return "";
+    return `<span class="om-spend-mods">`+ks.map(k=>{
+      const e=pm[k], p=e.payeurs;
+      const nom=(k==="?")?`<b title="Compte sans nom de modèle côté source">modèle inconnu</b>`:`<b>${escapeHtml(k)}</b>`;
+      return `<span>${nom} ${omMoney((Number(e.rev)||0)*netRate(),cur)}${p==null?"":` · ${fmtInt(p)} pay.`}</span>`;
+    }).join("")+`</span>`;
+  }
   // 💸 « Qui dépense aujourd'hui » — la question posée mot pour mot par André.
   // Toujours affiché (quelle que soit la fenêtre choisie) : c'est la ligne qu'il
   // vient chercher le matin. Un jour sans encaissement le dit franchement au
@@ -7078,11 +7128,15 @@ function renderOM(){
     // là où HORS_EQUIPE_DATA se charge à part et arrivait trop tard (ligne vide).
     const persoBloc=(function(){
       const pv=(d.totals&&d.totals.ancienVa&&d.totals.ancienVa.today&&d.totals.ancienVa.today.parVa)||{};
-      const arr=Object.keys(pv).map(raw=>({nom:pv[raw].display||raw,rev:pv[raw].rev,payeurs:pv[raw].payeurs}))
+      const arr=Object.keys(pv).map(raw=>({nom:pv[raw].display||raw,rev:pv[raw].rev,payeurs:pv[raw].payeurs,parModele:pv[raw].parModele}))
         .filter(e=>e&&e.rev>0).sort((a,b)=>b.rev-a.rev);
       if(!arr.length) return {chips:"",tot:0,n:0};
       const chips=`<span class="om-spend-perso-lbl" title="Tes comptes perso, hors équipe">🔒 Perso :</span>`
-        +arr.map(e=>`<span class="om-spend-c perso he-va" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe) — voir sa fiche"><b>${escapeHtml(e.nom)}</b> ${omMoney((e.rev||0)*netRate(),cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`).join("");
+        +arr.map(e=>{
+          const haut=`<span class="om-spend-top"><b>${escapeHtml(e.nom)}</b> ${omMoney((e.rev||0)*netRate(),cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`;
+          const mods=ligneModeles(e.parModele,cur);
+          return `<span class="om-spend-c perso he-va${mods?" avecmod":""}" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe) — voir sa fiche">${haut}${mods}</span>`;
+        }).join("");
       return {chips:chips,tot:arr.reduce((a,e)=>a+(e.rev||0),0),n:arr.length};
     })();
     const noteBase=`Argent dépensé aujourd'hui par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.`
@@ -7095,7 +7149,12 @@ function renderOM(){
       ? `💸 Qui dépense aujourd'hui — <b>${omMoney(tot*netRate(),cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag" title="Après les ${pctComm()} de commission OnlyFans — c'est ce qui te reste vraiment."> · net · équipe</span>`
       : `💸 Qui dépense aujourd'hui`;
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
-      +act.map(v=>`<span class="om-spend-c" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><b>${escapeHtml(v.va)}</b> ${omMoney((v.periodes.today.rev||0)*netRate(),cur)}${v.periodes.today.payeurs==null?"":` <i>· ${fmtInt(v.periodes.today.payeurs)} payeur${v.periodes.today.payeurs>1?"s":""}</i>`}</span>`).join("")
+      +act.map(v=>{
+        const t=v.periodes.today;
+        const haut=`<span class="om-spend-top"><b>${escapeHtml(v.va)}</b> ${omMoney((t.rev||0)*netRate(),cur)}${t.payeurs==null?"":` <i>· ${fmtInt(t.payeurs)} payeur${t.payeurs>1?"s":""}</i>`}</span>`;
+        const mods=ligneModeles(t.parModele,cur);
+        return `<span class="om-spend-c${mods?" avecmod":""}" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche">${haut}${mods}</span>`;
+      }).join("")
       +persoBloc.chips
       +`<div class="om-spend-n">${noteBase}</div>`
       +rec+`</div>`;
@@ -9600,7 +9659,14 @@ function renderProxy(){
   const d=PROXY_DATA;
   const noms={"4g":"Proxy 4G","residentiel":"Proxy résidentiel"};
   const items=d?[["4g",d.proxy4g],["residentiel",d.residentiel]].filter(([,p])=>p&&p.configure):[];
-  if(!d||!items.length){ panel.style.display="none"; return; }
+  // ⚠️ LE SOLDE DISPARAISSAIT AVEC LE PANNEAU. Ce panneau se cachait ENTIÈREMENT
+  // dès que le ping des proxies ne répondait pas — emportant la jauge de data,
+  // qui n'a pourtant rien à voir avec le ping et qui est précisément ce qu'il
+  // faut voir ce jour-là (à sec = les vues Instagram se figent). Le solde vit
+  // maintenant aussi sur sa propre carte « ⛽ Forfait proxy », mais ici non plus
+  // il ne doit plus s'évaporer.
+  const gbDispo=(typeof PROXY_DATA_GB!=="undefined" && PROXY_DATA_GB && PROXY_DATA_GB.configured && PROXY_DATA_GB.gbTotal>0);
+  if((!d||!items.length) && !gbDispo){ panel.style.display="none"; return; }
   panel.style.display="block";
   const ligne=([key,p])=>{
     const vivant=p.vivant===true;
@@ -9608,8 +9674,8 @@ function renderProxy(){
     const etat=vivant?`en ligne · IP <b>${escapeHtml(p.ip||"?")}</b>`:`<b style="color:#f87171">ne répond pas</b>${p.erreur?` <span style="color:var(--faint)" title="Détail technique : ${escapeHtml(p.erreur)}">(détail technique masqué)</span>`:""}`;
     return `<div class="sv-row"><span class="sv-name">${pastille} ${noms[key]||key}</span><span class="sv-cell" style="flex:1">${etat}</span></div>`;
   };
-  const has4gMort=Array.isArray(d.morts)&&d.morts.indexOf("4g")>=0;
-  const alerte=d.critique
+  const has4gMort=!!d&&Array.isArray(d.morts)&&d.morts.indexOf("4g")>=0;
+  const alerte=(d&&d.critique)
     ? `<div class="sv-note" style="margin-top:8px;color:#f87171">⚠️ Ton proxy résidentiel est à sec — ton scraping de vues Instagram va se figer. Vérifie l'abonnement/les identifiants du proxy.</div>`
     : has4gMort
       ? `<div class="sv-note" style="margin-top:8px">✅ Tes vues Instagram remontent par le résidentiel. Le 4G (secours) est à sec, mais ce n'est pas bloquant.</div>`
@@ -9650,8 +9716,13 @@ function renderProxy(){
         style="font-size:12px;color:var(--acc-ink)">Recharger sur FlameProxies →</a></div>
     </div>`;
   }
-  body.innerHTML=items.map(ligne).join("")+alertePlafond+alerte+jauge+
-    `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${d.maj?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
+  // Quand seul le solde est lisible, on le DIT plutôt que d'afficher une liste
+  // de proxies vide qui se lirait comme « aucun proxy configuré ».
+  const noPing=(!d||!items.length)
+    ? `<div class="sv-note" style="color:#facc15">⚠️ Je n'ai pas pu tester tes proxies à l'instant — le solde ci-dessous, lui, est à jour.</div>`
+    : "";
+  body.innerHTML=noPing+items.map(ligne).join("")+alertePlafond+alerte+jauge+
+    `<div class="bp-since" style="margin-top:10px"><button class="mn-act-btn" id="proxyRefresh" style="padding:6px 12px">🔄 Re-tester</button>${(d&&d.maj)?` <span style="color:var(--faint);font-size:11px">testé ${relTime(Date.parse(d.maj))}</span>`:""}</div>`;
   try{ fixPairs(); }catch(e){}
   const rb=$("#proxyRefresh");
   if(rb) rb.onclick=async()=>{ rb.disabled=true; rb.textContent="⏳ test en cours…"; await loadProxy(true); };
