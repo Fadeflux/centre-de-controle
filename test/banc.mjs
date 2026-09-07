@@ -174,7 +174,9 @@ const V=verifie;
   const faux = { fetch: (u,o)=>{ appels.push(((o&&o.method)||"GET")+" "+u);
       // le cerveau refuse les routes d argent a un compte associe
       const interdit = /(onlymonster|payments|onlychat|cash)/.test(String(u));
-      return Promise.resolve(new Response("{}", {status: interdit?403:200})); } };
+      // Le cerveau dit TOUJOURS « pour ce compte » sur un refus de role.
+      return Promise.resolve(new Response(interdit?'{"error":"non autorise pour ce compte"}':"{}",
+        {status: interdit?403:200})); } };
   new Function("window","Response", bloc)(faux, Response);
 
   // trois tours de boucle de 60 s, comme une page laissee ouverte
@@ -188,6 +190,17 @@ const V=verifie;
   V("un refus n est demande QU UNE FOIS (sinon le limiteur du cerveau coupe tout)",
     refuses===4, refuses+" appels refuses partis au lieu de 4 : a 8 par minute, le limiteur (25/15 min) coupe la page de l associee en ~3 min");
   V("ce qu elle a le droit de voir passe toujours", permis===3, permis+" appels au lieu de 3");
+
+  // ⚠️ Un 403 qui ne vient PAS du controle de role (pare-feu, passerelle) est
+  // PASSAGER : le memoriser eteindrait un panneau pour toute la session.
+  {
+    let n = 0;
+    const passager = { fetch: (u,o)=>{ n++; return Promise.resolve(new Response("blocked by gateway", {status:403})); } };
+    new Function("window","Response", bloc)(passager, Response);
+    for(let k=0;k<3;k++) await passager.fetch("https://cerveau/api/hub/onlymonster");
+    V("un 403 passager n est PAS memorise (sinon un hoquet eteint un panneau pour la session)",
+      n===3, "seulement "+n+" appels : le panneau a ete condamne sur un incident passager");
+  }
 
   // un POST refuse ne doit pas condamner le GET du meme chemin
   appels=[];
@@ -222,6 +235,41 @@ const V=verifie;
   }
   V("le detail du socle additionne EXACTEMENT le total affiche ("+cas+" tirages)",
     faux===0, faux+" cas faux, ex. "+JSON.stringify(exemple));
+}
+
+
+// ================= 6) une alerte au seuil illisible ne doit pas etre CREEE
+// (une alerte posee qui ne peut jamais se declencher est pire que pas d alerte :
+//  on croit etre prevenu et on ne l est pas)
+{
+  const blocLM = morceau("function lireMontant(txt, opts) {", "function alerteVersementIncertain(");
+  const bloc = morceau("function addRule(){", "function checkRules(){");
+  const METRICS = [{k:"ca_mois",label:"CA du mois",unit:"$",bool:false},
+                   {k:"proxy_mort",label:"Proxy en panne",bool:true}];
+  let RULES, toasts, sauve;
+  const champs = {};
+  const faux$ = (sel)=>({ value: champs[sel.replace("#","")] });
+  const faire = (metric, seuil)=>{
+    RULES=[]; toasts=[]; sauve=0;
+    champs.ruleMetric=metric; champs.ruleOp="<"; champs.ruleVal=seuil; champs.ruleLabelInput="";
+    const f = new Function("RULE_METRICS","RULES","$","saveRules","renderRules","toast","tkId","lireMontant","ESPACES",
+      blocLM + ";" + bloc + "; return addRule;")
+      (METRICS, RULES, faux$, ()=>{sauve++;}, ()=>{}, (a,b)=>toasts.push(a+" "+b), ()=>"id1", null, /[\s  ]/g);
+    f();
+    return { regle: RULES[0], toasts, sauve };
+  };
+  let r = faire("ca_mois", "5 000");         // clavier FR : espace insecable ou non
+  V("« 5 000 » ne devient pas un seuil de 0", !r.regle || r.regle.value===5000,
+    "regle creee avec le seuil "+JSON.stringify(r.regle && r.regle.value)+" : elle ne se declencherait JAMAIS");
+  r = faire("ca_mois", "cinq mille");
+  V("un seuil illisible ne cree PAS d alerte", !r.regle, "alerte creee au seuil "+JSON.stringify(r.regle && r.regle.value));
+  V("et on le dit", r.toasts.length>0, "aucun message : on croit l alerte posee");
+  r = faire("ca_mois", "");
+  V("un seuil VIDE ne cree pas d alerte muette", !r.regle, "alerte creee sans seuil");
+  r = faire("ca_mois", "5000");
+  V("un seuil normal passe toujours", !!r.regle && r.regle.value===5000, "seuil = "+JSON.stringify(r.regle && r.regle.value));
+  r = faire("proxy_mort", "");
+  V("une alerte OUI/NON n a pas besoin de seuil", !!r.regle, "l alerte booleenne a ete refusee a tort");
 }
 
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
