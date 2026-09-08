@@ -272,4 +272,53 @@ const V=verifie;
   V("une alerte OUI/NON n a pas besoin de seuil", !!r.regle, "l alerte booleenne a ete refusee a tort");
 }
 
+
+// ================= 7) migration des dates : ne RIEN perdre
+// Ce panneau n existait que dans le navigateur. En le passant cote serveur, le
+// premier chargement trouve un serveur VIDE et un appareil qui a tout
+// l historique — c est la situation de TOUS les appareils au moment du
+// deploiement. Ecraser reviendrait a supprimer les dates qu Andre croyait
+// sauvegardees. On verifie que c est bien l inverse qui se produit.
+{
+  const bloc = morceau("let DATES_LOADED=false, DATES_DIRTY=false;", "function dtNextOccurrence");
+  const noms = ["TOKEN","HUB_BASE","localStorage","fetch","toast","renderDates","renderCal","_depart"];
+  const faire = async (serveur, local) => {
+    let envois = [];
+    const dec = {
+      TOKEN:"j", HUB_BASE:"http://x",
+      localStorage:{_d:{},setItem(){},getItem(){return null;}},
+      fetch:(u,o)=>{ if(o&&o.method==="POST"){ envois.push(JSON.parse(o.body)); return Promise.resolve({ok:true}); }
+                     return Promise.resolve({ok:true, json:async()=>({dates:serveur})}); },
+      toast:()=>{}, renderDates:()=>{}, renderCal:()=>{}, _depart:local,
+    };
+    const api = new Function(...noms, "let DATES=_depart;"+bloc+
+      "; return {loadDates, saveDates, get DATES(){return DATES;}};")
+      (...noms.map(n=>n==="fetch"?((u,o)=>dec.fetch(u,o)):dec[n]));
+    await api.loadDates();
+    await new Promise(r=>setTimeout(r,5));
+    return { dates: api.DATES, envois };
+  };
+
+  const r1 = await faire([], [{id:"a",text:"Anniv Welzy",date:"2026-10-01",yearly:true}]);
+  V("premier chargement : ce qui n existait que sur l appareil est GARDE",
+    r1.dates.length===1 && r1.dates[0].id==="a",
+    "la date locale a disparu : ce commit aurait efface l historique d Andre");
+  V("... et remonte au serveur",
+    r1.envois.length===1 && (r1.envois[0].dates||[]).some(d=>d.id==="a"),
+    "rien n a ete pousse : la date resterait locale pour toujours");
+  V("l anniversaire garde son caractere annuel",
+    (r1.envois[0].dates||[])[0].chaqueAnnee===true, "chaqueAnnee perdu a l aller");
+
+  const r2 = await faire([{id:"s1",texte:"RDV compta",date:"2026-11-05",chaqueAnnee:false}], []);
+  V("ce que le serveur a arrive bien sur un appareil neuf",
+    r2.dates.length===1 && r2.dates[0].text==="RDV compta", JSON.stringify(r2.dates));
+  V("et rien n est repousse inutilement", r2.envois.length===0, "POST parasite");
+
+  const r3 = await faire([{id:"s1",texte:"RDV compta",date:"2026-11-05",chaqueAnnee:false}],
+                         [{id:"a",text:"Anniv Welzy",date:"2026-10-01",yearly:true}]);
+  V("les deux cotes fusionnent, aucun ne gagne contre l autre",
+    r3.dates.length===2 && r3.dates.some(d=>d.id==="s1") && r3.dates.some(d=>d.id==="a"),
+    JSON.stringify(r3.dates.map(d=>d.id)));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
