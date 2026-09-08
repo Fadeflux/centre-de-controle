@@ -7399,6 +7399,18 @@ function renderOM(){
       // On ne casse la ligne en deux que s'il y a VRAIMENT deux origines : sur un
       // seul canal, deux lignes identiques n'apprendraient rien.
       if(cles.length<2) return ligneHors(e.nom, e.subsTotal, e.revTotal, e.ltv, "");
+      // ⚠️ NE JAMAIS FAIRE DISPARAÎTRE DE L'ARGENT EN LE RANGEANT MIEUX.
+      // Les abonnés et l'argent viennent de deux sources différentes. Quand la
+      // source d'argent est en repli (API OnlyMonster muette), le total de
+      // l'entité est connu mais sa ventilation ne l'est PAS : découper la ligne
+      // afficherait alors « Bot · Instagram — » et « Bot · Twitter — », deux
+      // tirets à la place d'un montant qu'on connaît. On garde la ligne entière
+      // et on dit pourquoi le détail manque.
+      const argentVentile = cles.some(k=>pp[k] && pp[k].rev!=null);
+      if(!ko && e.revTotal!=null && !argentVentile){
+        return ligneHors(e.nom, e.subsTotal, e.revTotal, e.ltv, "",
+          "Le détail par bot n'est pas disponible en ce moment (la source d'argent est en repli) — ce total reste juste.");
+      }
       return cles.sort((a,b)=>(Number(pp[b].subs)||0)-(Number(pp[a].subs)||0)).map(k=>{
         const v=pp[k];
         return ligneHors(e.nom, v.subs, v.rev, v.ltv, "· "+nomPlat(k),
