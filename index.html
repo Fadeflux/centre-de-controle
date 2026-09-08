@@ -694,6 +694,7 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
+  body.assoc-mode #echeances,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
   body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
@@ -1375,6 +1376,24 @@
   .om-spend-mods{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:11px;color:var(--faint);line-height:1.35}
   .om-spend-mods span{white-space:nowrap}
   .om-spend-mods b{color:var(--muted);font-weight:600}
+  /* ⏳ Échéances */
+  .ech-intro{color:var(--faint);font-size:12px;margin:2px 0 8px;line-height:1.45}
+  .ech-add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .ech-add input,.ech-add select{font:inherit;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none;min-width:0}
+  .ech-add #echLabel{flex:1 1 180px}
+  .ech-add #echRappel{width:52px;text-align:center}
+  .ech-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
+  .ech-row:last-child{border-bottom:0}
+  .ech-row .ech-l{flex:1;min-width:0}
+  .ech-row .ech-cat{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .ech-row .ech-when{white-space:nowrap;font-weight:600}
+  .ech-ok .ech-when{color:var(--muted)} .ech-bientot .ech-when{color:#fbbf24}
+  .ech-urgent .ech-when{color:#f87171} .ech-expire .ech-when{color:#f87171}
+  .ech-inconnu .ech-when{color:#facc15}
+  .ech-row .ech-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:13px;padding:2px 5px}
+  .ech-row .ech-del:hover{color:#f87171}
+  .ech-badge{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(248,113,113,.14);color:#f87171;margin-left:6px}
+  .ech-note{color:var(--faint);font-size:11.5px}
   .om-spend-c:hover{background:rgba(52,211,153,.18)}
   .om-spend-c i{color:var(--faint);font-style:normal;font-size:11.5px}
   .om-spend-c.perso{background:rgba(148,163,184,.10);border-color:rgba(148,163,184,.32)}
@@ -2594,6 +2613,31 @@
   </div>
   </div>
 
+  <!-- ⏳ CE QUI VA EXPIRER — la fonctionnalité existait ENTIÈREMENT côté serveur
+       (/api/hub/expirations : états, seuil de rappel, compteurs) et n'avait
+       AUCUNE interface. Personne ne pouvait donc s'en servir.
+       Ce panneau répond à la question qui a coûté le plus cher cette semaine :
+       « qu'est-ce qui va s'arrêter tout seul sans prévenir ? » — forfait proxy,
+       abonnement OnlyChat, cookie, certificat, domaine, téléphones. -->
+  <div class="panel-box" id="echeances" style="display:none">
+    <div class="pb-head">⏳ Ce qui va expirer <span class="ech-badge" id="echBadge"></span></div>
+    <div class="ech-intro">Tout ce qui a une date de fin et qui casse quelque chose en silence quand elle passe. Le proxy, un abonnement, un certificat, un domaine.</div>
+    <div class="ech-add">
+      <input id="echLabel" placeholder="Quoi ? (ex : Forfait proxy FlameProxies)" autocomplete="off" />
+      <select id="echCat" title="Catégorie">
+        <option value="abonnement">Abonnement</option>
+        <option value="proxy">Proxy</option>
+        <option value="certificat">Certificat</option>
+        <option value="domaine">Domaine</option>
+        <option value="materiel">Matériel</option>
+        <option value="autre">Autre</option>
+      </select>
+      <input id="echDate" type="date" title="Date de fin" />
+      <input id="echRappel" type="text" inputmode="numeric" value="7" title="Prévenir combien de jours avant ?" />
+      <button class="act" id="echAdd">＋</button>
+    </div>
+    <div id="echList"></div>
+  </div>
   <div class="pair-row">
     <div class="panel-box" id="dates">
     <div class="pb-head">📌 Événements & dates</div>
@@ -2681,6 +2725,7 @@
       <input id="alName" placeholder="Modèle (ex : Layla)" autocomplete="off" />
       <input id="alAlias" placeholder="Pseudos séparés par virgules (onlyfans.com/layla, @layla_ig, Layla Rose)" autocomplete="off" />
       <button class="act al-btn" id="alAdd">＋ Surveiller</button>
+      <button class="act al-btn" id="alScan" title="Chercher maintenant, sans attendre le prochain passage automatique">🔍 Scanner</button>
     </div>
     <div id="alList"></div>
     <div class="al-leaks-head">🚨 Fuites détectées <span class="al-lc" id="alLeakCount"></span></div>
@@ -3279,7 +3324,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -4363,6 +4408,30 @@ function addWatch(){
 }
 function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.status=status; renderLeaks(); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leaks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id,status:status})}).catch(()=>{}); } }
 { const b=$("#alAdd"); if(b) b.onclick=addWatch; }
+// 🔍 SCANNER MAINTENANT. La route `/api/hub/leak-scan` existe depuis toujours,
+// et son commentaire côté serveur dit noir sur blanc « bouton "Scanner" sur le
+// site » — le bouton n'avait jamais été construit. On ne pouvait donc pas
+// vérifier un modèle qu'on vient d'ajouter : il fallait attendre le passage
+// automatique, sans savoir quand.
+{ const b=$("#alScan"); if(b) b.onclick=async()=>{
+    if(!TOKEN){ if(typeof toast==="function") toast("🔍 Connecte-toi d'abord",""); return; }
+    const t0=b.textContent; b.disabled=true; b.textContent="⏳ recherche…";
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/leak-scan",{method:"POST",headers:{"x-hub-token":TOKEN}});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      // On dit ce qui a été RÉELLEMENT fait. « Scan lancé » sans chiffre laisse
+      // croire qu'il a cherché même quand aucun modèle n'est surveillé.
+      if(typeof toast==="function"){
+        if(!j.scanned) toast("🔍 Rien à chercher","Aucun modèle surveillé — ajoute-en un au-dessus.");
+        else toast("🔍 "+j.scanned+" modèle"+(j.scanned>1?"s":"")+" passé"+(j.scanned>1?"s":"")+" au radar",
+                   j.found?(j.found+" fuite"+(j.found>1?"s":"")+" trouvée"+(j.found>1?"s":"")+" — voir ci-dessous"):"Aucune nouvelle fuite. ✅");
+      }
+      if(typeof loadLeaks==="function") loadLeaks();
+    }catch(e){
+      if(typeof toast==="function") toast("⚠️ Scan impossible","Le serveur n'a pas pu chercher ("+(e.message||"erreur")+"). Rien n'a été vérifié.");
+    }finally{ b.disabled=false; b.textContent=t0; }
+  }; }
 { const a=$("#alAlias"); if(a) a.addEventListener("keydown",e=>{ if(e.key==="Enter") addWatch(); }); }
 { const a=$("#alName"); if(a) a.addEventListener("keydown",e=>{ if(e.key==="Enter") $("#alAlias").focus(); }); }
 { const list=$("#alList"); if(list) list.addEventListener("click",e=>{
@@ -11121,6 +11190,97 @@ function gsRender(q){
 { const box=$("#gsRes"); if(box) box.addEventListener("click",e=>{ const b=e.target.closest("[data-gt]"); if(!b) return; const t=b.getAttribute("data-gt"), k=b.getAttribute("data-gk"); const inp=$("#gsInput"); if(inp) inp.value=""; gsRender(""); if(t==="va"){ if(typeof openVaCard==="function") openVaCard(k); } else if(t==="model"){ if(typeof openModelCard==="function") openModelCard(k); } else if(t==="horsequipe"){ if(typeof openHorsEquipeCard==="function") openHorsEquipeCard(k); } else jumpPanel(k); }); }
 document.addEventListener("click",e=>{ const gs=$("#gsearch"); if(gs && !gs.contains(e.target)){ const box=$("#gsRes"); if(box) box.style.display="none"; } });
 
+// ⏳ CE QUI VA EXPIRER.
+// La route existait ENTIÈREMENT côté serveur — états, seuil de rappel,
+// compteurs — et n'avait AUCUNE interface : personne ne pouvait s'en servir.
+// C'est la question qui a coûté le plus cher cette semaine : « qu'est-ce qui
+// va s'arrêter tout seul sans prévenir ? ».
+// Même verrou d'écriture que les autres listes : tant que la lecture serveur
+// n'a pas réussi, on n'envoie rien (sinon la première saisie effacerait tout).
+// La suppression est EXPLICITE côté serveur (liste `supprimer`) : rien ne
+// disparaît par simple omission, donc deux onglets ouverts ne s'effacent pas.
+let ECHEANCES=[], ECH_LOADED=false, ECH_DIRTY=false;
+async function loadEcheances(){
+  if(!TOKEN){ ECH_LOADED=true; renderEcheances(); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/expirations",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(r.ok){ const j=await r.json();
+      if(Array.isArray(j.expirations)){
+        // Fusion : ce qui a été tapé pendant que le verrou tenait n'est pas
+        // encore chez le serveur — l'écraser le ferait disparaître.
+        const vus=new Set(j.expirations.map(x=>x&&x.id));
+        const enAttente = ECH_DIRTY ? ECHEANCES.filter(x=>x&&!vus.has(x.id)) : [];
+        ECHEANCES=j.expirations.concat(enAttente); ECH_LOADED=true;
+        if(ECH_DIRTY) saveEcheances();
+      } }
+  }catch(e){}
+  renderEcheances();
+}
+function saveEcheances(supprimer){
+  if(!TOKEN){ renderEcheances(); return; }
+  if(!ECH_LOADED){ ECH_DIRTY=true;
+    if(typeof toast==="function") toast("⏳ En attente","Le serveur n'a pas encore répondu : ta saisie est gardée ici et partira dès qu'il répond.");
+    renderEcheances(); return; }
+  fetch(HUB_BASE+"/api/hub/expirations",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify({expirations:ECHEANCES, supprimer:supprimer||[]})})
+    .then(r=>{ if(r.ok){ ECH_DIRTY=false; loadEcheances(); return; }
+      ECH_DIRTY=true; if(typeof toast==="function") toast("⚠️ Échéance NON enregistrée","Le serveur n'a pas pu écrire — refais l'opération."); })
+    .catch(()=>{ ECH_DIRTY=true; if(typeof toast==="function") toast("⚠️ Échéance NON enregistrée","Pas de réseau : rien n'est parti au serveur."); });
+  renderEcheances();
+}
+function renderEcheances(){
+  const box=$("#echeances"), list=$("#echList"); if(!box||!list) return;
+  // Sans jeton, ce panneau n'a rien à dire : on le cache plutôt que d'inviter à
+  // saisir des dates qui ne partiraient nulle part.
+  if(!TOKEN){ box.style.display="none"; return; }
+  box.style.display="block";
+  const badge=$("#echBadge");
+  const alerte=ECHEANCES.filter(e=>e&&e.etat&&e.etat!=="ok").length;
+  if(badge){ badge.textContent=alerte?(alerte+" à surveiller"):""; badge.style.display=alerte?"":"none"; }
+  if(!ECHEANCES.length){
+    list.innerHTML=`<div class="tk-empty">Rien de suivi pour l'instant. Ajoute ce qui a une date de fin : forfait proxy, abonnement OnlyChat, certificat iPhone, domaine…</div>`;
+    return;
+  }
+  // « inconnu » = date illisible. Le serveur refuse de le peindre en vert, et
+  // nous non plus : ne pas savoir n'est pas rassurant.
+  const quand=(e)=>{
+    if(e.etat==="inconnu"||e.jours==null) return "date illisible";
+    if(e.jours<0) return "expiré depuis "+Math.abs(e.jours)+" j";
+    if(e.jours===0) return "expire AUJOURD'HUI";
+    if(e.jours===1) return "demain";
+    return "dans "+e.jours+" j";
+  };
+  list.innerHTML=ECHEANCES.map(e=>{
+    const cls="ech-"+(e.etat||"ok");
+    const d=e.date?new Date(e.date+"T00:00:00"):null;
+    const dTxt=(d&&!isNaN(d.getTime()))?d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+    return `<div class="ech-row ${cls}">`
+      +`<span class="ech-l"><b>${escapeHtml(e.label||"—")}</b> <span class="ech-cat">${escapeHtml(e.categorie||"")}</span>`
+      +`<div class="ech-note">${dTxt}${e.note?" · "+escapeHtml(e.note):""} · rappel ${fmtInt(e.rappel||7)} j avant</div></span>`
+      +`<span class="ech-when">${escapeHtml(quand(e))}</span>`
+      +`<button class="ech-del" data-echdel="${escapeHtml(e.id)}" title="Retirer">✕</button></div>`;
+  }).join("");
+}
+{ const b=$("#echAdd"); if(b) b.onclick=()=>{
+    const l=($("#echLabel")||{}).value||"", dt=($("#echDate")||{}).value||"", cat=($("#echCat")||{}).value||"autre";
+    const rBrut=String(($("#echRappel")||{}).value||"").trim();
+    if(!l.trim()){ if(typeof toast==="function") toast("⚠️ Il manque le nom","Écris ce qui expire, sinon le rappel ne dira rien."); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ if(typeof toast==="function") toast("⚠️ Il manque la date","Une échéance sans date n'avertit de rien — et donne l'impression fausse d'être couvert."); return; }
+    // Le rappel doit être un nombre : « une semaine » donnerait 0 en silence,
+    // donc une alerte qui ne sortirait jamais.
+    const rap=/^\d{1,2}$/.test(rBrut)?parseInt(rBrut,10):NaN;
+    if(!isFinite(rap)||rap<1||rap>90){ if(typeof toast==="function") toast("⚠️ Rappel non compris","Mets un nombre de jours entre 1 et 90 (par défaut 7)."); return; }
+    ECHEANCES.push({id:(typeof tkId==="function"?tkId():Date.now().toString(36)), label:l.trim(), categorie:cat, date:dt, rappel:rap, note:"", ts:Date.now()});
+    $("#echLabel").value=""; $("#echDate").value="";
+    saveEcheances();
+  }; }
+{ const l=$("#echList"); if(l) l.addEventListener("click",e=>{
+    const d=e.target.closest("[data-echdel]"); if(!d) return;
+    const id=d.getAttribute("data-echdel"); const it=ECHEANCES.find(x=>x.id===id);
+    if(!it || !confirm("Ne plus suivre « "+(it.label||"?")+" » ?\n\nTu ne seras plus prévenu avant sa date de fin.")) return;
+    ECHEANCES=ECHEANCES.filter(x=>x.id!==id);
+    saveEcheances([id]);   // suppression EXPLICITE : le serveur ne devine pas
+  }); }
 // 🗂️ #11 HISTORIQUE DES INCIDENTS : pannes passées + en cours (durée, récurrences).
 let INCIDENTS_DATA=null;
 async function loadIncidents(refresh){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/incidents"+(refresh?"?refresh=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; INCIDENTS_DATA=await r.json(); renderIncidents(); }catch(e){} }
@@ -13712,6 +13872,8 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof LW_LOADED!=="undefined" && !LW_LOADED) loadLeakwatch();
     // Idem pour la provision d'impôts (voir loadTaxRate).
     if(typeof TAX_LOADED!=="undefined" && !TAX_LOADED) loadTaxRate();
+    // Idem pour les échéances (voir loadEcheances).
+    if(typeof ECH_LOADED!=="undefined" && !ECH_LOADED) loadEcheances();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -13827,6 +13989,7 @@ function _argentEnAttente(){
     if(typeof VAGOALS_DIRTY   !== "undefined" && VAGOALS_DIRTY)   return true;
     if(typeof LW_DIRTY        !== "undefined" && LW_DIRTY)        return true;
     if(typeof TAX_DIRTY       !== "undefined" && TAX_DIRTY)       return true;
+    if(typeof ECH_DIRTY       !== "undefined" && ECH_DIRTY)       return true;
   }catch(e){}
   return false;
 }
