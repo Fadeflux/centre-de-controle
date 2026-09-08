@@ -694,7 +694,7 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
-  body.assoc-mode #echeances,
+  body.assoc-mode #echeances, body.assoc-mode #dates,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
   body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
@@ -2894,7 +2894,11 @@ const TOOLS = [
   // de proxy et les vues Instagram se figent en silence.
   { id:"proxy-solde",      world:"noctra", cat:"Noctra", name:"Proxy Residential FlameProxies", icon:"⛽", openUrl:"https://flameproxies.com", external:true,
     metrics:[{k:"go",l:"Data restante",f:v=>String(Math.round(Number(v)*10)/10).replace(".",",")+" Go"},
-             {k:"jours",l:"Ça tient encore",f:v=>"~"+v+" j"}] },
+             // ⚠️ « plus de N j » quand la mesure ne porte pas plus loin (le
+             // serveur borne l'horizon à 30× la durée observée). Annoncer
+             // « ~202 j » avec 8 h de recul, c'est rassurant et faux — et c'est
+             // précisément le chiffre censé empêcher la panne sèche.
+             {k:"jours",l:"Ça tient encore",f:v=>(typeof v==="string"&&v.indexOf(">")===0)?("plus de "+v.slice(1)+" j"):("~"+v+" j")}] },
 
   { id:"growthx",     world:"noctra", cat:"En construction", name:"GrowthX",      icon:"G", build:true },
   // ⭐ Plus "En construction" : Grind (ex-CoachOS) est en ligne avec de vrais
@@ -3042,10 +3046,13 @@ function render(data){
   // à « — ». On n'invente pas une autonomie.
   if(typeof PROXY_DATA_GB!=="undefined" && PROXY_DATA_GB && PROXY_DATA_GB.configured && PROXY_DATA_GB.gbRemaining!=null){
     const g=PROXY_DATA_GB, reste=Number(g.gbRemaining)||0;
-    data["proxy-solde"]={status:"online",metrics:{go:reste,jours:(g.joursRestants!=null?g.joursRestants:null)}};
+    // `>N` = borne basse (la mesure ne porte pas plus loin), `N` = estimation.
+    const _j = (g.joursRestants!=null) ? g.joursRestants
+             : (g.joursAuMoins!=null ? (">"+g.joursAuMoins) : null);
+    data["proxy-solde"]={status:"online",metrics:{go:reste,jours:_j}};
     if(reste<=2) data["proxy-solde"].note="À sec — recharge MAINTENANT, sinon tes vues Instagram se figent";
     else if(reste<=6) data["proxy-solde"].note="Bientôt à sec — pense à recharger";
-    else if(g.joursRestants!=null && g.joursRestants<=5) data["proxy-solde"].note="Il reste ~"+g.joursRestants+" jours à ce rythme";
+    else if(g.joursRestants!=null && g.joursRestants<=5) data["proxy-solde"].note="Il reste ~"+g.joursRestants+" jours à ce rythme"+(g.mesureSurH?(" (mesuré sur "+Math.round(g.mesureSurH)+" h)"):"");
   } else {
     delete data["proxy-solde"];
   }
@@ -3325,7 +3332,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -12508,7 +12515,48 @@ function tmStart(){ const min=Math.max(1,parseInt($("#tmMin").value,10)||0); TM_
 renderReminders(); tickClock(); setInterval(tickClock, 5000);
 
 /* ---------- dates importantes ---------- */
-function saveDates(){ localStorage.setItem("ccn_dates",JSON.stringify(DATES)); }
+// ⚠️ CE PANNEAU N'EXISTAIT QUE DANS CE NAVIGATEUR.
+// `saveDates` écrivait dans le localStorage et NULLE PART ailleurs : les dates
+// tapées sur le PC n'existaient pas sur le téléphone, et la sauvegarde ne les
+// contenait pas — une restauration ne les ramenait donc jamais. On les croyait
+// à l'abri parce qu'on les voyait.
+// Même mécanique que les autres listes : verrou de lecture (on n'envoie rien
+// tant qu'on n'a pas lu, sinon la première saisie effacerait le serveur),
+// reprise (*_DIRTY) et suppression EXPLICITE (le serveur ne devine pas ce qui
+// a disparu, donc deux onglets ouverts ne s'effacent pas l'un l'autre).
+let DATES_LOADED=false, DATES_DIRTY=false;
+function saveDates(supprimer){
+  localStorage.setItem("ccn_dates",JSON.stringify(DATES));   // cache hors-ligne
+  if(!TOKEN) return;
+  if(!DATES_LOADED){ DATES_DIRTY=true;
+    if(typeof toast==="function") toast("⏳ Date en attente","Le serveur n'a pas encore répondu : elle est gardée ici et partira dès qu'il répond.");
+    return; }
+  fetch(HUB_BASE+"/api/hub/dates",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify({dates:DATES.map(d=>({id:d.id,texte:d.text,date:d.date,chaqueAnnee:!!d.yearly})), supprimer:supprimer||[]})})
+    .then(r=>{ if(r.ok){ DATES_DIRTY=false; return; }
+      DATES_DIRTY=true; if(typeof toast==="function") toast("⚠️ Date NON enregistrée","Elle n'existe que sur cet appareil — refais l'opération."); })
+    .catch(()=>{ DATES_DIRTY=true; if(typeof toast==="function") toast("⚠️ Date NON enregistrée","Pas de réseau : rien n'est parti au serveur."); });
+}
+async function loadDates(){
+  if(!TOKEN){ DATES_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/dates",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return;                                  // 503 = base illisible : on garde ce qu'on a
+    const j=await r.json();
+    if(!Array.isArray(j.dates)) return;
+    const srv=j.dates.map(d=>({id:d.id,text:d.texte,date:d.date,yearly:!!d.chaqueAnnee}));
+    // ⚠️ PREMIÈRE FOIS : le serveur n'a rien, cet appareil a l'historique.
+    // C'est la situation de TOUS les appareils au moment de ce déploiement.
+    // Écraser reviendrait à supprimer les dates qu'André croyait sauvegardées.
+    const vus=new Set(srv.map(x=>x.id));
+    const aPousser=DATES.filter(x=>x&&x.id&&!vus.has(x.id));
+    DATES=srv.concat(aPousser);
+    DATES_LOADED=true;
+    if(aPousser.length){ saveDates(); }                // on remonte ce qui n'existait qu'ici
+    localStorage.setItem("ccn_dates",JSON.stringify(DATES));
+    renderDates(); if(typeof renderCal==="function") renderCal();
+  }catch(e){}
+}
 // Pour un évènement « chaque année », renvoie sa prochaine occurrence (cette année ou l'an prochain).
 function dtNextOccurrence(d, today){
   const base=new Date((d.date||"")+"T00:00:00"); if(isNaN(base)) return null;
@@ -12533,7 +12581,7 @@ function renderDates(){
 function addDate(){ const t=$("#dtText"), d=$("#dtDate"), y=$("#dtYearly"); const text=(t.value||"").trim(), date=(d.value||""); if(!text||!date) return; DATES.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),text,date,yearly:!!(y&&y.checked)}); t.value=""; d.value=""; if(y) y.checked=false; saveDates(); renderDates(); if(typeof renderCal==="function") renderCal(); }
 { const a=$("#dtAdd"); if(a) a.onclick=addDate; }
 { const t=$("#dtText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDate(); }); }
-{ const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ DATES=DATES.filter(z=>z.id!==x.getAttribute("data-dtdel")); saveDates(); renderDates(); } }); }
+{ const l=$("#dtList"); if(l) l.addEventListener("click",e=>{ const x=e.target.closest("[data-dtdel]"); if(x){ const _idSup=x.getAttribute("data-dtdel"); DATES=DATES.filter(z=>z.id!==_idSup); saveDates([_idSup]); renderDates(); } }); }
 renderDates();
 
 /* ---------- calendrier ---------- */
@@ -13881,6 +13929,8 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof TAX_LOADED!=="undefined" && !TAX_LOADED) loadTaxRate();
     // Idem pour les échéances (voir loadEcheances).
     if(typeof ECH_LOADED!=="undefined" && !ECH_LOADED) loadEcheances();
+    // Idem pour les événements & dates (voir loadDates).
+    if(typeof DATES_LOADED!=="undefined" && !DATES_LOADED) loadDates();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -13997,6 +14047,7 @@ function _argentEnAttente(){
     if(typeof LW_DIRTY        !== "undefined" && LW_DIRTY)        return true;
     if(typeof TAX_DIRTY       !== "undefined" && TAX_DIRTY)       return true;
     if(typeof ECH_DIRTY       !== "undefined" && ECH_DIRTY)       return true;
+    if(typeof DATES_DIRTY     !== "undefined" && DATES_DIRTY)     return true;
   }catch(e){}
   return false;
 }
