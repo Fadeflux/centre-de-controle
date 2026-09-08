@@ -7476,7 +7476,16 @@ function renderOM(){
     // « pas encore calculé » (le serveur le dit avec argentPret) de « pas de revenus ».
     const heAttente = (typeof HORS_EQUIPE_DATA!=="undefined" && HORS_EQUIPE_DATA && HORS_EQUIPE_DATA.argentPret===false)
       ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ <b>Les tirets ci-dessus ne sont PAS des zéros.</b> Les montants et la LTV de tes bots et de Clhoe se calculent encore côté serveur (c'est normal juste après un redémarrage) — ils apparaîtront <b>tout seuls</b> d'ici une minute. Les abonnés, eux, sont justes.</div>`
-      : "";
+      // ⚠️ L'AUTRE CAS, celui qui ne se répare pas tout seul : l'argent EST
+      // lisible, mais aucun dollar n'est attribué à ces noms. C'est un problème
+      // de NOM, pas de revenus — et il vivait jusqu'ici dans un journal serveur
+      // que personne ne lit. On le met à l'écran, avec les deux listes de noms
+      // côte à côte : c'est ce qu'il faut pour comprendre en dix secondes.
+      : (function(){
+          const dg=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA)?HORS_EQUIPE_DATA.diag:null;
+          if(!dg || !dg.argentPret || !(dg.muettes||[]).length) return "";
+          return `<div class="sv-note" style="margin-top:6px;border-left:3px solid #f87171;color:#f87171">🔴 <b>${escapeHtml(dg.muettes.join(", "))} : des abonnés, mais AUCUN argent rattaché.</b> Ce n'est pas « ça ne rapporte rien » — c'est un <b>problème de nom</b>. Les abonnés viennent des relevés de liens, l'argent vient d'OnlyMonster : si les deux ne l'écrivent pas pareil, rien ne se croise.<br><span style="color:var(--muted)">Je cherche : <b>${escapeHtml((dg.clesCherchees||[]).join(", "))}</b><br>Côté argent je connais : ${escapeHtml((dg.clesArgent||[]).join(", "))||"(aucun)"}</span></div>`;
+        })();
     return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows+heTot+heAttente;
   })();
   // 🧮 D'OÙ VIENNENT TOUS MES ABONNÉS ? (demande d'André)
