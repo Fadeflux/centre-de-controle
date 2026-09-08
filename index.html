@@ -5389,10 +5389,35 @@ function horsEquipeLigne(){
 // HORS_EQUIPE_DATA — elles ne figurent dans AUCUNE des sources habituelles
 // (OM_DATA, CONV_DATA, QUINZ_DATA, VASANTE, va-liens les filtrent toutes,
 // exprès). Le serveur refait ces calculs pour elles : voir hubHorsEquipe.js.
-function openHorsEquipeCard(nom){
+// ⚠️ CLIQUER SUR « Bot · Twitter » OUVRAIT LA FICHE DES DEUX BOTS REUNIS.
+// Le classement sépare bien les deux lignes, mais la fiche, elle, montrait le
+// cumul : 2 subs à l'écran, puis une fiche annonçant les 55. C'est le défaut
+// qu'on passe la journée à supprimer — deux chiffres pour la même chose.
+// `plat` = la plateforme cliquée. La fiche ne montre alors QUE ce bot.
+// ⚠️ Tout n'est pas ventilé par plateforme : la quinzaine, les abonnés du mois
+// et la trajectoire 8 semaines sont calculés par ENTITÉ. Les afficher sous un
+// titre « · Twitter » ferait croire qu'ils sont à lui. On les retire et on DIT
+// pourquoi, au lieu de montrer le chiffre de l'autre bot.
+function openHorsEquipeCard(nom, plat){
   const d=(typeof HORS_EQUIPE_DATA!=="undefined")?HORS_EQUIPE_DATA:null;
   const ents=(d&&Array.isArray(d.entites))?d.entites:[];
-  const v=ents.find(x=>x.nom===nom); if(!v) return;
+  let v=ents.find(x=>x.nom===nom); if(!v) return;
+  const _nomPlat=(k)=>k==="_"?"non étiqueté":(k.charAt(0).toUpperCase()+k.slice(1));
+  let surPlat="";
+  const _pv=(plat && v.parPlateforme)?v.parPlateforme[plat]:null;
+  if(_pv){
+    surPlat=" · "+_nomPlat(plat);
+    v=Object.assign({}, v, {
+      subsTotal:_pv.subs, revTotal:_pv.rev, revMois:_pv.revMois,
+      revJour:null, payeursJour:null,          // le jour n'est pas ventilé
+      ltv:_pv.ltv,
+      conv:(_pv.clics!=null)?{clics:_pv.clics, subs:_pv.subs,
+        cvr:(_pv.clics>0)?Math.round(_pv.subs/_pv.clics*1000)/10:null}:null,
+      subsMois:null, quinzCur:null, quinzPrev:null, sante:null,   // non ventilés
+      liens:(v.liens||[]).filter(l=>(l.plat||"_")===plat),
+      _plat:plat,
+    });
+  }
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
   const ko=(typeof revKo==="function")?revKo():false;
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
@@ -5400,19 +5425,12 @@ function openHorsEquipeCard(nom){
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const c=v.conv, s=v.sante;
   const ov=document.createElement("div"); ov.className="ppick";
-  ov.innerHTML=`<div class="ppick-box"><h3>🔒 ${escapeHtml(v.nom)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
-    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(v.nom)}, au même endroit.${(function(){
-      // ⚠️ Le classement montre une ligne PAR BOT (« Bot · Twitter — 72 $ »),
-      // mais cette fiche, elle, cumule TOUTES les origines. Cliquer sur la ligne
-      // Twitter et lire 1 890 $ ici, c'est deux chiffres pour la même chose —
-      // exactement ce qu'on passe la journée à supprimer. On le DIT.
-      const pp=v.parPlateforme||null; const k=pp?Object.keys(pp):[];
-      if(k.length<2) return "";
-      const noms=k.map(x=>x==="_"?"non étiqueté":(x.charAt(0).toUpperCase()+x.slice(1))).join(" + ");
-      return ` <b>Cette fiche cumule TOUTES ses origines (${escapeHtml(noms)})</b> — le détail par bot est dans le classement.`;
-    })()}</div>
+  ov.innerHTML=`<div class="ppick-box"><h3>${v._plat?"🤖":"🔒"} ${escapeHtml(v.nom)}${escapeHtml(surPlat)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
+    <div class="ppick-sub">${v._plat
+      ? `Uniquement ce que ce bot a ramené <b>sur ${escapeHtml(_nomPlat(v._plat))}</b> — l'autre bot a sa propre fiche.`
+      : `Tout ce qu'on sait sur ${escapeHtml(v.nom)}, au même endroit.`}</div>
     <div class="vacard-stats">
-      ${stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
+      ${v._plat?"":stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
       ${stat("Abonnés au total", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
       ${stat("Net généré (est.)", (ko||v.revTotal==null)?"—":money((Number(v.revTotal)||0)*NET), "")}
       ${stat("Net CE MOIS", (ko||v.revMois==null)?"—":money((Number(v.revMois)||0)*NET), (ko||v.revMois==null)?"pas encore mesuré":"")}
@@ -5425,6 +5443,7 @@ function openHorsEquipeCard(nom){
         // normal pour un effondrement. On compare au même stade.
         const qd=(typeof QUINZ_DATA!=="undefined"&&QUINZ_DATA)||null;
         const je=qd?Number(qd.joursEcoules)||0:0, jt=qd?Number(qd.joursTotal)||0:0;
+        if(v._plat) return "";   // la quinzaine n'est pas ventilée par bot
         if(!je||!jt||je>=jt) return stat("Quinzaine", fmtInt(v.quinzCur||0), "précédente : "+fmtInt(v.quinzPrev||0));
         const att=Math.round((Number(v.quinzPrev)||0)*je/jt);
         return stat("Quinzaine", fmtInt(v.quinzCur||0),
@@ -5463,7 +5482,9 @@ function openHorsEquipeCard(nom){
 document.addEventListener("click",e=>{
   const hc=e.target.closest(".he-va"); if(!hc) return;
   const nom=hc.getAttribute("data-he")||(hc.textContent||"").trim();
-  if(nom) openHorsEquipeCard(nom);
+  // La plateforme cliquée voyage avec le nom : sans elle, la fiche de
+  // « Bot · Twitter » montrait les deux bots réunis.
+  if(nom) openHorsEquipeCard(nom, hc.getAttribute("data-heplat")||null);
 });
 
 /* ---------- ⚠️ #3 risque de concentration (front, depuis OM_DATA) ---------- */
@@ -7388,13 +7409,13 @@ function renderOM(){
     // jamais par le champ `platform` en base, qui peut être écrasé par un
     // réglage (l'argent du bot Twitter serait alors compté comme de l'Insta).
     const nomPlat=(k)=>k==="_"?"non étiqueté":(k.charAt(0).toUpperCase()+k.slice(1));
-    const ligneHors=(nom, subs, rev, ltv, sousTitre, titreInfo)=>{
+    const ligneHors=(nom, subs, rev, ltv, sousTitre, titreInfo, plat)=>{
       // Jamais payé -> tout ce qu'il génère EST la marge (aucun coût de paie).
       // `rev` est BRUT à la source : une seule unité à l'écran, le net.
       const marge=(!ko&&rev!=null)?Math.round(rev*netRate()):null;
       return `<div class="omv-row omv-hors">`
         +`<span class="omv-rank">${sousTitre?"🤖":"🔒"}</span>`
-        +`<span class="omv-va he-va" data-he="${escapeHtml(nom)}"${titreInfo?` title="${escapeHtml(titreInfo)}"`:' title="Voir sa fiche"'}>${escapeHtml(nom)}${sousTitre?` <span class="omv-perso">${escapeHtml(sousTitre)}</span>`:""}</span>`
+        +`<span class="omv-va he-va" data-he="${escapeHtml(nom)}"${plat?` data-heplat="${escapeHtml(plat)}"`:""}${titreInfo?` title="${escapeHtml(titreInfo)}"`:' title="Voir sa fiche"'}>${escapeHtml(nom)}${sousTitre?` <span class="omv-perso">${escapeHtml(sousTitre)}</span>`:""}</span>`
         +`<span class="omv-s">${subs!=null?fmtInt(subs)+" subs":"—"}</span>`
         +`<span class="omv-r">${mnt(rev==null?null:rev*netRate())}</span>`
         +`<span class="omv-l">LTV ${ltvT(ltv)}</span>`
@@ -7424,7 +7445,8 @@ function renderOM(){
         const v=pp[k];
         return ligneHors(e.nom, v.subs, v.rev, v.ltv, "· "+nomPlat(k),
           k==="_" ? "Liens sans plateforme écrite dans leur nom — ni Instagram ni Twitter : je ne devine pas l'origine."
-                  : ("Ce que ce bot a ramené sur "+nomPlat(k)+", tous modèles confondus ("+v.liens+" lien"+(v.liens>1?"s":"")+")"));
+                  : ("Ce que ce bot a ramené sur "+nomPlat(k)+", tous modèles confondus ("+v.liens+" lien"+(v.liens>1?"s":"")+") — clique pour sa fiche"),
+          k);
       }).join("");
     }).join("");
     // 🧮 TOTAL des comptes perso — la question d'André : « combien j'ai gagné
@@ -7453,7 +7475,7 @@ function renderOM(){
     // « — » muet sur TOUTE la ligne = on ne sait pas dire pourquoi. On distingue
     // « pas encore calculé » (le serveur le dit avec argentPret) de « pas de revenus ».
     const heAttente = (typeof HORS_EQUIPE_DATA!=="undefined" && HORS_EQUIPE_DATA && HORS_EQUIPE_DATA.argentPret===false)
-      ? `<div class="sv-note" style="margin-top:6px">⏳ Les montants de Bot et Clhoe se calculent encore côté serveur — ils apparaîtront <b>tout seuls</b> ici dans une minute.</div>`
+      ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ <b>Les tirets ci-dessus ne sont PAS des zéros.</b> Les montants et la LTV de tes bots et de Clhoe se calculent encore côté serveur (c'est normal juste après un redémarrage) — ils apparaîtront <b>tout seuls</b> d'ici une minute. Les abonnés, eux, sont justes.</div>`
       : "";
     return `<div class="om-hors-head">🔒 Hors équipe — jamais payées, hors classement et hors totaux</div>`+rows+heTot+heAttente;
   })();
