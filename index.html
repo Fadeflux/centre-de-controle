@@ -5401,7 +5401,16 @@ function openHorsEquipeCard(nom){
   const c=v.conv, s=v.sante;
   const ov=document.createElement("div"); ov.className="ppick";
   ov.innerHTML=`<div class="ppick-box"><h3>🔒 ${escapeHtml(v.nom)} <span class="mn-msg-note">· hors équipe, jamais payée</span></h3>
-    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(v.nom)}, au même endroit.</div>
+    <div class="ppick-sub">Tout ce qu'on sait sur ${escapeHtml(v.nom)}, au même endroit.${(function(){
+      // ⚠️ Le classement montre une ligne PAR BOT (« Bot · Twitter — 72 $ »),
+      // mais cette fiche, elle, cumule TOUTES les origines. Cliquer sur la ligne
+      // Twitter et lire 1 890 $ ici, c'est deux chiffres pour la même chose —
+      // exactement ce qu'on passe la journée à supprimer. On le DIT.
+      const pp=v.parPlateforme||null; const k=pp?Object.keys(pp):[];
+      if(k.length<2) return "";
+      const noms=k.map(x=>x==="_"?"non étiqueté":(x.charAt(0).toUpperCase()+x.slice(1))).join(" + ");
+      return ` <b>Cette fiche cumule TOUTES ses origines (${escapeHtml(noms)})</b> — le détail par bot est dans le classement.`;
+    })()}</div>
     <div class="vacard-stats">
       ${stat("Abonnés ce mois", fmtInt(v.subsMois||0), "hors classement")}
       ${stat("Abonnés au total", v.subsTotal!=null?fmtInt(v.subsTotal):"—")}
