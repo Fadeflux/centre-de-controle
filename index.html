@@ -7370,20 +7370,41 @@ function renderOM(){
     if(per!=="tout") return `<div class="om-hors-head">🔒 Bot et Chloé n'apparaissent que sur « Toujours » — leur détail par période n'est pas calculé.</div>`;
     const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
     if(!ents.length) return "";
-    const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
-      // Jamais payée -> tout ce qu'elle génère EST la marge (aucun coût de paie).
-      // revTotal est BRUT ; ces entités ne sont pas payées → leur marge = tout le
-      // NET (brut × netRate). Avant, on affichait le brut comme « marge » (+20 %).
-      const marge=(!ko&&e.revTotal!=null)?Math.round(e.revTotal*netRate()):null;
+    // 🤖 UNE LIGNE PAR BOT, PAS UNE LIGNE PAR COMPTE (demande d'André, 07/09 :
+    // « Bot-insta Zoe et Layla c'est UN bot, bot-twitter c'est un AUTRE bot »).
+    // Ses liens s'appellent « Bot / Instagram » et « Bot / Twitter » sur deux
+    // comptes OF : le premier segment étant le même, l'attribution range tout
+    // sous un seul VA « Bot » et l'argent des deux bots se retrouvait mélangé.
+    // Le cerveau les sépare désormais par la plateforme ÉCRITE dans le lien —
+    // jamais par le champ `platform` en base, qui peut être écrasé par un
+    // réglage (l'argent du bot Twitter serait alors compté comme de l'Insta).
+    const nomPlat=(k)=>k==="_"?"non étiqueté":(k.charAt(0).toUpperCase()+k.slice(1));
+    const ligneHors=(nom, subs, rev, ltv, sousTitre, titreInfo)=>{
+      // Jamais payé -> tout ce qu'il génère EST la marge (aucun coût de paie).
+      // `rev` est BRUT à la source : une seule unité à l'écran, le net.
+      const marge=(!ko&&rev!=null)?Math.round(rev*netRate()):null;
       return `<div class="omv-row omv-hors">`
-        +`<span class="omv-rank">🔒</span>`
-        +`<span class="omv-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir sa fiche">${escapeHtml(e.nom)}</span>`
-        +`<span class="omv-s">${e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—"}</span>`
-        +`<span class="omv-r">${mnt(e.revTotal==null?null:e.revTotal*netRate())}</span>`   // même colonne = même unité (net)
-        +`<span class="omv-l">LTV ${ltvT(e.ltv)}</span>`
+        +`<span class="omv-rank">${sousTitre?"🤖":"🔒"}</span>`
+        +`<span class="omv-va he-va" data-he="${escapeHtml(nom)}"${titreInfo?` title="${escapeHtml(titreInfo)}"`:' title="Voir sa fiche"'}>${escapeHtml(nom)}${sousTitre?` <span class="omv-perso">${escapeHtml(sousTitre)}</span>`:""}</span>`
+        +`<span class="omv-s">${subs!=null?fmtInt(subs)+" subs":"—"}</span>`
+        +`<span class="omv-r">${mnt(rev==null?null:rev*netRate())}</span>`
+        +`<span class="omv-l">LTV ${ltvT(ltv)}</span>`
         +`<span class="omv-m ${marge!=null?'pos':''}">${marge!=null?"+"+omMoney(marge,cur):"—"}</span>`
         +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
         +`</div>`;
+    };
+    const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
+      const pp=e.parPlateforme||null;
+      const cles=pp?Object.keys(pp):[];
+      // On ne casse la ligne en deux que s'il y a VRAIMENT deux origines : sur un
+      // seul canal, deux lignes identiques n'apprendraient rien.
+      if(cles.length<2) return ligneHors(e.nom, e.subsTotal, e.revTotal, e.ltv, "");
+      return cles.sort((a,b)=>(Number(pp[b].subs)||0)-(Number(pp[a].subs)||0)).map(k=>{
+        const v=pp[k];
+        return ligneHors(e.nom, v.subs, v.rev, v.ltv, "· "+nomPlat(k),
+          k==="_" ? "Liens sans plateforme écrite dans leur nom — ni Instagram ni Twitter : je ne devine pas l'origine."
+                  : ("Ce que ce bot a ramené sur "+nomPlat(k)+", tous modèles confondus ("+v.liens+" lien"+(v.liens>1?"s":"")+")"));
+      }).join("");
     }).join("");
     // 🧮 TOTAL des comptes perso — la question d'André : « combien j'ai gagné
     // avec mes deux bots ? ». Ils ne sont dans AUCUN total d'équipe (c'est voulu :
