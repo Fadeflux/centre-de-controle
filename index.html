@@ -11630,7 +11630,11 @@ function renderEcheances(){
   const alerte=ECHEANCES.filter(e=>e&&e.etat&&e.etat!=="ok").length;
   if(badge){ badge.textContent=alerte?(alerte+" à surveiller"):""; badge.style.display=alerte?"":"none"; }
   if(!ECHEANCES.length){
-    list.innerHTML=`<div class="tk-empty">Rien de suivi pour l'instant. Ajoute ce qui a une date de fin : forfait proxy, abonnement OnlyChat, certificat iPhone, domaine…</div>`;
+    // ⚠️ CE RETOUR ANTICIPÉ SAUTAIT LE BLOC MESURÉ — c'est-à-dire précisément
+    // dans le cas réel (aucune date tapée à la main, parce qu'on ne les tape
+    // pas). Trouvé en ouvrant la vraie page, pas en relisant le code.
+    list.innerHTML=`<div class="tk-empty">Rien de suivi à la main pour l'instant. Ajoute ce qui a une date de fin que je ne peux pas mesurer : certificat iPhone, domaine, contrat…</div>`;
+    rendreEcheancesMesurees();
     return;
   }
   // « inconnu » = date illisible. Le serveur refuse de le peindre en vert, et
