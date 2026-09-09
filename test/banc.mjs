@@ -321,4 +321,42 @@ const V=verifie;
     JSON.stringify(r3.dates.map(d=>d.id)));
 }
 
+
+// ================= 8) les primes reellement versees entrent dans le profit
+// Le compte de resultat deduisait un cout VA THEORIQUE (abonnes x tarif). Les
+// primes, la part manager et la part team leader reellement versees n entraient
+// dans AUCUN calcul : le profit affiche etait plus haut que la realite, et le
+// partage entre associes avec.
+{
+  const bloc = morceau("function primesVerseesCeMois(){", "function moneyPrecis(");
+  const faire = (hist, mk) => new Function("PCUMUL_HIST","tgMonthKey", bloc + "; return primesVerseesCeMois;")(hist, mk)();
+  const MK = (ts) => new Date(ts).toISOString().slice(0,7);
+  const now = Date.now(), moisDernier = now - 40*86400000;
+
+  const r = faire([
+    { va:"Welzy", subsPay:400, prime:150, manager:0,  leader:0,  ts: now },
+    { va:"Yohan", subsPay:300, prime:0,   manager:75, leader:50, ts: now },
+    { va:"Prince",subsPay:200, prime:900, manager:0,  leader:0,  ts: moisDernier },   // AUTRE mois
+  ], MK);
+  V("seules les primes du MOIS EN COURS comptent", r.total===275,
+    "total="+r.total+" (attendu 275 : 150 + 75 + 50 ; les 900 du mois dernier ne comptent pas)");
+  V("le detail est ventile", r.prime===150 && r.manager===75 && r.leader===50,
+    JSON.stringify(r));
+
+  // ⚠️ Le controle qui compte le plus : journal pas encore lu.
+  V("journal absent = null, PAS zero",
+    faire(null, MK)===null,
+    "un 0 voudrait dire « aucune prime versee ce mois » — la conclusion la plus fausse possible");
+
+  // Aucun versement ce mois : la, zero est la VERITE, pas une ignorance.
+  const vide = faire([{ va:"X", prime:900, manager:0, leader:0, ts: moisDernier }], MK);
+  V("aucun versement ce mois = 0, et c est juste", vide && vide.total===0, JSON.stringify(vide));
+
+  // Journal plafonne a 200 lignes cote serveur : le total peut etre un minimum.
+  const plein = Array.from({length:200}, (_,i)=>({ va:"V"+i, prime:1, manager:0, leader:0, ts: now }));
+  const tr = faire(plein, MK);
+  V("un journal tronque est SIGNALE au lieu d etre affirme", tr && tr.tronque===true,
+    "sans ce drapeau, un total sous-estime passerait pour exact");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

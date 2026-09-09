@@ -6821,6 +6821,24 @@ function sousTitreOrigine(brutOf, tg, cur, fmt){
   const tgR=Math.round(t), ofR=total-tgR;
   return `dont OnlyFans ${fmt(ofR,cur)} · Telegram ${fmt(tgR,cur)}`;
 }
+function primesVerseesCeMois(){
+  const h=(typeof PCUMUL_HIST!=="undefined"&&Array.isArray(PCUMUL_HIST))?PCUMUL_HIST:null;
+  // ⚠️ « absent ≠ 0 » : journal pas encore lu = on ne sait pas, et surtout on
+  // ne retire RIEN du profit. Afficher 0 ici voudrait dire « tu n'as versé
+  // aucune prime ce mois-ci » — la conclusion la plus fausse possible.
+  if(!h) return null;
+  const mk=(typeof tgMonthKey==="function")?tgMonthKey(Date.now()):null;
+  const duMois=h.filter(x=>x&&x.ts&&(!mk||tgMonthKey(x.ts)===mk));
+  const som=(c)=>duMois.reduce((a,x)=>a+(Number(x[c])||0),0);
+  const prime=som("prime"), manager=som("manager"), leader=som("leader");
+  // Le journal est plafonné à 200 lignes côté serveur. Si la plus ancienne
+  // ligne reçue est POSTÉRIEURE au 1er du mois, il a peut-être été tronqué :
+  // le total serait alors un minimum, et on le dit au lieu de l'affirmer.
+  const plusVieille=h.length?Math.min.apply(null,h.map(x=>Number(x&&x.ts)||Infinity)):null;
+  const debutMois=new Date(); debutMois.setDate(1); debutMois.setHours(0,0,0,0);
+  const tronque=(h.length>=200 && plusVieille && plusVieille>debutMois.getTime());
+  return { total:Math.round((prime+manager+leader)*100)/100, prime:prime, manager:manager, leader:leader, n:duMois.length, tronque:tronque };
+}
 function moneyPrecis(v,cur){ return HIDE ? "•••" : (Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+(cur||"$"); }
 // ⚠️ CORRIGÉ le 2026-08-23 — TOUTES les LTV s'affichent désormais en NET.
 // Elles étaient en BRUT depuis le début, alors qu'André raisonne en net et paie
@@ -8234,6 +8252,17 @@ function renderRenta(){
   // brut − marge, qui gonflait ce coût de la commission 20 % et faisait re-soustraire
   // la commission une 2e fois plus bas → profit sous-estimé de 20 % du brut).
   const coutVA=netMonth*netRate()-margeMonth;
+  // 💸 CE QUE TU AS VRAIMENT VERSÉ EN PLUS DES SUBS — primes, part manager,
+  // part team leader.
+  // ⚠️ CE COMPTE DE RÉSULTAT NE LES DÉDUISAIT NULLE PART. `coutVA` vient de
+  // `margeMonth`, que le serveur calcule comme « net − paie » avec une paie
+  // THÉORIQUE (abonnés × tarif). Les primes et les parts que tu verses
+  // réellement n'entraient donc dans AUCUN calcul de profit : le profit affiché
+  // était plus haut que la réalité, du montant exact de ce que tu as versé en
+  // plus. Et c'est ce profit qui sert au partage entre associés.
+  // La donnée existe déjà : chaque versement enregistre sa ventilation
+  // (subsPay / prime / manager / leader) dans le journal de paie.
+  const primesMois=primesVerseesCeMois();
   const coutOutils=(typeof COSTS!=="undefined"?COSTS:[]).reduce((a,c)=>a+coutMensuel(c),0);
   const tgMonth=(typeof tgMonthTotal==="function"?tgMonthTotal():0);
   // ⚠️ `coutMensuel()` rend un tarif d'un MOIS COMPLET, mais `margeMonth` et
@@ -8266,7 +8295,12 @@ function renderRenta(){
   // 💬 Commission OnlyChat SUR LES VENTES (en plus des 180 $/mois
   // d'abonnements déjà dans "Coûts des outils") : onlychatFee() ci-dessus.
   const ocFee=Math.round(onlychatFee(netMonth*netRate(), tgMonth));
-  const profitReel=profitNet-ocFee;
+  // ⚠️ ET SURTOUT : ON LE DÉDUIT VRAIMENT. Ajouter la ligne à l'écran sans
+  // toucher au total, ce serait de la décoration — le profit resterait faux et
+  // le partage entre associés avec. Si le journal n'est pas lu (`null`), on ne
+  // déduit RIEN et la ligne affiche « — » : mieux vaut un profit qu'on sait
+  // incomplet qu'un profit amputé d'un montant inventé.
+  const profitReel=profitNet-ocFee-((primesMois&&primesMois.total>0)?primesMois.total:0);
   // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
   const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
   const provision=Math.round(Math.max(0,profitReel)*TAX/100);
@@ -8299,6 +8333,15 @@ function renderRenta(){
     <div class="rn-line"><span>CA brut du mois</span><span class="rn-v">${money(netMonth)}</span></div>
     <div class="rn-line"><span>− Commission OnlyFans (${pctComm()})</span><span class="rn-v neg">−${money(commission)}</span></div>
     <div class="rn-line"><span>− Coût des VA (subs payés)</span><span class="rn-v neg">−${money(coutVA)}</span></div>
+    ${(function(){
+      if(!primesMois) return `<div class="rn-line"><span>− Primes & parts versées <span class="ob-sub">(manager, team leader)</span></span><span class="rn-v">—</span></div>`;
+      if(!(primesMois.total>0)) return "";
+      const det=[];
+      if(primesMois.prime>0) det.push(money(primesMois.prime)+" de primes");
+      if(primesMois.manager>0) det.push(money(primesMois.manager)+" de part manager");
+      if(primesMois.leader>0) det.push(money(primesMois.leader)+" de part team leader");
+      return `<div class="rn-line"><span>− Primes & parts versées <span class="ob-sub">(${det.join(" · ")}${primesMois.tronque?" — au moins, journal tronqué":""})</span></span><span class="rn-v neg">−${money(primesMois.total)}</span></div>`;
+    })()}
     <div class="rn-line"><span>− Coûts des outils${moisEnCours?` <span class="ob-sub">(au prorata : jour ${day}/${dim} — ${money(coutOutils)} sur le mois complet)</span>`:""}</span><span class="rn-v neg">−${money(coutOutilsADate)}</span></div>
     ${tgMonth>0?`<div class="rn-line"><span>+ Revenus Telegram</span><span class="rn-v pos">+${money(tgMonth)}</span></div>`:""}
     ${ocFee>0?`<div class="rn-line"><span>− Commission OnlyChat (10 % OF + 15 % Telegram)</span><span class="rn-v neg">−${money(ocFee)}</span></div>`:""}
@@ -8478,7 +8521,12 @@ function renderSplit(){
   const _jS=(typeof jourDuMoisServeur==="function")?Math.max(1,jourDuMoisServeur()):Math.max(1,new Date().getDate());
   const _dS=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():30;
   const coutOutilsADate=Math.round(coutOutils*Math.min(1,_jS/_dS));
-  const profit=margeMonth-coutOutilsADate-ocFee+tgMonth;
+  // ⚠️ CE CHIFFRE DECIDE QUI TOUCHE QUOI. Il refaisait le meme calcul que le
+  // compte de resultat — donc il oubliait, lui aussi, les primes et les parts
+  // reellement versees. Chaque associe se voyait attribuer la moitie d'un
+  // profit trop haut. Une seule definition pour les deux ecrans.
+  const _pv=primesVerseesCeMois();
+  const profit=margeMonth-coutOutilsADate-ocFee+tgMonth-((_pv&&_pv.total>0)?_pv.total:0);
   const pct=Math.min(100,Math.max(0,parseInt(localStorage.getItem("ccn_split")||"50",10)||50));
   const nameMe=(typeof NAMES!=="undefined"?NAMES.moi:"Toi"), nameOther=(typeof NAMES!=="undefined"?NAMES.other:"Associé");
   const partMe=Math.round(profit*pct/100), partOther=Math.round(profit*(100-pct)/100);
