@@ -857,4 +857,55 @@ const V=verifie;
     "le motif est devenu inerte : il ne verrait plus rien passer");
 }
 
+
+// ================= 20) inscrire un VA le jour de l embauche
+// Un VA n existait dans ce centre qu a partir du moment ou Infloww lui
+// attribuait des abonnes : impossible de noter sa date d arrivee le jour ou on
+// l embauche, et impossible de voir celui qui ne demarre pas.
+// L inscription ne CREE aucun VA : c est un nom et une date, jamais de l argent.
+{
+  const bloc = morceau("function vaProduitDeja(nom){", "function renderVaNouveaux(");
+  const faire = (OM_DATA, VA_STARTS, VA_ARCHIVES) => new Function("OM_DATA","VA_STARTS","VA_ARCHIVES",
+    bloc + "; return { attente: vaEnAttente, produit: vaProduitDeja };")(OM_DATA, VA_STARTS, VA_ARCHIVES);
+
+  const JOUR = 86400000;
+  const ilYA = (n) => new Date(Date.now() - n*JOUR).toISOString().slice(0,10);
+
+  const om = { vas: [{ va: "Welzy" }, { va: "Yohan" }] };
+
+  // Un inscrit qui n a rien produit doit ressortir, avec ses jours.
+  const r = faire(om, { "Prince": ilYA(12), "Welzy": ilYA(300) }, []).attente();
+  V("un inscrit qui n a rien produit ressort", r.length===1 && r[0].va==="Prince", JSON.stringify(r));
+  V("... avec le nombre de jours depuis son arrivee", r[0].jours===12, "jours=" + r[0].jours);
+  V("un VA qui produit deja n est PAS dans la liste d attente",
+    !r.some(x => x.va==="Welzy"), "sa date d arrivee est juste une date, pas une alerte");
+
+  // ⚠️ LE CONTROLE QUI COMPTE : la liste des VA n est pas encore lue. Repondre
+  // « personne ne tarde » sans avoir regarde, c est le faux vert habituel.
+  V("liste des VA non lue = null, PAS une liste vide",
+    faire(null, { "Prince": ilYA(12) }, []).attente()===null,
+    "une liste vide se lirait « tout le monde a demarre »");
+  V("idem si `vas` n est pas un tableau",
+    faire({ vas: "boom" }, { "Prince": ilYA(3) }, []).attente()===null, "reponse malformee");
+
+  // Un VA archive (parti) ne doit pas etre signale comme « ne demarre pas ».
+  V("un VA parti n est pas signale comme tardif",
+    faire(om, { "Elegance": ilYA(40) }, ["Elegance"]).attente().length===0,
+    "il est parti : ce n est pas un demarrage rate");
+
+  // Une date illisible ne devient pas 0 jour.
+  const sale = faire(om, { "Sale": "pas-une-date" }, []).attente();
+  V("une date illisible ne devient pas « inscrit aujourd hui »",
+    sale.length===1 && sale[0].jours===null, JSON.stringify(sale));
+
+  // Le rapprochement se fait sur le nom, insensible a la casse et aux espaces.
+  V("le rapprochement ignore casse et espaces",
+    faire(om, { "  welzy ": ilYA(5) }, []).attente().length===0,
+    "sinon un espace en trop cree un doublon fantome");
+
+  // Les plus anciens en tete : ce sont eux qui posent question.
+  const tri = faire(om, { "A": ilYA(3), "B": ilYA(30), "C": ilYA(9) }, []).attente();
+  V("les plus anciens d abord", tri.map(x=>x.va).join("")==="BCA", tri.map(x=>x.va).join(""));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

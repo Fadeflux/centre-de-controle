@@ -2724,8 +2724,14 @@
     <div id="rlMsg" class="ech-note" style="margin-top:6px"></div>
   </div>
   <div class="panel-box" id="vaarchives" style="display:none">
-    <div class="pb-head">👥 VA archivés</div>
-    <div class="ech-intro">Ils ne sont plus dans le classement, le coach ni les alertes — mais leur historique reste compté dans tes totaux. Réactive-les quand tu veux.</div>
+    <div class="pb-head">👥 Équipe — arrivées et archives</div>
+    <div class="ech-intro">Inscris un VA <b>le jour où tu l'embauches</b>, même s'il n'a encore rien produit : son ancienneté sera juste dès le premier jour, et tu verras tout de suite ceux qui tardent à démarrer.</div>
+    <div class="rule-form" style="margin-bottom:8px">
+      <input id="vaNewNom" placeholder="Nom du VA, exactement comme dans Infloww">
+      <input id="vaNewDate" type="date">
+      <button class="mn-act-btn" id="vaNewAdd">＋</button>
+    </div>
+    <div id="vaNouveaux"></div>
     <div id="vaArchList"></div>
   </div>
   <div class="panel-box" id="echeances" style="display:none">
@@ -11543,6 +11549,16 @@ function buildActions(){
   const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
   if(fr && Array.isArray(fr.churned) && fr.churned.length) push(2,"💔",`${fr.churned.length} gros fan${fr.churned.length>1?"s":""} vien${fr.churned.length>1?"nent":"t"} de partir — à récupérer`,"churn");
+  // ➕ Un VA inscrit qui ne démarre pas. C'est exactement la question qu'on ne
+  // pouvait pas se poser avant : il n'existait nulle part tant qu'il n'avait
+  // rien produit. On ne crie qu'à partir de 10 jours — avant, c'est normal.
+  try{
+    const _att=(typeof vaEnAttente==="function")?vaEnAttente():null;
+    if(_att && _att.length){
+      const tard=_att.filter(x=>x && x.jours!=null && x.jours>=10);
+      if(tard.length) push(1,"➕",`${tard.length} VA inscrit${tard.length>1?"s":""} n'${tard.length>1?"ont":"a"} toujours rien produit : ${tard.slice(0,2).map(x=>x.va+" (J+"+x.jours+")").join(", ")}${tard.length>2?"…":""}`,"vaarchives");
+    }
+  }catch(e){}
   const gh=(typeof GHOSTS!=="undefined")?GHOSTS:null;
   if(gh && gh.count) push(1,"👻",`${gh.count} VA fantôme${gh.count>1?"s":""} (rien produit)`,"ghosts");
   if(typeof ANOM_LIST!=="undefined" && ANOM_LIST.length){ const a0=ANOM_LIST[0]; push(Math.max(1,a0.sev),"📊",`${ANOM_LIST.length} anomalie${ANOM_LIST.length>1?"s":""} détectée${ANOM_LIST.length>1?"s":""} — ${a0.plain||String(a0.texte).replace(/<[^>]+>/g,"")}`,"anomalies"); }
@@ -12176,17 +12192,100 @@ function anciennete(iso){
   const a=Math.floor(m/12), r=m%12;
   return a+" an"+(a>1?"s":"")+(r?(" "+r+" mois"):"");
 }
+// ➕ INSCRIRE UN VA LE JOUR DE L'EMBAUCHE.
+// Un VA n'existait dans ce centre qu'à partir du moment où Infloww lui
+// attribuait des abonnés. Impossible, donc, de noter sa date d'arrivée le jour
+// où on l'embauche — et impossible de voir celui qui ne démarre pas, puisqu'il
+// n'apparaissait nulle part. Le seul endroit où poser cette date était la
+// fiche d'un VA... qui produit déjà.
+//
+// ⚠️ CE QUE CETTE INSCRIPTION N'EST PAS, et c'est volontaire : elle ne CRÉE
+// aucun VA. C'est un nom et une date, rien d'autre. Elle n'entre ni dans la
+// paie, ni dans l'attribution des abonnés, ni dans aucun total — sinon on
+// fabriquerait des VA fantômes qui fausseraient l'argent. Le jour où Infloww
+// commence à lui attribuer des abonnés, il rejoint le classement tout seul,
+// avec son ancienneté déjà juste.
+//
+// ⚠️ LE NOM DOIT CORRESPONDRE. La jonction se fait sur le nom. S'il est écrit
+// autrement que dans Infloww, l'inscription restera orpheline — on l'affiche
+// donc telle quelle, en le disant, plutôt que de deviner un rapprochement.
+function vaProduitDeja(nom){
+  const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]);
+  const n=String(nom||"").trim().toLowerCase();
+  return vas.some(v=>v && String(v.va||"").trim().toLowerCase()===n);
+}
+// Les inscrits qui n'ont encore rien produit, avec le nombre de jours depuis
+// leur arrivée. `null` si on ne sait pas encore lire la liste des VA : « absent
+// ≠ 0 », on ne veut pas annoncer « personne ne tarde » sans avoir regardé.
+function vaEnAttente(){
+  const om=(typeof OM_DATA!=="undefined")?OM_DATA:null;
+  if(!om || !Array.isArray(om.vas)) return null;
+  const arch=(typeof VA_ARCHIVES!=="undefined"&&Array.isArray(VA_ARCHIVES))?VA_ARCHIVES:[];
+  const out=[];
+  Object.keys((typeof VA_STARTS!=="undefined"&&VA_STARTS)||{}).forEach(nom=>{
+    if(vaProduitDeja(nom)) return;
+    if(arch.some(a=>String(a).trim().toLowerCase()===String(nom).trim().toLowerCase())) return;   // parti : normal
+    const d=VA_STARTS[nom];
+    const t=Date.parse(String(d)+"T00:00:00");
+    const jours=isFinite(t)?Math.max(0,Math.floor((Date.now()-t)/86400000)):null;
+    out.push({ va:nom, date:d||null, jours:jours });
+  });
+  // Les plus anciens d'abord : ce sont eux qui posent question.
+  out.sort((a,b)=>((b.jours==null?-1:b.jours)-(a.jours==null?-1:a.jours)));
+  return out;
+}
+function renderVaNouveaux(){
+  const z=$("#vaNouveaux"); if(!z) return;
+  const l=vaEnAttente();
+  if(l===null){ z.innerHTML=`<div class="tk-empty">❓ Liste des VA pas encore lue — je ne peux pas dire qui tarde à démarrer.</div>`; return; }
+  if(!l.length){ z.innerHTML=""; return; }
+  z.innerHTML=l.map(x=>{
+    const tard=(x.jours!=null && x.jours>=10);
+    const quand=(x.jours==null)?"date illisible"
+      :(x.jours===0?"inscrit aujourd'hui":("inscrit il y a "+x.jours+" jour"+(x.jours>1?"s":"")));
+    return `<div class="ech-row ${tard?"ech-urgent":"ech-attente"}">`
+      +`<span class="ech-l"><b>${escapeHtml(x.va)}</b>`
+      +`<div class="ech-note">${escapeHtml(quand)} · n'a <b>encore rien produit</b>${tard?" — ça fait long":""}. Si le nom ne correspond pas exactement à Infloww, il restera ici pour toujours.</div></span>`
+      +`<button class="ech-del" data-vanewdel="${escapeHtml(x.va)}" title="Retirer cette inscription">✕</button></div>`;
+  }).join("");
+}
 function renderVaArchives(){
   const box=$("#vaarchives"), list=$("#vaArchList"); if(!box||!list) return;
   // Sans jeton, ou sans archive, ce panneau n'a rien à dire.
-  if(!TOKEN || !VA_ARCHIVES.length){ box.style.display="none"; return; }
+  // Le panneau s'ouvre aussi quand il n'y a AUCUNE archive : c'est là qu'on
+  // inscrit les arrivées. Le cacher rendrait l'inscription introuvable le jour
+  // où elle sert — le premier.
+  if(!TOKEN){ box.style.display="none"; return; }
   box.style.display="block";
+  renderVaNouveaux();
+  if(!VA_ARCHIVES.length){ list.innerHTML=""; return; }
   list.innerHTML=VA_ARCHIVES.slice().sort().map(n=>{
     const deb=VA_STARTS[n]||"", anc=anciennete(deb);
     return `<div class="vaa-row"><span class="vaa-n">${escapeHtml(n)}${anc?` <span class="vaa-anc">${escapeHtml(anc)} dans l'équipe</span>`:""}</span>`
       +`<button class="act" data-vaunarch="${escapeHtml(n)}">↩️ Réactiver</button></div>`;
   }).join("");
 }
+{ const b=$("#vaNewAdd"); if(b) b.onclick=()=>{
+    const nom=String(($("#vaNewNom")||{}).value||"").trim();
+    const dt=String(($("#vaNewDate")||{}).value||"").trim();
+    if(!nom){ if(typeof toast==="function") toast("⚠️ Il manque le nom","Écris-le exactement comme dans Infloww, sinon l'inscription ne se rattachera jamais."); return; }
+    // Une date illisible ne doit pas devenir « aujourd'hui » en silence :
+    // l'ancienneté serait fausse pour toujours, et c'est tout l'intérêt.
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ if(typeof toast==="function") toast("⚠️ Il manque la date d'arrivée","Sans elle, l'ancienneté ne veut rien dire."); return; }
+    if(VA_STARTS[nom] && VA_STARTS[nom]!==dt
+       && !confirm(nom+" a déjà une date d'arrivée ("+VA_STARTS[nom]+").\n\nLa remplacer par "+dt+" ?")) return;
+    VA_STARTS[nom]=dt; saveVaStarts();
+    $("#vaNewNom").value=""; $("#vaNewDate").value="";
+    renderVaArchives();
+    if(typeof toast==="function") toast("➕ "+nom+" inscrit",
+      vaProduitDeja(nom) ? "Sa date d'arrivée est enregistrée." : "Il apparaîtra dans le classement dès qu'Infloww lui attribuera des abonnés.");
+  }; }
+{ const l=$("#vaNouveaux"); if(l) l.addEventListener("click",e=>{
+    const b=e.target.closest("[data-vanewdel]"); if(!b) return;
+    const n=b.getAttribute("data-vanewdel");
+    if(!confirm("Retirer l'inscription de "+n+" ?\n\nSa date d'arrivée sera oubliée.")) return;
+    delete VA_STARTS[n]; saveVaStarts(); renderVaArchives();
+  }); }
 { const l=$("#vaArchList"); if(l) l.addEventListener("click",e=>{
     const b=e.target.closest("[data-vaunarch]"); if(!b) return;
     const n=b.getAttribute("data-vaunarch");
