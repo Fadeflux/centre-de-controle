@@ -694,7 +694,7 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
-  body.assoc-mode #echeances, body.assoc-mode #dates,
+  body.assoc-mode #echeances, body.assoc-mode #dates, body.assoc-mode #vaarchives,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
   body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
@@ -1395,6 +1395,15 @@
   .ech-row .ech-del:hover{color:#f87171}
   .ech-badge{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(248,113,113,.14);color:#f87171;margin-left:6px}
   .ech-note{color:var(--faint);font-size:11.5px}
+  .vaa-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
+  .vaa-row:last-child{border-bottom:0}
+  .vaa-row .vaa-n{flex:1;min-width:0}
+  .vaa-anc{color:var(--faint);font-size:11.5px}
+  .vaa-row button{flex:0 0 auto;font-size:12px;padding:5px 10px}
+  .vc-equipe{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px}
+  .vc-equipe .vc-eq-l{flex:1;min-width:120px;color:var(--muted)}
+  .vc-equipe button{font:inherit;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);cursor:pointer}
+  .vc-equipe button:hover{border-color:var(--acc-line)}
   .om-spend-c:hover{background:rgba(52,211,153,.18)}
   .om-spend-c i{color:var(--faint);font-style:normal;font-size:11.5px}
   .om-spend-c.perso{background:rgba(148,163,184,.10);border-color:rgba(148,163,184,.32)}
@@ -2620,6 +2629,14 @@
        Ce panneau répond à la question qui a coûté le plus cher cette semaine :
        « qu'est-ce qui va s'arrêter tout seul sans prévenir ? » — forfait proxy,
        abonnement OnlyChat, cookie, certificat, domaine, téléphones. -->
+  <!-- 👥 Un VA archivé disparaît de PARTOUT : sans cette liste, il n'existe
+       plus aucun endroit d'où le faire revenir. Archiver serait alors une
+       porte à sens unique, ce qu'aucun geste réversible ne devrait être. -->
+  <div class="panel-box" id="vaarchives" style="display:none">
+    <div class="pb-head">👥 VA archivés</div>
+    <div class="ech-intro">Ils ne sont plus dans le classement, le coach ni les alertes — mais leur historique reste compté dans tes totaux. Réactive-les quand tu veux.</div>
+    <div id="vaArchList"></div>
+  </div>
   <div class="panel-box" id="echeances" style="display:none">
     <div class="pb-head">⏳ Ce qui va expirer <span class="ech-badge" id="echBadge"></span></div>
     <div class="ech-intro">Tout ce qui a une date de fin et qui casse quelque chose en silence quand elle passe. Le proxy, un abonnement, un certificat, un domaine.</div>
@@ -3332,7 +3349,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -11295,6 +11312,118 @@ function renderEcheances(){
     ECHEANCES=ECHEANCES.filter(x=>x.id!==id);
     saveEcheances([id]);   // suppression EXPLICITE : le serveur ne devine pas
   }); }
+// 👥 ÉQUIPE : ancienneté et archivage, depuis le centre.
+// ⚠️ CES DEUX ROUTES REMPLACENT LA LISTE ENTIÈRE À CHAQUE ÉCRITURE.
+// Le serveur le dit lui-même : c'est l'incident du 2026-08-17 — un GET qui
+// répondait « [] » sur un hoquet de base, un nom ajouté, et le POST écrasait
+// toute la liste par ce seul nom (Bot et Bot-insta disparus).
+// On n'écrit donc RIEN tant qu'on n'a pas lu, et une saisie faite pendant une
+// panne est retenue puis rejouée.
+let VA_ARCHIVES=[], VAARCH_LOADED=false, VAARCH_DIRTY=false;
+let VA_STARTS={},   VASTART_LOADED=false, VASTART_DIRTY=false;
+
+async function loadVaArchives(){
+  if(!TOKEN){ VAARCH_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-archives",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return;                       // 503 « liste illisible » : on ne conclut rien
+    const j=await r.json();
+    if(!Array.isArray(j.archives)) return;
+    // Fusion : un archivage fait pendant la panne ne doit pas être annulé par
+    // la lecture qui le suit.
+    const dedans=new Set(j.archives.map(x=>String(x)));
+    const enAttente = VAARCH_DIRTY ? VA_ARCHIVES.filter(x=>!dedans.has(String(x))) : [];
+    VA_ARCHIVES=j.archives.concat(enAttente);
+    VAARCH_LOADED=true;
+    if(VAARCH_DIRTY) saveVaArchives();
+  }catch(e){}
+  renderVaArchives();
+}
+function saveVaArchives(){
+  if(!TOKEN) return;
+  if(!VAARCH_LOADED){ VAARCH_DIRTY=true;
+    if(typeof toast==="function") toast("⏳ En attente","La liste des archives n'a pas encore été lue : l'envoyer maintenant l'écraserait. Ça partira tout seul.");
+    renderVaArchives(); return; }
+  fetch(HUB_BASE+"/api/hub/va-archives",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify({archives:VA_ARCHIVES})})
+    .then(r=>{ if(r.ok){ VAARCH_DIRTY=false; if(typeof loadAll==="function") loadAll(); return; }
+      VAARCH_DIRTY=true; if(typeof toast==="function") toast("⚠️ NON enregistré","Le serveur n'a pas pu écrire — refais l'opération."); })
+    .catch(()=>{ VAARCH_DIRTY=true; if(typeof toast==="function") toast("⚠️ NON enregistré","Pas de réseau : rien n'est parti."); });
+  renderVaArchives();
+}
+async function loadVaStarts(){
+  if(!TOKEN){ VASTART_LOADED=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-start",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(!j || typeof j.starts!=="object" || !j.starts) return;
+    const srv=j.starts;
+    if(VASTART_DIRTY) Object.keys(VA_STARTS).forEach(k=>{ srv[k]=VA_STARTS[k]; });   // le local gagne : il n'est pas encore parti
+    VA_STARTS=srv; VASTART_LOADED=true;
+    if(VASTART_DIRTY) saveVaStarts();
+  }catch(e){}
+}
+function saveVaStarts(){
+  if(!TOKEN) return;
+  if(!VASTART_LOADED){ VASTART_DIRTY=true;
+    if(typeof toast==="function") toast("⏳ En attente","Les dates d'arrivée n'ont pas encore été lues : ça partira tout seul.");
+    return; }
+  fetch(HUB_BASE+"/api/hub/va-start",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify({starts:VA_STARTS})})
+    .then(r=>{ if(r.ok){ VASTART_DIRTY=false; return; }
+      VASTART_DIRTY=true; if(typeof toast==="function") toast("⚠️ Date NON enregistrée","Refais l'opération."); })
+    .catch(()=>{ VASTART_DIRTY=true; if(typeof toast==="function") toast("⚠️ Date NON enregistrée","Pas de réseau."); });
+}
+// « il est là depuis 7 mois » se lit mieux que « 2026-02-14 ».
+function anciennete(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||""))) return "";
+  const d=new Date(iso+"T00:00:00"); if(isNaN(d.getTime())) return "";
+  const j=Math.floor((Date.now()-d.getTime())/86400000);
+  if(j<0) return "arrive bientôt";
+  if(j<31) return j+" j";
+  const m=Math.floor(j/30.44);
+  if(m<12) return m+" mois";
+  const a=Math.floor(m/12), r=m%12;
+  return a+" an"+(a>1?"s":"")+(r?(" "+r+" mois"):"");
+}
+function renderVaArchives(){
+  const box=$("#vaarchives"), list=$("#vaArchList"); if(!box||!list) return;
+  // Sans jeton, ou sans archive, ce panneau n'a rien à dire.
+  if(!TOKEN || !VA_ARCHIVES.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  list.innerHTML=VA_ARCHIVES.slice().sort().map(n=>{
+    const deb=VA_STARTS[n]||"", anc=anciennete(deb);
+    return `<div class="vaa-row"><span class="vaa-n">${escapeHtml(n)}${anc?` <span class="vaa-anc">${escapeHtml(anc)} dans l'équipe</span>`:""}</span>`
+      +`<button class="act" data-vaunarch="${escapeHtml(n)}">↩️ Réactiver</button></div>`;
+  }).join("");
+}
+{ const l=$("#vaArchList"); if(l) l.addEventListener("click",e=>{
+    const b=e.target.closest("[data-vaunarch]"); if(!b) return;
+    const n=b.getAttribute("data-vaunarch");
+    if(!confirm("Réactiver "+n+" ?\n\nIl réapparaîtra dans le classement, la paie et les alertes.")) return;
+    VA_ARCHIVES=VA_ARCHIVES.filter(x=>String(x)!==String(n));
+    saveVaArchives();
+    if(typeof toast==="function") toast("↩️ "+n+" réactivé","Il revient dans le classement au prochain rafraîchissement.");
+  }); }
+// 👋 ARCHIVER — geste lourd : il disparaît du classement, du coach et des
+// alertes. On dit ce que ça fait, et surtout on prévient s'il reste de l'argent
+// à lui verser : son historique reste, mais on ne veut pas l'oublier.
+function archiverVa(nom){
+  let du=null;
+  try{
+    const pc=(typeof PCUMUL!=="undefined"&&PCUMUL&&Array.isArray(PCUMUL.vas))?PCUMUL.vas.find(x=>x&&x.va===nom):null;
+    if(pc && pc.aPayer!=null) du=Number(pc.aPayer)||0;
+  }catch(e){}
+  const avert = (du!=null && du>0)
+    ? "\n\n⚠️ Tu lui dois encore "+(typeof fmtMoney==="function"?fmtMoney(du):du+" $")+". Il RESTERA dans « Paie au cumul » tant que ce n'est pas soldé — il ne disparaît pas de ta dette."
+    : "";
+  if(!confirm("Archiver "+nom+" ?\n\nIl sort du classement, du coach et des alertes. Son historique reste compté dans tes totaux."+avert+"\n\nTu pourras le réactiver depuis « VA archivés ».")) return false;
+  if(VA_ARCHIVES.indexOf(nom)<0) VA_ARCHIVES.push(nom);
+  saveVaArchives();
+  if(typeof toast==="function") toast("👋 "+nom+" archivé","Tu peux le réactiver dans le panneau « VA archivés ».");
+  return true;
+}
 // 🗂️ #11 HISTORIQUE DES INCIDENTS : pannes passées + en cours (durée, récurrences).
 let INCIDENTS_DATA=null;
 async function loadIncidents(refresh){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/incidents"+(refresh?"?refresh=1":""),{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; INCIDENTS_DATA=await r.json(); renderIncidents(); }catch(e){} }
@@ -13210,6 +13339,17 @@ function openVaCard(vaName){
     <div class="va-notes"><div class="va-notes-h">🗒️ Mes notes sur ${escapeHtml(vaName)}</div>
       <textarea id="vaNoteBox" class="va-notes-box" placeholder="Dispo, forces/faiblesses, ce que tu lui as dit, à suivre…">${escapeHtml((typeof vaNoteGet==="function"?vaNoteGet(vaName):""))}</textarea>
       <div class="va-notes-save" id="vaNoteSaved"></div></div>
+    <div class="vc-equipe">
+      <span class="vc-eq-l">${(function(){
+        const d=(typeof VA_STARTS!=="undefined"&&VA_STARTS)?VA_STARTS[vaName]:"";
+        const a=(typeof anciennete==="function")?anciennete(d):"";
+        // « absent ≠ 0 » : sans date connue on ne calcule aucune ancienneté.
+        return d ? ("📅 Arrivé le "+new Date(d+"T00:00:00").toLocaleDateString("fr-FR")+(a?(" · <b>"+escapeHtml(a)+"</b> dans l'équipe"):""))
+                 : "📅 Date d'arrivée inconnue";
+      })()}</span>
+      <button data-vc="start">📅 Date d'arrivée</button>
+      <button data-vc="archive">👋 Archiver</button>
+    </div>
     <div class="vacard-btns">
       <button data-vc="goal">🎯 Objectif</button>
       <button data-vc="draft">✍️ Rédige-le (IA)</button>
@@ -13222,6 +13362,25 @@ function openVaCard(vaName){
     const act=b.getAttribute("data-vc");
     if(act==="close"){ ov.remove(); return; }
     if(act==="goal"){ ov.remove(); if(typeof setVaGoal==="function") setVaGoal(vaName); return; }
+    if(act==="start"){
+      const actuel=(typeof VA_STARTS!=="undefined"&&VA_STARTS&&VA_STARTS[vaName])||"";
+      const v=prompt("Date d'arrivée de "+vaName+" dans l'équipe (AAAA-MM-JJ) :", actuel);
+      if(v===null) return;
+      const t=String(v).trim();
+      // Vider = effacer la date. Une date illisible ne change RIEN et le dit :
+      // une ancienneté fausse est pire qu'une ancienneté absente.
+      if(t===""){ delete VA_STARTS[vaName]; saveVaStarts(); ov.remove(); openVaCard(vaName); return; }
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(t) || isNaN(new Date(t+"T00:00:00").getTime())){
+        if(typeof toast==="function") toast("⚠️ Date non comprise","Écris-la comme ça : 2026-02-14. Rien n'a été changé.");
+        return;
+      }
+      VA_STARTS[vaName]=t; saveVaStarts();
+      ov.remove(); openVaCard(vaName); return;
+    }
+    if(act==="archive"){
+      if(typeof archiverVa==="function" && archiverVa(vaName)) ov.remove();
+      return;
+    }
     if(act==="draft"){
       // ✍️ #4 : l'IA rédige un message pour ce VA (respecte la règle subs-only côté serveur).
       const intent=prompt("Objectif du message pour "+vaName+" ? (ex : le motiver, lui demander de poster plus, le féliciter)","");
@@ -13931,6 +14090,10 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
     if(typeof ECH_LOADED!=="undefined" && !ECH_LOADED) loadEcheances();
     // Idem pour les événements & dates (voir loadDates).
     if(typeof DATES_LOADED!=="undefined" && !DATES_LOADED) loadDates();
+    // Idem pour l'équipe (archives + dates d'arrivée) : ces deux routes
+    // REMPLACENT la liste entière, donc écrire sans avoir lu l'écraserait.
+    if(typeof VAARCH_LOADED!=="undefined" && !VAARCH_LOADED) loadVaArchives();
+    if(typeof VASTART_LOADED!=="undefined" && !VASTART_LOADED) loadVaStarts();
   }
 } }
 setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_MS);
@@ -14048,6 +14211,8 @@ function _argentEnAttente(){
     if(typeof TAX_DIRTY       !== "undefined" && TAX_DIRTY)       return true;
     if(typeof ECH_DIRTY       !== "undefined" && ECH_DIRTY)       return true;
     if(typeof DATES_DIRTY     !== "undefined" && DATES_DIRTY)     return true;
+    if(typeof VAARCH_DIRTY    !== "undefined" && VAARCH_DIRTY)    return true;
+    if(typeof VASTART_DIRTY   !== "undefined" && VASTART_DIRTY)   return true;
   }catch(e){}
   return false;
 }
