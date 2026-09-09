@@ -13117,6 +13117,11 @@ function seDeconnecter(){
       const br=btn.getBoundingClientRect();
       menu.style.right="auto";
       menu.style.top=Math.round(Math.max(8, br.bottom+8))+"px";
+      // ⚠️ La hauteur maximale dépend de l'ENDROIT où le menu commence, pas
+      // seulement de la fenêtre. Un `max-height:calc(100vh - 90px)` fixe le
+      // laissait déborder de 56 px vers le bas quand le bouton est un peu bas :
+      // les derniers réglages (dont « Se déconnecter ») devenaient inatteignables.
+      menu.style.maxHeight = Math.max(160, Math.round(window.innerHeight - parseFloat(menu.style.top||"0") - 12)) + "px";
       const mw=menu.getBoundingClientRect().width || menu.offsetWidth || 236;
       let left=Math.max(12, Math.min(br.right-mw, window.innerWidth-mw-12));
       menu.style.left=Math.round(left)+"px";
