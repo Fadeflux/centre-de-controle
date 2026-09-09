@@ -10710,12 +10710,58 @@ function renderCoutOpp(){
 // après quinzaine. Calculé côté front depuis /api/hub/va-quinzaines (subs par
 // quinzaine) + la rentabilité courante d'OM_DATA (un VA EN PERTE relève du
 // détecteur « à couper », pas d'ici).
-let VAQZ_DATA=null, DECROCHE_FLAGS=[], OPP_FLAGS=[], ANOM_LIST=[];
-async function loadDecroche(){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}}); if(!r.ok) return; VAQZ_DATA=await r.json(); renderDecroche(); renderOpp(); renderAnomalies(); }catch(e){} }
+let VAQZ_DATA=null, VAQZ_ETAT=null, DECROCHE_FLAGS=[], OPP_FLAGS=[], ANOM_LIST=[];
+// ⚠️ CE CHARGEMENT ÉCHOUAIT EN SILENCE, ET TROIS DÉTECTEURS AVEC LUI.
+// `if(!r.ok) return` + `catch(e){}` : aucun rendu, `DECROCHE_FLAGS` restait le
+// tableau vide du départ, et la file d'actions n'affichait AUCUNE ligne
+// « décrochage ». Or l'absence de ligne se lit exactement comme « aucun VA ne
+// décroche » — la conclusion INVERSE de la vérité, qui est « je n'ai pas
+// mesuré ». Trois détecteurs vivent sur cette seule source : décrochage,
+// décollages (opportunités) et anomalies. Un radar qui ne peut pas dire
+// « je n'ai pas regardé » est pire qu'un radar absent : on lui fait confiance.
+async function loadDecroche(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/va-quinzaines",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok){ VAQZ_ETAT={ok:false, raison:"le serveur a répondu "+r.status, ts:Date.now()}; if(VAQZ_DATA) VAQZ_DATA._perime=true; }
+    else { VAQZ_DATA=await r.json(); if(VAQZ_DATA) VAQZ_DATA._perime=false; VAQZ_ETAT={ok:true, ts:Date.now()}; }
+  }catch(e){
+    VAQZ_ETAT={ok:false, raison:"pas de réseau", ts:Date.now()};
+    if(VAQZ_DATA) VAQZ_DATA._perime=true;
+  }
+  // On rend DANS TOUS LES CAS : c'est le rendu qui porte l'aveu d'ignorance.
+  try{ renderDecroche(); }catch(e){}
+  try{ renderOpp(); }catch(e){}
+  try{ renderAnomalies(); }catch(e){}
+}
+// « Est-ce que j'ai vraiment regardé ? » — une seule réponse pour les trois
+// détecteurs. `null` tant qu'on n'a pas encore essayé (on ne crie pas au
+// démarrage), `false` dès qu'une tentative a échoué sans rien en réserve.
+function vaqzMesure(){
+  const et=(typeof VAQZ_ETAT!=="undefined")?VAQZ_ETAT:null;
+  const d=(typeof VAQZ_DATA!=="undefined")?VAQZ_DATA:null;
+  if(!et) return null;
+  if(et.ok===false && !(d && d.parVa)) return { mesure:false, raison:et.raison||"raison inconnue" };
+  return { mesure:true, perime:!!(d && d._perime), raison:(d&&d._perime)?(et.raison||""):"" };
+}
 function renderDecroche(){
   const panel=$("#decroche"), body=$("#decrocheBody"), cnt=$("#dcCount"); if(!panel||!body) return;
   const d=VAQZ_DATA;
-  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ DECROCHE_FLAGS=[]; panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
+  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){
+    DECROCHE_FLAGS=[];
+    const _m=(typeof vaqzMesure==="function")?vaqzMesure():null;
+    if(TOKEN && _m && _m.mesure===false){
+      // Panneau caché = « rien à signaler ». Ici on n'a rien MESURé : on le dit.
+      panel.style.display="block";
+      if(cnt) cnt.textContent="?";
+      body.innerHTML=`<div class="dc-intro">❓ <b>Décrochage non mesuré.</b> Les subs par quinzaine n'ont pas pu être lus (${escapeHtml(_m.raison)}). Un panneau vide voudrait dire « aucun VA ne décroche » — ce n'est pas ce qu'on sait : on ne sait pas. Les décollages et les anomalies sortent de la même source et sont dans le même état.</div>`;
+      if(typeof renderActions==="function") renderActions();
+      return;
+    }
+    panel.style.display="none"; if(cnt)cnt.textContent="";
+    if(typeof renderActions==="function") renderActions();
+    return;
+  }
   const prof={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va) prof[v.va.toLowerCase()]={roi:v.roi,marge:v.marge,unpaid:v.unpaid}; });
   const enCours=(typeof d.enCours==="number")?d.enCours:(d.labels.length-1);
   const flags=[];
@@ -11103,6 +11149,8 @@ function buildActions(){
     if(rep) push(1,"♻️",`${rep} repost${rep>1?"s":""} à signaler`,"antileak");
   }
   if(DECROCHE_FLAGS && DECROCHE_FLAGS.length){ const n=DECROCHE_FLAGS.length; push(1,"📉",`${n} VA en décrochage : ${DECROCHE_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"decroche",{kind:"vacard",va:DECROCHE_FLAGS[0].va,label:"👤 Fiche"}); }
+  else { const _m=(typeof vaqzMesure==="function")?vaqzMesure():null;
+    if(_m && _m.mesure===false) push(1,"❓",`Décrochage, décollages et anomalies NON MESURés — ${_m.raison}`,"decroche",{kind:"reloadvaqz",label:"🔄 Remesurer"}); }
   if(OPP_FLAGS && OPP_FLAGS.length){ const n=OPP_FLAGS.length; push(0,"🚀",`${n} VA décollent — pousse : ${OPP_FLAGS.slice(0,2).map(f=>f.va).join(", ")}${n>2?"…":""}`,"opportunites",{kind:"vacard",va:OPP_FLAGS[0].va,label:"👤 Fiche"}); }
   const fr=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null;
   if(fr && fr.count) push(1,"💤",`${fr.count} gros fan${fr.count>1?"s":""} endormi${fr.count>1?"s":""} à faire relancer`,"fanradar");
@@ -11118,6 +11166,7 @@ let LAST_ACTIONS=[];
 function doQuickAction(q){
   if(!q) return;
   if(q.kind==="retest"){ if(typeof loadProxy==="function") loadProxy(true); if(typeof toast==="function") toast("🔄 Test des proxies…",""); }
+  else if(q.kind==="reloadvaqz"){ if(typeof loadDecroche==="function") loadDecroche(); if(typeof toast==="function") toast("🔄 Nouvelle mesure du décrochage…",""); }
   else if(q.kind==="reload"){ if(typeof loadOM==="function") loadOM(); if(typeof loadCash==="function") loadCash(true); if(typeof toast==="function") toast("🔄 Rechargement des chiffres…",""); }
   else if(q.kind==="vacard" && q.va){ if(typeof openVaCard==="function") openVaCard(q.va); }
   else if(q.kind==="jump" && q.panel){ jumpPanel(q.panel); }

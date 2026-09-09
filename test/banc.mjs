@@ -404,4 +404,36 @@ const V=verifie;
   V("un tableau perime est marque comme tel", vieux && vieux.perime===true, JSON.stringify(vieux));
 }
 
+
+// ================= 10) un radar qui ne peut pas dire « je n ai pas regarde »
+// `loadDecroche` echouait en silence : pas de rendu, DECROCHE_FLAGS restait le
+// tableau vide du depart, et la file d actions n affichait AUCUNE ligne. Pas de
+// ligne se lit « aucun VA ne decroche » — l inverse de la verite. Trois
+// detecteurs vivent sur cette source : decrochage, decollages, anomalies.
+{
+  const bloc = morceau("function vaqzMesure(){", "function renderDecroche(");
+  const faire = (etat, data) => new Function("VAQZ_ETAT","VAQZ_DATA", bloc + "; return vaqzMesure;")(etat, data)();
+
+  V("avant toute tentative, on ne crie pas", faire(null, null)===null,
+    "une alerte des le premier pixel = du bruit, et le bruit se desapprend");
+
+  // ⚠️ LE CONTROLE QUI COMPTE : mesure ratee, rien en reserve.
+  const ko = faire({ok:false, raison:"le serveur a repondu 500"}, null);
+  V("une mesure ratee est AVOUEE, pas tue", ko && ko.mesure===false,
+    "sans ca, le panneau se cache et le silence passe pour « tout va bien »");
+  V("et le motif suit", ko && /500/.test(ko.raison||""), JSON.stringify(ko));
+
+  const ok = faire({ok:true}, {parVa:{Welzy:[10,8,4]}, labels:["a","b","c"]});
+  V("une vraie mesure reste une vraie mesure", ok && ok.mesure===true && ok.perime===false, JSON.stringify(ok));
+
+  // Cas piege : ca a marche tout a l heure, la derniere tentative a echoue.
+  // On garde les chiffres (mieux que rien) sans les faire passer pour frais.
+  const vieux = faire({ok:false, raison:"pas de reseau"},
+                      {parVa:{Welzy:[10,8,4]}, labels:["a","b","c"], _perime:true});
+  V("des chiffres gardes apres un echec sont marques perimes",
+    vieux && vieux.mesure===true && vieux.perime===true, JSON.stringify(vieux));
+  V("... mais on n efface pas ce qu on sait deja",
+    vieux && vieux.mesure===true, "tout jeter serait aussi faux que tout affirmer");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
