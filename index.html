@@ -6127,18 +6127,32 @@ function sparkWeeks(weeks){
   const max=Math.max(1,...weeks.map(w=>Number(w)||0));
   return `<span class="spark">${weeks.map(w=>`<span class="spk" style="height:${Math.max(3,Math.round((Number(w)||0)/max*26))}px" title="${Number(w)||0} subs"></span>`).join("")}</span>`;
 }
+// ⚠️ QUATRE PANNEAUX LISENT `VASANTE`, ET CE MATIN JE N'EN AI CORRIGÉ QU'UN.
+// `renderVaRisque` sait dire depuis quand la collecte est arrêtée ; les
+// trajectoires et le journal automatique, qui lisent la MÊME charge, ne
+// disaient rien. Une panne de relevé fait pourtant chuter les deux : les
+// journées non mesurées comptent comme des journées à zéro dans les courbes.
+// C'est la deuxième fois aujourd'hui que je corrige un consommateur sur
+// plusieurs — d'où une phrase UNIQUE, partagée par les trois.
+function bandeauVaSante(){
+  const m=(typeof VASANTE!=="undefined"&&VASANTE&&VASANTE.mesure)?VASANTE.mesure:null;
+  const retard=(m&&Number(m.joursSansReleve))||0;
+  if(!(retard>0)) return "";
+  return `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Chiffres arrêtés au ${escapeHtml(String(m.dernierJour||"?"))}</b> — ${retard} jour${retard>1?"s":""} sans relevé. Les journées non mesurées ne sont pas des journées à zéro : ce qui suit est incomplet.</div>`;
+}
 function renderVaTraj(){
   const box=$("#vatraj"); if(!box) return;
   const vas=(VASANTE&&Array.isArray(VASANTE.vas))?VASANTE.vas:[];
   if(!vas.length){ box.style.display="none"; return; }
   box.style.display="block";
+  const _bvs=(typeof bandeauVaSante==="function")?bandeauVaSante():"";
   const arrow=t=>t.dir==="up"?"📈":t.dir==="down"?"📉":"➡️";
   const lbl=t=>t.dir==="up"?"progresse":t.dir==="down"?"décline":"stagne";
   // Un VA qui démarre de presque rien donne des % énormes (+4000%) : au-delà de
   // 150% on dit « forte hausse/baisse » plutôt qu'un nombre absurde.
   const pctTxt=t=>{ if(t.pct==null) return ""; if(t.pct>150) return " (forte hausse)"; if(t.pct<-90) return " (à l'arrêt)"; return ` ${t.pct>0?"+":""}${t.pct}%`; };
   const rows=vas.map(v=>`<div class="tj-row"><span class="tj-va">${escapeHtml(v.va)}</span>${sparkWeeks(v.weeks||[])}<span class="tj-dir tj-${v.traj.dir}">${arrow(v.traj)} ${lbl(v.traj)}${pctTxt(v.traj)}</span></div>`).join("");
-  $("#vatrajBody").innerHTML=rows+`<div class="cc-hint">8 dernières semaines d'abonnés par VA. Flèche = 4 dernières semaines vs les 4 d'avant.</div>`;
+  $("#vatrajBody").innerHTML=_bvs+rows+`<div class="cc-hint">8 dernières semaines d'abonnés par VA. Flèche = 4 dernières semaines vs les 4 d'avant.</div>`;
 }
 function renderVaRisque(){
   const box=$("#varisque"); if(!box) return;
@@ -6169,14 +6183,20 @@ function renderVaRisque(){
 function renderChangements(){
   const box=$("#changements"); if(!box) return;
   const ch=(VASANTE&&Array.isArray(VASANTE.changements))?VASANTE.changements:[];
-  if(!ch.length){ box.style.display="none"; return; }
+  const _bvs=(typeof bandeauVaSante==="function")?bandeauVaSante():"";
+  // ⚠️ Un journal VIDE parce qu'on n'a rien mesuré se lit « rien n'a bougé ».
+  // Quand la collecte est en retard, on ouvre quand même le panneau pour le dire.
+  if(!ch.length){
+    if(_bvs){ box.style.display="block"; const b=$("#changementsBody")||box; b.innerHTML=_bvs; return; }
+    box.style.display="none"; return;
+  }
   box.style.display="block";
   const rows=ch.map(c=>{
     const dt=new Date(c.date+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
     const drv=(c.drivers||[]).map(x=>`${escapeHtml(x.va)} +${x.subs}`).join(" · ");
     return `<div class="chg-row"><span class="ch-ico">${c.type==="up"?"🚀":"📉"}</span><div><div class="ch-h">${dt} : <b>${c.subs} subs</b> <span class="ch-x">${c.ratio?`(×${String(c.ratio).replace(".",",")} la moyenne)`:""}</span></div><div class="ch-d">${drv?"surtout "+drv:""}</div></div></div>`;
   }).join("");
-  $("#changementsBody").innerHTML=rows+`<div class="cc-hint">Les jours où l'équipe a nettement dévié de sa moyenne, et qui l'a causé.</div>`;
+  $("#changementsBody").innerHTML=_bvs+rows+`<div class="cc-hint">Les jours où l'équipe a nettement dévié de sa moyenne, et qui l'a causé.</div>`;
 }
 
 /* ---------- 📊 #11 cohortes + pourquoi (fetch /api/hub/cohortes) ---------- */
@@ -6309,12 +6329,18 @@ function renderRecos(){
     const shareM=bestModel.subs/totModelSubs;
     if(shareM<0.35) recos.push({p:1,ico:"🎭",act:`Pousse plus de trafic vers ${bestModel.m}`,why:`C'est ton modèle le plus rentable (LTV ${fmtLtv(bestModel.ltv,cur)}/abonné, nette) mais il ne reçoit que ${Math.round(shareM*100)}% des subs. Y orienter tes VA à volume = argent facile.`});
   }
-  if(!recos.length){ box.style.display="block"; $("#recosBody").innerHTML=`<div class="tk-empty">✅ Rien d'urgent : équipe équilibrée, personne en risque. Continue comme ça.</div>`; return; }
+  // ⚠️ QUATRIÈME panneau sur `VASANTE`, et le plus dangereux des quatre : il ne
+  // se contente pas d'afficher, il RECOMMANDE. Avec une collecte en panne, les
+  // journées non mesurées comptent comme des journées à zéro, et il conseillerait
+  // d'agir sur des baisses inventées. Surtout, son « ✅ Rien d'urgent, personne
+  // en risque » serait affirmé sur une mesure qui n'a pas eu lieu.
+  const _bvsR=(typeof bandeauVaSante==="function")?bandeauVaSante():"";
+  if(!recos.length){ box.style.display="block"; $("#recosBody").innerHTML=_bvsR+(_bvsR?`<div class="tk-empty">❓ Rien à recommander <b>sur ce qui a été mesuré</b>. Ce n'est pas « tout va bien ».</div>`:`<div class="tk-empty">✅ Rien d'urgent : équipe équilibrée, personne en risque. Continue comme ça.</div>`); return; }
   box.style.display="block";
   recos.sort((a,b)=>a.p-b.p);
   // Dédoublonne par (action) et limite à 6 pour rester actionnable.
   const seen={}; const list=recos.filter(r=>{ if(seen[r.act]) return false; seen[r.act]=1; return true; }).slice(0,6);
-  $("#recosBody").innerHTML=list.map(r=>`<div class="rc-row"><span class="rc-ico">${r.ico}</span><div><div class="rc-act">${escapeHtml(r.act)}</div><div class="rc-why">${escapeHtml(r.why)}</div>${r.va?`<button class="rc-btn" data-rcva="${escapeHtml(r.va)}">👤 Ouvrir sa fiche</button>`:""}</div></div>`).join("");
+  $("#recosBody").innerHTML=_bvsR+list.map(r=>`<div class="rc-row"><span class="rc-ico">${r.ico}</span><div><div class="rc-act">${escapeHtml(r.act)}</div><div class="rc-why">${escapeHtml(r.why)}</div>${r.va?`<button class="rc-btn" data-rcva="${escapeHtml(r.va)}">👤 Ouvrir sa fiche</button>`:""}</div></div>`).join("");
 }
 { const rb=$("#recosBody"); if(rb) rb.addEventListener("click",e=>{ const b=e.target.closest("[data-rcva]"); if(b&&typeof openVaCard==="function") openVaCard(b.getAttribute("data-rcva")); }); }
 

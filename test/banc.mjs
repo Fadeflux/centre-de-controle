@@ -1032,6 +1032,22 @@ const V=verifie;
   V("chacun sait dire « je n ai pas mesure »", sansAveu.length === 0,
     "ceux-la se cachent en silence quand la source est muette : " + sansAveu.join(", "));
 
+  // ⚠️ MEME MOTIF, DEUXIEME SOURCE, LE MEME JOUR. J ai appris a `renderVaRisque`
+  // a dire depuis quand la collecte est arretee ; les trajectoires et le journal
+  // automatique lisent la MEME charge `VASANTE` et ne disaient rien. Une panne de
+  // releve fait pourtant chuter les deux, puisque les journees non mesurees
+  // comptent comme des journees a zero dans les courbes.
+  const consVs = [], sansVs = [];
+  for (const n of noms) {
+    const c = bornes(n);
+    if (!c || !c.includes("VASANTE")) continue;
+    consVs.push(n);
+    if (!c.includes("bandeauVaSante") && !c.includes("joursSansReleve") && !c.includes("VASANTE.mesure")) sansVs.push(n);
+  }
+  V("les panneaux qui lisent VASANTE sont bien tous la", consVs.length >= 3, "trouves : " + consVs.join(", "));
+  V("chacun dit depuis quand la collecte est arretee", sansVs.length === 0,
+    "ceux-la affichent des courbes creusees par une panne sans le dire : " + sansVs.join(", "));
+
   // Un controle qu on n a jamais vu echouer ne prouve rien.
   {
     const faux = "\nfunction renderBidon(){ const d=VAQZ_DATA; return; }";
