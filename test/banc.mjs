@@ -436,4 +436,100 @@ const V=verifie;
     vieux && vieux.mesure===true, "tout jeter serait aussi faux que tout affirmer");
 }
 
+
+// ================= 11) la facture Railway n entrait dans aucun profit
+// `coutOutils` n additionne que la liste tapee a la main. Railway a son propre
+// panneau et son propre reglage, et ne descendait ni dans le compte de resultat
+// ni dans le partage avec l associee. Deux pieges a eviter en le corrigeant :
+// le compter DEUX fois (s il est deja dans la liste), et deduire une ESTIMATION
+// comme si c etait une facture.
+{
+  const bloc = morceau("function coutRailwayMois(){", "function duReellement(");
+  const faire = (RW_DATA, COSTS) => new Function("RW_DATA","COSTS","coutMensuel",
+    bloc + "; return coutRailwayMois;")(RW_DATA, COSTS, (c)=>Number(c&&c.m)||0)();
+
+  const facture = { total: 240, factureSaisie: true, projets: [{}] };
+
+  const r = faire(facture, []);
+  V("une facture SAISIE est deduite du profit", r && r.aAjouter===240, JSON.stringify(r));
+
+  // LE CONTROLE QUI COMPTE #1 : deja tape a la main dans les depenses d outils.
+  const dbl = faire(facture, [{ n: "Railway", m: 240 }]);
+  V("deja dans les depenses d outils : on n ajoute RIEN", dbl && dbl.aAjouter===0,
+    "sinon la facture est comptee DEUX fois et le profit tombe de 240 $ pour rien");
+  V("... et on le dit", dbl && dbl.dansLaListe===true, JSON.stringify(dbl));
+
+  // Ecart entre ce qu il a tape et la vraie facture : on le signale.
+  const ecart = faire(facture, [{ n: "railway prod", m: 100 }]);
+  V("un montant tape loin de la vraie facture est signale", ecart && ecart.ecart===140,
+    "ecart=" + (ecart && ecart.ecart));
+
+  // LE CONTROLE QUI COMPTE #2 : sans facture saisie, `total` est une ESTIMATION
+  // (le serveur a mesure un meme projet a 10,08 $ puis 0,72 $ en une heure).
+  // La deduire fabriquerait un faux precis dans le partage entre associes.
+  const estim = faire({ total: 190, factureSaisie: false, projets: [{}] }, []);
+  V("une estimation n est PAS deduite du profit", estim && estim.aAjouter===0,
+    "deduire une estimation = un faux precis dans le partage d associes");
+  V("... et l ecran doit dire que le profit est trop haut", estim && estim.manquant===true,
+    "sans ce drapeau, l absence de ligne se lit « Railway ne coute rien »");
+
+  // « absent != 0 » : panneau pas charge = rien a dire.
+  V("panneau Railway non charge = null, PAS zero", faire(null, [])===null,
+    "un 0 voudrait dire « Railway est gratuit »");
+  V("un total illisible ne devient pas un montant",
+    (faire({ total: "n/a", factureSaisie: true, projets: [{}] }, [])||{}).montant===null, "NaN affiche en dur");
+}
+
+
+// ================= 12) la pastille « nouvelle version » etait INERTE
+// Elle n etait accrochee qu a `controllerchange`, qui n arrive que si sw.js
+// change d octets. index.html part plusieurs fois par jour, sw.js jamais : la
+// pastille ne pouvait pas s allumer, et eteinte elle se lit « tu es a jour ».
+// On surveille maintenant la signature (ETag) de la page.
+{
+  const bloc = morceau("var _signaturePage=null;", "function proposerMaj(");
+  const monter = (reponses) => {
+    let i = 0, proposees = 0;
+    const fetchFaux = async () => {
+      const r = reponses[Math.min(i++, reponses.length - 1)];
+      if (r === "reseau") throw new Error("hors ligne");
+      return { ok: r.ok !== false, headers: { get: (k) => (r[String(k).toLowerCase()] || null) } };
+    };
+    const f = new Function("fetch", "proposerMaj",
+      bloc + "; return { v: verifierVersionPage, n: () => _signaturePage };")(fetchFaux, () => { proposees++; });
+    return { ...f, combien: () => proposees };
+  };
+
+  const E = (t) => ({ etag: t });
+
+  const a = monter([E('"aaa"'), E('"aaa"')]);
+  await a.v(); await a.v();
+  V("meme version : aucune pastille", a.combien()===0, "propositions=" + a.combien());
+  V("la premiere mesure sert de repere, elle n alerte pas", a.n()==='"aaa"', String(a.n()));
+
+  const b = monter([E('"aaa"'), E('"bbb"')]);
+  await b.v(); await b.v();
+  V("une mise en ligne allume la pastille", b.combien()===1, "propositions=" + b.combien());
+
+  // ⚠️ LE CONTROLE QUI COMPTE : pas de signature du tout. Une pastille qui
+  // s allume au hasard se fait ignorer en deux jours — et le jour ou elle a
+  // raison, personne ne clique.
+  const c = monter([{}, {}]);
+  await c.v(); await c.v();
+  V("sans signature, on ne conclut RIEN", c.combien()===0, "propositions=" + c.combien());
+
+  // A defaut d ETag, la date de derniere modification fait l affaire.
+  const d = monter([{ "last-modified": "lun" }, { "last-modified": "mar" }]);
+  await d.v(); await d.v();
+  V("la date de modification sert de repli", d.combien()===1, "propositions=" + d.combien());
+
+  const e = monter(["reseau", "reseau"]);
+  await e.v(); await e.v();
+  V("une coupure reseau n allume rien et ne casse rien", e.combien()===0, "propositions=" + e.combien());
+
+  const f = monter([{ ok: false }, { ok: false }]);
+  await f.v(); await f.v();
+  V("une reponse en erreur n allume rien", f.combien()===0, "propositions=" + f.combien());
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
