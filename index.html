@@ -11053,7 +11053,15 @@ function renderBurnout(){
   const panel=$("#burnout"), body=$("#burnoutBody"); if(!panel||!body) return;
   const charge=(typeof CHARGE_DATA!=="undefined"&&CHARGE_DATA)||null;
   if(!TOKEN||!charge||!Array.isArray(charge.vas)){ panel.style.display="none"; return; }
+  // ⚠️ L'épuisement se juge sur DEUX signaux : la charge et le décrochage. Si
+  // les subs par quinzaine n'ont pas pu être lus, le second manque — le panneau
+  // continue de fonctionner, mais il voit moins bien. Il ne dit pas « tout va
+  // bien » pour autant : il dit qu'il lui manque un œil.
   const decro={}; if(typeof DECROCHE_FLAGS!=="undefined"&&Array.isArray(DECROCHE_FLAGS)) DECROCHE_FLAGS.forEach(f=>{ if(f&&f.va) decro[f.va.toLowerCase()]=1; });
+  const _mB=(typeof vaqzMesure==="function")?vaqzMesure():null;
+  const _noteBurnout=(_mB&&_mB.mesure===false)
+    ? `<div class="sv-note" style="margin-bottom:8px">❓ Verdict <b>partiel</b> : le décrochage n'a pas pu être mesuré (${escapeHtml(_mB.raison)}). Seule la charge de travail est prise en compte ici.</div>`
+    : "";
   const flags=charge.vas.filter(v=>{
     if(!v||v.statsOnly) return false;
     const p=v.posts7||0, pp=v.postsPrev7||0; if(pp<3) return false;
@@ -11064,7 +11072,7 @@ function renderBurnout(){
   }).map(v=>({va:v.va, p:v.posts7||0, pp:v.postsPrev7||0}));
   if(!flags.length){ panel.style.display="none"; return; }
   panel.style.display="block";
-  body.innerHTML=`<div class="cac-intro">Ces VA <b>ralentissent sur tous les fronts</b> (moins de posts ET moins de résultats) — souvent un signe de fatigue, pas de fainéantise. Prends de leurs nouvelles avant qu'ils décrochent.</div>`
+  body.innerHTML=_noteBurnout+`<div class="cac-intro">Ces VA <b>ralentissent sur tous les fronts</b> (moins de posts ET moins de résultats) — souvent un signe de fatigue, pas de fainéantise. Prends de leurs nouvelles avant qu'ils décrochent.</div>`
     +flags.slice(0,10).map(f=>`<div class="bo-row">😮‍💨 <b>${escapeHtml(f.va)}</b> : ${f.pp}→${f.p} posts/sem et résultats en baisse. <span class="bo-tip">Un petit message ?</span></div>`).join("");
   try{ fixPairs(); }catch(e){}
 }
@@ -11331,7 +11339,22 @@ function renderDecroche(){
 function renderOpp(){
   const panel=$("#opportunites"), body=$("#oppBody"), cnt=$("#opCount"); if(!panel||!body) return;
   const d=VAQZ_DATA; OPP_FLAGS=[];
-  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){ panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
+  // ⚠️ MON PROPRE CORRECTIF ÉTAIT À MOITIÉ APPLIQUÉ. Ce matin j'ai appris à
+  // `renderDecroche` à dire « je n'ai pas mesuré ». Mais TROIS détecteurs vivent
+  // sur `VAQZ_DATA` — décrochage, décollages et anomalies — et je n'en ai rendu
+  // qu'un seul honnête. Les deux autres continuaient de se cacher en silence :
+  // exactement le motif des « jumeaux » que je passe la journée à corriger,
+  // commis par moi, le jour même.
+  if(!TOKEN || !d || !d.parVa || !Array.isArray(d.labels)){
+    const _m=(typeof vaqzMesure==="function")?vaqzMesure():null;
+    if(TOKEN && _m && _m.mesure===false){
+      panel.style.display="block";
+      if(cnt) cnt.textContent="?";
+      body.innerHTML=`<div class="dc-intro">❓ <b>Décollages non mesurés.</b> Les subs par quinzaine n'ont pas pu être lus (${escapeHtml(_m.raison)}). Un panneau vide voudrait dire « personne ne décolle » — on n'en sait rien.</div>`;
+      return;
+    }
+    panel.style.display="none"; if(cnt)cnt.textContent=""; return;
+  }
   const prof={}; if(typeof OM_DATA!=="undefined"&&OM_DATA&&Array.isArray(OM_DATA.vas)) OM_DATA.vas.forEach(v=>{ if(v&&v.va) prof[v.va.toLowerCase()]={unpaid:v.unpaid}; });
   const enCours=(typeof d.enCours==="number")?d.enCours:(d.labels.length-1);
   const flags=[];
@@ -11369,6 +11392,18 @@ function renderAnomalies(){
   const panel=$("#anomalies"), body=$("#anomBody"), cnt=$("#anCount"); if(!panel||!body) return;
   ANOM_LIST=[];
   if(!TOKEN){ panel.style.display="none"; if(cnt)cnt.textContent=""; return; }
+  // ⚠️ Troisième détecteur sur la même source (voir renderOpp). Une liste
+  // d'anomalies vide parce qu'on n'a rien lu se lit « rien d'anormal » — la
+  // conclusion inverse de la vérité.
+  {
+    const _m=(typeof vaqzMesure==="function")?vaqzMesure():null;
+    if(_m && _m.mesure===false){
+      panel.style.display="block";
+      if(cnt) cnt.textContent="?";
+      body.innerHTML=`<div class="dc-intro">❓ <b>Anomalies non recherchées.</b> Les subs par quinzaine n'ont pas pu être lus (${escapeHtml(_m.raison)}). « Rien d'anormal » et « je n'ai pas regardé » ne se ressemblent que sur un écran vide.</div>`;
+      return;
+    }
+  }
   const cur=(OM_DATA&&OM_DATA.currency)||"$";
   const money=v=>HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+cur;
   const ko=(typeof revKo==="function")?revKo():false;

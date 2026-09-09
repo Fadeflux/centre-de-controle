@@ -988,4 +988,57 @@ const V=verifie;
     Array.isArray(f([{ d:"2026-09-01", mois:"2026-09", profit:100 }], "2026-09")), "doit rester un tableau");
 }
 
+
+// ================= 23) une source, TROIS detecteurs : ils avouent ensemble
+// Ce matin j ai appris a `renderDecroche` a dire « je n ai pas mesure ». Mais
+// TROIS detecteurs vivent sur `VAQZ_DATA` -- decrochage, decollages, anomalies
+// -- et je n en avais rendu qu UN seul honnete. Les deux autres continuaient de
+// se cacher en silence : le motif des « jumeaux » que je passe la journee a
+// corriger, commis par moi, le jour meme.
+//
+// Ce controle lit le VRAI fichier. Un quatrieme detecteur ajoute demain sans
+// l aveu fera echouer ce banc.
+//
+// ⚠️ PREMIERE VERSION FAUSSE, gardee en memoire : elle decoupait le corps d une
+// fonction « jusqu a la prochaine declaration de fonction ». La ligne
+// `let VAQZ_DATA=null, ...` tombait donc dans la tranche de `renderCoutOpp`,
+// qui ne lit pourtant PAS cette source -- et le banc a accuse une fonction
+// innocente. On compte les accolades, on ne devine plus.
+{
+  const bornes = (nom) => {
+    const i = src.indexOf("\nfunction " + nom + "(");
+    if (i < 0) return null;
+    const j = src.indexOf("{", i);
+    let prof = 0, k = j;
+    for (; k < src.length; k++) {
+      if (src[k] === "{") prof++;
+      else if (src[k] === "}") { prof--; if (prof === 0) break; }
+    }
+    return src.slice(j, k + 1);
+  };
+
+  // Toutes les fonctions render* du fichier, decoupees a l accolade.
+  const noms = [...src.matchAll(/\nfunction (render[A-Za-z0-9_$]*)\(/g)].map(m => m[1]);
+  const consommateurs = [], sansAveu = [];
+  for (const n of noms) {
+    const c = bornes(n);
+    if (!c || !c.includes("VAQZ_DATA")) continue;
+    consommateurs.push(n);
+    if (!c.includes("vaqzMesure")) sansAveu.push(n);
+  }
+
+  V("les trois detecteurs de VAQZ_DATA sont bien tous la",
+    consommateurs.length === 3, "trouves : " + consommateurs.join(", "));
+  V("chacun sait dire « je n ai pas mesure »", sansAveu.length === 0,
+    "ceux-la se cachent en silence quand la source est muette : " + sansAveu.join(", "));
+
+  // Un controle qu on n a jamais vu echouer ne prouve rien.
+  {
+    const faux = "\nfunction renderBidon(){ const d=VAQZ_DATA; return; }";
+    V("... et le controle attrape bien une fonction qui lit la source sans avouer",
+      faux.includes("VAQZ_DATA") && !faux.includes("vaqzMesure"),
+      "le controle ne reconnait plus la forme qu il surveille");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
