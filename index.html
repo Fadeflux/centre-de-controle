@@ -1311,6 +1311,11 @@
   .settings-row .btn{margin:0;pointer-events:none}
   /* `min-width:0` : sans lui, un texte long refuse de se couper dans un flex et
      repousse la boîte au lieu de revenir à la ligne. */
+  .ech-mes{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+  .ech-mes-t{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px}
+  .pay-h-corr{opacity:.7;font-size:11px;margin-left:4px}
+  .pay-h-fix{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;min-height:32px;min-width:32px;border-radius:6px}
+  .pay-h-fix:hover{background:var(--surface-2);color:var(--text)}
   .settings-lbl{font-size:14px;color:var(--text);min-width:0;overflow-wrap:anywhere;line-height:1.35}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
@@ -2709,6 +2714,7 @@
       <button class="act" id="echAdd">＋</button>
     </div>
     <div id="echList"></div>
+      <div id="echMesure" class="ech-mes"></div>
   </div>
   <div class="pair-row">
     <div class="panel-box" id="dates">
@@ -3193,6 +3199,9 @@ function render(data){
   renderBrief(data, live, onCount, stInW);
   renderPaie(data);
   renderGoal(data);
+  // Les échéances mesurées lisent LAST : elles doivent suivre chaque
+  // rafraîchissement, sinon elles affichent « non mesuré » pour toujours.
+  try{ if(typeof rendreEcheancesMesurees==="function") rendreEcheancesMesurees(); }catch(e){}
 }
 
 /* ---------- résumé du jour + météo business ---------- */
@@ -5198,12 +5207,23 @@ function renderPaieCumul(){
   // Le panneau voisin (Fiche de paie) traite déjà ce cas avec un « + ? » et une
   // note jaune : on fait pareil, pour que les deux racontent la même chose.
   const sansBase=vas.filter(v=>!v.unpaid && v.base==null);
+  // ✏️ LE JOURNAL SE LIT MAIS NE SE CORRIGE PAS — alors que le serveur sait le
+  // faire depuis longtemps (POST /api/hub/pay-history/correct, avec verrou et
+  // trace honnête de l'ancienne valeur). Il n'avait simplement aucun bouton.
+  // Cas réel déjà vécu : 192 abonnés payés à Yohan, le clic en compte 199 (7
+  // arrivés entre l'observation et le clic). Le repère se corrigeait, le
+  // journal gardait « +199 » — c'est-à-dire que le registre censé servir à
+  // repérer un bug affichait le bug.
   const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
     const dt=new Date(h.ts||0), okd=!isNaN(dt.getTime());
+    const corr=(h&&h.corrige&&h.corrige.avant)?h.corrige.avant:null;
     return `<div class="pay-h-row"><span>${escapeHtml(h.va||"")}</span>`
       +`<span class="pay-h-d">${okd?dt.toLocaleDateString("fr-FR"):""}</span>`
       +`<span class="pay-h-n">+${fmtInt(h.subsPaid||0)} subs</span>`
-      +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span></div>`;
+      +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span>`
+      +(corr?`<span class="pay-h-corr" title="Corrigé — avant : ${fmtInt(corr.subsPaid||0)} subs, ${pcMoney(corr.amount||0)}">✏️</span>`:"")
+      +(h&&h.id?`<button class="pay-h-fix" data-fixid="${escapeHtml(String(h.id))}" title="Corriger le nombre d'abonnés de cette ligne">✏️</button>`:"")
+      +`</div>`;
   }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
   $("#pcumulBody").innerHTML = mgrSel + rows
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}${sansBase.length?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note"></span></div>`
@@ -6854,6 +6874,26 @@ function sousTitreOrigine(brutOf, tg, cur, fmt){
 //     aux tarifs publics — le serveur dit lui-même qu'un même projet a été
 //     mesuré à 10,08 $ puis 0,72 $ en une heure. On ne déduit donc rien : on
 //     dit que le profit est SURESTIMÉ tant que la facture n'est pas tapée.
+// 🎯 CE QUE TE RAPPORTE UN ABONNÉ, MODÈLE PAR MODÈLE.
+// La ligne des modèles montrait déjà une marge — mais en TOTAL, donc le plus
+// gros modèle gagne toujours, et la comparaison ne dit rien. Normalisée par
+// abonné, elle répond à la vraie question : lequel des deux est le moins cher
+// à faire grandir ?
+//
+// ⚠️ LE BON DÉNOMINATEUR. La marge est calculée côté serveur sur les abonnés
+// PAYÉS (les comptes perso ne sont jamais rémunérés). Diviser par `subs`
+// mélangerait deux dénominateurs : un chiffre qui a l'air précis et qui est
+// faux — pire que pas de chiffre. On exige donc `subsPayes`.
+// ⚠️ Et une marge nulle n'est PAS une marge de zéro : quand le modèle n'a pas
+// pu être mesuré, le serveur envoie `null`. On renvoie null aussi.
+function margeParAbonne(entree){
+  if(!entree) return null;
+  const marge=Number(entree.marge);
+  const payes=Number(entree.subsPayes);
+  if(entree.marge==null || !isFinite(marge)) return null;
+  if(entree.subsPayes==null || !isFinite(payes) || payes<=0) return null;
+  return Math.round((marge/payes)*100)/100;
+}
 function coutRailwayMois(){
   const d=(typeof RW_DATA!=="undefined")?RW_DATA:null;
   if(!d) return null;                                   // « absent ≠ 0 »
@@ -7214,7 +7254,11 @@ function renderOM(){
         :((!surTout&&mL.ltvGlobale!=null)?` <span class="lbl-info" title="Revenu total de ${escapeHtml(OM_MODEL)} ÷ TOUS ses fans réels (${fmtInt(mL.fansReels)}), lien de VA ou pas — pas seulement les ${fmtInt(mL.subsTotal)} abonnés amenés par l'équipe.">ⓘ</span>`:"");
       return `<div class="tile"><div class="lbl">${label}${info}</div><div class="val">${ltvT(ltvVal)}</div></div>`;
     })()}</div>`;
-  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net" title="Net, après les ${pctComm()} de commission OnlyFans — même unité que la LTV et la marge en dessous">${mnt(d.models[m].net==null?null:d.models[m].net*netRate())}<span class="om-model-base"> net</span></div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
+  const modelsRow=(OM_MODEL==="all"&&models.length)?`<div class="om-models-row">${models.map(m=>`<div class="om-model" data-om="${escapeHtml(m)}"><div class="om-model-name">${escapeHtml(m)}</div><div class="om-model-net" title="Net, après les ${pctComm()} de commission OnlyFans — même unité que la LTV et la marge en dessous">${mnt(d.models[m].net==null?null:d.models[m].net*netRate())}<span class="om-model-base"> net</span></div><div class="om-model-subs">${fmtInt(d.models[m].subs||0)} subs · LTV ${ltvT(d.models[m].ltv)}${(()=>{
+        const mpa=(typeof margeParAbonne==="function")?margeParAbonne(d.models[m]):null;
+        if(ko||mpa==null) return "";
+        return ` · <span class="${mpa>=0?'pos':'neg'}" title="Marge du mois ÷ abonnés payés. C'est le chiffre à comparer entre modèles : le total, lui, favorise toujours le plus gros.">${(mpa>=0?"+":"−")}${String(Math.abs(mpa)).replace(".",",")} $/abonné</span>`;
+      })()}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
   // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
   // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
@@ -11533,6 +11577,49 @@ function saveEcheances(supprimer){
     .catch(()=>{ ECH_DIRTY=true; if(typeof toast==="function") toast("⚠️ Échéance NON enregistrée","Pas de réseau : rien n'est parti au serveur."); });
   renderEcheances();
 }
+// ⚙️ CE QUI VA S'ARRÊTER TOUT SEUL, ET QUE PERSONNE N'A BESOIN DE TAPER.
+// Le panneau ne connaissait que les dates saisies à la main — donc rien, parce
+// qu'on ne saisit pas. Or trois choses qui coupent le robinet sont déjà
+// mesurées ailleurs dans cette page : le cookie GetMySocial, le forfait proxy
+// et le solde OnlyChat.
+//
+// ⚠️ ON NE LES ÉCRIT PAS DANS LA LISTE. Une échéance stockée ne se remesure
+// pas : elle périme en silence et devient un mensonge daté. Ce sont des lignes
+// vivantes, relues à chaque affichage.
+// ⚠️ ET ON DIT LAQUELLE EST UNE VRAIE DATE. Le cookie a une date d'expiration
+// exacte. Les deux autres sont des ESTIMATIONS calculées sur la consommation
+// observée — la même famille de chiffre que le « ~202 j » extrapolé de 8 h
+// d'observation qui avait failli passer pour une certitude.
+// ⚠️ ET UNE SOURCE NON MESURÉE RESTE AFFICHÉE, en gris. La faire disparaître,
+// dans un panneau qui répond à « qu'est-ce qui va s'arrêter ? », se lirait
+// « rien à signaler ».
+function echeancesMesurees(){
+  const L=(typeof LAST!=="undefined"&&LAST)?LAST:null;
+  const brut=(id,k)=>{ const d=L&&L[id]; const v=(d&&d.metrics)?d.metrics[k]:null;
+    return (v==null||v==="")?null:v; };
+  // Le serveur borne l'horizon : ">30" veut dire « au moins 30 j », pas 30.
+  const jr=(v)=>{ if(v==null) return null;
+    if(typeof v==="string"&&v.indexOf(">")===0){ const n=Number(v.slice(1)); return isFinite(n)?{n:n,mini:true}:null; }
+    const n=Number(v); return isFinite(n)?{n:n,mini:false}:null; };
+  const ck=(typeof COOKIE_DATA!=="undefined")?COOKIE_DATA:null;
+  const out=[];
+  out.push({ cle:"cookie", label:"Cookie GetMySocial", exact:true,
+    j: (ck&&ck.jours!=null)?jr(ck.jours):null,
+    date: (ck&&ck.expire_le)?String(ck.expire_le):null,
+    reste: null,
+    quoi:"Les liens de tes VA arrêtent de compter leurs abonnés." });
+  const pgo=brut("proxy-solde","go");
+  out.push({ cle:"proxy", label:"Proxy Residential FlameProxies", exact:false,
+    j: jr(brut("proxy-solde","jours")), date:null,
+    reste: (pgo!=null)?(String(Math.round(Number(pgo)*10)/10).replace(".",",")+" Go"):null,
+    quoi:"Le scraper n'a plus de proxy : les vues Instagram se figent." });
+  const osolde=brut("onlychat-solde","solde");
+  out.push({ cle:"onlychat", label:"Solde OnlyChat", exact:false,
+    j: jr(brut("onlychat-solde","jours")), date:null,
+    reste: (osolde!=null&&typeof fmtMoney==="function")?fmtMoney(Number(osolde)):null,
+    quoi:"L'IA de vente Telegram arrête de répondre." });
+  return out;
+}
 function renderEcheances(){
   const box=$("#echeances"), list=$("#echList"); if(!box||!list) return;
   // Sans jeton, ce panneau n'a rien à dire : on le cache plutôt que d'inviter à
@@ -11571,6 +11658,29 @@ function renderEcheances(){
       +`<span class="ech-when">${escapeHtml(quand(e))}</span>`
       +`<button class="ech-del" data-echdel="${escapeHtml(e.id)}" title="Retirer">✕</button></div>`;
   }).join("");
+  rendreEcheancesMesurees();
+}
+function rendreEcheancesMesurees(){
+  const zone=$("#echMesure"); if(!zone) return;
+  const lignes=echeancesMesurees();
+  zone.innerHTML=`<div class="ech-mes-t">⚙️ Mesuré tout seul — rien à taper</div>`
+    + lignes.map(l=>{
+      if(!l.j) return `<div class="ech-row ech-attente"><span class="ech-l"><b>${escapeHtml(l.label)}</b>`
+        + `<div class="ech-note">${escapeHtml(l.quoi)}</div></span>`
+        + `<span class="ech-when" title="Aucune mesure reçue — ce n'est pas « tout va bien », c'est « je ne sais pas ».">non mesuré</span></div>`;
+      const n=l.j.n;
+      const cls = (n<0) ? "ech-expire" : (n<=3 ? "ech-urgent" : (n<=14 ? "ech-bientot" : "ech-ok"));
+      const quand = l.j.mini ? ("plus de "+n+" j")
+        : (n<0 ? ("dépassé depuis "+Math.abs(n)+" j")
+        : (n===0 ? "AUJOURD'HUI" : (n===1 ? "demain" : ((l.exact?"dans ":"~")+n+" j"))));
+      const det=[];
+      if(l.date) det.push("expire le "+escapeHtml(l.date));
+      if(l.reste) det.push("reste "+escapeHtml(l.reste));
+      det.push(l.exact ? "date exacte" : "estimation au rythme actuel");
+      return `<div class="ech-row ${cls}"><span class="ech-l"><b>${escapeHtml(l.label)}</b>`
+        + `<div class="ech-note">${det.join(" · ")} — ${escapeHtml(l.quoi)}</div></span>`
+        + `<span class="ech-when">${quand}</span></div>`;
+    }).join("");
 }
 { const b=$("#echAdd"); if(b) b.onclick=()=>{
     const l=($("#echLabel")||{}).value||"", dt=($("#echDate")||{}).value||"", cat=($("#echCat")||{}).value||"autre";
@@ -12226,6 +12336,7 @@ function renderCookie(){
   el.innerHTML=(j<0)
     ? `🚨 <b>Le cookie GetMySocial a expiré</b> (le ${escapeHtml(d.expire_le||"?")}). Les liens de tracking de tes VA ne fonctionnent plus — leurs abonnés ne sont plus comptés. À remplacer maintenant.`
     : `${urgent?"🚨":"⚠️"} <b>Cookie GetMySocial : ${j} jour${j>1?"s":""} restant${j>1?"s":""}</b> (expire le ${escapeHtml(d.expire_le||"?")}). Il ne se renouvelle pas tout seul : quand il meurt, les liens de tes VA s'arrêtent <b>sans alerte</b> et leurs abonnés cessent d'être comptés.`;
+  try{ if(typeof rendreEcheancesMesurees==='function') rendreEcheancesMesurees(); }catch(e){}
 }
 let CONV_DATA=null;
 // ⏱️ QUAND UN ABONNÉ DEVIENT UN CLIENT (idée 3)
@@ -13315,6 +13426,52 @@ function seDeconnecter(){
   location.reload();
 }
 { const b=$("#logout"); if(b) b.onclick=seDeconnecter; }
+
+// ✏️ Corriger une ligne du journal de paie.
+// ⚠️ Ce bouton ne change PAS ce qu'on doit encore à quelqu'un : le repère de
+// paie fait foi, pas le journal. Il répare la TRACE — celle qui sert justement
+// à repérer une erreur. Le dire, sinon on croit avoir réglé une dette.
+async function corrigerLigneJournal(id){
+  if(!TOKEN || !id) return;
+  const ligne=((typeof PCUMUL_HIST!=="undefined"&&PCUMUL_HIST)||[]).find(h=>h&&String(h.id)===String(id));
+  if(!ligne){ alert("Ligne introuvable — recharge le panneau."); return; }
+  const avant=Number(ligne.subsPaid)||0;
+  const rep=prompt("✏️ Corriger le versement à "+(ligne.va||"?")+"\n\n"
+    +"Le journal dit : "+avant+" abonnés payés.\n"
+    +"Combien avais-tu réellement payé ?\n\n"
+    +"⚠️ Ça corrige la TRACE, pas ce que tu lui dois encore — ça, c'est le repère de paie.",
+    String(avant));
+  if(rep===null) return;
+  const n=Math.floor(Number(String(rep).replace(",",".")));
+  // Une saisie illisible ne doit pas devenir 0 : « 0 abonné payé » est un
+  // montant, pas une absence de réponse.
+  if(!isFinite(n) || n<0){ alert("❌ « "+rep+" » n'est pas un nombre d'abonnés — rien n'a été modifié."); return; }
+  if(n===avant) return;
+  if(!confirm("Passer de "+avant+" à "+n+" abonnés payés pour "+(ligne.va||"?")+" ?\n\n"
+    +"L'ancienne valeur reste inscrite à côté : on ne réécrit pas l'histoire, on la corrige.")) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/pay-history/correct",{method:"POST",
+      headers:{"content-type":"application/json","x-hub-token":TOKEN},
+      body:JSON.stringify({id:String(id), subsPaid:n})});
+    let j=null; try{ j=await r.json(); }catch(e){}
+    if(!r.ok || !j || !j.ok){
+      alert("❌ Rien n'a été modifié.\n\n"+((j&&j.error)||("le serveur a répondu "+r.status)));
+      return;
+    }
+    if(typeof toast==="function") toast("✏️ Journal corrigé",
+      (ligne.va||"")+" : "+avant+" → "+n+" abonnés");
+    if(typeof loadPaieCumul==="function") await loadPaieCumul();
+    // Le compte de résultat lit les primes de ce même journal : il doit suivre.
+    if(typeof renderRenta==="function") renderRenta();
+    if(typeof renderSplit==="function") renderSplit();
+  }catch(e){
+    alert("❌ Rien n'a été modifié ("+(e.message||"réseau")+").");
+  }
+}
+document.addEventListener("click", function(e){
+  const b=e.target && e.target.closest && e.target.closest(".pay-h-fix");
+  if(b) corrigerLigneJournal(b.getAttribute("data-fixid"));
+});
 
 // ⛔ DÉCONNECTER TOUT LE MONDE, TOUT DE SUITE.
 // « Se déconnecter » ne vide que CE téléphone : c'est un geste local, pas une

@@ -532,4 +532,81 @@ const V=verifie;
   V("une reponse en erreur n allume rien", f.combien()===0, "propositions=" + f.combien());
 }
 
+
+// ================= 13) ce qui va s arreter tout seul, sans le taper
+// Le panneau ne connaissait que les dates saisies a la main -- donc rien. Trois
+// choses qui coupent le robinet sont deja mesurees ailleurs dans la page.
+{
+  const bloc = morceau("function echeancesMesurees(){", "function renderEcheances(");
+  const faire = (LAST, COOKIE_DATA) => new Function("LAST","COOKIE_DATA","fmtMoney",
+    bloc + "; return echeancesMesurees;")(LAST, COOKIE_DATA, (v)=>v+" $")();
+
+  const L = {
+    "proxy-solde":    { metrics: { jours: 12, go: 45.23 } },
+    "onlychat-solde": { metrics: { jours: 8,  solde: 42 } },
+  };
+  const r = faire(L, { jours: 3, expire_le: "2026-09-12" });
+  const par = Object.fromEntries(r.map(x => [x.cle, x]));
+
+  V("les trois sources sont toujours listees", r.length===3, "recu " + r.length);
+  V("le cookie est une VRAIE date", par.cookie.exact===true && par.cookie.date==="2026-09-12", JSON.stringify(par.cookie));
+  V("le proxy est une ESTIMATION, et c est dit", par.proxy.exact===false && par.proxy.j.n===12, JSON.stringify(par.proxy));
+  V("le reste de data est repris tel quel", par.proxy.reste==="45,2 Go", par.proxy.reste);
+  V("le solde OnlyChat suit la meme regle", par.onlychat.exact===false && par.onlychat.j.n===8, JSON.stringify(par.onlychat));
+
+  // ⚠️ LE CONTROLE QUI COMPTE #1 : « >30 » veut dire « AU MOINS 30 j ».
+  // Le serveur borne l horizon a 30x la duree observee. Lire 30 tout court, ce
+  // serait refaire le « ~202 j » extrapole de 8 h qui avait failli passer pour
+  // une certitude.
+  const mini = faire({ "proxy-solde": { metrics: { jours: ">30", go: 400 } } }, null);
+  const pm = mini.find(x => x.cle==="proxy");
+  V("un horizon borne est lu comme un MINIMUM", pm.j.n===30 && pm.j.mini===true, JSON.stringify(pm.j));
+
+  // ⚠️ LE CONTROLE QUI COMPTE #2 : rien de mesure. Faire disparaitre la ligne,
+  // dans un panneau qui repond a « qu est-ce qui va s arreter ? », se lirait
+  // « rien a signaler ».
+  const vide = faire(null, null);
+  V("sans aucune mesure, les lignes restent la", vide.length===3, "recu " + vide.length);
+  V("... et disent « je ne sais pas », pas « tout va bien »",
+    vide.every(x => x.j===null), JSON.stringify(vide.map(x => x.j)));
+
+  // Une valeur illisible ne doit pas devenir un nombre de jours.
+  const sale = faire({ "proxy-solde": { metrics: { jours: "bientot" } } }, null);
+  V("une mesure illisible ne devient pas une echeance",
+    sale.find(x => x.cle==="proxy").j===null, "un texte libre ne doit pas etre lu comme des jours");
+
+  // Un depassement doit rester lisible en negatif, pas etre efface.
+  const perime = faire(null, { jours: -4, expire_le: "2026-09-01" });
+  V("une echeance deja depassee est gardee", perime.find(x=>x.cle==="cookie").j.n===-4, "cookie expire efface");
+}
+
+
+// ================= 14) quel modele est le moins cher a faire grandir
+// La ligne des modeles montrait une marge, mais en TOTAL : le plus gros gagne
+// toujours et la comparaison ne dit rien. Normalisee par abonne, elle repond.
+{
+  const bloc = morceau("function margeParAbonne(", "function coutRailwayMois(");
+  const f = new Function(bloc + "; return margeParAbonne;")();
+
+  V("marge par abonne = marge / abonnes PAYES", f({ marge: 600, subsPayes: 400 })===1.5,
+    String(f({ marge: 600, subsPayes: 400 })));
+  V("une marge negative reste negative", f({ marge: -120, subsPayes: 300 })===-0.4,
+    String(f({ marge: -120, subsPayes: 300 })));
+
+  // ⚠️ LE CONTROLE QUI COMPTE : le mauvais denominateur. `subs` compte AUSSI les
+  // comptes perso, jamais remuneres ; la marge, elle, ne les facture pas.
+  // Diviser par `subs` donnerait un chiffre qui a l air precis et qui est faux.
+  V("sans le denominateur payes, on ne calcule RIEN",
+    f({ marge: 600, subs: 400 })===null,
+    "on a divise par « subs » : deux denominateurs melanges dans le meme chiffre");
+
+  // « absent != 0 » des deux cotes.
+  V("marge non mesuree = null, pas 0", f({ marge: null, subsPayes: 400 })===null, "0 se lirait « ce modele ne rapporte rien »");
+  V("aucun abonne paye = null (pas une division par zero)", f({ marge: 600, subsPayes: 0 })===null, String(f({ marge: 600, subsPayes: 0 })));
+  V("entree vide = null", f(null)===null && f({})===null, "une carte vide ne doit pas produire un chiffre");
+
+  // Une marge de zero EST une mesure : elle doit sortir 0, pas null.
+  V("une marge reellement nulle vaut 0, et le dit", f({ marge: 0, subsPayes: 200 })===0, String(f({ marge: 0, subsPayes: 200 })));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
