@@ -694,7 +694,7 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
-  body.assoc-mode #echeances, body.assoc-mode #dates, body.assoc-mode #vaarchives,
+  body.assoc-mode #echeances, body.assoc-mode #dates, body.assoc-mode #vaarchives, body.assoc-mode #relancer,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
   body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
@@ -1403,6 +1403,9 @@
   .ech-row .ech-del:hover{color:#f87171}
   .ech-badge{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(248,113,113,.14);color:#f87171;margin-left:6px}
   .ech-note{color:var(--faint);font-size:11.5px}
+  .rl-btns{display:flex;flex-wrap:wrap;gap:6px}
+  .rl-btns button{flex:1 1 160px;font-size:12.5px;padding:8px 10px}
+  .rl-btns button:disabled{opacity:.55;cursor:progress}
   .vaa-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:.5px solid var(--line);font-size:13.5px}
   .vaa-row:last-child{border-bottom:0}
   .vaa-row .vaa-n{flex:1;min-width:0}
@@ -2640,6 +2643,29 @@
   <!-- 👥 Un VA archivé disparaît de PARTOUT : sans cette liste, il n'existe
        plus aucun endroit d'où le faire revenir. Archiver serait alors une
        porte à sens unique, ce qu'aucun geste réversible ne devrait être. -->
+  <!-- 🔁 RELANCER UN ENVOI. Les tableaux VA partent a 12 h et 23 h 55, les recaps
+       a 23 h 55, le rapport LTV le lundi. Si le service redemarre pile a ce
+       moment-la (un deploiement suffit), l'envoi est simplement PERDU : rien ne
+       le rattrape et personne ne l'apprend. Les quatre routes existaient depuis
+       toujours ; il n'y avait aucun bouton pour s'en servir. -->
+  <div class="panel-box" id="relancer" style="display:none">
+    <div class="pb-head">🔁 Relancer un envoi</div>
+    <div class="ech-intro">Un message n'est pas parti sur Discord ? Relance-le ici. Ces envois n'ont <b>aucun rattrapage automatique</b> : sans ce bouton, ce qui est perdu l'est pour de bon.</div>
+    <div class="ech-add">
+      <input id="rlDate" type="date" title="Pour quelle journée ? (vide = aujourd'hui)" />
+      <select id="rlMoment" title="Pour les tableaux VA">
+        <option value="soir">Tableaux VA : soir</option>
+        <option value="midi">Tableaux VA : midi</option>
+      </select>
+    </div>
+    <div class="rl-btns">
+      <button class="act" data-rl="run-va-boards">👥 Renvoyer les tableaux VA</button>
+      <button class="act" data-rl="run-recap-subs">📊 Récap subs</button>
+      <button class="act" data-rl="run-recap-clics">🖱️ Récap clics</button>
+      <button class="act" data-rl="run-ltv-hebdo">📈 Rapport LTV hebdo</button>
+    </div>
+    <div id="rlMsg" class="ech-note" style="margin-top:6px"></div>
+  </div>
   <div class="panel-box" id="vaarchives" style="display:none">
     <div class="pb-head">👥 VA archivés</div>
     <div class="ech-intro">Ils ne sont plus dans le classement, le coach ni les alertes — mais leur historique reste compté dans tes totaux. Réactive-les quand tu veux.</div>
@@ -3357,7 +3383,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts, renderRelancer,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -11320,6 +11346,81 @@ function renderEcheances(){
     ECHEANCES=ECHEANCES.filter(x=>x.id!==id);
     saveEcheances([id]);   // suppression EXPLICITE : le serveur ne devine pas
   }); }
+// 🔁 RELANCER UN ENVOI.
+// Les tableaux VA partent à 12 h et 23 h 55, les récaps à 23 h 55, le rapport
+// LTV le lundi. Si le service redémarre pile à ce moment-là — un déploiement
+// suffit — l'envoi est PERDU : rien ne le rattrape et personne ne l'apprend.
+// Les quatre routes existaient depuis toujours, sans aucun bouton pour s'en
+// servir : quand un message ne partait pas, il fallait me le demander.
+//
+// ⚠️ CHAQUE BOUTON DIT CE QU'IL VA VRAIMENT FAIRE, y compris son risque. Un
+// « Relancer » qui poste en double dans un salon sans prévenir, c'est un piège.
+const RELANCES = {
+  "run-va-boards": {
+    nom: "les tableaux VA",
+    // `forcer` est le coeur du bouton : sans lui, un tableau MARQUÉ livré (mais
+    // jamais reçu) ne serait pas refait — donc le bouton ne servirait à rien
+    // dans le seul cas où on le clique.
+    corps: () => ({ date: rlDate(), moment: (($("#rlMoment")||{}).value)||"soir", forcer: true }),
+    risque: "Chaque VA peut recevoir son tableau une DEUXIÈME fois.",
+    lire: (j) => "Tableaux VA renvoyés" + (j && j.subs!=null ? (" — " + j.subs + " subs, " + (j.clics!=null?j.clics:"?") + " clics") : ""),
+  },
+  "run-recap-subs": {
+    nom: "le récap des subs",
+    corps: () => ({ date: rlDate() }),
+    risque: "Le message sera reposté dans le salon, même s'il y est déjà.",
+    lire: (j) => "Récap subs reposté pour " + ((j && j.date) || "aujourd'hui"),
+  },
+  "run-recap-clics": {
+    nom: "le récap des clics",
+    corps: () => ({ date: rlDate() }),
+    risque: "Le message sera reposté dans le salon, même s'il y est déjà.",
+    lire: (j) => "Récap clics reposté" + (j && j.postes!=null ? (" — " + j.postes + " message(s)") : ""),
+  },
+  "run-ltv-hebdo": {
+    nom: "le rapport LTV hebdomadaire",
+    corps: () => ({}),
+    risque: "Le rapport sera reposté dans son salon.",
+    // ⚠️ `posted` peut être false : le job a tourné mais n'a rien publié. On ne
+    // dit PAS « envoyé » dans ce cas — c'est exactement le genre de faux
+    // succès qui fait croire qu'un message est parti.
+    lire: (j) => (j && j.posted) ? "Rapport LTV reposté" : "Le job a tourné mais n'a RIEN publié (source muette ?)",
+  },
+};
+function rlDate(){
+  const v=String((($("#rlDate")||{}).value)||"").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";   // vide = aujourd'hui, côté serveur
+}
+{ const z=$("#relancer"); if(z) z.addEventListener("click", async (e)=>{
+    const b=e.target.closest("[data-rl]"); if(!b) return;
+    const cle=b.getAttribute("data-rl"), def=RELANCES[cle]; if(!def) return;
+    if(!TOKEN){ if(typeof toast==="function") toast("Connecte-toi d'abord",""); return; }
+    const d=rlDate(), quand=d?("du "+d):"d'aujourd'hui";
+    if(!confirm("Relancer "+def.nom+" "+quand+" ?\n\n"+def.risque+"\n\nC'est fait pour rattraper un envoi qui n'est jamais parti — recevoir deux fois vaut mieux que ne rien recevoir.")) return;
+    const msg=$("#rlMsg"), t0=b.textContent;
+    b.disabled=true; b.textContent="⏳ envoi…"; if(msg) msg.textContent="";
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/"+cle,{method:"POST",
+        headers:{"content-type":"application/json","x-hub-token":TOKEN},
+        body:JSON.stringify(def.corps())});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+      const txt=def.lire(j);
+      if(msg) msg.textContent="✅ "+txt;
+      if(typeof toast==="function") toast("🔁 "+def.nom.charAt(0).toUpperCase()+def.nom.slice(1), txt);
+    }catch(err){
+      // On DIT que rien n'est parti. Un « relancé » optimiste sur un échec
+      // laisserait croire le message envoyé — et personne n'irait vérifier.
+      const e2=String(err&&err.message||err);
+      if(msg) msg.textContent="⚠️ Rien n'a été envoyé — "+e2;
+      if(typeof toast==="function") toast("⚠️ Relance échouée","Rien n'est parti ("+e2+"). Réessaie, ou dis-le-moi.");
+    }finally{ b.disabled=false; b.textContent=t0; }
+  }); }
+function renderRelancer(){
+  const z=$("#relancer"); if(!z) return;
+  z.style.display = TOKEN ? "block" : "none";
+}
+
 // 👥 ÉQUIPE : ancienneté et archivage, depuis le centre.
 // ⚠️ CES DEUX ROUTES REMPLACENT LA LISTE ENTIÈRE À CHAQUE ÉCRITURE.
 // Le serveur le dit lui-même : c'est l'incident du 2026-08-17 — un GET qui
