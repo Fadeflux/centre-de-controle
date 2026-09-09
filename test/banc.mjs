@@ -908,4 +908,84 @@ const V=verifie;
   V("les plus anciens d abord", tri.map(x=>x.va).join("")==="BCA", tri.map(x=>x.va).join(""));
 }
 
+
+// ================= 21) la repetition avant de payer
+// C est le SERVEUR qui recalcule le montant : la page ne l envoie pas. Ce
+// qu Andre confirme n est donc pas forcement ce qui part -- le 2026-08-15,
+// « Payer 150 $ » a ecrit 210 $ (7 abonnes arrives entre le regard et le clic).
+{
+  const bloc = morceau("function comparerRepetition(", "async function repetitionPaie(");
+  const f = new Function(bloc + "; return comparerRepetition;")();
+
+  V("meme montant des deux cotes : on ne derange pas",
+    f(150, { ok:true, amount:150 }).etat==="ok", JSON.stringify(f(150,{ok:true,amount:150})));
+
+  // ⚠️ LE CONTROLE QUI COMPTE : le serveur ne dit pas la meme chose.
+  const d = f(150, { ok:true, amount:210, nouveaux:420 });
+  V("un ecart est signale AVANT la confirmation", d.etat==="diverge", JSON.stringify(d));
+  V("... avec l ecart chiffre", d.ecart===60 && d.montant===210 && d.ecran===150, JSON.stringify(d));
+  V("... et le nombre d abonnes que le serveur compte", d.nouveaux===420, String(d.nouveaux));
+
+  // Un centime d arrondi n est pas un desaccord : sinon la question sort a
+  // chaque paiement et on apprend a cliquer « oui » sans lire.
+  V("un centime d arrondi ne declenche rien",
+    f(150, { ok:true, amount:150.004 }).etat==="ok", JSON.stringify(f(150,{ok:true,amount:150.004})));
+  V("un centime PLEIN, lui, se signale",
+    f(150, { ok:true, amount:150.02 }).etat==="diverge", JSON.stringify(f(150,{ok:true,amount:150.02})));
+
+  // Repetition indisponible : on ne BLOQUE pas le paiement, on le dit.
+  // Empecher de payer parce qu un apercu n a pas repondu couterait plus cher
+  // que le risque qu il couvre.
+  for (const cas of [null, undefined, { ok:false, error:"boom" }, { ok:true }, { ok:true, amount:"n/a" }]) {
+    V("repetition indisponible = on le DIT, on ne bloque pas (" + JSON.stringify(cas) + ")",
+      f(150, cas).etat==="indisponible", JSON.stringify(f(150, cas)));
+  }
+
+  // Le montant de l ecran illisible : le serveur fait foi, sans faux ecart.
+  V("ecran illisible : on prend le serveur sans crier a l ecart",
+    f(NaN, { ok:true, amount:210 }).etat==="ok", JSON.stringify(f(NaN,{ok:true,amount:210})));
+}
+
+
+// ================= 22) le compte de resultat fige, mois par mois
+// Il est RECALCULE a chaque affichage, avec les couts d outils d AUJOURD HUI.
+// Le 1er du mois, celui du mois precedent disparait et se reconstruit avec des
+// charges qu il n avait pas : deux mois jamais comparables.
+{
+  const bloc = morceau("function pnlMoisTermines(", "function comparerRepetition(");
+  const f = new Function(bloc + "; return pnlMoisTermines;")();
+
+  const hist = [
+    { d:"2026-07-05", mois:"2026-07", profit: 900,  caNet: 4000 },
+    { d:"2026-07-31", mois:"2026-07", profit: 3100, caNet: 12000 },
+    { d:"2026-08-10", mois:"2026-08", profit: 1200, caNet: 5000 },
+    { d:"2026-08-31", mois:"2026-08", profit: 4050, caNet: 14800 },
+    { d:"2026-09-09", mois:"2026-09", profit: 800,  caNet: 3000 }
+  ];
+  const r = f(hist, "2026-09");
+  V("le mois EN COURS n est pas presente comme fige",
+    !r.some(x => x.mois==="2026-09"), JSON.stringify(r.map(x=>x.mois)));
+  V("le resultat d un mois = son DERNIER releve",
+    r.find(x=>x.mois==="2026-08").profit===4050, JSON.stringify(r));
+  V("... et pas le premier", r.find(x=>x.mois==="2026-07").profit===3100, JSON.stringify(r));
+  V("les mois sortent dans l ordre", r.map(x=>x.mois).join(",")==="2026-07,2026-08", r.map(x=>x.mois).join(","));
+  V("on sait combien de jours composent le mois fige",
+    r.find(x=>x.mois==="2026-08").jours===2, String(r.find(x=>x.mois==="2026-08").jours));
+
+  // ⚠️ LE CONTROLE QUI COMPTE : historique pas lu. Rendre une liste vide se
+  // lirait « aucun mois n a jamais fait de profit ».
+  V("historique non lu = null, PAS une liste vide", f(null, "2026-09")===null, String(f(null,"2026-09")));
+  V("idem si la reponse est malformee", f("boom", "2026-09")===null, String(f("boom","2026-09")));
+
+  // Un mois dont le profit n a pas pu etre mesure garde `null` : il ne doit pas
+  // etre affiche comme un mois a 0 $.
+  const nul = f([{ d:"2026-07-31", mois:"2026-07", profit:null }], "2026-09");
+  V("un profit non mesure reste null, pas 0", nul[0].profit===null, JSON.stringify(nul));
+
+  // Aucun mois termine : la liste est vide, mais ce n est pas `null` -- c est
+  // une vraie reponse (« pas encore »), pas une ignorance.
+  V("aucun mois termine = liste vide, et c est une vraie reponse",
+    Array.isArray(f([{ d:"2026-09-01", mois:"2026-09", profit:100 }], "2026-09")), "doit rester un tableau");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

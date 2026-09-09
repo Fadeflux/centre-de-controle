@@ -3458,7 +3458,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadPrevisions, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadPrevisions, loadPnl, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -5446,7 +5446,29 @@ $("#pcumulBody").addEventListener("click", async e=>{
       const b=row?row.querySelector(".pc-cahier"):null;
       return b?`\n\n⚠️ ATTENTION : un versement pour ${va} est déjà noté dans le cahier depuis ton dernier clic << Payer >>.\nSi c'était pour ces mêmes abonnés, tu vas payer DEUX FOIS.`:"";
     })();
-    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+`\n\nLe bot préviendra ${va} du montant dans son ticket.`+ligneCahier)) return;
+    // 🧾 On demande au serveur ce qu'il écrirait, AVANT de demander à André.
+    pay.disabled=true; const _lbl=pay.textContent; pay.textContent="…";
+    const _rep=await repetitionPaie(va, prime, manager, leader);
+    pay.disabled=false; pay.textContent=_lbl;
+    if(_rep && _rep.ok===false){
+      alert("⛔ Le serveur REFUSE ce versement :\n\n"+String(_rep.error||"")
+        +(_rep.detail?("\n\n"+String(_rep.detail)):"")
+        +"\n\nRIEN n'a été versé. C'est la répétition qui te le dit avant, pas après.");
+      return;
+    }
+    const _cmp=comparerRepetition(subsPart+prime+manager+leader, _rep);
+    if(_cmp.etat==="diverge"){
+      if(!confirm("⚠️ Le serveur ne calcule PAS le même montant que l'écran.\n\n"
+        +"À l'écran : "+pcMoneyClair(_cmp.ecran)+"\n"
+        +"Ce qui partirait : "+pcMoneyClair(_cmp.montant)+"  ("+(_cmp.ecart>0?"+":"")+pcMoneyClair(_cmp.ecart)+")\n"
+        +((_cmp.nouveaux!=null)?("\nLe serveur compte "+_cmp.nouveaux+" nouveaux abonnés.\n"):"")
+        +"\nC'est normal si des abonnés sont arrivés depuis que tu regardes.\n"
+        +"C'est le SERVEUR qui fait foi.\n\nContinuer avec "+pcMoneyClair(_cmp.montant)+" ?")) return;
+    }
+    const _sousTitre=(_cmp.etat==="indisponible")
+      ? "\n\n❓ Je n'ai pas pu vérifier ce montant auprès du serveur : c'est le chiffre de l'écran."
+      : "\n\n✅ Montant confirmé par le serveur.";
+    if(!confirm(`Payer ${va} ?\n\n${n} nouveaux subs → ${pcMoneyClair(subsPart)}`+(prime>0?`\n+ prime ${pcMoneyClair(prime)}`:"")+(manager>0?`\n+ manager ${pcMoneyClair(manager)}`:"")+(leader>0?`\n+ team leader ${pcMoneyClair(leader)}`:"")+(extra?`\n= ${pcMoneyClair(totalPay)} au total`:"")+_sousTitre+`\n\nLe bot préviendra ${va} du montant dans son ticket.`+ligneCahier)) return;
     pay.disabled=true; const old=pay.textContent; pay.textContent="…";
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, primesReglees})});
@@ -7098,6 +7120,95 @@ function bilanPrevision(d, money){
 // fabriquerait un faux précis. On se contente d'un AVERTISSEMENT quand ce
 // qu'on s'apprête à sortir dépasse ce qu'on sait être là, en disant exactement
 // ce que ce « là » couvre et ne couvre pas.
+// 🧾 RÉPÉTITION AVANT DE PAYER — ce que le SERVEUR va vraiment écrire.
+//
+// C'est le serveur qui recalcule le montant : la page ne l'envoie pas. Ce que
+// tu confirmes à l'écran n'est donc pas forcément ce qui part. Le 2026-08-15,
+// « Payer 150 $ » a écrit 210 $ — 7 abonnés étaient arrivés entre le moment où
+// André a regardé et le moment où il a cliqué.
+//
+// On demande donc au serveur, AVANT la confirmation, de refaire tout son calcul
+// et tous ses refus sans rien écrire. Le chiffre affiché dans la question est
+// alors celui qui partira.
+//
+// ⚠️ Si la répétition échoue, on ne bloque PAS le paiement : on le dit, et on
+// retombe sur le chiffre de l'écran. Empêcher de payer parce qu'un aperçu n'a
+// pas répondu serait un contrôle qui coûte plus qu'il ne protège.
+// 📊 FIGER LE COMPTE DE RÉSULTAT, JOUR APRÈS JOUR.
+// Il est RECALCULÉ à chaque affichage, avec les coûts d'outils d'AUJOURD'HUI.
+// Le 1er du mois, celui du mois précédent disparaît et se reconstruit avec des
+// charges qu'il n'avait pas : impossible de comparer deux mois sur les mêmes
+// bases, ni même de dire « en août j'ai gagné X ».
+// Même recette que le journal des prévisions : on note ce qu'on affiche, une
+// fois par jour. Le dernier relevé d'un mois EST donc son résultat final.
+//
+// ⚠️ Le calcul reste ICI. Le refaire côté serveur créerait un DEUXIÈME compte
+// de résultat — le piège des jumeaux qui a produit le voyant vert menteur et le
+// filtre à moitié appliqué. Le serveur ne fait que garder ce qu'on lui envoie.
+let PNL_HIST=null, PNL_ENVOYE_LE=null;
+async function loadPnl(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/pnl",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;
+    const j=await r.json();
+    PNL_HIST=Array.isArray(j.historique)?j.historique:[];
+    if(typeof renderRenta==="function") renderRenta();
+  }catch(e){}
+}
+function noterPnl(l){
+  if(!TOKEN || !l || !l.d) return;
+  // Une seule écriture par jour et par session : renderRenta tourne toutes les
+  // 60 s, on ne va pas écrire 1 440 fois.
+  if(PNL_ENVOYE_LE===l.d) return;
+  // ⚠️ On n'envoie RIEN tant que les revenus sont muets : figer un profit
+  // calculé sur une source qui n'a pas répondu, c'est graver une contre-vérité
+  // dans un historique fait pour être relu dans six mois.
+  if(l.caBrut==null) return;
+  PNL_ENVOYE_LE=l.d;
+  fetch(HUB_BASE+"/api/hub/pnl",{method:"POST",
+    headers:{"content-type":"application/json","x-hub-token":TOKEN},
+    body:JSON.stringify(l)}).catch(()=>{ PNL_ENVOYE_LE=null; });   // échec : on réessaiera
+}
+// Le profit FINAL des mois terminés : le dernier relevé de chaque mois.
+// `null` si l'historique n'a pas été lu — « absent ≠ 0 ».
+function pnlMoisTermines(hist, moisEnCours){
+  if(!Array.isArray(hist)) return null;
+  const parMois={};
+  hist.forEach(x=>{ if(x&&x.mois) (parMois[x.mois]=parMois[x.mois]||[]).push(x); });
+  return Object.keys(parMois).sort()
+    .filter(m=>!moisEnCours || m<moisEnCours)
+    .map(m=>{
+      const l=parMois[m].slice().sort((a,b)=>a.d<b.d?-1:1);
+      const fin=l[l.length-1];
+      return { mois:m, profit:(fin&&fin.profit!=null)?Number(fin.profit):null,
+               caNet:(fin&&fin.caNet!=null)?Number(fin.caNet):null, jours:l.length, arreteLe:fin?fin.d:null };
+    });
+}
+function comparerRepetition(ecran, serveur){
+  if(!serveur || serveur.ok!==true) return { etat:"indisponible" };
+  const a=Number(ecran), b=Number(serveur.amount);
+  if(!isFinite(b)) return { etat:"indisponible" };
+  if(!isFinite(a)) return { etat:"ok", montant:b, ecart:0 };
+  const ecart=Math.round((b-a)*100)/100;
+  // Un centime d'arrondi n'est pas un désaccord. Au-delà, on prévient.
+  return { etat: (Math.abs(ecart)<0.01) ? "ok" : "diverge",
+           montant:b, ecran:Math.round(a*100)/100, ecart:ecart,
+           nouveaux: (serveur.nouveaux!=null)?Number(serveur.nouveaux):null };
+}
+async function repetitionPaie(va, prime, manager, leader){
+  if(!TOKEN) return null;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",
+      headers:{"content-type":"application/json","x-hub-token":TOKEN},
+      body:JSON.stringify({va:va, prime:prime, manager:manager, leader:leader, repetition:true})});
+    const j=await r.json();
+    // Le serveur refuse aussi en répétition (VA perso, base non définie, saut
+    // anormal) : c'est précieux, ça arrive AVANT la confirmation au lieu d'après.
+    if(!r.ok) return { ok:false, error:(j&&j.error)||("le serveur a répondu "+r.status), detail:(j&&j.detail)||null };
+    return j;
+  }catch(e){ return null; }
+}
 function caisseSuffit(aSortir, cash){
   const x=Number(aSortir);
   if(!isFinite(x) || x<=0) return null;               // rien à sortir : rien à dire
@@ -8660,6 +8771,18 @@ function renderRenta(){
   // déduit RIEN et la ligne affiche « — » : mieux vaut un profit qu'on sait
   // incomplet qu'un profit amputé d'un montant inventé.
   const profitReel=profitNet-ocFee-((primesMois&&primesMois.total>0)?primesMois.total:0);
+  // On fige ce qu'on vient d'afficher, une fois par jour.
+  try{
+    if(typeof noterPnl==="function" && typeof jourServeur==="function"){
+      noterPnl({ d:String(jourServeur()).slice(0,10),
+        caBrut:(ko||t.netMonth==null)?null:Number(t.netMonth),
+        caNet:(ko||t.netMonth==null)?null:Math.round(Number(t.netMonth)*netRate()),
+        marge:(ko||d.totals.margeMonth==null)?null:Number(d.totals.margeMonth),
+        outils:coutOutils, railway:(_rw&&_rw.aAjouter)||0,
+        primes:(primesMois&&primesMois.total!=null)?primesMois.total:null,
+        ocFee:ocFee, tg:tgMonth, profit:profitReel });
+    }
+  }catch(e){}
   // 🧾 #7 — impôts/charges à provisionner : taux réglable, mis de côté sur le profit.
   const TAX=Math.max(0,Math.min(60,Number(localStorage.getItem("ccn_tax_rate"))||0));
   const provision=Math.round(Math.max(0,profitReel)*TAX/100);
@@ -8719,6 +8842,22 @@ function renderRenta(){
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
     ${(typeof bilanPrevision==="function")?bilanPrevision(PREV_DATA, money):""}
+    ${(()=>{
+      // 📊 Les mois TERMINÉS, figés le jour où ils se sont terminés.
+      // Sans ça, le compte de résultat d'août se reconstruisait en septembre avec
+      // les charges de septembre : deux mois jamais comparables.
+      if(typeof pnlMoisTermines!=="function") return "";
+      const mois=(typeof jourServeur==="function")?String(jourServeur()).slice(0,7):null;
+      const l=pnlMoisTermines((typeof PNL_HIST!=="undefined")?PNL_HIST:null, mois);
+      if(l===null) return "";                       // pas lu : on se tait
+      const avecProfit=l.filter(x=>x.profit!=null);
+      if(!avecProfit.length)
+        return `<div class="rn-proj" style="margin-top:4px;font-size:12px;opacity:.75">📊 Aucun mois complet figé pour l'instant : le premier le sera à la fin de ce mois-ci.</div>`;
+      const derniers=avecProfit.slice(-3).reverse();
+      return `<div class="rn-proj" style="margin-top:4px;font-size:12px">📊 Mois terminés, figés : `
+        + derniers.map(x=>`<b>${escapeHtml(x.mois)}</b> ${money(x.profit)}`).join(" · ")
+        + ` <span class="ob-sub">(profit réel du mois, avec les charges de CE mois-là)</span></div>`;
+    })()}
     ${(()=>{
       // ⭐ Demande explicite d'André : « combien j'ai fait le mois dernier avec
       // OF et Telegram en brut, sachant que le Telegram vient déjà avec le net
