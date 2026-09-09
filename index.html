@@ -590,6 +590,22 @@
   .rule-form select,.rule-form input{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
   .rule-form input{max-width:120px}
   .rule-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .rule-row:last-child{border-bottom:0}
+  /* ⚠️ COMMANDES DE LIGNE TROP PETITES POUR UN DOIGT — mesuré le 2026-09-09
+     sur un écran de 375 px, dans la vraie page :
+       • « fait » (.tk-ck)   13 × 21 px
+       • « supprimer » (.tk-del) 19 × 22 px, COLLÉE à la précédente
+       • .rule-del 23 × 20, .sc-del 23 × 20, .ech-del 26 × 23
+     La recommandation Apple est 44 × 44. Deux commandes de 20 px côte à côte,
+     dont l'une détruit une ligne sans rien demander, c'est une erreur de doigt
+     qui attend son tour. On agrandit la ZONE TOUCHABLE sans changer le dessin :
+     la marge négative compense l'agrandissement pour ne pas déformer les lignes. */
+  @media (pointer: coarse) {
+    .tk-ck, .tk-del, .tk-move, .rule-del, .sc-del, .ech-del, .pay-h-fix {
+      min-width:44px; min-height:44px;
+      display:inline-flex; align-items:center; justify-content:center;
+      margin-top:-10px; margin-bottom:-10px;
+    }
+  }
   .rule-now{font-size:12px;color:var(--text);margin-top:2px} .rule-now.nc{color:var(--faint);font-style:italic}
   .rule-dot{font-size:12px} .rule-body{flex:1;min-width:0} .rule-lbl{font-size:13.5px;font-weight:600} .rule-sub{font-size:12px;color:var(--muted)}
   .rule-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .rule-del:hover{color:#f87171}
@@ -4667,7 +4683,9 @@ $("#scName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#scUrl").foc
 $("#scGrid").addEventListener("click",e=>{
   const st=e.target.closest("[data-scstar]"), dl=e.target.closest("[data-scdel]");
   if(st){ const i=+st.getAttribute("data-scstar"); SHORTCUTS[i].r=!SHORTCUTS[i].r; saveShortcuts(); renderShortcuts(); }
-  else if(dl){ const i=+dl.getAttribute("data-scdel"); SHORTCUTS.splice(i,1); saveShortcuts(); renderShortcuts(); }
+  else if(dl){ const i=+dl.getAttribute("data-scdel"); const c=SHORTCUTS[i];
+    if(c && !confirm("Retirer le raccourci « "+String(c.n||"").slice(0,40)+" » ?")) return;
+    SHORTCUTS.splice(i,1); saveShortcuts(); renderShortcuts(); }
 });
 $("#scRoutine").onclick = ()=>{
   const routine = SHORTCUTS.filter(s=>s.r);
@@ -6846,7 +6864,13 @@ renderRoutines();
 { const list=$("#taskList"); if(list){
   list.addEventListener("click",e=>{
     const ck=e.target.closest("[data-tkdone]"); if(ck){ const it=TASKS[TK_VIEW].find(x=>x.id===ck.getAttribute("data-tkdone")); if(it){ it.done=!it.done; if(it.done){ try{ it.doneJour=tkPeriodeDe(Date.now(), it.repeat); }catch(e){} } else { it.doneJour=""; } if(it.done){ if(it.repeat) it.doneTs=Date.now(); it.doneBy=(typeof WHO!=="undefined"?WHO:"moi"); it.doneAt=Date.now(); tkPop(); } else { it.doneTs=0; it.doneBy=""; it.doneAt=0; } it.upd=Date.now(); saveTasks(); renderTasks(); if(typeof renderDuo==="function") renderDuo(); } return; }
-    const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id); if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
+    // ⚠️ SUPPRIMER UNE TÂCHE NE DEMANDAIT RIEN, et la croix est à quelques
+    // pixels de la case « fait » (19 × 22 contre 13 × 21 sur iPhone). Le geste
+    // raté le plus banal du panneau détruisait une ligne en silence. Les
+    // échéances demandaient déjà confirmation ; les tâches, non.
+    const dl=e.target.closest("[data-tkdel]"); if(dl){ const id=dl.getAttribute("data-tkdel"); const it=TASKS[TK_VIEW].find(x=>x.id===id);
+      if(it && !confirm("Supprimer « "+String(it.text||"").slice(0,60)+" » ?")) return;
+      if(it){ it.del=true; it.upd=Date.now(); saveTasks(); renderTasks(); } return; }
     // 🧹 Ménage : solde d'un coup les tâches qui dorment depuis plus de 30 jours.
     // Même mécanisme que le ✕ (tombstone `del` + `upd`), donc la suppression se
     // propage aux autres appareils au lieu de revenir à la synchro suivante.
