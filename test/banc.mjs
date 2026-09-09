@@ -710,4 +710,36 @@ const V=verifie;
   V("... et « non » est une VRAIE reponse, pas un vide", /non/.test(r6) && r6.length>0, r6);
 }
 
+
+// ================= 17) ce que l IA de vente te prend, PAR NATURE
+// Le panneau disait combien elle preleve et finissait par un aveu : « ce solde
+// finance l IA sur Telegram ET OnlyFans ». La source envoyait pourtant le
+// `type` de chaque prelevement ; le cerveau ne gardait que date et montant.
+{
+  const bloc = morceau("  const natureLigne=(function(){", "  const soldeLigne=(d.solde!=null)");
+  const faire = (soldeParNature) => new Function("d","tgMoney","escapeHtml",
+    "const natureLigne=" + bloc.replace(/^\s*const natureLigne=/, "") + "; return natureLigne;")(
+      { soldeParNature }, (v) => Math.round(Number(v)) + " $", (x) => String(x));
+
+  const r = faire({ COMMISSION: 120, SUBSCRIPTION: 180 });
+  V("le detail par nature s affiche", /COMMISSION/.test(r) && /SUBSCRIPTION/.test(r), r);
+  V("le total est la somme du detail", /300 \$/.test(r), r);
+  V("le plus gros poste vient en premier", r.indexOf("SUBSCRIPTION") < r.indexOf("COMMISSION"), r);
+
+  // ⚠️ LE CONTROLE QUI COMPTE : rien de lu. Un total a 0 se lirait « l IA ne te
+  // prend rien », la conclusion la plus fausse possible sur une ligne de cout.
+  V("ventilation non lue = on se tait", faire(null)==="", faire(null));
+  V("objet vide = on se tait aussi", faire({})==="", faire({}));
+
+  // Un prelevement sans type reste A PART. Le fondre dans une autre categorie
+  // rendrait le total juste et le detail mensonger.
+  const q = faire({ COMMISSION: 100, "?": 40 });
+  V("un prelevement sans type est dit comme tel", /nature non pr/.test(q), q);
+  V("... et compte quand meme dans le total", /140 \$/.test(q), q);
+
+  // Une valeur illisible ne doit pas devenir une ligne a 0.
+  const z = faire({ COMMISSION: 100, BIDON: 0 });
+  V("une nature a zero n encombre pas la ligne", !/BIDON/.test(z), z);
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

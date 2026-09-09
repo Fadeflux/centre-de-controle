@@ -453,6 +453,8 @@
   .oc-solde.bas{color:#facc15;border-color:color-mix(in srgb,#facc15 45%,transparent);background:color-mix(in srgb,#facc15 10%,transparent)}
   .oc-solde.bas b{color:#facc15}
   .oc-solde-j{color:var(--faint);font-size:11.5px}
+  .oc-nature{font-size:12px;color:var(--muted);margin-top:5px}
+  .oc-nature b{color:var(--text)}
   .oc-solde-j.urgent{color:#f87171;font-weight:700}
   /* 🗓️ historique des briefings */
   .bh-item{padding:10px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--surface-2)}
@@ -4142,12 +4144,30 @@ function renderOnlyChat(){
       Écart : <b>${tgMoney(ecartJour)} par jour</b>, soit <b>~${tgMoney(Math.round(ecartJour*dim))} sur un mois</b> de profit probablement surestimé.
       <div style="margin-top:4px;opacity:.75">⚠️ À confirmer sur ta facture avant d'en tirer une conclusion : le coût/jour est mesuré sur 7 jours, et ce solde finance l'IA sur <b>Telegram ET OnlyFans</b> — il n'est donc pas imputable au seul Telegram. Ton abonnement fixe peut aussi y passer, alors qu'il est déjà compté dans « Dépenses d'outils ».</div></div>`;
   })();
+  // 🧾 CE QUE L'IA T'A PRIS, PAR NATURE.
+  // Le bloc au-dessus dit combien elle prélève, et finit par un aveu : « ce
+  // solde finance l'IA sur Telegram ET OnlyFans ». La source envoyait pourtant
+  // le `type` de chaque prélèvement ; le cerveau ne gardait que la date et le
+  // montant. On avait le détail en main et on le jetait à la lecture.
+  // ⚠️ On n'invente AUCUNE catégorie : on additionne ce que la source appelle
+  // elle-même, et un prélèvement sans type reste à part, dit comme tel — le
+  // fondre dans une autre rendrait le total juste et le détail faux.
+  const natureLigne=(function(){
+    const pn=d.soldeParNature;
+    if(!pn || typeof pn!=="object") return "";        // « absent ≠ 0 » : non lu = on se tait
+    const ks=Object.keys(pn).filter(k=>Number(pn[k])>0).sort((a,b)=>Number(pn[b])-Number(pn[a]));
+    if(!ks.length) return "";
+    const tot=ks.reduce((a,k)=>a+Number(pn[k]),0);
+    const nom=k=>(k==="?")?"nature non précisée":k;
+    return `<div class="oc-nature" title="Prélèvements des 7 derniers jours, classés par ce que la source appelle elle-même — aucune catégorie inventée ici.">🧾 Sur 7 jours elle a pris <b>${tgMoney(tot)}</b> — ${ks.map(k=>`${escapeHtml(nom(k))} <b>${tgMoney(Number(pn[k]))}</b>`).join(" · ")}</div>`;
+  })();
   const soldeLigne=(d.solde!=null)
     ? `<div class="oc-solde${soldeBas?" bas":""}" title="Solde prépayé qui finance l'IA de vente — à zéro elle s'arrête (seuil d'alerte : ${seuilSolde} $)">💳 Solde : <b>${tgMoney(d.solde)}</b>${jrsTxt}${soldeBas?" ⚠️ recharge bientôt":""}</div>`
     : "";
   $("#onlychatBody").innerHTML = `
     <div class="oc-tot">${tgMoney(d.totalRevenue)}<span class="oc-tot-sub">ce mois-ci</span></div>
     ${soldeLigne}
+    ${natureLigne}
     ${coutReel}
     ${tgToday!=null?`<div class="oc-today">📅 Aujourd'hui <b>${tgMoney(tgToday)}</b></div>`:""}
     ${goalBlock}
