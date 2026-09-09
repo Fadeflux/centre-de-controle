@@ -742,4 +742,119 @@ const V=verifie;
   V("une nature a zero n encombre pas la ligne", !/BIDON/.test(z), z);
 }
 
+
+// ================= 18) le partage ne regardait jamais la caisse
+// `renderSplit` ne contenait AUCUNE reference a la tresorerie : on repartissait
+// un profit calcule sur du chiffre d affaires sans jamais verifier qu il y a
+// l argent pour le sortir.
+{
+  const bloc = morceau("function caisseSuffit(", "function coutRailwayMois(");
+  const f = new Function(bloc + "; return caisseSuffit;")();
+
+  V("assez de caisse : rien a signaler",
+    f(2000, { apresPaie: 5000 }).etat==="ok", JSON.stringify(f(2000, { apresPaie: 5000 })));
+
+  const d = f(6000, { apresPaie: 4500 });
+  V("pas assez : on previent, avec le manque", d.etat==="depasse" && d.manque===1500, JSON.stringify(d));
+
+  // ⚠️ LE CONTROLE QUI COMPTE : tresorerie non lue. Repondre « ok » ferait
+  // croire que la verification a eu lieu ; repondre « depasse » inquieterait
+  // pour rien. La seule reponse juste est « je ne sais pas ».
+  for (const cas of [null, { error: "boom" }, { tresoIndispo: true }, { apresPaie: null }, { apresPaie: "n/a" }]) {
+    V("tresorerie illisible = « je ne sais pas » (" + JSON.stringify(cas) + ")",
+      f(3000, cas).etat==="inconnu", JSON.stringify(f(3000, cas)));
+  }
+
+  // Une tresorerie PARTIELLE est un plancher : le dire, sinon on inquiete pour rien.
+  V("une tresorerie partielle est signalee comme un plancher",
+    f(6000, { apresPaie: 4500, tresoPartiel: true }).partiel===true, "le drapeau partiel s est perdu");
+
+  // Rien a sortir = rien a dire : pas de bandeau parasite en debut de mois.
+  V("rien a sortir : aucun message", f(0, { apresPaie: 4500 })===null, JSON.stringify(f(0, { apresPaie: 4500 })));
+  V("un montant negatif ne declenche rien non plus", f(-10, { apresPaie: 4500 })===null, "un profit negatif n est pas un retrait");
+}
+
+
+// ================= 19) le detecteur de « mesure absente lue comme zero »
+// Presque tous les bugs d argent trouves cette semaine sont le MEME : le
+// cerveau envoie `null` quand il ne sait pas, la page ecrit `Number(x)||0`, et
+// « je ne sais pas » devient « zero ». Un zero se lit comme une mesure.
+//
+// Plutot que de les chercher un par un, on relit le VRAI fichier et on exige
+// que toute coercition a zero portant sur un champ que le cerveau peut envoyer
+// a `null` soit ENTOUREE d une garde (revKo(), ou un test != null). Une
+// nouvelle coercition non gardee fera echouer ce banc.
+//
+// ⚠️ Il attrape une FAMILLE de bugs, pas tous les bugs. Dit ici pour que
+// personne ne le prenne pour un rejeu complet.
+{
+  // ⚠️ LITTÉRAL de regex, pas `new RegExp("...")` : dans une chaîne JS,
+  // "\s" devient "s" et "\|" devient "|". La 1re version se transformait
+  // donc en alternance de vide et signalait TOUTES les lignes du fichier.
+  // Un détecteur qui trouve partout ne trouve rien.
+  const motif = () => /(?:Number|parseFloat|parseInt)\(\s*([A-Za-z_$][\w$.\[\]'"]*\.(?:netMonth|netLastMonth|subsMonth|subsDay|margeMonth|apresPaie|dispo|attente|revMonth|revPeriod|ltvGlobale|ltv|roi|marge|solde|aPayer|subsQuinzaine))\s*(?:,\s*10\s*)?\)\s*\|\|\s*0/g;
+
+  const lignes = src.split("\n");
+  // Frontieres de fonctions calculees UNE fois, et garde memorisee par fonction.
+  // (La premiere version relisait le corps a chaque occurrence : sur 13 000
+  // lignes, Node tombait a court de memoire. Un controle qui ne tourne pas ne
+  // protege rien.)
+  const debuts = [];
+  lignes.forEach((l, i) => { const m = /^(?:async )?function ([A-Za-z0-9_$]+)\(/.exec(l); if (m) debuts.push({ i, nom: m[1] }); });
+  const gardee = new Array(debuts.length).fill(null);
+  const indexFonction = (n) => { let lo = 0, hi = debuts.length - 1, r = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (debuts[mid].i <= n) { r = mid; lo = mid + 1; } else hi = mid - 1; }
+    return r; };
+  const aUneGarde = (k, n) => {
+    if (k < 0) return false;
+    if (gardee[k] === null) {
+      const finF = (k + 1 < debuts.length) ? debuts[k + 1].i : lignes.length;
+      const corps = lignes.slice(debuts[k].i, finF).join("\n");
+      gardee[k] = corps.includes("revKo") || corps.includes("==null") || corps.includes("!=null");
+    }
+    return gardee[k];
+  };
+
+  const marque = new Array(debuts.length).fill(null);
+  const aUnMarqueur = (k) => {
+    if (k < 0) return false;
+    if (marque[k] === null) {
+      const finF = (k + 1 < debuts.length) ? debuts[k + 1].i : lignes.length;
+      marque[k] = lignes.slice(debuts[k].i, finF).join("{B}n").includes("@zero-assume");
+    }
+    return marque[k];
+  };
+  const fuites = [], exemptes = [];
+  const RE = motif();
+  lignes.forEach((l, idx) => {
+    if (l.indexOf("||") < 0) return;              // filtre rapide
+    RE.lastIndex = 0;
+    let m;
+    while ((m = RE.exec(l))) {
+      if (m.index === RE.lastIndex) RE.lastIndex++;   // jamais de boucle infinie
+      const k = indexFonction(idx);
+      if (aUneGarde(k, idx)) continue;
+      // Exemption ASSUMÉE : le code porte `@zero-assume` avec sa raison.
+      // ⚠️ On l'annonce a CHAQUE passage. Une exemption silencieuse survit a sa
+      // raison -- c'est exactement ce qui s'est passe avec `dispensees` dans
+      // test/preflight.js, qui a laisse 4 routes sans prevol pendant des mois.
+      if (aUnMarqueur(k)) { exemptes.push((k >= 0 ? debuts[k].nom : "?")); continue; }
+      fuites.push("L" + (idx + 1) + " " + (k >= 0 ? debuts[k].nom : "?") + " : " + m[1]);
+    }
+  });
+  V("aucune mesure absente n est lue comme un zero", fuites.length === 0,
+    "coercitions non gardees : " + fuites.join(" | "));
+  // On NOMME les exemptions a chaque passage : une exemption qu on ne voit plus
+  // est une exemption qui survivra a sa raison.
+  V("les exemptions assumees sont au nombre attendu (" + [...new Set(exemptes)].join(", ") + ")",
+    new Set(exemptes).size <= 1,
+    "de nouvelles fonctions se sont exemptees : " + [...new Set(exemptes)].join(", "));
+
+  // Un controle qu on n a jamais vu echouer ne prouve rien : on lui donne une
+  // ligne fautive fabriquee, il doit la reconnaitre.
+  V("... et le detecteur reconnait bien la forme qu il surveille",
+    motif().test("  const x = Number(t.netMonth)||0;"),
+    "le motif est devenu inerte : il ne verrait plus rien passer");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

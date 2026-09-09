@@ -3443,7 +3443,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadPrevisions, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -7022,6 +7022,74 @@ function margeParAbonne(entree){
   if(entree.subsPayes==null || !isFinite(payes) || payes<=0) return null;
   return Math.round((marge/payes)*100)/100;
 }
+// 📉 EST-CE QUE TA PRÉVISION A RAISON ?
+// La « prévision intelligente » de fin de mois pilote quatre écrans qui décident
+// (message du matin, paliers d'objectif, compte de résultat, partage entre
+// associés). Elle n'était écrite nulle part : impossible de dire si elle avait
+// vu juste le mois dernier. Une prévision qu'on ne confronte jamais n'est pas
+// une prévision, c'est une opinion à laquelle on obéit.
+// Le cerveau la note une fois par jour depuis le 2026-09-09 ; ici on montre le
+// verdict des mois TERMINÉS.
+let PREV_DATA=null;
+async function loadPrevisions(){
+  if(!TOKEN) return;
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/previsions",{headers:{"x-hub-token":TOKEN}});
+    if(!r.ok) return;                       // pas lu = on ne dira rien
+    PREV_DATA=await r.json();
+    if(typeof renderRenta==="function") renderRenta();
+  }catch(e){}
+}
+// Rend la phrase du dernier mois jugeable, ou "" si on n'a rien à dire.
+// ⚠️ Le premier bilan ne sortira qu'après un mois COMPLET de relevés : c'est le
+// prix d'une mesure honnête, et on le dit plutôt que d'afficher un vide.
+function bilanPrevision(d, money){
+  const b=(d&&Array.isArray(d.bilan))?d.bilan:null;
+  if(!b) return "";                                   // « absent ≠ 0 »
+  if(!b.length){
+    const n=(d&&Array.isArray(d.historique))?d.historique.length:0;
+    return `<div class="rn-proj" style="margin-top:4px;font-size:12px;opacity:.75">📉 Pas encore de verdict sur cette prévision : il faut un mois entier de relevés (${n} jour${n>1?"s":""} noté${n>1?"s":""}).</div>`;
+  }
+  const x=b[b.length-1];
+  if(!x || x.annonce==null || x.reel==null) return "";
+  const sur=(x.ecart<0);
+  const pc=(x.ecartPct==null)?"":` (${x.ecart>=0?"+":"−"}${Math.abs(x.ecartPct)} %)`;
+  const juste=(x.ecartPct!=null && Math.abs(x.ecartPct)<=10);
+  return `<div class="rn-proj" style="margin-top:4px;font-size:12px">📉 <b>${juste?"Elle voit juste":(sur?"Elle a surestimé":"Elle a sous-estimé")}</b> : en ${escapeHtml(String(x.mois))}, le ${escapeHtml(String(x.leJour).slice(8,10))} elle annonçait <b>${money(x.annonce)}</b> — tu as fait <b>${money(x.reel)}</b>${pc}.</div>`;
+}
+// 💵 LE PARTAGE NE REGARDAIT JAMAIS LA CAISSE.
+// `renderSplit` ne contient AUCUNE référence à la trésorerie — vérifié : zéro
+// occurrence de CASH_DATA, `apresPaie`, `tresorerie` ou `cash` dans toute la
+// fonction. On répartit donc un profit calculé sur du chiffre d'affaires, sans
+// jamais vérifier qu'il y a l'argent pour le sortir.
+//
+// ⚠️ CE QU'ON NE FAIT PAS, et pourquoi : on n'affiche PAS « tu peux prendre
+// X ». Le chiffre disponible (`apresPaie`) est la trésorerie OnlyFans moins la
+// paie à venir — il ne connaît ni l'argent Telegram (rail séparé), ni les
+// abonnements à payer. Le présenter comme « ce que tu peux prendre »
+// fabriquerait un faux précis. On se contente d'un AVERTISSEMENT quand ce
+// qu'on s'apprête à sortir dépasse ce qu'on sait être là, en disant exactement
+// ce que ce « là » couvre et ne couvre pas.
+function caisseSuffit(aSortir, cash){
+  const x=Number(aSortir);
+  if(!isFinite(x) || x<=0) return null;               // rien à sortir : rien à dire
+  const d=cash;
+  // « absent ≠ 0 » : trésorerie non lue, ce n'est pas « il n'y a rien », et ce
+  // n'est pas « tout va bien » non plus. On le dit.
+  if(!d || d.error || d.tresoIndispo || d.apresPaie==null) return { etat:"inconnu", aSortir:Math.round(x*100)/100 };
+  const reste=Number(d.apresPaie);
+  if(!isFinite(reste)) return { etat:"inconnu", aSortir:Math.round(x*100)/100 };
+  return {
+    etat: (x>reste) ? "depasse" : "ok",
+    aSortir: Math.round(x*100)/100,
+    reste: Math.round(reste*100)/100,
+    manque: Math.round(Math.max(0,x-reste)*100)/100,
+    // Une trésorerie PARTIELLE (un compte n'a pas répondu) est un plancher :
+    // le « reste » est donc au moins ça, peut-être plus. À dire, sinon on
+    // inquiète pour rien.
+    partiel: !!d.tresoPartiel
+  };
+}
 function coutRailwayMois(){
   const d=(typeof RW_DATA!=="undefined")?RW_DATA:null;
   if(!d) return null;                                   // « absent ≠ 0 »
@@ -8291,9 +8359,24 @@ function moisValeurNet(h){ return (Number(h&&h.net)||0)*netRate() + ((typeof tgH
 // atteint », série, ligne d'objectif du graphe, coach) DOIT passer par ici —
 // sinon l'écart brut/net/Telegram se réintroduit panneau par panneau (bug vécu).
 function caNetMois(){
+  // @zero-assume : onze appelants font de l'arithmétique sur ce résultat ; un
+  // `null` les transformerait tous en NaN. On garde donc le 0, et on fournit
+  // `caNetMoisFiable()` juste en dessous pour que ce qui AFFIRME quelque chose
+  // (badge « objectif atteint ») puisse se taire au lieu de mentir.
   const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
   const tg=(typeof tgMonthTotal==="function")?(Number(tgMonthTotal("all"))||0):0;
   return (Number(t.netMonth)||0)*netRate()+tg;
+}
+// ⚠️ `caNetMois()` doit rendre un NOMBRE : onze endroits font de
+// l'arithmétique dessus, et un `null` les transformerait tous en NaN. Mais
+// quand la source d'argent est muette, `netMonth` est `null` et le résultat
+// vaut alors le Telegram SEUL, présenté comme le CA net du mois entier.
+// On ne change donc pas le calcul : on fournit de quoi savoir s'il est complet,
+// et on s'en sert là où le chiffre sert à AFFIRMER quelque chose.
+function caNetMoisFiable(){
+  if(typeof revKo==="function" && revKo()) return false;
+  const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||null);
+  return !!(t && t.netMonth!=null);
 }
 // 🔮 PROJECTION nette de fin de mois — SOURCE UNIQUE.
 // Il en existait DEUX formules à l'écran, et l'écart valait exactement le
@@ -8607,6 +8690,7 @@ function renderRenta(){
     <div class="rn-proj">${F?"🧠 Prévision intelligente":"🔮 Au rythme actuel"}, fin de mois : ~<b>${money(projNetMois())}</b> net de CA <span style="opacity:.75">(${money(projNet)} brut OnlyFans → ${money(projNet*netRate())} net${projTg>0?" + "+money(projTg)+" Telegram projeté":""})</span>${rangeHtml} · ~<b>${money(projProfitReel)}</b> de profit net.</div>
     ${recordLine}
     ${F?`<div class="rn-proj" style="margin-top:4px;font-size:12px">🧠 Calculée sur tes 4 dernières semaines : tendance récente + jours forts/faibles de la semaine.</div>`:""}
+    ${(typeof bilanPrevision==="function")?bilanPrevision(PREV_DATA, money):""}
     ${(()=>{
       // ⭐ Demande explicite d'André : « combien j'ai fait le mois dernier avec
       // OF et Telegram en brut, sachant que le Telegram vient déjà avec le net
@@ -8798,7 +8882,21 @@ function renderSplit(){
   let w={}; try{ w=JSON.parse(localStorage.getItem(wKey)||"{}"); }catch(e){}
   const wMe=Number(w.me)||0, wOther=Number(w.other)||0;
   panel.style.display="block";
+  // Ce qui reste à sortir pour les DEUX : c'est ça qui doit tenir dans la caisse.
+  const _aSortir=Math.max(0,(partMe-wMe))+Math.max(0,(partOther-wOther));
+  const _caisse=(typeof caisseSuffit==="function")
+    ? caisseSuffit(_aSortir, (typeof CASH_DATA!=="undefined")?CASH_DATA:null) : null;
+  const _caisseNote=(function(){
+    if(!_caisse) return "";
+    if(_caisse.etat==="inconnu")
+      return `<div class="sv-note" style="margin-bottom:8px">❓ <b>Je n'ai pas pu lire ta trésorerie</b> — impossible de dire s'il y a de quoi sortir ${money(_caisse.aSortir)}. Ce n'est pas « tout va bien ».</div>`;
+    if(_caisse.etat==="depasse")
+      return `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Il reste ${money(_caisse.aSortir)} à sortir à vous deux</b>, mais après avoir payé tes VA il ne resterait que <b>${money(_caisse.reste)}</b> sur OnlyFans${_caisse.partiel?" (au moins — un compte n'a pas répondu)":""} : il manque <b>${money(_caisse.manque)}</b>.
+        <div style="margin-top:4px;opacity:.75">Ce chiffre ne compte QUE la trésorerie OnlyFans moins la paie à venir : ni ton argent Telegram, ni tes abonnements à payer. À recouper avant de conclure.</div></div>`;
+    return "";
+  })();
   $("#splitBody").innerHTML=`
+    ${_caisseNote}
     ${(typeof tgBandeau==="function")?tgBandeau():""}
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> (une source ne répond pas) : le profit réparti ci-dessous est un <b>minimum</b>.</div>`:""}
     <div class="sp-row"><div class="sp-name">${escapeHtml(nameMe)} <span class="sp-pct">${pct}%</span></div><div class="sp-v">${money(partMe)}</div></div>
@@ -10176,7 +10274,14 @@ function renderBadges(){
     isRecord=(c&&c.net!=null&&!c.partiel&&ok.length===passes.length&&moisValeurNet(c)>prevMax&&prevMax>0); }
   // 🎯 Même base que l'anneau renderGoal : net OF + Telegram (via caNetMois),
   // sinon le badge « objectif atteint » se déclenchait sur du BRUT (seuil faux).
-  const goalMet=(typeof GOAL!=="undefined"&&GOAL)?((GOAL.type==="rev"?caNetMois():(Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0))>=GOAL.value):false;
+  // ⚠️ Un objectif en ARGENT ne peut pas être déclaré « atteint » quand la
+  // moitié OnlyFans n'a pas été mesurée : `caNetMois()` vaudrait le Telegram
+  // seul. On ne dit pas « pas atteint » non plus — on ne dit rien.
+  const goalMet=(typeof GOAL!=="undefined"&&GOAL)
+    ? ((GOAL.type==="rev")
+        ? ((typeof caNetMoisFiable==="function" && !caNetMoisFiable()) ? false : (caNetMois()>=GOAL.value))
+        : ((Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0)>=GOAL.value))
+    : false;
   const subsQz=Number(((LAST["stats-tracker"]||{}).metrics||{}).subsQuinzaine)||0;
   // netTotal est du BRUT : les paliers « X $ générés » doivent se déclencher en NET
   // (× netRate), comme la tuile « Argent généré » et comme isRecord/goalMet — sinon
@@ -12445,7 +12550,12 @@ function tarifVaReel(){
   try{
     const vas=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>0);
     if(!vas.length) return 0.5;
-    const taux=vas.map(v=>Math.max(0,(Number(v.rev)||0)*netRate()-(Number(v.marge)||0))/(Number(v.subs)||1)).filter(x=>x>0);
+    // ⚠️ UNE MARGE NON MESURÉE N'EST PAS UNE MARGE NULLE. Avec `||0`, un VA
+    // dont la marge n'a pas pu être lue voyait TOUT son revenu compté comme de
+    // la paie : il tirait le « tarif réel » vers le haut alors qu'on ne savait
+    // simplement rien de lui. On l'écarte du calcul plutôt que de l'inventer.
+    const taux=vas.filter(v=>v && v.marge!=null && isFinite(Number(v.marge)))
+      .map(v=>Math.max(0,(Number(v.rev)||0)*netRate()-Number(v.marge))/(Number(v.subs)||1)).filter(x=>x>0);
     if(!taux.length) return 0.5;
     return taux.reduce((a,b)=>a+b,0)/taux.length;
   }catch(e){ return 0.5; }
@@ -13006,7 +13116,12 @@ function renderSubValue(){
   const panel=$("#subval"); if(!panel) return;
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{}, cur=om.currency||"$";
   // Les VA non payés (perso) n'entrent pas dans une réflexion sur la paie.
-  const vas=(om.vas||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>=10 && (Number(v.rev)||0)>0);
+  // ⚠️ Même piège que `tarifVaReel` : `marge=Number(v.marge)||0` plus bas
+  // transformait une marge NON MESURÉE en marge nulle, donc « ce VA te coûte
+  // tout ce qu'il rapporte ». On écarte ceux dont la marge est inconnue : ce
+  // panneau compare des VA, il ne peut pas comparer avec un chiffre inventé.
+  const vas=(om.vas||[]).filter(v=>!v.unpaid && (Number(v.subs)||0)>=10 && (Number(v.rev)||0)>0
+    && v.marge!=null && isFinite(Number(v.marge)));
   if(vas.length<2){ panel.style.display="none"; return; }
   panel.style.display="block";
   const money=v=>(typeof HIDE!=="undefined"&&HIDE)?"•••":(Math.round(Number(v)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
