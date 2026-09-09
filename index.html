@@ -1298,12 +1298,20 @@
   .morning.show ~ #voiceFab{display:none}
   .voice-fab.listening{background:var(--down);animation:micpulse 1s infinite}
   .settings-wrap{position:relative}
-  .settings-menu{position:fixed;background:var(--surface-2,#17181b);border:1px solid var(--line-2);border-radius:14px;padding:6px;min-width:220px;max-width:calc(100vw - 24px);box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:55;display:none;flex-direction:column;gap:2px}
+  /* ⚠️ CE MENU FAISAIT 562 px DE LARGE ET SORTAIT DE L'ÉCRAN.
+     Une seule étiquette est une phrase entière (« Accueil léger au chargement
+     (l'essentiel d'abord, les panneaux au tap) ») : sans largeur maximale, elle
+     étirait tout le menu sur une seule ligne. Ancré par la droite, il partait
+     alors hors de la fenêtre et les libellés étaient coupés en plein mot.
+     On borne la largeur et on laisse les textes revenir à la ligne. */
+  .settings-menu{position:fixed;background:var(--surface-2,#17181b);border:1px solid var(--line-2);border-radius:14px;padding:6px;min-width:220px;max-width:min(320px, calc(100vw - 24px));box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:55;display:none;flex-direction:column;gap:2px;max-height:calc(100vh - 90px);overflow-y:auto}
   .settings-menu.show{display:flex}
   .settings-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;cursor:pointer}
   .settings-row:hover{background:color-mix(in srgb,var(--acc) 12%,transparent)}
   .settings-row .btn{margin:0;pointer-events:none}
-  .settings-lbl{font-size:14px;color:var(--text)}
+  /* `min-width:0` : sans lui, un texte long refuse de se couper dans un flex et
+     repousse la boîte au lieu de revenir à la ligne. */
+  .settings-lbl{font-size:14px;color:var(--text);min-width:0;overflow-wrap:anywhere;line-height:1.35}
   .ask-ans:empty{display:none}
   .ask-ans.muted{color:var(--muted)}
 
@@ -12913,7 +12921,25 @@ function seDeconnecter(){
       row.onclick=(e)=>{ if(!b.contains(e.target)) b.click(); menu.classList.remove("show"); };
       menu.appendChild(row);
     });
-    const positionMenu=()=>{ const br=btn.getBoundingClientRect(), mw=menu.offsetWidth||236; menu.style.top=Math.round(br.bottom+8)+"px"; let left=br.right-mw; left=Math.max(12, Math.min(left, window.innerWidth-mw-12)); menu.style.left=Math.round(left)+"px"; };
+    // ⚠️ ON MESURE LE MENU **AFFICHÉ**, PAS UNE LARGEUR SUPPOSÉE.
+    // L'ancienne version prenait `menu.offsetWidth||236` : quand la mesure
+    // tombait à 0 (menu encore caché) ou que la largeur réelle changeait
+    // ensuite, le calage se faisait sur une largeur fausse et le menu sortait
+    // de l'écran — libellés coupés en plein mot. On place, on RELIT, et on
+    // recale si ça dépasse encore. Un dernier filet en `right:` garantit qu'il
+    // ne peut pas franchir le bord droit.
+    const positionMenu=()=>{
+      const br=btn.getBoundingClientRect();
+      menu.style.right="auto";
+      menu.style.top=Math.round(Math.max(8, br.bottom+8))+"px";
+      const mw=menu.getBoundingClientRect().width || menu.offsetWidth || 236;
+      let left=Math.max(12, Math.min(br.right-mw, window.innerWidth-mw-12));
+      menu.style.left=Math.round(left)+"px";
+      // Deuxième mesure : si ça déborde encore (largeur qui a bougé au retour
+      // à la ligne), on abandonne le calage par la gauche et on colle à droite.
+      const r2=menu.getBoundingClientRect();
+      if(r2.right>window.innerWidth-8 || r2.left<8){ menu.style.left="auto"; menu.style.right="12px"; }
+    };
     btn.onclick=(e)=>{ e.stopPropagation(); const open=menu.classList.toggle("show"); if(open) positionMenu(); };
     document.addEventListener("click",(e)=>{ if(!menu.contains(e.target) && e.target!==btn) menu.classList.remove("show"); });
     window.addEventListener("resize",()=>{ if(menu.classList.contains("show")) positionMenu(); });
