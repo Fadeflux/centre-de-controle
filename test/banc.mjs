@@ -609,4 +609,105 @@ const V=verifie;
   V("une marge reellement nulle vaut 0, et le dit", f({ marge: 0, subsPayes: 200 })===0, String(f({ marge: 0, subsPayes: 200 })));
 }
 
+
+// ================= 15) raccourcis et routines : ne plus mourir avec le cache
+// C etaient les deux dernieres listes tapees a la main qui n appelaient AUCUN
+// serveur : aucune cle en base, donc absentes de l export manuel ET de la
+// sauvegarde de 4h30. Vider le cache du telephone les effacait pour de bon.
+{
+  const bloc = morceau("let LISTES_LUES=false", "function pousserListes(");
+  const monter = (reponse, locaux) => {
+    const pousses = [];
+    let SHORTCUTS = (locaux && locaux.shortcuts) || [];
+    let ROUTINES  = (locaux && locaux.routines) || [];
+    const store = {};
+    const fetchFaux = async () => {
+      if (reponse === "ko") return { ok: false };
+      if (reponse === "reseau") throw new Error("hors ligne");
+      return { ok: true, json: async () => reponse };
+    };
+    const f = new Function("TOKEN","HUB_BASE","fetch","SHORTCUTS","ROUTINES",
+      "localStorage","pousserListes","renderShortcuts","renderRoutines",
+      bloc + "; return { charger: loadListesPerso, lues: () => LISTES_LUES, S: () => SHORTCUTS, R: () => ROUTINES };")(
+      "jeton", "http://x", fetchFaux, SHORTCUTS, ROUTINES,
+      { setItem: (k, v) => { store[k] = v; }, getItem: (k) => store[k] || null },
+      (q) => pousses.push(q), () => {}, () => {});
+    return Object.assign(f, { pousses, store });
+  };
+
+  // Appareil neuf : le serveur a tout, l appareil n a rien.
+  const a = monter({ shortcuts: [{ n: "OnlyMonster", u: "https://om" }], routines: [{ name: "Matin" }] }, null);
+  await a.charger();
+  V("ce que le serveur a arrive sur un appareil neuf",
+    a.S().length===1 && a.S()[0].n==="OnlyMonster" && a.R().length===1, JSON.stringify(a.S()));
+  V("et rien n est repousse inutilement", a.pousses.length===0, JSON.stringify(a.pousses));
+
+  // ⚠️ LE CONTROLE QUI COMPTE : premier chargement, le serveur est VIDE et
+  // l appareil a tout. Ecraser ici, c est effacer des mois de raccourcis.
+  const b = monter({ shortcuts: [], routines: [] },
+                   { shortcuts: [{ n: "Infloww", u: "https://i" }], routines: [{ name: "Soir" }] });
+  await b.charger();
+  V("ce qui n existait que sur l appareil est GARDE",
+    b.S().length===1 && b.S()[0].n==="Infloww", JSON.stringify(b.S()));
+  V("... et remonte au serveur", b.pousses.some(q => q && q.shortcuts), JSON.stringify(b.pousses));
+  V("les routines suivent la meme regle",
+    b.R().length===1 && b.pousses.some(q => q && q.routines), JSON.stringify(b.pousses));
+
+  // Les deux cotes fusionnent, aucun ne gagne contre l autre.
+  const c = monter({ shortcuts: [{ n: "OnlyMonster", u: "https://om" }], routines: [] },
+                   { shortcuts: [{ n: "Infloww", u: "https://i" }], routines: [] });
+  await c.charger();
+  V("les deux cotes fusionnent", c.S().length===2, JSON.stringify(c.S().map(x=>x.n)));
+  V("aucun doublon quand la meme entree est des deux cotes",
+    (await (async () => { const d = monter({ shortcuts:[{n:"Infloww",u:"https://i"}], routines:[] },
+                                           { shortcuts:[{n:"Infloww",u:"https://i"}], routines:[] });
+      await d.charger(); return d.S().length; })())===1, "le raccourci a ete duplique a chaque ouverture");
+
+  // ⚠️ LECTURE RATEE : on n ecrira RIEN. Sinon la premiere modification sur cet
+  // appareil effacerait la liste du serveur.
+  const e = monter("ko", { shortcuts: [{ n: "Local", u: "https://l" }], routines: [] });
+  await e.charger();
+  V("serveur muet : la liste locale est intacte", e.S().length===1 && e.S()[0].n==="Local", JSON.stringify(e.S()));
+  V("serveur muet : on ne se declare PAS pret a ecrire", e.lues()===false,
+    "ecrire sur une lecture ratee efface la liste du serveur");
+
+  const g = monter("reseau", { shortcuts: [{ n: "Local", u: "https://l" }], routines: [] });
+  await g.charger();
+  V("coupure reseau : idem, rien n est perdu ni ecrase", g.S().length===1 && g.lues()===false, JSON.stringify(g.S()));
+}
+
+
+// ================= 16) une alerte qui ne dit pas ou on en est
+// La ligne affichait la REGLE et une pastille. La valeur du moment etait deja
+// calculee deux lignes plus haut, pour choisir la couleur, puis jetee. Le seul
+// indice sur l etat ⚪ etait un `title=` : un survol, invisible au doigt.
+{
+  const bloc = morceau("function ruleEtat(r){", "function ruleLabel(");
+  const faire = (regle, valeur) => new Function("RULE_METRICS","ruleMetricVal","fmtInt",
+    bloc + "; return ruleEtat;")(
+      [{k:"ca_mois",label:"CA brut du mois",unit:"$",bool:false},
+       {k:"proxy_mort",label:"Proxy en panne",bool:true}],
+      () => valeur, (n) => String(Math.round(n)))(regle);
+
+  const r1 = faire({ metric:"ca_mois", op:">", value:20000 }, 4180);
+  V("la ligne dit ou on en est aujourd hui", /4180/.test(r1), r1);
+  V("... et ce qu il manque pour que ca sonne", /15820/.test(r1), r1);
+
+  const r2 = faire({ metric:"ca_mois", op:">", value:20000 }, 24000);
+  V("un seuil franchi est annonce comme tel", /franchi/.test(r2), r2);
+
+  const r3 = faire({ metric:"ca_mois", op:"<", value:500 }, 3000);
+  V("un seuil vers le BAS parle de marge, pas de manque", /marge/.test(r3) && /2500/.test(r3), r3);
+
+  // ⚠️ LE CONTROLE QUI COMPTE : source muette. Ecrire « aujourd hui 0 $ »
+  // ferait croire a un effondrement du chiffre d affaires.
+  const r4 = faire({ metric:"ca_mois", op:">", value:20000 }, undefined);
+  V("une mesure non recue se dit, elle ne devient pas 0", /non re/.test(r4) && !/0 \$/.test(r4), r4);
+
+  const r5 = faire({ metric:"proxy_mort", op:">", value:0 }, 1);
+  V("une alerte oui/non affiche oui ou non", /oui/.test(r5), r5);
+  const r6 = faire({ metric:"proxy_mort", op:">", value:0 }, 0);
+  V("... et « non » est une VRAIE reponse, pas un vide", /non/.test(r6) && r6.length>0, r6);
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

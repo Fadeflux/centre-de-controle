@@ -590,6 +590,7 @@
   .rule-form select,.rule-form input{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px}
   .rule-form input{max-width:120px}
   .rule-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .rule-row:last-child{border-bottom:0}
+  .rule-now{font-size:12px;color:var(--text);margin-top:2px} .rule-now.nc{color:var(--faint);font-style:italic}
   .rule-dot{font-size:12px} .rule-body{flex:1;min-width:0} .rule-lbl{font-size:13.5px;font-weight:600} .rule-sub{font-size:12px;color:var(--muted)}
   .rule-del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;flex-shrink:0} .rule-del:hover{color:#f87171}
   /* #9 bus factor */
@@ -3420,7 +3421,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -4590,8 +4591,67 @@ async function sendLeakDmca(id){
 renderWatch(); renderLeaks(); renderIdentity();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
+// ⚠️ TES RACCOURCIS ET TES ROUTINES MOURAIENT AVEC LE NAVIGATEUR.
+// C'étaient les deux dernières listes tapées à la main qui n'appelaient AUCUN
+// serveur : aucune clé en base, donc absentes de l'export manuel ET de la
+// sauvegarde automatique de 4h30. Vider le cache du téléphone les effaçait pour
+// de bon, changer d'appareil repartait de zéro — sans que rien ne le dise.
+//
+// Même prudence que les autres listes, apprise à chaque fois à nos dépens :
+//  • tant que la lecture serveur n'a pas réussi, on n'ÉCRIT RIEN (sinon la
+//    première modification sur un appareil neuf efface tout le reste) ;
+//  • au premier chargement le serveur est vide et l'appareil a tout : on
+//    POUSSE, on n'écrase pas ;
+//  • un POST ne parle que de la liste qui a bougé : envoyer les deux ferait
+//    qu'une liste vide côté appareil effacerait l'autre côté serveur.
+let LISTES_LUES=false, LISTES_ARETTE={};
+async function loadListesPerso(){
+  if(!TOKEN){ LISTES_LUES=true; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/listes-perso",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok){ return; }                      // pas lu = on n'écrira pas : on garde le local
+    const j=await r.json();
+    const sSrv=Array.isArray(j.shortcuts)?j.shortcuts:[];
+    const rSrv=Array.isArray(j.routines)?j.routines:[];
+    // Fusion par identité lisible : le nom (+ l'URL pour un raccourci).
+    const cleS=x=>String((x&&x.n)||"")+"|"+String((x&&x.u)||"");
+    const vusS=new Set(sSrv.map(cleS));
+    const enPlusS=SHORTCUTS.filter(x=>x&&!vusS.has(cleS(x)));
+    const cleR=x=>String((x&&x.name)||"");
+    const vusR=new Set(rSrv.map(cleR));
+    const enPlusR=ROUTINES.filter(x=>x&&!vusR.has(cleR(x)));
+    SHORTCUTS=sSrv.concat(enPlusS);
+    if(typeof ROUTINES!=="undefined") ROUTINES=rSrv.concat(enPlusR);
+    localStorage.setItem("ccn_shortcuts", JSON.stringify(SHORTCUTS));
+    try{ localStorage.setItem("ccn_routines", JSON.stringify(ROUTINES)); }catch(e){}
+    LISTES_LUES=true;
+    // Ce que l'appareil avait en plus n'existe pas encore chez le serveur.
+    if(enPlusS.length) pousserListes({shortcuts:SHORTCUTS});
+    if(enPlusR.length) pousserListes({routines:ROUTINES});
+  }catch(e){}
+  try{ if(typeof renderShortcuts==="function") renderShortcuts(); }catch(e){}
+  try{ if(typeof renderRoutines==="function") renderRoutines(); }catch(e){}
+}
+function pousserListes(quoi){
+  if(!TOKEN) return;
+  if(!LISTES_LUES){
+    // On mémorise l'intention : elle partira dès que la lecture aura réussi.
+    Object.assign(LISTES_ARETTE, quoi||{});
+    if(typeof toast==="function") toast("⏳ En attente","Le serveur n'a pas encore répondu : ta liste est gardée ici et partira dès qu'il répond.");
+    return;
+  }
+  const corps=Object.assign({}, LISTES_ARETTE, quoi||{});
+  LISTES_ARETTE={};
+  fetch(HUB_BASE+"/api/hub/listes-perso",{method:"POST",
+    headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(corps)})
+    .then(r=>{ if(!r.ok && typeof toast==="function") toast("⚠️ Liste NON enregistrée","Le serveur n'a pas pu écrire — elle reste sur cet appareil."); })
+    .catch(()=>{ if(typeof toast==="function") toast("⚠️ Liste NON enregistrée","Pas de réseau — elle reste sur cet appareil."); });
+}
 let SHORTCUTS = lsJSON("ccn_shortcuts",[]);
-function saveShortcuts(){ localStorage.setItem("ccn_shortcuts", JSON.stringify(SHORTCUTS)); }
+function saveShortcuts(){
+  localStorage.setItem("ccn_shortcuts", JSON.stringify(SHORTCUTS));
+  pousserListes({shortcuts:SHORTCUTS});
+}
 function normUrl(u){ u=(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return u; }
 function renderShortcuts(){
   if(!SHORTCUTS.length){ $("#scGrid").innerHTML = `<div class="sc-empty">Ajoute tes liens (Railway, Drive, salons Discord…). L'étoile ★ = dans ta routine du matin.</div>`; return; }
@@ -5994,8 +6054,25 @@ function renderVaRisque(){
   if(!VASANTE){ box.style.display="none"; return; }
   const risky=vas.filter(v=>v.risk&&v.risk.level!=="none").sort((a,b)=>(a.risk.level==="high"?0:1)-(b.risk.level==="high"?0:1));
   box.style.display="block";
-  if(!risky.length){ $("#varisqueBody").innerHTML=`<div class="tk-empty">✅ Personne ne montre de signe de départ. Toute l'équipe produit.</div>`; return; }
-  $("#varisqueBody").innerHTML=risky.map(v=>{ const hi=v.risk.level==="high"; return `<div class="rk-row"><span class="rk-dot">${hi?"🔴":"🟠"}</span><div><div class="rk-va">${escapeHtml(v.va)}</div><div class="rk-why">${escapeHtml(v.risk.reason)} — <b>parle-lui</b> avant qu'il décroche.</div></div></div>`; }).join("");
+  // ⚠️ CE PANNEAU ÉTAIT LE SEUL SANS MARQUEUR DE MESURE.
+  // Un jour sans relevé comptait comme un jour à zéro sub : une panne de
+  // collecte de 10 jours faisait basculer TOUTE l'équipe en « risque de départ
+  // élevé », sur une mesure qui n'avait pas eu lieu. Le cerveau ne compte plus
+  // les jours non mesurés ; ici, on dit depuis quand il ne mesure plus — parce
+  // qu'un « ✅ tout le monde produit » sur des chiffres arrêtés est un mensonge
+  // aussi coûteux que l'accusation qu'il remplaçait.
+  const _m=(VASANTE&&VASANTE.mesure)?VASANTE.mesure:null;
+  const _retard=(_m&&Number(_m.joursSansReleve))||0;
+  const _bandeau = _retard>0
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>Chiffres arrêtés au ${escapeHtml(String(_m.dernierJour||"?"))}</b> — ${_retard} jour${_retard>1?"s":""} sans relevé. Les jours non mesurés ne comptent pas dans les verdicts ci-dessous, mais ils ne disent rien non plus : ce qui s'est passé depuis est inconnu.</div>`
+    : "";
+  if(!risky.length){
+    $("#varisqueBody").innerHTML = _bandeau + (_retard>0
+      ? `<div class="tk-empty">❓ <b>Rien à signaler sur ce qui a été mesuré</b> — mais la collecte est arrêtée depuis ${_retard} jour${_retard>1?"s":""}. Ce n'est pas « tout va bien ».</div>`
+      : `<div class="tk-empty">✅ Personne ne montre de signe de départ. Toute l'équipe produit.</div>`);
+    return;
+  }
+  $("#varisqueBody").innerHTML=_bandeau+risky.map(v=>{ const hi=v.risk.level==="high"; return `<div class="rk-row"><span class="rk-dot">${hi?"🔴":"🟠"}</span><div><div class="rk-va">${escapeHtml(v.va)}</div><div class="rk-why">${escapeHtml(v.risk.reason)} — <b>parle-lui</b> avant qu'il décroche.</div></div></div>`; }).join("");
 }
 function renderChangements(){
   const box=$("#changements"); if(!box) return;
@@ -6756,7 +6833,10 @@ function renderTasks(){
 { const tabs=$("#taskTabs"); if(tabs) tabs.addEventListener("click",e=>{ const b=e.target.closest("[data-tkview]"); if(b){ TK_VIEW=b.getAttribute("data-tkview"); localStorage.setItem("ccn_tkview",TK_VIEW); TK_TAG=""; const d=$("#taskDest"); if(d) d.value=TK_VIEW; renderTasks(); } }); }
 { const f=$("#taskFilter"); if(f) f.addEventListener("click",e=>{ const c=e.target.closest("[data-tag]"); if(c){ TK_TAG=c.getAttribute("data-tag"); renderTasks(); } }); }
 let ROUTINES = lsJSON("ccn_routines",[]); if(!Array.isArray(ROUTINES)) ROUTINES=[];
-function saveRoutines(){ localStorage.setItem("ccn_routines",JSON.stringify(ROUTINES)); }
+function saveRoutines(){
+  localStorage.setItem("ccn_routines",JSON.stringify(ROUTINES));
+  if(typeof pousserListes==="function") pousserListes({routines:ROUTINES});
+}
 function renderRoutines(){ const sel=$("#rtSel"); if(!sel) return; sel.innerHTML=`<option value="">📁 Charger une routine…</option>`+ROUTINES.map((r,i)=>`<option value="${i}">${escapeHtml(r.name)} (${r.tasks.length})</option>`).join(""); }
 function saveRoutine(){ const items=(TASKS[TK_VIEW]||[]).filter(x=>!x.done).map(x=>({text:x.text,tags:x.tags||[],prio:x.prio||"n"})); if(!items.length){ alert("La liste est vide, rien à enregistrer."); return; } const name=prompt("Nom de la routine (ex : Routine du matin) :"); if(!name) return; ROUTINES.push({name:name.slice(0,40),tasks:items}); saveRoutines(); renderRoutines(); if(typeof toast==="function") toast("📁 Routine enregistrée",name); }
 function loadRoutine(i){ const r=ROUTINES[i]; if(!r) return; tkNorm(); r.tasks.forEach(t=>TASKS[TK_VIEW].unshift({id:tkId(),text:t.text,tags:t.tags||[],prio:t.prio||"n",done:false,ts:Date.now(),repeat:"",upd:Date.now()})); saveTasks(); renderTasks(); if(typeof toast==="function") toast("✅ Routine chargée",r.name+" · "+r.tasks.length+" tâches"); }
@@ -12026,6 +12106,29 @@ function ruleTriggered(r){
   const t=Number(r.value)||0;
   switch(r.op){ case"<":return v<t; case"<=":return v<=t; case">":return v>t; case">=":return v>=t; case"==":return v===t; default:return null; }
 }
+// ⚠️ LA LIGNE D'ALERTE NE DISAIT PAS OÙ ON EN EST.
+// Elle affichait la RÈGLE (« quand CA brut du mois > 20 000 ») et une pastille.
+// La VALEUR du moment était pourtant déjà calculée deux lignes plus haut, par
+// `ruleMetricVal`, uniquement pour choisir la couleur — puis jetée. Le seul
+// indice sur l'état ⚪ était un `title=`, c'est-à-dire un survol : invisible au
+// doigt sur téléphone, là où ce panneau est lu.
+// Aucun appel serveur à ajouter : la donnée est déjà en mémoire.
+function ruleEtat(r){
+  const M=RULE_METRICS.find(m=>m.k===r.metric); if(!M) return "";
+  const v=ruleMetricVal(r.metric);
+  // « absent ≠ 0 » : une mesure non reçue s'écrit en toutes lettres. Écrire
+  // « aujourd'hui 0 $ » sur une source muette ferait croire à un effondrement.
+  if(v===undefined) return `<div class="rule-now nc">mesure non reçue — impossible de dire où on en est</div>`;
+  if(M.bool) return `<div class="rule-now">actuellement : <b>${v?"oui":"non"}</b></div>`;
+  const t=Number(r.value)||0, u=M.unit?(" "+M.unit):"";
+  const versLeBas=(r.op==="<"||r.op==="<=");
+  const franchi=versLeBas?(v<=t):(v>=t);
+  const ecart=Math.abs(v-t);
+  const suite=franchi
+    ? "seuil franchi"
+    : (versLeBas ? ("il reste "+fmtInt(ecart)+u+" de marge") : ("il en manque "+fmtInt(ecart)+u+" pour que ça sonne"));
+  return `<div class="rule-now">aujourd'hui <b>${fmtInt(v)}${u}</b> — ${suite}</div>`;
+}
 function ruleLabel(r){ const M=RULE_METRICS.find(m=>m.k===r.metric)||{label:r.metric,unit:""}; return M.bool?M.label:`${M.label} ${r.op} ${fmtInt(r.value)}${M.unit?" "+M.unit:""}`; }
 function renderRules(){
   const panel=$("#rules"), body=$("#rulesBody"); if(!panel||!body) return;
@@ -12035,7 +12138,7 @@ function renderRules(){
   const metOpts=RULE_METRICS.map(m=>`<option value="${m.k}">${escapeHtml(m.label)}</option>`).join("");
   const list=RULES.length?RULES.map(r=>{
     const trig=ruleTriggered(r), dot=trig===true?"🔴":trig===false?"🟢":"⚪";
-    return `<div class="rule-row"><span class="rule-dot" title="${trig===true?"déclenchée":trig===false?"OK":"donnée indispo"}">${dot}</span><div class="rule-body"><div class="rule-lbl">${escapeHtml(r.label||("Alerte : "+ruleLabel(r)))}</div><div class="rule-sub">quand ${escapeHtml(ruleLabel(r))}</div></div><button class="rule-del" data-ruledel="${escapeHtml(r.id)}">✕</button></div>`;
+    return `<div class="rule-row"><span class="rule-dot" title="${trig===true?"déclenchée":trig===false?"OK":"donnée indispo"}">${dot}</span><div class="rule-body"><div class="rule-lbl">${escapeHtml(r.label||("Alerte : "+ruleLabel(r)))}</div><div class="rule-sub">quand ${escapeHtml(ruleLabel(r))}</div>${ruleEtat(r)}</div><button class="rule-del" data-ruledel="${escapeHtml(r.id)}">✕</button></div>`;
   }).join(""):`<div class="cac-intro">Aucune règle. Crée-en une : tu recevras une notif dès qu'elle se déclenche (même dashboard fermé, si les notifs sont activées).</div>`;
   body.innerHTML=`<div class="rule-form">
       <select id="ruleMetric">${metOpts}</select>
