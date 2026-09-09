@@ -694,7 +694,7 @@
   body.assoc-mode #notepad, body.assoc-mode #duo, body.assoc-mode #antileak, body.assoc-mode #decisions,
   body.assoc-mode #vips, body.assoc-mode #churn, body.assoc-mode #compare, body.assoc-mode #onboarding,
   body.assoc-mode #conv, body.assoc-mode #history, body.assoc-mode #goal, body.assoc-mode #subval, body.assoc-mode #achievements,
-  body.assoc-mode #echeances, body.assoc-mode #dates, body.assoc-mode #vaarchives, body.assoc-mode #relancer,
+  body.assoc-mode #echeances, body.assoc-mode #dates, body.assoc-mode #vaarchives, body.assoc-mode #relancer, body.assoc-mode #crons,
   body.assoc-mode #insights, body.assoc-mode #sim3, body.assoc-mode #streak, body.assoc-mode #saison, body.assoc-mode #coaching,
   body.assoc-mode #tip{display:none !important}
   /* La météo (calendrier) reste visible en vue associé, mais sa section ARGENT
@@ -1403,6 +1403,13 @@
   .ech-row .ech-del:hover{color:#f87171}
   .ech-badge{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(248,113,113,.14);color:#f87171;margin-left:6px}
   .ech-note{color:var(--faint);font-size:11.5px}
+  .cr-row{display:flex;align-items:baseline;gap:9px;padding:6px 0;border-bottom:.5px solid var(--line);font-size:13px}
+  .cr-row:last-child{border-bottom:0}
+  .cr-n{flex:1;min-width:0;overflow-wrap:anywhere}
+  .cr-e{white-space:nowrap;font-size:12px}
+  .cr-rouge .cr-e{color:#f87171;font-weight:600} .cr-orange .cr-e{color:#fbbf24;font-weight:600}
+  .cr-gris .cr-e{color:var(--faint)} .cr-vert .cr-e{color:var(--muted)}
+  .cr-h{color:var(--faint);font-size:11px}
   .rl-btns{display:flex;flex-wrap:wrap;gap:6px}
   .rl-btns button{flex:1 1 160px;font-size:12.5px;padding:8px 10px}
   .rl-btns button:disabled{opacity:.55;cursor:progress}
@@ -2648,6 +2655,18 @@
        moment-la (un deploiement suffit), l'envoi est simplement PERDU : rien ne
        le rattrape et personne ne l'apprend. Les quatre routes existaient depuis
        toujours ; il n'y avait aucun bouton pour s'en servir. -->
+  <!-- 🕹️ CHIEN DE GARDE DES AUTOMATISMES. ~130 taches tournent toutes seules
+       cote cerveau et AUCUNE n'enregistrait qu'elle avait tourne : quand l'une
+       s'arretait, on le decouvrait des jours plus tard parce qu'un message
+       attendu n'etait jamais arrive. -->
+  <div class="panel-box" id="crons" style="display:none">
+    <div class="pb-head">🕹️ Automatismes <span class="ech-badge" id="cronBadge"></span></div>
+    <div class="ech-intro">Tout ce qui doit tourner tout seul : briefings, tableaux des VA, salon CEO, contrôles de solde, sauvegardes. Si l'un s'arrête, <b>tu le vois ici</b> au lieu de t'en apercevoir trois jours plus tard.</div>
+    <div id="cronList"></div>
+    <div class="rl-btns" style="margin-top:6px">
+      <button class="act" id="cronTout">Voir aussi ce qui va bien</button>
+    </div>
+  </div>
   <div class="panel-box" id="relancer" style="display:none">
     <div class="pb-head">🔁 Relancer un envoi</div>
     <div class="ech-intro">Un message n'est pas parti sur Discord ? Relance-le ici. Ces envois n'ont <b>aucun rattrapage automatique</b> : sans ce bouton, ce qui est perdu l'est pour de bon.</div>
@@ -3383,7 +3402,7 @@ async function doLogin(){
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
-    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts, renderRelancer,
+    loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
     loadRailway, loadProxy, loadTresorerie, loadCash, loadCac, loadDecroche,
     loadCharge, loadQuinz, loadRules, loadDecisions, loadVaNotes, loadInsights,
@@ -11346,6 +11365,71 @@ function renderEcheances(){
     ECHEANCES=ECHEANCES.filter(x=>x.id!==id);
     saveEcheances([id]);   // suppression EXPLICITE : le serveur ne devine pas
   }); }
+// 🕹️ CHIEN DE GARDE DES AUTOMATISMES.
+// ~130 tâches tournent toutes seules côté cerveau. Aucune n'enregistrait qu'elle
+// avait tourné : quand l'une s'arrêtait, on le découvrait des jours plus tard,
+// parce qu'un message attendu n'était jamais arrivé.
+// ⚠️ PAR DÉFAUT ON NE MONTRE QUE CE QUI CLOCHE. Afficher 130 lignes vertes
+// noierait les deux rouges — et un panneau qu'on survole est un panneau inutile.
+let CRONS=null, CRONS_TOUT=false;
+async function loadCrons(){
+  const box=$("#crons"); if(!box) return;
+  if(!TOKEN){ box.style.display="none"; return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/crons",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(r.ok) CRONS=await r.json();
+  }catch(e){}
+  renderCrons();
+}
+// Quelques noms techniques traduits. ⚠️ Volontairement un simple habillage :
+// si un nom n'est pas dans la liste, on affiche le nom BRUT. Une traduction
+// manquante ne doit jamais faire disparaître une ligne — c'est exactement
+// comme ça qu'on rate la tâche qui vient de tomber.
+const CRON_NOMS={
+  gmsCookie:"Cookie GetMySocial", subsRecap:"Récap des subs", clicksRecap:"Récap des clics",
+  subsVaBoards:"Tableaux privés des VA", clicksVaBoards:"Tableaux clics des VA",
+  hubBrief:"Briefing du matin", hubBrain:"Cerveau — récap du soir",
+  chaine_du_soir:"Chaîne du soir (tableau + paie)", proxyHealth:"Solde du proxy",
+  hubSante:"Contrôle de santé", hubCoherence:"Contrôle de cohérence",
+  hubAutoBackup:"Sauvegarde automatique", leakScan:"Radar anti-fuite",
+  crashAlerts:"Chien de garde du scraping", profilePoller:"Sondage des profils Instagram",
+  subsPayroll:"Paie", subsMilestones:"Paliers & records", hubRules:"Tes alertes perso",
+  inactivityAlerts:"Alertes d'inactivité des VA", hubOnlyChatLtvHebdo:"Rapport LTV hebdo",
+  hubDoubleRail:"Double rail OF + Telegram", ceoPrises:"Payeurs frais — salon CEO",
+  hubExpirations:"Échéances", subsApiSync:"Synchro des abonnés",
+};
+function cronJoli(nom){
+  const m=String(nom||"").match(/^([A-Za-z0-9_+\-]+)\s*(\(.*\))?$/);
+  const brut=m?m[1]:String(nom||""), horaire=m&&m[2]?m[2]:"";
+  const parts=brut.split("+").map(x=>CRON_NOMS[x]||x);
+  return { titre:parts.join(" + "), horaire:horaire.replace(/^\(|\)$/g,"") };
+}
+function renderCrons(){
+  const box=$("#crons"), list=$("#cronList"), badge=$("#cronBadge"), bt=$("#cronTout");
+  if(!box||!list) return;
+  if(!TOKEN || !CRONS || !Array.isArray(CRONS.taches)){ box.style.display="none"; return; }
+  box.style.display="block";
+  const t=CRONS.taches;
+  const soucis=t.filter(x=>x.couleur==="rouge"||x.couleur==="orange");
+  if(badge){ badge.textContent=soucis.length?(soucis.length+(soucis.length>1?" à regarder":" à regarder")):""; badge.style.display=soucis.length?"":"none"; }
+  const aMontrer=CRONS_TOUT?t:soucis;
+  if(bt) bt.textContent=CRONS_TOUT?("Ne montrer que ce qui cloche ("+soucis.length+")"):("Voir aussi ce qui va bien ("+t.length+" au total)");
+  if(!aMontrer.length){
+    list.innerHTML=`<div class="tk-empty">✅ Les <b>${fmtInt(t.length)}</b> automatismes tournent. Rien à faire.</div>`;
+    return;
+  }
+  const pastille={rouge:"🔴",orange:"🟠",gris:"⚪",vert:"🟢"};
+  list.innerHTML=aMontrer.map(x=>{
+    const j=cronJoli(x.nom);
+    return `<div class="cr-row cr-${escapeHtml(x.couleur||"gris")}">`
+      +`<span class="cr-n">${pastille[x.couleur]||"⚪"} ${escapeHtml(j.titre)}`
+      +(j.horaire?` <span class="cr-h">${escapeHtml(j.horaire)}</span>`:"")
+      +(x.erreurs>0?` <span class="cr-h">· ${fmtInt(x.erreurs)} erreur${x.erreurs>1?"s":""}</span>`:"")
+      +`</span><span class="cr-e">${escapeHtml(x.texte||"")}</span></div>`;
+  }).join("");
+}
+{ const b=$("#cronTout"); if(b) b.onclick=()=>{ CRONS_TOUT=!CRONS_TOUT; renderCrons(); }; }
+
 // 🔁 RELANCER UN ENVOI.
 // Les tableaux VA partent à 12 h et 23 h 55, les récaps à 23 h 55, le rapport
 // LTV le lundi. Si le service redémarre pile à ce moment-là — un déploiement
@@ -14244,7 +14328,7 @@ setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_M
 function boucleLente(){
   if(pageCachee() || $("#gate").classList.contains("show")) return;
   [ "loadTresorerie","loadCoherence","loadSanteComptes","loadCac",
-    "loadDecroche","loadConversion","loadHours","loadProxy" ].forEach(function(n){
+    "loadDecroche","loadConversion","loadHours","loadProxy","loadCrons" ].forEach(function(n){
     try{ if(typeof window[n]==="function") window[n](); }catch(e){}
   });
   // loadIncidents prend un paramètre : sans `true`, c'est une simple lecture du
