@@ -1,0 +1,7 @@
+CORRECTION (2026-09-09) : ce message annonce « 163 controles au banc ».
+Le compte reel au moment de ce commit etait 161.
+
+Cause : j'ai redige le message AVANT de relancer `node test/banc.mjs`. Le code
+et les controles sont justes ; seul le chiffre du message etait faux.
+
+Regle posee : mesurer, PUIS rediger.
