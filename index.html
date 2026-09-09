@@ -83,6 +83,15 @@
   }
   .wrap{max-width:980px;margin:0 auto}
   #sidebar:empty{display:none}
+  /* ⚠️ SIX PANNEAUX COLLÉS SUR TÉLÉPHONE — mesuré le 2026-09-09 sur 375 px :
+     0 px entre Journal, Tâches, Horloge, Objectif, Dates et Calendrier.
+     Le déménagement vers cette colonne se fait SANS condition de largeur (JS),
+     et `margin:0!important` vit ici, hors du bloc grand écran — alors que
+     l'espacement (`display:flex; gap:16px`) n'était posé qu'à partir de 1180 px.
+     Sur téléphone : plus de marges, et pas encore de gap. On donne donc la
+     même colonne à TOUTES les largeurs ; le bloc grand écran ne fait plus que
+     la positionner. */
+  #sidebar{display:flex;flex-direction:column;gap:16px}
   #sidebar > .panel-box, #sidebar > .tkbox{margin:0!important}
   @media (min-width:1180px){
     /* Largeur FLUIDE : 1340px fixes laissaient d'énormes bandes vides sur les
