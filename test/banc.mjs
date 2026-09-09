@@ -359,4 +359,49 @@ const V=verifie;
     "sans ce drapeau, un total sous-estime passerait pour exact");
 }
 
+
+// ================= 9) « a payer » : trois ecrans, et aucun le vrai montant
+// La tuile d en-tete, la ligne d observation et l ecran du matin affichaient
+// tous `aPayer` (vue quinzaine : subs x tarif). Le montant qu Andre sort
+// vraiment du compte est celui de « Paie au cumul », qui tient compte de ce
+// qui a deja ete verse. Apres une paie de milieu de quinzaine, les deux vont
+// du simple au double.
+{
+  const bloc = morceau("function duReellement(){", "function primesVerseesCeMois(");
+  const faire = (PCUMUL) => new Function("PCUMUL", bloc + "; return duReellement;")(PCUMUL)();
+
+  const base = { total: 850, primesTotal: 0, vas: [
+    { va:"Welzy",  base: 1200, nouveaux: 40, aPayer: 500 },
+    { va:"Yohan",  base: 900,  nouveaux: 28, aPayer: 350 },
+    { va:"Bot",    base: null, nouveaux: 0,  aPayer: 0, unpaid: true },   // perso : jamais paye
+  ]};
+  const r = faire(base);
+  V("le vrai montant du remonte en une du tableau de bord", r && r.total===850, JSON.stringify(r));
+  V("le compte perso n est pas compte comme un VA a payer", r && r.nbVa===2, "nbVa="+(r&&r.nbVa));
+  V("sans VA orphelin, le total n est pas annonce comme un plancher", r && r.plancher===false, JSON.stringify(r));
+
+  // ⚠️ Le controle qui compte : cote serveur, un VA sans repere de paie vaut
+  // EXACTEMENT 0 dans le total. La verite est « je ne sais pas ». Annoncer 850
+  // comme un montant ferme, c est preparer 850 et en devoir davantage.
+  const orphelin = faire(Object.assign({}, base, { vas: base.vas.concat([{ va:"Prince", base:null, nouveaux:60, aPayer:0 }]) }));
+  V("un VA sans repere de paie transforme le total en PLANCHER",
+    orphelin && orphelin.plancher===true && orphelin.sansBase===1,
+    "sans ce drapeau la tuile affiche un montant ferme qui est faux : "+JSON.stringify(orphelin));
+
+  // « absent != 0 » : rien de charge => rien a dire, surement pas « 0 $ a payer ».
+  V("tableau non charge = null, PAS zero", faire(null)===null, "un 0 voudrait dire « tu ne dois rien »");
+  V("tableau vide = null aussi", faire({ total:0, vas:[] })===null, "0 VA ne veut pas dire 0 du");
+  V("un total illisible ne devient pas 0", faire({ total:"n/a", vas:base.vas })===null, "NaN affiche en dur");
+
+  // Les primes Discord ne sont PAS dans le total : il faut le dire, pas l ignorer.
+  const avecPrimes = faire(Object.assign({}, base, { primesTotal: 120 }));
+  V("les primes non reglees sont signalees a part du total", avecPrimes && avecPrimes.primes===120, JSON.stringify(avecPrimes));
+  const primesKo = faire(Object.assign({}, base, { primesTotal: null, primesKo: true }));
+  V("primes illisibles = null, pas 0", primesKo && primesKo.primes===null, JSON.stringify(primesKo));
+
+  // Un tableau perime ne doit pas passer pour frais : c est sur ce chiffre qu on paie.
+  const vieux = faire(Object.assign({}, base, { _perime: true }));
+  V("un tableau perime est marque comme tel", vieux && vieux.perime===true, JSON.stringify(vieux));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

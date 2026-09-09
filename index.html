@@ -3161,7 +3161,13 @@ function render(data){
   // panneau `#paie` est masqué en vue associé depuis toujours — son résumé en
   // haut de page, non.
   if(stInW && !document.body.classList.contains("assoc-mode")){
-    tiles.push(`<div class="tile"><div class="lbl" title="Vue historique par quinzaine. Le montant que tu verses vraiment est celui de « Paie au cumul », plus bas.">À payer si tu soldais la quinzaine</div><div class="val">${tiret(gg("stats-tracker","aPayer"),fmtMoney)}</div></div>`);
+    const _du=(typeof duReellement==="function")?duReellement():null;
+    const _quinz=tiret(gg("stats-tracker","aPayer"),fmtMoney);
+    if(_du){
+      tiles.push(`<div class="tile"><div class="lbl" title="Ce que tu dois RÉELLEMENT depuis la dernière paie — le chiffre du panneau « Paie au cumul ». La quinzaine, en dessous, est une vue historique : elle ignore ce qui a déjà été versé.">À payer maintenant${_du.perime?" ⚠️":""}</div><div class="val">${fmtMoney(_du.total)}${_du.plancher?` <span class="tile-sub">+ ?</span>`:""}</div><div class="tile-sub">${_du.nbVa} VA · vue quinzaine : ${_quinz}${(_du.primes>0)?` · +${fmtMoney(_du.primes)} de primes à part`:""}${_du.perime?" · chiffres pas à jour":""}</div></div>`);
+    } else {
+      tiles.push(`<div class="tile"><div class="lbl" title="Vue historique par quinzaine. Le montant que tu verses vraiment est celui de « Paie au cumul », plus bas.">À payer si tu soldais la quinzaine</div><div class="val">${_quinz}</div><div class="tile-sub">vue quinzaine — le montant réel n'a pas pu être lu</div></div>`);
+    }
     tiles.push(`<div class="tile"><div class="lbl" title="Abonnés amenés par tes VA sur la quinzaine en cours. À ne pas comparer avec « Subs du mois » du panneau OnlyMonster : période ET périmètre différents.">Subs équipe (cette quinzaine)</div><div class="val">${tiret(gg("stats-tracker","subsQuinzaine"),fmtInt)}</div></div>`);
   }
   // Hors monde Noctra, le profit n'est pas « 0 » : il est HORS PÉRIMÈTRE → null
@@ -3240,7 +3246,9 @@ function renderBrief(data, live, onCount, stInW){
   // discret, mais la vue associé n'est pas le mode discret : elle doit cacher
   // ces lignes ENTIÈREMENT, pas les remplacer par des points.
   const _assoc = document.body.classList.contains("assoc-mode");
-  if (!_assoc && stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer`);
+  const _duObs=(!_assoc && typeof duReellement==="function")?duReellement():null;
+  if (_duObs) s.push(`<b>${fmtMoney(_duObs.total)}${_duObs.plancher?" +?":""}</b> à payer maintenant`);
+  else if (!_assoc && stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer sur la quinzaine`);
   if(off) s.push(`<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b> : ${horsLigne.map(t=>escapeHtml(t.name)).join(", ")}`);
   if(muets.length) s.push(`<b>❔ ${muets.length} muet${muets.length>1?"s":""}</b> : ${muets.map(t=>escapeHtml(t.name)).join(", ")} <span class="ob-sub">(pas de nouvelles — ce n'est pas « en panne », mais pas « ça va » non plus)</span>`);
   if(!off && !muets.length) s.push(`tous tes outils tournent`);
@@ -6821,6 +6829,33 @@ function sousTitreOrigine(brutOf, tg, cur, fmt){
   const tgR=Math.round(t), ofR=total-tgR;
   return `dont OnlyFans ${fmt(ofR,cur)} · Telegram ${fmt(tgR,cur)}`;
 }
+// ⚠️ TROIS ÉCRANS ANNONÇAIENT « à payer », AUCUN LE MONTANT QU'ON SORT.
+// La tuile d'en-tête, la ligne d'observation et l'écran du matin lisaient tous
+// le même `aPayer` de stats-tracker : une vue HISTORIQUE par quinzaine (subs de
+// la quinzaine × tarif) qui ignore ce qui a déjà été versé ET le repère de paie.
+// Le montant réellement dû est celui de « Paie au cumul » (depuis la dernière
+// paie) : après une paie de milieu de quinzaine, les deux vont du simple au
+// double. Trois écrans d'accord entre eux et tous les trois à côté de la plaque,
+// c'est pire qu'un désaccord visible. On affiche donc le VRAI dès qu'on le
+// connaît, la quinzaine reléguée en sous-titre.
+// « absent ≠ 0 » : tableau non chargé → null (« — »), jamais un zéro inventé.
+function duReellement(){
+  var d=(typeof PCUMUL!=="undefined")?PCUMUL:null;
+  if(!d || !Array.isArray(d.vas) || !d.vas.length) return null;
+  var t=Number(d.total);
+  if(!isFinite(t)) return null;
+  // Mêmes réserves que le panneau « Paie au cumul », mot pour mot — sinon on
+  // recrée le problème qu'on corrige :
+  //  • un VA sans repère de paie compte 0 côté serveur alors que la vérité est
+  //    « je ne sais pas » → ce total est un PLANCHER, pas un montant ;
+  //  • les primes Discord ne sont PAS dedans ;
+  //  • un tableau périmé ne doit pas passer pour frais.
+  var sansBase=d.vas.filter(function(v){ return v && !v.unpaid && v.base==null; }).length;
+  var primes=(d.primesKo || d.primesTotal==null) ? null : (Number(d.primesTotal)||0);
+  var nbVa=d.vas.filter(function(v){ return v && !v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0; }).length;
+  return { total:Math.round(t*100)/100, plancher:sansBase>0, sansBase:sansBase,
+           primes:primes, perime:!!d._perime, nbVa:nbVa };
+}
 function primesVerseesCeMois(){
   const h=(typeof PCUMUL_HIST!=="undefined"&&Array.isArray(PCUMUL_HIST))?PCUMUL_HIST:null;
   // ⚠️ « absent ≠ 0 » : journal pas encore lu = on ne sait pas, et surtout on
@@ -9209,7 +9244,13 @@ function mnMoneyHtml(){
         <div class="sub">${(!revKo()&&tgM>0)?sousTitreOrigine(tot.netMonth,tgM,cur,(x,c)=>"<b>"+money(x)+"</b>"):""}${(!revKo()&&tgM>0&&!ev)?" · ":""}${ev?"":"ce mois : <b>"+(tot.subsMonth!=null?tot.subsMonth:"—")+"</b> subs"}</div>
         <div class="mn-today" title="Le CA du jour se complète au fil des heures : les ventes remontent chez OnlyMonster avec un léger délai.">📅 Aujourd'hui <span class="t-big">${ajArgent}</span> <span class="t-sub">· ${ajSubs} · en cours</span></div>
         ${ajSplit}
-        ${(!ev&&st.aPayer!=null)?`<div class="mn-pay" title="Vue historique par quinzaine : subs de la quinzaine en cours × tarif + primes Discord, SANS tenir compte de ce qui a déjà été payé ni du repère de paie. Le montant que tu verses vraiment est celui de « Paie au cumul ».">💸 <b>${money(st.aPayer)}</b> à payer si tu soldais la quinzaine</div>`:""}`;
+        ${(function(){
+          if(ev) return "";
+          const d=(typeof duReellement==="function")?duReellement():null;
+          if(d) return `<div class="mn-pay" title="Ce que tu dois réellement à tes VA depuis la dernière paie (panneau « Paie au cumul »).">💸 <b>${money(d.total)}${d.plancher?" +?":""}</b> à payer maintenant${(st.aPayer!=null)?` <span class="t-sub">· vue quinzaine ${money(st.aPayer)}</span>`:""}</div>`;
+          if(st.aPayer==null) return "";
+          return `<div class="mn-pay" title="Vue historique par quinzaine : subs de la quinzaine en cours × tarif + primes Discord, SANS tenir compte de ce qui a déjà été payé ni du repère de paie. Le montant que tu verses vraiment est celui de « Paie au cumul ».">💸 <b>${money(st.aPayer)}</b> à payer si tu soldais la quinzaine</div>`;
+        })()}`;
 }
 function renderMorning(){
   const ev=COACH_MODE==="evening";
