@@ -865,11 +865,19 @@ const V=verifie;
 // L inscription ne CREE aucun VA : c est un nom et une date, jamais de l argent.
 {
   const bloc = morceau("function vaProduitDeja(nom){", "function renderVaNouveaux(");
-  const faire = (OM_DATA, VA_STARTS, VA_ARCHIVES) => new Function("OM_DATA","VA_STARTS","VA_ARCHIVES",
-    bloc + "; return { attente: vaEnAttente, produit: vaProduitDeja };")(OM_DATA, VA_STARTS, VA_ARCHIVES);
+  // ⚠️ CE BLOC DEPENDAIT DE L HEURE QU IL EST. `ilYA()` fabriquait ses dates en
+  // UTC, la fonction testee comparait a `Date.now()` en heure de Paris : entre
+  // 22 h et minuit, « il y a 12 jours » devenait 13 et le banc rougissait tout
+  // seul. Le code de production a ete corrige (il compare deux dates de
+  // calendrier via `jourServeur()`), et ce banc ne regarde plus l horloge du
+  // tout : on lui DONNE le jour metier. Il rend le meme verdict a 3 h comme a
+  // 23 h, en ete comme en hiver.
+  const AUJOURDHUI = "2026-09-12";
+  const faire = (OM_DATA, VA_STARTS, VA_ARCHIVES) => new Function("OM_DATA","VA_STARTS","VA_ARCHIVES","jourServeur",
+    bloc + "; return { attente: vaEnAttente, produit: vaProduitDeja };")(OM_DATA, VA_STARTS, VA_ARCHIVES, () => AUJOURDHUI);
 
   const JOUR = 86400000;
-  const ilYA = (n) => new Date(Date.now() - n*JOUR).toISOString().slice(0,10);
+  const ilYA = (n) => new Date(Date.parse(AUJOURDHUI + "T00:00:00Z") - n*JOUR).toISOString().slice(0,10);
 
   const om = { vas: [{ va: "Welzy" }, { va: "Yohan" }] };
 
@@ -1054,6 +1062,79 @@ const V=verifie;
     V("... et le controle attrape bien une fonction qui lit la source sans avouer",
       faux.includes("VAQZ_DATA") && !faux.includes("vaqzMesure"),
       "le controle ne reconnait plus la forme qu il surveille");
+  }
+}
+
+
+// ══ 24. LA TUILE DE LA FERME iPHONE : JAMAIS DE VERT PAR DEFAUT ══════════════
+// La ferme tourne sur le PC, pas sur Railway : le cerveau ne la sonde pas, elle
+// POUSSE son etat. « Rien recu » et « recu il y a 3 h » sont donc des cas
+// NORMAUX -- et ils ne veulent PAS dire « tout va bien ». Un voyant vert pendant
+// que la ferme est en pause serait exactement la faute que cette tuile existe
+// pour eviter.
+{
+  const b = morceau("async function fermeDansLesCartes(tools){", "async function load(){");
+  const avec = (reponse) => new Function("TOKEN","HUB_BASE","fetch",
+    b + "; return fermeDansLesCartes;")("jeton","http://x", reponse);
+  const lire = async (rep) => {
+    const t = {};
+    await avec(async () => ({ ok:true, json: async () => rep }))(t);
+    return t["iphone-panel"];
+  };
+
+  {
+    const c = await lire({ recue:false, etat:null, muette:true, ageMin:null });
+    V("ferme jamais recue : pas de vert", c && c.status !== "online", JSON.stringify(c));
+    V("... et elle DIT qu elle n a jamais parle", /jamais re/i.test((c||{}).note||""), (c||{}).note);
+    V("... et aucun chiffre n est fabrique",
+      c.metrics.comptes === null && c.metrics.ageMin === null, JSON.stringify(c.metrics));
+  }
+  {
+    const c = await lire({ recue:true, muette:true, ageMin:187,
+      etat:{ lisible:true, planificateur:true, quarantaine:0, challenges:0, comptes:12 } });
+    V("ferme silencieuse depuis 3 h : pas de vert", c.status !== "online", JSON.stringify(c));
+    V("... et elle dit depuis quand", String(c.note||"").indexOf("187") >= 0, c.note);
+  }
+  {
+    const c = await lire({ recue:true, muette:false, ageMin:2,
+      etat:{ lisible:true, planificateur:false, quarantaine:0, challenges:0, comptes:12,
+             pauseAuto:{ quand:"2026-09-12 01:00", comptes:3, raison:"coupe-circuit anti-ban" } } });
+    V("mise en PAUSE par le coupe-circuit : voyant eteint", c.status === "offline", JSON.stringify(c));
+    V("... et on lit que ce n est pas toi qui l as arretee",
+      /PAUSE AUTOMATIQUE/.test(c.note||"") && /coupe-circuit/.test(c.note||""), c.note);
+  }
+  {
+    const c = await lire({ recue:true, muette:false, ageMin:1,
+      etat:{ lisible:true, planificateur:true, quarantaine:2, quarantaineNoms:["zoe","lina"],
+             challenges:1, comptes:12 } });
+    V("des comptes en quarantaine : voyant orange", c.status === "warn", JSON.stringify(c));
+    V("... et on sait QUI", /zoe/.test(c.note||"") && /lina/.test(c.note||""), c.note);
+    V("... et combien sont bloques par Instagram", c.metrics.challenges === 1, JSON.stringify(c.metrics));
+  }
+  {
+    const c = await lire({ recue:true, muette:false, ageMin:1,
+      etat:{ lisible:true, planificateur:true, quarantaine:0, challenges:0, comptes:12,
+             alertesMuettes:true } });
+    V("un canal d alerte vide se dit MEME quand tout va bien",
+      /aucun canal d/.test(c.note||""), c.note);
+  }
+  {
+    // Le controle doit savoir NE PAS alarmer, sinon il est inerte.
+    const c = await lire({ recue:true, muette:false, ageMin:3,
+      etat:{ lisible:true, planificateur:true, quarantaine:0, challenges:0, comptes:12,
+             alertesMuettes:false } });
+    V("tout va bien : voyant vert et rien a lire", c.status === "online" && !c.note, JSON.stringify(c));
+    V("... et l age est affiche", c.metrics.ageMin === 3, JSON.stringify(c.metrics));
+  }
+  {
+    // Le cerveau muet ne doit pas casser le reste de la page.
+    const t = {};
+    let leve = null;
+    try {
+      await avec(async () => { throw new Error("hors ligne"); })(t);
+    } catch (e) { leve = e; }
+    V("cerveau injoignable : la tuile se tait, elle ne casse pas la page",
+      leve === null && t["iphone-panel"] === undefined, String(leve));
   }
 }
 

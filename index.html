@@ -3026,7 +3026,19 @@ const TOOLS = [
   // plus aucune tuile d'argent, plus de brief, plus de catalogue. (Cassé le
   // 2026-08-06 en corrigeant juste l'URL, retrouvé par l'audit du 08-07.)
   { id:"coachos",     world:"noctra", cat:"Noctra", name:"Grind", icon:"C", voyantOnly:true, openUrl:"https://grindperform.up.railway.app" },
-  { id:"iphone-panel",world:"noctra", cat:"En construction", name:"iPhone Panel", icon:"◉", build:true },
+  // ⚠️ ELLE ÉTAIT MARQUÉE « EN CONSTRUCTION » — exactement comme Grind ci-dessus.
+  // Or la ferme iPhone fait tourner TOUT le parc Instagram, et depuis le 11/09
+  // son coupe-circuit anti-ban peut RÉELLEMENT mettre le planificateur en pause.
+  // Ça arrivait en silence : il fallait être devant le PC, sur localhost:8770,
+  // pour l'apprendre. Elle pousse maintenant son état au cerveau toutes les
+  // 5 min (voir `fermeDansLesCartes`).
+  { id:"iphone-panel",world:"noctra", cat:"Noctra", name:"Ferme iPhone", icon:"◉",
+    metrics:[
+      {k:"comptes",     l:"Comptes",      f:v=>fmtInt(v)},
+      {k:"quarantaine", l:"Quarantaine",  f:v=>fmtInt(v)},
+      {k:"challenges",  l:"Bloqués IG",   f:v=>fmtInt(v)},
+      {k:"ageMin",      l:"Vue il y a",   f:v=>v+" min"},
+    ] },
   { id:"monloader",   world:"noctra", cat:"En construction", name:"MonLoader",    icon:"M", build:true },
 ];
 
@@ -3325,6 +3337,57 @@ function demoFallback(msg){
 }
 function showReauth(){ openGate("🔑 Ta session a expiré — reconnecte-toi."); }
 let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null;
+/* ── La ferme iPhone dans les cartes ──────────────────────────────────────
+   Elle tourne sur le PC (localhost:8770), pas sur Railway : le cerveau ne peut
+   pas aller la sonder, c'est ELLE qui pousse son état toutes les 5 min. On le
+   récupère ici et on l'ajoute aux cartes comme n'importe quel outil.
+
+   ⚠️ JAMAIS DE VERT PAR DÉFAUT. « Pas encore reçue » et « silencieuse depuis
+   3 h » ne veulent pas dire « tout va bien », ils veulent dire « je ne sais
+   pas ». Un voyant vert pendant que la ferme est à l'arrêt serait exactement la
+   faute que cette carte existe pour éviter. */
+async function fermeDansLesCartes(tools){
+  if(!TOKEN || !HUB_BASE || !tools) return tools;
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/ferme-etat",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return tools;                     // on n'invente rien : la carte reste « — »
+    const v = await r.json(), e = (v && v.etat) || {};
+    let status = "unknown", note = "";
+    if(!v || !v.recue){
+      note = "jamais reçue — le panneau n'a pas encore parlé au cerveau (à redémarrer ?)";
+    } else if(v.muette){
+      status = "warn";
+      note = "silencieuse depuis "+v.ageMin+" min — PC éteint, panneau arrêté ou réseau coupé. "
+           + "Ces chiffres ne valent plus rien.";
+    } else if(e.lisible === false){
+      status = "warn"; note = "la ferme n'a pas pu se relire : "+(e.note||"état illisible");
+    } else if(!e.planificateur){
+      status = "offline";
+      note = e.pauseAuto
+        ? ("EN PAUSE AUTOMATIQUE — "+(e.pauseAuto.raison||"coupe-circuit anti-ban")
+           +(e.pauseAuto.quand?(" (depuis "+e.pauseAuto.quand+")"):""))
+        : "planificateur arrêté — plus aucune publication";
+    } else if(e.quarantaine>0 || e.challenges>0){
+      status = "warn";
+      note = (e.quarantaine>0 ? (e.quarantaine+" compte(s) en quarantaine"
+              +(e.quarantaineNoms&&e.quarantaineNoms.length?(" : "+e.quarantaineNoms.join(", ")):"")) : "")
+           + ((e.quarantaine>0 && e.challenges>0) ? " · " : "")
+           + (e.challenges>0 ? (e.challenges+" bloqué(s) par Instagram") : "");
+    } else {
+      status = "online";
+    }
+    // Un canal d'alerte vide, c'est ne rien savoir : ça se dit même quand tout va bien.
+    if(e.alertesMuettes) note = (note?note+" · ":"") + "aucun canal d'alerte branché : tu ne seras prévenu de rien";
+    tools["iphone-panel"] = { status:status, note:note, metrics:{
+      comptes:     (e.comptes     == null ? null : e.comptes),
+      quarantaine: (e.quarantaine == null ? null : e.quarantaine),
+      challenges:  (e.challenges  == null ? null : e.challenges),
+      ageMin:      (v && v.recue  ? v.ageMin : null),   // null -> « — », jamais « 0 min »
+    }};
+  }catch(_){ /* jamais bloquer le rendu des autres cartes pour celle-ci */ }
+  return tools;
+}
+
 async function load(){
   if(LOADING) return;               // évite les appels concurrents (poll 60s + retry)
   LOADING=true;
@@ -3356,8 +3419,10 @@ async function load(){
     }
     OFFLINE_FAILS=0; if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
     IS_LIVE = true;
-    render(j.tools||{});
-    try{ localStorage.setItem("ccn_lastdata", JSON.stringify(j.tools||{})); }catch(_){}
+    const tools = j.tools || {};
+    await fermeDansLesCartes(tools);     // la ferme pousse son état ; elle n'est pas dans /api/hub
+    render(tools);
+    try{ localStorage.setItem("ccn_lastdata", JSON.stringify(tools)); }catch(_){}
     $("#sub").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) + " · mis à jour à l'instant";
     $("#footnote").textContent = new Date().toLocaleString("fr-FR");
     setBanner("");
@@ -12426,8 +12491,17 @@ function vaEnAttente(){
     if(vaProduitDeja(nom)) return;
     if(arch.some(a=>String(a).trim().toLowerCase()===String(nom).trim().toLowerCase())) return;   // parti : normal
     const d=VA_STARTS[nom];
-    const t=Date.parse(String(d)+"T00:00:00");
-    const jours=isFinite(t)?Math.max(0,Math.floor((Date.now()-t)/86400000)):null;
+    // ⚠️ DEUX HORLOGES MÉLANGÉES. Avant : `Date.parse(d+"T00:00:00")` — sans
+    // suffixe, le navigateur lit ça en heure de PARIS — comparé à `Date.now()`.
+    // Or ces dates viennent du cerveau, en heure MÉTIER (UTC+1 fixe). Entre 22 h
+    // et minuit à Paris l'été, le décalage faisait basculer l'arrondi : un VA
+    // arrivé il y a 12 jours affichait « 13 jours ». Deux heures par jour, tous
+    // les jours. `jourServeur()` existe justement pour ça (cf. son commentaire).
+    // On compare maintenant deux DATES DE CALENDRIER, ancrées toutes les deux à
+    // minuit UTC : plus aucune heure dans le calcul, donc plus aucun décalage.
+    const t=Date.parse(String(d)+"T00:00:00Z");
+    const h=Date.parse(jourServeur()+"T00:00:00Z");
+    const jours=(isFinite(t)&&isFinite(h))?Math.max(0,Math.round((h-t)/86400000)):null;
     out.push({ va:nom, date:d||null, jours:jours });
   });
   // Les plus anciens d'abord : ce sont eux qui posent question.
