@@ -1138,4 +1138,80 @@ const V=verifie;
   }
 }
 
+
+// ══ 25. « CE QUE JE NE SAIS PAS AUJOURD'HUI » ════════════════════════════════
+// 53 fonctions d'affichage savent dire « je n'ai pas mesure », chacune dans son
+// coin sur 80 panneaux. Rien ne les rassemblait. Ce bandeau ne rejuge rien : il
+// APPELLE les controles existants. Ce qui compte ici :
+//   - il ne fabrique pas d'inconnu quand tout est mesure (sinon il n'est plus lu) ;
+//   - un helper qui LEVE ne doit pas emporter tout l'aveu ;
+//   - chaque inconnu dit DEPUIS QUAND quand l'information existe.
+{
+  const b = morceau("function mesuresManquantes(){", "function rendreMesuresManquantes(){");
+  const NOMS = ["caNetMoisFiable","vaqzMesure","coutRailwayMois","VASANTE","echeancesMesurees","LAST"];
+  const faire = (o) => new Function(...NOMS, b + "; return mesuresManquantes;")(
+    ...NOMS.map(n => o[n]));
+
+  const TOUT_MESURE = {
+    caNetMoisFiable: () => true,
+    vaqzMesure: () => ({ mesure:true, perime:false }),
+    coutRailwayMois: () => ({ montant:12.5, saisie:true }),
+    VASANTE: { mesure:{ joursSansReleve:0 } },
+    echeancesMesurees: () => ([{ cle:"cookie", label:"Cookie", j:{n:5}, quoi:"x" }]),
+    LAST: { "iphone-panel": { metrics:{ ageMin:3 } } },
+  };
+
+  {
+    const r = faire(TOUT_MESURE)();
+    V("tout est mesure : le bandeau n a rien a dire", r.length === 0, JSON.stringify(r));
+  }
+  {
+    const r = faire(Object.assign({}, TOUT_MESURE, { caNetMoisFiable: () => false }))();
+    V("CA net non fiable : il le dit", r.some(x => /CA net/.test(x.quoi)), JSON.stringify(r));
+  }
+  {
+    const r = faire(Object.assign({}, TOUT_MESURE, { VASANTE:{ mesure:{ joursSansReleve:9 } } }))();
+    const l = r.find(x => /Sant/.test(x.quoi));
+    V("collecte VA arretee : il le dit", !!l, JSON.stringify(r));
+    V("... et DEPUIS QUAND", l && l.depuis === "9 j", l && l.depuis);
+  }
+  {
+    const r = faire(Object.assign({}, TOUT_MESURE, { coutRailwayMois: () => ({ montant:31, saisie:false }) }))();
+    V("cout Railway estime, pas facture : il le dit",
+      r.some(x => /Railway/.test(x.quoi) && /ESTIMATION/.test(x.pourquoi)), JSON.stringify(r));
+  }
+  {
+    const r = faire(Object.assign({}, TOUT_MESURE, {
+      echeancesMesurees: () => ([{ label:"Proxy", j:null, quoi:"le scraping s arrete" }]) }))();
+    V("une echeance non mesuree ressort, avec sa consequence",
+      r.some(x => /Proxy/.test(x.quoi) && /scraping/.test(x.pourquoi)), JSON.stringify(r));
+  }
+  {
+    const r = faire(Object.assign({}, TOUT_MESURE, { LAST:{ "iphone-panel":{ metrics:{ ageMin:null } } } }))();
+    V("ferme muette : elle figure parmi les inconnus",
+      r.some(x => /Ferme iPhone/.test(x.quoi)), JSON.stringify(r));
+  }
+  {
+    // LE CONTROLE QUI COMPTE : un helper casse ne doit pas faire disparaitre
+    // l'aveu des autres. Sinon la page se taberait au moment ou elle sait le
+    // moins de choses -- l'inverse de ce qu'on veut.
+    const r = faire(Object.assign({}, TOUT_MESURE, {
+      caNetMoisFiable: () => { throw new Error("casse"); },
+      VASANTE: { mesure:{ joursSansReleve:4 } } }))();
+    V("un controle qui leve n emporte pas tout le bandeau",
+      r.some(x => /Sant/.test(x.quoi)), JSON.stringify(r));
+  }
+  {
+    // Helpers absents (vieille page, chargement partiel) : aucun plantage.
+    let leve = null, r = null;
+    try { r = faire({ caNetMoisFiable:undefined, vaqzMesure:undefined, coutRailwayMois:undefined,
+                      VASANTE:undefined, echeancesMesurees:undefined, LAST:undefined })(); }
+    catch(e){ leve = e; }
+    V("helpers absents : il ne plante pas", leve === null, String(leve));
+    V("... et il ne pretend pas que tout va bien",
+      Array.isArray(r) && r.some(x => /Sant/.test(x.quoi)),
+      "VASANTE absente = sante des VA inconnue : " + JSON.stringify(r));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

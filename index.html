@@ -2194,6 +2194,14 @@
     <div class="gs-res" id="gsRes"></div>
   </div>
 
+<!-- ⚠️ « CE QUE JE NE SAIS PAS AUJOURD'HUI »
+     Cinquante-trois fonctions d'affichage savent dire « je n'ai pas mesuré » —
+     chacune dans son coin, sur quatre-vingts panneaux. Pour savoir ce qui est
+     aveugle aujourd'hui, il fallait les balayer toutes ; personne ne le fait.
+     Ce bandeau ne juge RIEN de neuf : il rassemble ce que ces contrôles disent
+     déjà. Une mesure absente n'est pas un zéro, et ne doit pas se taire.
+     Vide = il se cache tout seul : un bandeau permanent n'est plus lu. -->
+<div class="essentiel" id="jesaispas" style="display:none"></div>
 <div class="essentiel" id="essentiel" style="display:none">
     <div class="ess-hero" id="essHero"></div>
     <div class="ess-reco" id="essReco" style="display:none"></div>
@@ -3252,6 +3260,79 @@ function render(data){
   // Les échéances mesurées lisent LAST : elles doivent suivre chaque
   // rafraîchissement, sinon elles affichent « non mesuré » pour toujours.
   try{ if(typeof rendreEcheancesMesurees==="function") rendreEcheancesMesurees(); }catch(e){}
+  try{ if(typeof rendreMesuresManquantes==="function") rendreMesuresManquantes(); }catch(e){}
+}
+
+/* ── « Ce que je ne sais pas aujourd'hui » ────────────────────────────────────
+   53 fonctions d'affichage de cette page savent dire « je n'ai pas mesuré » —
+   chacune dans son coin, sur 80 panneaux. Rien ne les rassemblait : pour savoir
+   ce qui est aveugle aujourd'hui, il fallait les balayer toutes.
+
+   ⚠️ CETTE FONCTION NE JUGE RIEN DE NEUF. Chaque ligne vient d'un contrôle qui
+   existait déjà (`caNetMoisFiable`, `vaqzMesure`, `coutRailwayMois`,
+   `echeancesMesurees`, le champ `mesure` de VASANTE, l'âge de l'état de la
+   ferme). Réécrire les règles ici, c'est se garantir deux verdicts qui
+   divergent : on APPELLE, on ne recopie pas.
+
+   Chaque contrôle est dans son propre try : un helper absent ou qui lève ne doit
+   pas emporter tout le bandeau — sinon l'aveu disparaît, et c'est exactement ce
+   qu'on veut éviter. */
+function mesuresManquantes(){
+  const out=[];
+  const dire=(quoi,pourquoi,depuis)=>out.push({quoi:quoi,pourquoi:pourquoi||"",depuis:depuis||null});
+
+  try{ if(typeof caNetMoisFiable==="function" && !caNetMoisFiable())
+    dire("CA net du mois","les revenus ne remontent pas — ne décide rien sur ce chiffre"); }catch(e){}
+
+  try{ if(typeof vaqzMesure==="function"){
+    const m=vaqzMesure();
+    if(m===null) dire("Quinzaines par VA","jamais reçues");
+    else if(m && m.mesure===false) dire("Quinzaines par VA", m.raison||"non mesurées");
+    else if(m && m.perime) dire("Quinzaines par VA","chiffres périmés"+(m.raison?(" — "+m.raison):""));
+  } }catch(e){}
+
+  try{ if(typeof coutRailwayMois==="function"){
+    const r=coutRailwayMois();
+    if(!r) dire("Coût Railway","jamais relevé");
+    else if(r.montant==null) dire("Coût Railway","aucun montant lu");
+    else if(!r.saisie) dire("Coût Railway","c'est une ESTIMATION — la facture n'est pas saisie");
+  } }catch(e){}
+
+  try{
+    const v=(typeof VASANTE!=="undefined")?VASANTE:null;
+    if(!v) dire("Santé des VA","jamais reçue");
+    else if(v.mesure && Number(v.mesure.joursSansReleve)>0)
+      dire("Santé des VA","la collecte est arrêtée", Number(v.mesure.joursSansReleve)+" j");
+  }catch(e){}
+
+  try{ if(typeof echeancesMesurees==="function"){
+    (echeancesMesurees()||[]).forEach(e=>{
+      if(e && e.j==null) dire("Échéance : "+e.label, e.quoi ? ("aucune mesure — "+e.quoi) : "aucune mesure");
+    });
+  } }catch(e){}
+
+  try{
+    const f=(typeof LAST!=="undefined"&&LAST)?LAST["iphone-panel"]:null;
+    if(f && f.metrics && f.metrics.ageMin==null)
+      dire("Ferme iPhone","le panneau n'a pas parlé au cerveau — son état est inconnu");
+  }catch(e){}
+
+  return out;
+}
+
+function rendreMesuresManquantes(){
+  const el=$("#jesaispas"); if(!el) return;
+  let liste=[];
+  try{ liste=mesuresManquantes()||[]; }catch(e){ liste=[]; }
+  // Rien d'inconnu = le bandeau disparaît. Un bandeau toujours là n'est plus lu.
+  if(!liste.length){ el.style.display="none"; el.innerHTML=""; return; }
+  const lignes=liste.map(m=>`<li><b>${escapeHtml(m.quoi)}</b>`
+    + (m.depuis?` <span class="delta down">depuis ${escapeHtml(String(m.depuis))}</span>`:"")
+    + (m.pourquoi?` — ${escapeHtml(m.pourquoi)}`:"") + `</li>`).join("");
+  el.innerHTML = `<div class="card-note">🫥 ${liste.length} chose${liste.length>1?"s":""} que je ne sais pas aujourd'hui`
+    + ` <span class="note">— une mesure absente n'est pas un zéro</span></div>`
+    + `<ul style="margin:6px 0 0 18px;line-height:1.6">${lignes}</ul>`;
+  el.style.display="block";
 }
 
 /* ---------- résumé du jour + météo business ---------- */
