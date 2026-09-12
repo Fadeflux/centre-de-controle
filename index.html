@@ -3469,6 +3469,19 @@ async function fermeDansLesCartes(tools){
   return tools;
 }
 
+/* ⚠️ LE JETON EXPIRÉ ENFERMAIT DEHORS. Mesuré : le centre fait 147 appels au
+   cerveau et SEPT seulement savent reconnaître un refus d'authentification.
+   Avec un jeton périmé, l'ouverture de la page en tirait ~50 d'un coup, tous
+   refusés. Le compteur d'échecs du cerveau (25 par quart d'heure) était franchi
+   immédiatement — et comme la route de connexion passait par le même compteur,
+   se reconnecter répondait « Trop de tentatives refusées » pendant 15 minutes.
+   Pour des tentatives jamais faites.
+   Le cerveau exempte maintenant sa porte de sortie ; ici on coupe la rafale à
+   la source : au PREMIER refus, tout le monde se tait jusqu'à la reconnexion. */
+let AUTH_KO = false;
+function authRefusee(){ AUTH_KO = true; }
+function authRetablie(){ AUTH_KO = false; }
+
 async function load(){
   if(LOADING) return;               // évite les appels concurrents (poll 60s + retry)
   LOADING=true;
@@ -3481,7 +3494,7 @@ async function load(){
     for(let attempt=0; attempt<3; attempt++){
       try{
         const r = await fetch(HUB_URL,{headers:{"x-hub-token":TOKEN},cache:"no-store"});
-        if(r.status===401){ authFail=true; throw new Error("HTTP 401"); }
+        if(r.status===401){ authFail=true; authRefusee(); throw new Error("HTTP 401"); }
         if(!r.ok) throw new Error("HTTP "+r.status);
         j = await r.json(); break;
       }catch(e){ lastErr=e; if(authFail) break; if(attempt<2) await new Promise(res=>setTimeout(res,1200*(attempt+1))); }
@@ -3498,7 +3511,8 @@ async function load(){
       }
       throw (lastErr||new Error("offline"));
     }
-    OFFLINE_FAILS=0; if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
+    OFFLINE_FAILS=0; authRetablie();   // une lecture reussie rouvre le robinet
+    if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
     IS_LIVE = true;
     const tools = j.tools || {};
     await fermeDansLesCartes(tools);     // la ferme pousse son état ; elle n'est pas dans /api/hub
@@ -3603,6 +3617,8 @@ async function doLogin(){
    • après une reconnexion, c'était l'inverse : « Paie au cumul », trajectoires,
      cohortes, objectif figé… restaient vides jusqu'à un rechargement manuel. */
 function loadAll(){
+  // Rien ne sert de lancer cinquante appels qui seront tous refuses.
+  if(AUTH_KO) return;
   [ loadOM, loadTip, loadTasks, loadPayments, loadPaieCumul, loadReminders, loadSms,
     loadVaGoals, loadFanRadar, loadGhosts, loadLeakwatch, loadLeaks, loadIdentity, loadTaxRate, loadEcheances, loadDates, loadListesPerso, loadPrevisions, loadPnl, loadVaArchives, loadVaStarts, renderRelancer, loadCrons,
     loadPaieRoles, loadSplit, loadTgrev, loadOnlyChat, loadOnlyChatCoach, loadOcRelance, loadCoherence, loadEntComptes, loadSanteComptes, loadTgVa, loadIaHumain, loadOnlyChatGoal, loadOnlyChatHistory, loadFirstSale, loadCosts, loadHours, loadConversion, loadHorsEquipe, loadSources, loadCookie,
@@ -13866,7 +13882,9 @@ function renderPie(){
 
 /* ---------- démarrage ---------- */
 fillMe();
-load();
+// On garde la promesse : `loadAll()` (plus bas) l'attend avant de tirer ses
+// ~50 appels, pour ne pas les gaspiller sur un jeton perime.
+const PREMIER_LOAD = load();
 // Fin de l'animation d'entrée : on retire « booting » après le 1er rendu, pour que
 // les tuiles ne re-glissent plus à chaque rafraîchissement 60 s. (Au pire, si ce
 // timer ne partait pas, l'animation continuerait comme avant — jamais pire.)
@@ -15466,7 +15484,14 @@ refreshSecHeads();
 applyCatCollapsed();
 try{ initCatSpy(); }catch(e){}
 
-loadAll();   // même liste qu'après une reconnexion (voir loadAll)
+// ⚠️ ON ATTEND DE SAVOIR SI LE JETON EST BON. `load()` est lancée plus haut mais
+// elle est asynchrone : sans cette attente, `loadAll()` partait AVANT sa réponse
+// et tirait ses ~50 appels même avec un jeton périmé — c'est ce qui franchissait
+// le compteur d'échecs du cerveau d'un seul coup. `PREMIER_LOAD` ne rejette
+// jamais : on enchaîne, et `loadAll()` se tait tout seul si l'auth a été refusée.
+Promise.resolve(typeof PREMIER_LOAD !== "undefined" ? PREMIER_LOAD : null)
+  .catch(function(){})
+  .then(function(){ loadAll(); });   // même liste qu'après une reconnexion (voir loadAll)
 // 📱 #6 raccourcis d'appui long sur l'icône (manifest shortcuts) : ?go=<id> saute au panneau.
 // Les panneaux se remplissent en différé (fetch) : on RÉESSAIE jusqu'à ce que la
 // cible soit visible (10 s max) — un seul essai à 1,5 s la ratait presque toujours.
@@ -15577,6 +15602,7 @@ setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_M
 // atteint, et le journal des pannes ne voyait jamais une panne commencée après
 // l'ouverture de la page.
 function boucleLente(){
+  if(AUTH_KO) return;
   if(pageCachee() || $("#gate").classList.contains("show")) return;
   [ "loadTresorerie","loadCoherence","loadSanteComptes","loadCac",
     "loadDecroche","loadConversion","loadHours","loadProxy","loadCrons" ].forEach(function(n){

@@ -1351,4 +1351,47 @@ const V=verifie;
   }
 }
 
+
+// ══ 28. JETON EXPIRE : NE PAS S'ENFERMER DEHORS ══════════════════════════════
+// Mesure : 147 appels au cerveau, SEPT seulement savent reconnaitre un refus.
+// Avec un jeton perime, l'ouverture de la page en tirait ~50 d'un coup ; le
+// compteur d'echecs du cerveau (25 / 15 min) etait franchi immediatement, et la
+// route de connexion passant par le MEME compteur, se reconnecter repondait
+// « Trop de tentatives refusees » pendant 15 minutes -- pour des tentatives
+// jamais faites.
+{
+  const bAll = morceau("function loadAll(){", "].forEach(function(f)");
+  V("loadAll se tait quand l auth est refusee",
+    /if\(AUTH_KO\)\s*return;/.test(bAll),
+    "sans ce garde, cinquante appels partent pour etre tous refuses");
+  // Il doit se taire AVANT de construire sa liste, pas apres.
+  V("... et il se tait AVANT de lancer quoi que ce soit",
+    bAll.indexOf("AUTH_KO") < bAll.indexOf("loadOM"),
+    "le garde arrive trop tard dans la fonction");
+
+  const bLente = morceau("function boucleLente(){", "function _argentEnAttente(");
+  V("la boucle lente aussi", /if\(AUTH_KO\)\s*return;/.test(bLente), bLente.slice(0, 120));
+
+  const bLoad = morceau("async function load(){", "function togglePin(");
+  V("un refus leve le drapeau", /authFail=true; authRefusee\(\)/.test(bLoad),
+    "le drapeau n est jamais leve : le garde ne servira jamais");
+  V("... et une lecture reussie le baisse", /authRetablie\(\)/.test(bLoad),
+    "sans ca, la page reste muette APRES la reconnexion");
+
+  // LE CONTROLE QUI COMPTE : au demarrage, `loadAll()` ne doit plus partir
+  // AVANT de savoir si le jeton est bon. C'est ce depart immediat qui franchissait
+  // le compteur d'echecs.
+  const src2 = fs.readFileSync(FICH, "utf8");
+  V("au demarrage, loadAll attend la premiere lecture",
+    /PREMIER_LOAD[\s\S]{0,400}loadAll\(\)/.test(src2),
+    "loadAll() repart sans attendre : la rafale revient");
+  V("... et la premiere lecture est bien gardee dans une promesse",
+    /const PREMIER_LOAD = load\(\);/.test(src2),
+    "PREMIER_LOAD n existe plus : l attente ci-dessus ne veut plus rien dire");
+  // Et il ne doit plus exister d appel nu en debut de ligne.
+  V("plus aucun `loadAll();` lance sans condition",
+    !/(?:^|\n)\s*loadAll\(\);/.test(src2),
+    "un appel nu subsiste : il repartira avant la reponse");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
