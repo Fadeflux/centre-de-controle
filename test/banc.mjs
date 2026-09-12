@@ -1803,6 +1803,55 @@ const V=verifie;
   }
 }
 
+// ================= LA PAGE ENTIERE SE COMPILE
+// ⚠️ (13/09) Les controles ci-dessus extraient des MORCEAUX : une erreur de
+// syntaxe ailleurs dans la page (un commentaire `//` colle au milieu d'une ligne
+// qui avale la fin de l'instruction) les laisse tous verts, alors que le
+// navigateur refuse le script ENTIER — plus aucun panneau ne marche. Vecu en
+// corrigeant cette page, rattrape avant publication.
+{
+  const { Script } = await import("node:vm");
+  const reScript = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let ms, n = 0; const erreurs = [];
+  while ((ms = reScript.exec(src))) {
+    if (/\bsrc\s*=/.test(ms[1])) continue;
+    n++;
+    try { new Script(ms[2]); } catch (e) { erreurs.push(e.message); }
+  }
+  V("chaque script de la page se compile", n > 0 && erreurs.length === 0, n + " script(s) ; " + erreurs.join(" | "));
+}
+
+// ================= GARDES MORTES : `typeof X==="function"` sur un nom qui n'existe nulle part
+// ⚠️ (13/09) La garde evite l'erreur… et cache que la fonctionnalite ne tourne
+// JAMAIS : `tkRender` (le tableau se dessine avec `renderTasks`) laissait le
+// tableau des taches sur la vue d'avant la connexion ; `money` (absent de la
+// page) sortait l'objectif en clair meme en mode discret.
+{
+  const NAVIGATEUR = new Set(["window","document","navigator","Notification","speechSynthesis","SpeechRecognition",
+    "webkitSpeechRecognition","structuredClone","requestIdleCallback","IntersectionObserver","ResizeObserver",
+    "BroadcastChannel","AbortController","fetch","Chart","queueMicrotask","crypto","caches","PushManager",
+    "ClipboardItem","MediaRecorder","AudioContext","webkitAudioContext","EventSource","WebSocket","matchMedia",
+    "requestAnimationFrame","TextEncoder","Blob","File","Image","Audio"]);
+  const morts = [];
+  const re = /typeof\s+([A-Za-z_$][\w$]*)\s*===?\s*["']function["']/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const nom = m[1];
+    if (NAVIGATEUR.has(nom)) continue;
+    const e = nom.replace(/\$/g, "\\$");
+    const defini = new RegExp(
+      "function\\s+" + e + "\\s*\\(" +                       // function nom(
+      "|(?:const|let|var)\\s+" + e + "\\b" +                 // const nom
+      "|(?:const|let|var)\\s+[^;\\n]*[,{]\\s*" + e + "\\b" + // const a, nom / { nom }
+      "|window\\." + e + "\\s*=" +                           // window.nom =
+      "|[(,]\\s*" + e + "\\s*[,)=]" +                        // parametre (nom) / (a, nom)
+      "|\\b" + e + "\\s*=>"                                  // nom => …
+    ).test(src);
+    if (!defini) morts.push(nom + " (l." + src.slice(0, m.index).split("\n").length + ")");
+  }
+  V("aucun appel protege par typeof vers une fonction qui n existe nulle part", morts.length === 0, "gardes mortes : " + morts.join(", "));
+}
+
 // ================= ANNULER UNE PAIE : un echec de la correction se VOIT
 // ⚠️ (13/09) Le VA a peut-etre deja recu « paie envoyee ». Si l'annulation
 // echouait (503, reseau), `.catch(()=>{})` et un 503 lu comme une reponse

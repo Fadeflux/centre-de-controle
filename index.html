@@ -3613,7 +3613,10 @@ async function doLogin(){
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ localStorage.setItem("ccn_name",name); }   // CURRENT_USER retiré : écrit, jamais lu
   appliquerNoms(noms);   // les prénoms viennent du serveur, plus du code (dépôt public)
-  try{ if(typeof fillMe==="function") fillMe(); if(typeof tkRender==="function") tkRender(); }catch(e){}
+  // ⚠️ (13/09) Ce redessin appelait `tkRender`, un nom qui n'existe pas ici (le
+  // tableau se dessine avec `renderTasks`) : la garde `typeof` le sautait en silence,
+  // et le tableau des tâches gardait la vue et les prénoms d'AVANT la connexion.
+  try{ if(typeof fillMe==="function") fillMe(); if(typeof renderTasks==="function") renderTasks(); }catch(e){}
   // ⚠️ Le serveur REFUSE désormais Telegram, la paie et toute écriture à un
   // compte associé (403). Sans ça, l'écran tenterait ces appels et afficherait
   // des pannes là où il s'agit d'un refus normal. On bascule donc en vue associé
@@ -6374,7 +6377,7 @@ async function saveObjGoal(g){
     const _anneau=(typeof GOAL!=="undefined" && GOAL && GOAL.type==="rev" && Number(GOAL.value)>0)?Number(GOAL.value):null;
     if(_anneau!=null){
       alert("Ce panneau suit deja l'objectif de l'anneau du haut : "
-        + ((typeof money==="function")?money(_anneau):(_anneau+" $")) + " net."
+        + fmtMoney(_anneau) + " net."   // `money` n'existe pas ici : le montant sortait brut, même en mode discret
         + "\n\nSi tu fixes un objectif ici, il ne s'affichera nulle part — mais il "
         + "servira quand meme aux alertes du serveur. Deux objectifs differents pour "
         + "le meme mois, c'est la meilleure facon de se tromper."
@@ -9618,7 +9621,7 @@ $("#om").addEventListener("click",e=>{
   const perB=e.target.closest&&e.target.closest("[data-omper]");
   if(perB && !perB.disabled){ OM_PERIODE=perB.getAttribute("data-omper"); try{localStorage.setItem("ccn_om_periode",OM_PERIODE);}catch(_){} renderOM(); return; }
   const vaCard=e.target.closest&&e.target.closest("[data-vacard]");
-  if(vaCard){ const nom=vaCard.getAttribute("data-vacard"); if(typeof openVaCard==="function") openVaCard(nom); else if(typeof gsGo==="function") gsGo(nom); return; }
+  if(vaCard){ const nom=vaCard.getAttribute("data-vacard"); /* repli `gsGo` retiré le 13/09 : il n'a jamais existé dans cette page */ if(typeof openVaCard==="function") openVaCard(nom); return; }
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
 });
