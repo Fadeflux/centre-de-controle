@@ -1726,4 +1726,38 @@ const V=verifie;
   }
 }
 
+// ================= ENVOIS « ET ON OUBLIE » : un refus du serveur doit se voir
+// ⚠️ (12/09) Neuf enregistrements (taches, rappels, regles, decisions, notes des
+// VA, objectif Telegram...) partaient avec `.catch(()=>{})` : la reponse n'etait
+// jamais lue, un refus passait pour un succes.
+{
+  // Controle derive de la page : plus aucun POST dont la reponse est jetee.
+  const ENVOI_JETE = /fetch\(HUB_BASE\+"\/api\/[^"]+"\s*,\s*\{[^}]*method:"(POST|PUT|DELETE)"[\s\S]*?\)\.catch\(\(\)=>\{\}\)/;
+  const jetes = [];
+  src.split("\n").forEach((l, n) => { if (ENVOI_JETE.test(l) && !/\.ok\b/.test(l)) jetes.push("l." + (n + 1)); });
+  V("aucun enregistrement dont la reponse du serveur est jetee", jetes.length === 0, "a corriger : " + jetes.join(", "));
+  V("... et le controle reconnait la forme d avant",
+    ENVOI_JETE.test('fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{});'),
+    "controle inerte");
+
+  // L'aide partagee, executee pour de bon.
+  let bloc = null;
+  try { bloc = morceau("function envoiServeur(chemin, corps, libelle){", "// 🎯 Objectif mensuel Telegram"); } catch (e) { bloc = null; }
+  V("l aide qui lit la reponse du serveur existe", !!bloc, "introuvable : chaque envoi jette sa reponse");
+  if (bloc) {
+    const toasts = []; let reponse = null;
+    const f = new Function("fetch","HUB_BASE","TOKEN","toast", bloc + "; return envoiServeur;");
+    const envoi = f(() => Promise.resolve(reponse()), "http://x", "jeton", (a,b) => toasts.push(a + " | " + (b||"")));
+    reponse = () => ({ ok:false, status:503 });
+    const r1 = await envoi("/api/hub/rules", {rules:[]}, "Règles");
+    V("refus du serveur : l envoi rend false", r1 === false, "rend " + r1);
+    V("... et l ecran le dit", toasts.length === 1 && /NON enregistré/.test(toasts[0]), toasts.join(" / ") || "aucun message");
+    await envoi("/api/hub/rules", {rules:[]}, "Règles");
+    V("... une seule fois par minute pendant une saisie", toasts.length === 1, toasts.length + " messages");
+    reponse = () => ({ ok:true, status:200 });
+    const r2 = await envoi("/api/hub/rules", {rules:[]}, "Règles");
+    V("succes : true, sans message", r2 === true && toasts.length === 1, "rend " + r2 + ", " + toasts.length + " messages");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

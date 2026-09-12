@@ -3744,7 +3744,7 @@ function saveTodos(){
   if(!(TOKEN && HUB_URL)) return;
   if(!TODOS_LOADED){ TODOS_DIRTY=true; return; }
   clearTimeout(todoSyncT);
-  todoSyncT = setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:TODOS})}).catch(()=>{}); }, 600);
+  todoSyncT = setTimeout(()=>{ envoiServeur("/api/hub/notes",{notes:TODOS},"Liste de choses à faire"); }, 600);
 }
 function renderTodos(){
   const done = TODOS.filter(t=>t.d).length;
@@ -4227,6 +4227,26 @@ function renderOcVersus(d){
   return `<div class="oc-vs-cap">🆚 Qui convertit le mieux (PPV ouverts)</div><div class="oc-vs">${rows}</div>`;
 }
 
+// ⚠️ ENVOIS « ET ON OUBLIE » (12/09). Ces enregistrements partaient avec
+// `.catch(()=>{})` : la réponse du serveur n'était jamais lue. Un refus — base
+// indisponible, jeton expiré, compte en lecture seule — laissait croire la
+// modification enregistrée partout, alors qu'elle ne vivait que sur cet
+// appareil (et le serveur, lui, répondait même « ok » sans avoir écrit).
+// On le DIT, une fois par minute par sujet, pour ne pas noyer l'écran pendant
+// une saisie. Rend true seulement si le serveur a confirmé.
+function envoiServeur(chemin, corps, libelle){
+  const dejaDit = envoiServeur._dit || (envoiServeur._dit = {});
+  return fetch(HUB_BASE+chemin,{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify(corps)})
+    .then(r=>{ if(!r || !r.ok) throw new Error("HTTP "+(r?r.status:"?")); return true; })
+    .catch(e=>{
+      const maintenant=Date.now();
+      if(typeof toast==="function" && (!dejaDit[libelle] || maintenant-dejaDit[libelle]>60000)){
+        dejaDit[libelle]=maintenant;
+        toast("⚠️ "+libelle+" : NON enregistré sur le serveur","Gardé sur cet appareil seulement ("+((e&&e.message)||"réseau")+"). Tes autres écrans ne le verront pas — réessaie plus tard.");
+      }
+      return false;
+    });
+}
 // 🎯 Objectif mensuel Telegram — manuel, simple, chargé/sauvé côté serveur
 // (cross-device) comme l'objectif OnlyFans, mais sans auto-calcul/gel.
 let ONLYCHAT_GOAL = parseInt(localStorage.getItem("ccn_onlychat_goal")||"0",10)||0;
@@ -4242,7 +4262,7 @@ async function saveOnlyChatGoal(g){
   ONLYCHAT_GOAL=Math.max(0,Math.round(Number(g)||0));
   localStorage.setItem("ccn_onlychat_goal",String(ONLYCHAT_GOAL));
   renderOnlyChat();
-  if(TOKEN){ try{ await fetch(HUB_BASE+"/api/hub/onlychat-goal",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({goal:ONLYCHAT_GOAL})}); }catch(e){} }
+  if(TOKEN){ await envoiServeur("/api/hub/onlychat-goal",{goal:ONLYCHAT_GOAL},"Objectif Telegram"); }
 }
 { const b=$("#ocGoalEdit"); if(b) b.onclick=()=>{
     const cur=ONLYCHAT_GOAL>0?String(ONLYCHAT_GOAL):"";
@@ -7139,7 +7159,7 @@ let TASKS_LOADED=false;
 function saveTasks(){
   tkNorm(); TK_LAST_EDIT=Date.now(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS));
   if(TOKEN && !TASKS_LOADED) return;   // pas de POST tant qu'on n'a pas lu : la fusion (syncTasks) s'en chargera
-  if(TOKEN){ clearTimeout(TK_SAVE_T); TK_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); },500); }
+  if(TOKEN){ clearTimeout(TK_SAVE_T); TK_SAVE_T=setTimeout(()=>{ envoiServeur("/api/hub/tasks",{tasks:TASKS},"Tableau des tâches"); },500); }
 }
 function tkSig(x){ return [x.id,x.text,(x.tags||[]).join(","),x.done?1:0,x.prio||"n",x.repeat||"",x.doneTs||0,x.del?1:0,x.upd||0].join("|"); }
 function tkBoardSig(b){ return TK_KEYS.map(k=>(b[k]||[]).map(tkSig).join(";")).join("§"); }
@@ -7172,7 +7192,7 @@ async function syncTasks(){
     TASKS_LOADED=true;                // une lecture réussie lève le verrou d'écriture
     const m=tkMerge(TASKS,j.tasks);
     if(tkBoardSig(m.board)!==tkBoardSig(TASKS)){ TASKS=m.board; tkNorm(); localStorage.setItem("ccn_tasks",JSON.stringify(TASKS)); renderTasks(); }
-    if(m.localWins && Date.now()-TK_LAST_EDIT>1500){ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); }
+    if(m.localWins && Date.now()-TK_LAST_EDIT>1500){ envoiServeur("/api/hub/tasks",{tasks:TASKS},"Tableau des tâches"); }
   }catch(e){}
 }
 /* ⚠️ 450 LECTURES DE BASE PAR HEURE POUR UN TABLEAU QU'ON NE REGARDE PAS.
@@ -10718,7 +10738,7 @@ function daysSinceFirstSale(){
 function saveFirstSale(v){
   FIRST_SALE=(v||"").slice(0,10);
   localStorage.setItem("ccn_firstsale",FIRST_SALE);
-  if(TOKEN) fetch(HUB_BASE+"/api/hub/first-sale",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({date:FIRST_SALE})}).catch(()=>{});
+  if(TOKEN) envoiServeur("/api/hub/first-sale",{date:FIRST_SALE},"Date de première vente");
   renderBadges();
 }
 async function loadFirstSale(){
@@ -12877,7 +12897,7 @@ async function loadRules(){
   catch(e){ try{ RULES=JSON.parse(localStorage.getItem("ccn_rules")||"[]"); }catch(e2){ RULES=[]; } }
   renderRules();
 }
-function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN && !RULES_LOADED){ RULES_DIRTY=true; return; } if(TOKEN){ fetch(HUB_BASE+"/api/hub/rules",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({rules:RULES})}).catch(()=>{}); } }
+function saveRules(){ localStorage.setItem("ccn_rules",JSON.stringify(RULES)); if(TOKEN && !RULES_LOADED){ RULES_DIRTY=true; return; } if(TOKEN){ envoiServeur("/api/hub/rules",{rules:RULES},"Règles"); } }
 function ruleMetricVal(k){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null, ko=(typeof revKo==="function")?revKo():false, t=(om&&om.totals)||{};
   if(k==="revenus_muets") return ko?1:0;
@@ -13120,7 +13140,7 @@ async function loadDecisions(){
   catch(e){ try{ DECISIONS=JSON.parse(localStorage.getItem("ccn_decisions")||"[]"); }catch(e2){ DECISIONS=[]; } }
   renderDecisions();
 }
-function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN && !DECISIONS_LOADED){ DECISIONS_DIRTY=true; return; } if(TOKEN){ fetch(HUB_BASE+"/api/hub/decisions",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({decisions:DECISIONS})}).catch(()=>{}); } }
+function saveDecisions(){ localStorage.setItem("ccn_decisions",JSON.stringify(DECISIONS)); if(TOKEN && !DECISIONS_LOADED){ DECISIONS_DIRTY=true; return; } if(TOKEN){ envoiServeur("/api/hub/decisions",{decisions:DECISIONS},"Journal des décisions"); } }
 function decisionImpact(dateStr){
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||null; if(!om||!Array.isArray(om.dailyNet)||revKo()) return null;
   const dn=om.dailyNet, idx=dn.findIndex(x=>x.date===dateStr); if(idx<0) return null;
@@ -14030,7 +14050,7 @@ function saveReminders(){
   if(!TOKEN) return;
   if(!REMINDERS_LOADED){ REMINDERS_DIRTY=true; return; }
   clearTimeout(RM_SAVE_T);
-  RM_SAVE_T=setTimeout(()=>{ fetch(HUB_BASE+"/api/hub/reminders",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({reminders:REMINDERS})}).catch(()=>{}); },500);
+  RM_SAVE_T=setTimeout(()=>{ envoiServeur("/api/hub/reminders",{reminders:REMINDERS},"Rappels"); },500);
 }
 async function loadReminders(){
   if(!TOKEN){ REMINDERS_LOADED=true; renderReminders(); return; }
@@ -14757,7 +14777,7 @@ async function loadVaNotes(){
   catch(e){ try{ VANOTES=JSON.parse(localStorage.getItem("ccn_va_notes")||"{}"); }catch(e2){ VANOTES={}; } }
 }
 function vaNoteGet(va){ return VANOTES[String(va||"").toLowerCase()]||""; }
-function vaNotesPush(){ if(TOKEN){ fetch(HUB_BASE+"/api/hub/va-notes",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({notes:VANOTES})}).catch(()=>{}); } }
+function vaNotesPush(){ if(TOKEN){ envoiServeur("/api/hub/va-notes",{notes:VANOTES},"Notes sur les VA"); } }
 function vaNoteSet(va,txt){ const k=String(va||"").toLowerCase(); if(!k) return; txt=String(txt||""); if(txt.trim()) VANOTES[k]=txt; else delete VANOTES[k]; localStorage.setItem("ccn_va_notes",JSON.stringify(VANOTES)); if(TOKEN && !VANOTES_LOADED){ VANOTES_DIRTY.add(k); return; } vaNotesPush(); }
 // Dit la vérité sur l'état de la synchro au lieu d'un « ✓ enregistré » qui
 // laisserait croire que la note est partie sur le serveur alors qu'elle n'est
