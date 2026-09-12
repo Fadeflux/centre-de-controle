@@ -1461,4 +1461,55 @@ const V=verifie;
   }
 }
 
+
+// ══ 30. « LE FIL EST VIVANT » N'EST PAS « LE TRAVAIL A EU LIEU » ═════════════
+// Le tick du planificateur de la ferme note l'heure a la DEUXIEME ligne, donc
+// AVANT de travailler : il se disait « a l'heure » meme en plantant de bout en
+// bout, et un `except: pass` avalait l'echec. Le battement porte maintenant
+// TROIS choses (dernier tick, dernier SUCCES, echecs d'affilee) ; il faut que
+// l'ecran les juge, sinon on aurait juste deplace le silence.
+{
+  const b = morceau("async function fermeDansLesCartes(tools){", "async function load(){");
+  const lire = async (etat) => {
+    const t = {};
+    await new Function("TOKEN","HUB_BASE","fetch", b + "; return fermeDansLesCartes;")(
+      "jeton","http://x",
+      async () => ({ ok:true, json: async () => ({ recue:true, muette:false, ageMin:1, etat:etat }) })
+    )(t);
+    return t["iphone-panel"];
+  };
+  const SAIN = { lisible:true, planificateur:true, quarantaine:0, challenges:0, comptes:12,
+                 alertesMuettes:false, dernierSucces: Math.floor(Date.now()/1000) - 60,
+                 echecsSuite:0, panneauDepuis: Math.floor(Date.now()/1000) - 7200 };
+
+  {
+    const c = await lire(SAIN);
+    V("planificateur sain : rien a signaler", c.status === "online" && !c.note, JSON.stringify(c));
+  }
+  {
+    const c = await lire(Object.assign({}, SAIN, { echecsSuite:4, derniereErreur:"cookie mort" }));
+    V("quatre passages rates d affilee : voyant orange", c.status === "warn", JSON.stringify(c));
+    V("... et on lit qu il se croit a l heure sans rien publier",
+      /ÉCHOU|ECHOU/.test(c.note||"") && /cookie mort/.test(c.note||""), c.note);
+  }
+  {
+    // Panneau demarre depuis 2 h et AUCUN passage abouti : anormal.
+    const c = await lire(Object.assign({}, SAIN, { dernierSucces:null }));
+    V("aucun passage abouti depuis le demarrage : signale", c.status === "warn", JSON.stringify(c));
+  }
+  {
+    // ... mais un panneau qui vient de demarrer n a pas encore eu le temps.
+    const c = await lire(Object.assign({}, SAIN, { dernierSucces:null,
+      panneauDepuis: Math.floor(Date.now()/1000) - 60 }));
+    V("un panneau qui vient de demarrer n est PAS accuse", c.status === "online",
+      "sinon la tuile crie orange a chaque redemarrage : " + JSON.stringify(c));
+  }
+  {
+    const vieux = Math.floor(Date.now()/1000) - 3600;
+    const c = await lire(Object.assign({}, SAIN, { dernierSucces:vieux }));
+    V("dernier succes vieux d une heure : signale, avec le delai",
+      c.status === "warn" && /60 min/.test(c.note||""), c.note);
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

@@ -3448,6 +3448,24 @@ async function fermeDansLesCartes(tools){
         ? ("EN PAUSE AUTOMATIQUE — "+(e.pauseAuto.raison||"coupe-circuit anti-ban")
            +(e.pauseAuto.quand?(" (depuis "+e.pauseAuto.quand+")"):""))
         : "planificateur arrêté — plus aucune publication";
+    } else if(Number(e.echecsSuite)>=3){
+      // ⚠️ « LE FIL EST VIVANT » N'EST PAS « LE TRAVAIL A EU LIEU ». Le tick du
+      // planificateur note l'heure AVANT de travailler : il se disait donc « à
+      // l'heure » même en plantant de bout en bout. On juge maintenant le dernier
+      // SUCCÈS et les échecs d'affilée.
+      status = "warn";
+      note = "le planificateur tourne mais ses "+e.echecsSuite+" derniers passages ont ÉCHOUÉ"
+           + (e.derniereErreur ? (" — "+e.derniereErreur) : "")
+           + ". Il se croit à l'heure et ne publie rien.";
+    } else if(e.dernierSucces==null && Number(e.panneauDepuis) > 0
+              && (Date.now()/1000 - Number(e.panneauDepuis)) > 600){
+      status = "warn";
+      note = "aucun passage abouti depuis le démarrage du panneau (il y a plus de 10 min)";
+    } else if(e.dernierSucces!=null && (Date.now()/1000 - Number(e.dernierSucces)) > 900){
+      status = "warn";
+      note = "dernier passage abouti il y a "
+           + Math.round((Date.now()/1000 - Number(e.dernierSucces))/60) + " min — le fil tourne, "
+           + "mais rien n'aboutit";
     } else if(e.quarantaine>0 || e.challenges>0){
       status = "warn";
       note = (e.quarantaine>0 ? (e.quarantaine+" compte(s) en quarantaine"
