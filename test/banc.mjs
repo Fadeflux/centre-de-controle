@@ -1394,4 +1394,71 @@ const V=verifie;
     "un appel nu subsiste : il repartira avant la reponse");
 }
 
+
+// ══ 29. DEUX AUDITS DU 11-12/09, RENDUS PERMANENTS ═══════════════════════════
+// Je les ai passes a la main et ils ont trouve de vrais defauts. Mais un audit
+// manuel ne vaut que pour le jour ou on le passe.
+{
+  const src3 = fs.readFileSync(FICH, "utf8");
+
+  // ── (a) UN MESSAGE ADRESSE A UN ELEMENT QUI N'EXISTE PAS ──────────────────
+  // `flashMsg(id, msg)` fait `if (!el) return;` : il sort EN SILENCE quand sa
+  // cible manque. Appele avec un identifiant absent de la page, il refusait une
+  // saisie sans un mot -- le bouton semblait mort. Trouve dans les trois sites
+  // finance le 12/09 ; un refus muet est pire que le bug qu'il corrige.
+  {
+    // Les fonctions « parle a un element et abandonne en silence ».
+    const muettes = [];
+    const rxDef = /function\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)[^)]*\)\s*\{[\s\S]{0,300}?getElementById\(\s*\2\s*\)[\s\S]{0,160}?if\s*\(\s*!\s*\w+\s*\)\s*return\s*;/g;
+    let m;
+    while ((m = rxDef.exec(src3)) !== null) muettes.push(m[1]);
+
+    // Les identifiants qui existent vraiment dans la page (dont ceux fabriques).
+    const ids = new Set([...src3.matchAll(/id\s*=\s*["']([^"']+)["']/g)].map(x => x[1]));
+    [...src3.matchAll(/\.id\s*=\s*["']([^"']+)["']/g)].forEach(x => ids.add(x[1]));
+    const prefixes = [...src3.matchAll(/["']([a-z]+-)["']\s*\+/g)].map(x => x[1]);
+    const connu = (x) => ids.has(x) || prefixes.some(p => x.startsWith(p));
+
+    const perdus = [];
+    for (const f of new Set(muettes)) {
+      const rx = new RegExp("\\b" + f + "\\s*\\(\\s*['\"]([^'\"]+)['\"]", "g");
+      let a;
+      while ((a = rx.exec(src3)) !== null) {
+        if (!connu(a[1])) perdus.push(f + "('" + a[1] + "')");
+      }
+    }
+    V("aucun message n est adresse a un element inexistant",
+      perdus.length === 0,
+      "ces messages partent dans le vide (l utilisateur ne voit RIEN) : " + [...new Set(perdus)].join(", "));
+    V("... et le detecteur a bien trouve des fonctions a surveiller",
+      muettes.length > 0, "il ne reconnait plus la forme : il est inerte");
+  }
+
+  // ── (b) UNE DATE COMPAREE A UNE HEURE ─────────────────────────────────────
+  // `Date.parse(jour + "T00:00:00")` SANS suffixe est lu en heure de PARIS, alors
+  // que les dates viennent du cerveau en heure METIER (UTC+1 fixe). Entre 22 h et
+  // minuit l ete, « 12 jours » devenait « 13 jours ». Deux heures par jour.
+  // Trouve le 12/09 dans `vaEnAttente` ; la regle est : on compare des DATES DE
+  // CALENDRIER ancrees a minuit UTC, jamais des instants.
+  {
+    // ⚠️ ON RETIRE LES COMMENTAIRES D'ABORD. Ce detecteur s'est accuse lui-meme
+    // au premier lancement : le commentaire qui EXPLIQUE le correctif cite la
+    // forme fautive. Un banc qui lit le texte brut accuse toujours celui qui a
+    // pris la peine d'ecrire pourquoi.
+    const codeSeul = src3.split("\n")
+      .filter(l => { const t = l.trim(); return t && !t.startsWith("//") && !t.startsWith("*"); })
+      .join("\n");
+    const sans = [...codeSeul.matchAll(/Date\.parse\(([^)]{0,80}?)T00:00:00(?!Z)/g)]
+      .map(x => x[0].slice(0, 70));
+    V("aucune date n est comparee en heure du navigateur",
+      sans.length === 0,
+      "ces lectures sont en heure de Paris alors que les dates sont en heure metier : "
+      + sans.join(" | "));
+    // Le controle doit savoir echouer.
+    V("... et le detecteur reconnait bien la forme fautive",
+      /Date\.parse\(([^)]{0,80}?)T00:00:00(?!Z)/.test('Date.parse(d+"T00:00:00")'),
+      "le detecteur est inerte");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
