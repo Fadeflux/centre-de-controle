@@ -15559,9 +15559,9 @@ function boucleRafraichissement(){ if(!$("#gate").classList.contains("show")){ l
   // ⚠️ loadHorsEquipe n'était appelé QU'AU CHARGEMENT de la page. Si les montants
   // n'étaient pas encore prêts à cet instant (le serveur finit son 1er calcul après
   // un redémarrage : il renvoie alors argentPret=false et des montants à null), le
-  // navigateur gardait ce résultat POUR TOUJOURS — Bot et Clhoe restaient sur
-  // « — » alors que le serveur avait les chiffres 60 s plus tard (mesuré :
-  // Bot 356 $ / LTV 8,48 · Clhoe 1 260 $ / LTV 8,69). Le reste du dashboard se
+  // navigateur gardait ce résultat POUR TOUJOURS — les comptes perso restaient
+  // sur « — » alors que le serveur avait les chiffres 60 s plus tard (mesuré sur
+  // les deux comptes, montants et LTV bien présents). Le reste du dashboard se
   // rafraîchissait normalement, ce qui rendait la panne invisible.
   try{ if(typeof loadHorsEquipe==="function") loadHorsEquipe(); }catch(e){}
   try{ if(typeof loadCookie==="function") loadCookie(); }catch(e){}
