@@ -3107,11 +3107,24 @@ function cardHTML(t, data){
   const pinned = PINS.indexOf(t.id) !== -1;
   const star = t.build ? "" : `<button class="star ${pinned?'on':''}" data-pin="${t.id}" title="${pinned?'Désépingler':'Épingler'}" aria-label="Épingler">${pinned?'★':'☆'}</button>`;
   const dot  = t.build ? "" : `<span class="dot ${statusClass(st)}"></span>`;
+  /* ⚠️ LA RAISON ÉTAIT ENVOYÉE ET N'ÉTAIT AFFICHÉE NULLE PART.
+     Le cerveau calcule, pour chaque outil en panne, une raison PRÉCISE —
+     « planificateur arrêté (plus rien depuis 40 min) », « drive (no auth
+     configured) », « base de données injoignable » — et son commentaire dit
+     pourquoi : « hors ligne » tout court envoie chercher au mauvais endroit
+     quand le service RÉPOND mais que son TRAVAIL est arrêté.
+     Elle arrivait bien dans la carte (`d.raison`)… et rien ne la lisait : on
+     voyait une pastille rouge sans un mot. Une mesure juste, avec personne au
+     bout du fil — la faute que tout le reste du jour a consisté à corriger.
+     On ne l'affiche QUE si l'outil n'est pas en ligne : sinon ce serait du
+     bruit permanent, et le bruit permanent ne se lit plus. */
+  const raisonHTML = (d.raison && st !== "online")
+    ? `<div class="card-note">⚠ ${escapeHtml(String(d.raison))}</div>` : "";
   let body;
   if (t.build){
     body = `<div class="note">Pas encore en ligne</div>`;
   } else if (t.voyantOnly){
-    body = `<div class="note">${st==="online"?"En ligne":st==="offline"?"Hors ligne":"—"} · voyant seul</div>`;
+    body = `<div class="note">${st==="online"?"En ligne":st==="offline"?"Hors ligne":"—"} · voyant seul</div>${raisonHTML}`;
   } else {
     // Filet : une fiche outil mal remplie (metrics oublié) ne doit JAMAIS
     // pouvoir tuer tout le rendu de la page — cf. l'incident Grind ci-dessus.
@@ -3124,7 +3137,7 @@ function cardHTML(t, data){
     }).join("");
     // `note` = un état à faire ressortir (ex : « EN PAUSE »), envoyé par le cerveau.
     const note = d.note ? `<div class="card-note">🛑 ${escapeHtml(String(d.note))}</div>` : "";
-    body = `${note}<div class="metrics">${m}</div>`;
+    body = `${note}${raisonHTML}<div class="metrics">${m}</div>`;
   }
   const restartBtn = (t.restart && TOKEN) ? `<button class="restart-btn" data-restart="${escapeHtml(t.restart)}" data-restartname="${escapeHtml(t.name)}" title="Redémarrer ce bot">🔄 Redémarrer</button>` : "";
   // `links` = plusieurs destinations pour un même outil (ex : les 2 fournisseurs

@@ -1512,4 +1512,62 @@ const V=verifie;
   }
 }
 
+
+// ══ 31. LA RAISON D'UNE PANNE ETAIT ENVOYEE ET JAMAIS AFFICHEE ═══════════════
+// Le cerveau calcule, pour chaque outil en panne, une raison PRECISE
+// (« planificateur arrete (plus rien depuis 40 min) », « drive (no auth) »,
+// « base de donnees injoignable ») et son commentaire dit pourquoi : « hors
+// ligne » tout court envoie chercher au mauvais endroit quand le service REPOND
+// mais que son TRAVAIL est arrete.
+// Elle arrivait bien dans la carte (`d.raison`)... et RIEN ne la lisait : une
+// pastille rouge, sans un mot. Une mesure juste, avec personne au bout du fil.
+{
+  const b = morceau("function cardHTML(t, data){", "function inWorld(");
+  const faire = () => new Function(
+    "PINS","TOKEN","escapeHtml","statusClass","deltaHTML","sparkSVG","fmtInt",
+    b + "; return cardHTML;")(
+      [], "jeton",
+      (x) => String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),
+      (s) => s==="online"?"on":s==="offline"?"off":s==="warn"?"warn":"",
+      () => "", () => "", (v) => String(v));
+
+  const carte = (outil, etat) => faire()(outil, { "x": etat });
+  const OUTIL = { id:"x", name:"Truc", icon:"T", metrics:[{k:"a",l:"A",f:v=>String(v)}] };
+
+  {
+    const h = carte(OUTIL, { status:"offline", raison:"planificateur arrete (plus rien depuis 40 min)", metrics:{} });
+    V("outil en panne : la raison s affiche",
+      /planificateur arrete/.test(h) && /plus rien depuis 40 min/.test(h),
+      "pastille rouge sans un mot : " + h.slice(0, 160));
+  }
+  {
+    const h = carte(OUTIL, { status:"warn", raison:"drive (no auth configured)", metrics:{} });
+    V("etat orange aussi", /no auth configured/.test(h), h.slice(0, 160));
+  }
+  {
+    // ... mais PAS quand tout va bien : un bandeau permanent ne se lit plus.
+    const h = carte(OUTIL, { status:"online", raison:"peu importe", metrics:{} });
+    V("outil en ligne : aucune raison affichee", !/peu importe/.test(h), h.slice(0, 160));
+  }
+  {
+    // Carte « voyant seul » (Grind) : elle n a pas de metriques, la raison doit
+    // quand meme apparaitre -- sinon les outils les plus muets restent muets.
+    const h = carte({ id:"x", name:"Grind", icon:"G", voyantOnly:true },
+                    { status:"offline", raison:"base de donnees injoignable" });
+    V("carte « voyant seul » : la raison s affiche aussi",
+      /base de donnees injoignable/.test(h), h.slice(0, 160));
+  }
+  {
+    // Une raison vient du reseau : elle doit etre echappee comme tout le reste.
+    const h = carte(OUTIL, { status:"offline", raison:"<img src=x onerror=alert(1)>", metrics:{} });
+    V("la raison est echappee (elle vient du reseau)",
+      !/<img/.test(h) && /&lt;img/.test(h), h.slice(0, 200));
+  }
+  {
+    // Sans raison, rien ne doit casser ni apparaitre.
+    const h = carte(OUTIL, { status:"offline", metrics:{} });
+    V("pas de raison : la carte se rend quand meme", typeof h === "string" && h.length > 10);
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
