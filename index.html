@@ -3593,12 +3593,12 @@ async function doLogin(){
   const user=($("#pwUser")?$("#pwUser").value.trim().toLowerCase():""), input=$("#pw").value.trim();
   if(!input){ $("#pwErr").textContent="Entre ton mot de passe."; return; }
   const go=$("#pwGo"); go.disabled=true; go.textContent="…"; $("#pwErr").textContent="";
-  let tok="", who=null, name="", motif="", role=null;
+  let tok="", who=null, name="", motif="", role=null, noms=null;
   try{
     // `role` : le serveur dit maintenant s'il s'agit du patron ou d'un compte
     // associé. Avant, tout le monde recevait le MÊME jeton tout-puissant.
     const r=await fetch(HUB_BASE+"/api/hub/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:user, password:input})});
-    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; role=j.role||null; if(!who){ who=whoFromUser(j.username||user); } } }
+    if(r.ok){ const j=await r.json(); if(j.token){ tok=j.token; who=j.who||null; name=j.name||""; role=j.role||null; noms=j.noms||null; if(!who){ who=whoFromUser(j.username||user); } } }
     // ⚠️ Dire la VÉRITÉ sur la cause. Avant, toute panne (trop de tentatives,
     // cerveau injoignable, coupure réseau) s'affichait « mot de passe
     // incorrect » : on cherchait un problème de mot de passe qui n'existait pas,
@@ -3612,6 +3612,8 @@ async function doLogin(){
   if(!who) who=whoFromUser(user);
   if(who){ WHO=who; localStorage.setItem("ccn_who",WHO); TK_VIEW=WHO; localStorage.setItem("ccn_tkview",WHO); fillMe(); const s=$("#taskDest"); if(s) s.value=WHO; }
   if(name){ localStorage.setItem("ccn_name",name); }   // CURRENT_USER retiré : écrit, jamais lu
+  appliquerNoms(noms);   // les prénoms viennent du serveur, plus du code (dépôt public)
+  try{ if(typeof fillMe==="function") fillMe(); if(typeof tkRender==="function") tkRender(); }catch(e){}
   // ⚠️ Le serveur REFUSE désormais Telegram, la paie et toute écriture à un
   // compte associé (403). Sans ça, l'écran tenterait ces appels et afficherait
   // des pannes là où il s'agit d'un refus normal. On bascule donc en vue associé
@@ -6860,19 +6862,24 @@ async function loadTip(force){
 { const _t=$("#tipRefresh"); if(_t) _t.onclick=()=>loadTip(true); }
 
 /* ---------- tâches d'équipe (3 listes + tags, sync serveur) ---------- */
-// ⚠️ LA SEULE LIGNE DE CE FICHIER QUI PORTE ENCORE LE PRÉNOM D'UN TIERS.
-// Elle est FONCTIONNELLE : `whoFromUser()` rapproche le nom d'utilisateur de
-// connexion de l'une de ces deux entrées pour savoir à qui appartient la
-// colonne de tâches. La remplacer par « Moi / Associée » casserait ce
-// rapprochement pour la personne qui se connecte.
-// Tout le reste du fichier a été anonymisé le 12/09 (90 lignes : démo,
-// commentaires, exemples, fixtures) parce que ce dépôt est PUBLIC et que la
-// page entière est servie sur fadeflux.github.io — mesuré, 1,17 Mo téléchargés
-// sans compte ni jeton.
-// Celle-ci ne peut pas l'être de la même façon : elle demande de sortir le
-// dépôt du public, ou de faire venir les noms du serveur (qui les connaît déjà,
-// via HUB_USERS, derrière le jeton).
-const NAMES = { moi:"Andre", other:"Manon" };   // Noctra ; côté Shinra = { moi:"Andre", other:"Ghoulz" }
+// ⚠️ PLUS AUCUN PRÉNOM ÉCRIT ICI — ce dépôt est PUBLIC et la page entière est
+// servie à qui la demande (mesuré le 12/09 : 1,17 Mo téléchargés sans compte ni
+// jeton). Cette ligne portait le prénom de l'opérateur ET celui de son associée.
+// On ne pouvait pas seulement les effacer : ils servent d'étiquettes au tableau
+// des tâches. Ils arrivent donc du serveur, à la connexion, derrière le mot de
+// passe — `HUB_USERS` les porte déjà, il n'y a rien de nouveau à configurer.
+// Tant qu'on n'est pas connecté, l'écran dit « Moi » / « Associé(e) » : c'est
+// une étiquette honnête, pas un faux nom.
+const NAMES = { moi:"Moi", other:"Associé(e)" };
+function appliquerNoms(n){
+  if(!n || typeof n!=="object") return;
+  if(n.moi)   NAMES.moi   = String(n.moi);
+  if(n.autre) NAMES.other = String(n.autre);
+  try{ localStorage.setItem("ccn_noms", JSON.stringify({moi:NAMES.moi, autre:NAMES.other})); }catch(e){}
+}
+// Au chargement : on reprend ce que la dernière connexion avait appris, pour ne
+// pas afficher « Associé(e) » pendant une seconde à chaque ouverture.
+try{ appliquerNoms(JSON.parse(localStorage.getItem("ccn_noms")||"null")); }catch(e){}
 const AVATARS = { moi:"🧑‍💻", other:"🧑‍🚀" };
 // Identité = login : le nom d'utilisateur est rapproché de NAMES ci-dessus
 // (dérivé du nom d'utilisateur si le serveur ne le donne pas). Les identifiants
@@ -14279,7 +14286,7 @@ function toggleConvo(){
    disent rien de l'argent, et les réenregistrer à chaque connexion serait pénible.
    Les listes en attente d'envoi sont vérifiées AVANT : partir avec de l'argent
    tapé et non envoyé, c'est le perdre. */
-const _CLES_SENSIBLES = ["ccn_token","ccn_role","ccn_who","ccn_name",
+const _CLES_SENSIBLES = ["ccn_token","ccn_role","ccn_who","ccn_name","ccn_noms",
   "ccn_payments","ccn_costs","ccn_tgrev","ccn_va_notes","ccn_decisions","ccn_rules",
   "ccn_lastdata","ccn_split","ccn_assoc","ccn_assoc_prevhide","ccn_manager_va",
   "ccn_goal","ccn_obj_goal","ccn_onlychat_goal","ccn_tax_rate","ccn_reminders","ccn_todos"];
