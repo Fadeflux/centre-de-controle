@@ -10108,7 +10108,7 @@ function majMorningChiffres(){
   zone.innerHTML=mnMoneyHtml();
   const et=$("#mnEtatRev"); if(et) et.innerHTML=mnBanniereRevenus();
   const vb=$("#mnVerdictBox");
-  if(vb){ const v=paceVerdict(); vb.innerHTML=v?`<div class="mn-verdict ${v.up?"up":"dn"}">${v.text}</div>`:""; }
+  if(vb){ const v=paceVerdict(); vb.innerHTML=v?`<div class="mn-verdict ${v.up?"up":"dn"}">${escapeHtml(v.text)}</div>`:""; }
   // Même animation qu'au premier rendu, mais seulement quand un vrai chiffre existe.
   const _tg=(typeof tgMonthTotal==="function")?tgMonthTotal():0;
   const mv=$("#mnMoney");
@@ -12007,7 +12007,7 @@ function renderActions(){
   if(cnt) cnt.textContent=String(A.length);
   const sevCls=["info","med","high","crit"];
   LAST_ACTIONS=A;
-  box.innerHTML=A.map((a,i)=>`<div class="act-wrap"><button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>${a.quick?`<button class="act-quick" data-qk="${i}">${a.quick.label}</button>`:""}</div>`).join("");
+  box.innerHTML=A.map((a,i)=>`<div class="act-wrap"><button class="act-row sev-${sevCls[a.sev]||'med'}" data-jump="${a.panel}"><span class="act-ico">${a.icon}</span><span class="act-txt">${escapeHtml(a.text)}</span><span class="act-go">→</span></button>${a.quick?`<button class="act-quick" data-qk="${i}">${escapeHtml(a.quick.label)}</button>`:""}</div>`).join("");
 }
 // 🎛️ TUILES DE L'ESSENTIEL AU CHOIX. Le catalogue ci-dessous liste tout ce
 // qu'on SAIT afficher ; André coche celles qu'il veut (✎, 2 à 4) et l'ordre

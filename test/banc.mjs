@@ -1570,4 +1570,56 @@ const V=verifie;
   }
 }
 
+
+// ══ 32. AUCUN TEXTE N'ENTRE DANS DU HTML SANS ETRE ECHAPPE ═══════════════════
+// Audit securite du 12/09. Verdict : PAS de faille -- le texte des actions est
+// bien echappe, et les libelles des boutons rapides sont des chaines ecrites en
+// dur (« 💸 Payer », « 👤 Fiche »).
+// MAIS le point d'insertion, lui, ne l'etait pas : le jour ou quelqu'un rend un
+// libelle dynamique (`label: "👤 " + f.va`), la faille nait SANS UN MOT. Un nom
+// de VA vient d'un nom de lien, et ce sont les VA qui creent leurs liens.
+// Ce banc ferme la porte avant qu'on l'ouvre.
+{
+  const src4 = fs.readFileSync(FICH, "utf8");
+  const ligneActions = src4.split("\n").find(l => l.includes('class="act-quick"'));
+  V("le rendu des actions est bien la", !!ligneActions);
+  if (ligneActions) {
+    V("le libelle du bouton rapide est echappe",
+      /escapeHtml\(a\.quick\.label\)/.test(ligneActions),
+      "un libelle dynamique deviendrait une injection : " + ligneActions.slice(0, 140));
+    V("... et le texte de l action aussi",
+      /escapeHtml\(a\.text\)/.test(ligneActions), ligneActions.slice(0, 140));
+  }
+
+  // Le meme controle, generalise : dans TOUTE insertion `innerHTML`, une
+  // expression qui lit un champ de TEXTE venu du reseau doit passer par
+  // `escapeHtml`. On ne regarde que les champs qui portent du texte libre --
+  // un nombre ou une classe CSS ne peut rien injecter.
+  const CHAMPS = /\.\s*(va|name|nom|link_name|title|body|fan|username|pseudo|raison|note|text|label)\b/;
+  const nus = [];
+  src4.split("\n").forEach((l, n) => {
+    const t = l.trim();
+    if (t.startsWith("//") || t.startsWith("*")) return;
+    if (!l.includes("innerHTML") && !l.includes("insertAdjacentHTML")) return;
+    const m = l.match(/\$\{[^{}]*\}/g) || [];
+    m.forEach((e) => {
+      if (!CHAMPS.test(e)) return;
+      if (/escapeHtml\(|esc\(|encodeURIComponent\(/.test(e)) return;
+      // `t.name` vient de TOOLS, une constante ecrite dans la page : rien de
+      // reseau la-dedans. On l'exempte NOMMEMENT plutot que d'elargir la regle.
+      if (/t\.name/.test(e) && /off\.map/.test(l)) return;
+      nus.push("l." + (n + 1) + " " + e.slice(0, 70));
+    });
+  });
+  V("aucun texte reseau n entre dans du HTML sans echappement",
+    nus.length === 0,
+    "a verifier a la main : " + nus.join(" | "));
+
+  // Le controle doit savoir echouer, sinon il est inerte.
+  const faux = 'el.innerHTML = `<b>${d.va}</b>`;';
+  V("... et le controle attrape bien une insertion nue",
+    CHAMPS.test("${d.va}") && !/escapeHtml\(/.test(faux),
+    "le controle ne reconnait plus la forme qu il surveille");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
