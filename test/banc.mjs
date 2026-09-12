@@ -1309,4 +1309,46 @@ const V=verifie;
   }
 }
 
+
+// ══ 27. LA SONDE DES TACHES : 450 LECTURES DE BASE PAR HEURE ═════════════════
+// `/api/hub/tasks` lit la base a CHAQUE appel (aucun cache serveur, contrairement
+// aux autres routes qui servent un cache de 10 a 30 min). A 8 s, cela faisait 450
+// requetes par heure d'onglet ouvert, pour un tableau qui bouge quelques fois par
+// jour et qui n'est qu'un panneau sur 80.
+// Ce qu'on verifie : on espace QUAND ON NE REGARDE PAS, et jamais au prix de la
+// reactivite -- sinon la « correction » ferait attendre une carte deplacee.
+{
+  const b = morceau("function tkDoitSonder(tick, maintenant){", "let TK_TICK=0;");
+  const faire = (regarde, derniereEdition) => new Function("tkRegarde","TK_LAST_EDIT",
+    b + "; return tkDoitSonder;")(() => regarde, derniereEdition);
+
+  const T = 1757700000000;
+  {
+    const f = faire(true, 0);
+    V("panneau REGARDE : on sonde a chaque tour (8 s)",
+      [1,2,3,4,5,6,7].every(t => f(t, T) === true));
+  }
+  {
+    const f = faire(false, 0);
+    const sondes = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].filter(t => f(t, T));
+    V("panneau pas regarde : on espace a un tour sur huit",
+      sondes.length === 2 && sondes[0] === 8 && sondes[1] === 16, JSON.stringify(sondes));
+  }
+  {
+    // LE CONTROLE QUI COMPTE : espacer ne doit pas faire attendre ce qu'on vient
+    // de taper. Une carte deplacee a l'instant part au tour suivant.
+    const f = faire(false, T - 3000);
+    V("une modification recente part tout de suite, meme panneau ferme",
+      f(3, T) === true);
+    const g = faire(false, T - 120000);
+    V("... mais une modification VIEILLE ne rouvre pas le robinet",
+      g(3, T) === false, "sinon on repart a 450 lectures par heure");
+  }
+  {
+    // Le controle doit savoir dire NON, sinon il est inerte.
+    const f = faire(false, 0);
+    V("le controle sait refuser (il n est pas inerte)", f(1, T) === false);
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

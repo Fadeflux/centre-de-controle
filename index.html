@@ -7045,7 +7045,37 @@ async function syncTasks(){
     if(m.localWins && Date.now()-TK_LAST_EDIT>1500){ fetch(HUB_BASE+"/api/hub/tasks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({tasks:TASKS})}).catch(()=>{}); }
   }catch(e){}
 }
-setInterval(syncTasks, 8000);
+/* ⚠️ 450 LECTURES DE BASE PAR HEURE POUR UN TABLEAU QU'ON NE REGARDE PAS.
+   Mesuré : `/api/hub/tasks` lit la base à CHAQUE appel (aucun cache serveur,
+   contrairement aux autres routes qui servent un cache de 10 à 30 min). À 8 s,
+   ça fait 450 requêtes par heure d'onglet ouvert — pour un tableau qui bouge
+   quelques fois par jour, et qui n'est qu'un panneau sur quatre-vingts : la
+   plupart du temps il n'est même pas à l'écran.
+
+   On garde les 8 s quand on le REGARDE (c'est là qu'on veut voir arriver ce
+   qu'on vient de taper sur le téléphone) et quand on vient d'y toucher ; sinon
+   on espace à ~64 s. Rien ne change pour l'utilisateur, la base souffle.
+   `syncTasks` se tait déjà tout seul quand l'onglet est en arrière-plan. */
+function tkRegarde(){
+  try{
+    const el=$("#tasks"); if(!el) return false;
+    if(el.offsetParent===null) return false;          // panneau masqué ou replié
+    const r=el.getBoundingClientRect();
+    return r.bottom>0 && r.top<(window.innerHeight||0);
+  }catch(e){ return true; }                           // dans le doute, on sonde
+}
+/* La décision est une fonction nommée pour être vérifiable au banc : inline,
+   personne ne saurait dire si les trois échappatoires tiennent encore. */
+function tkDoitSonder(tick, maintenant){
+  if(tkRegarde()) return true;                        // on le regarde : 8 s
+  if(maintenant - TK_LAST_EDIT < 30000) return true;  // on vient d'y toucher
+  return (tick % 8) === 0;                            // sinon, ~64 s
+}
+let TK_TICK=0;
+setInterval(function(){
+  TK_TICK++;
+  if(tkDoitSonder(TK_TICK, Date.now())) syncTasks();
+}, 8000);
 function addTask(){
   const t=$("#taskText"), g=$("#taskTags"), d=$("#taskDest"), rp=$("#taskRepeat");
   const text=(t.value||"").trim(); if(!text) return;
