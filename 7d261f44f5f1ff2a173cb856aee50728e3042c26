@@ -1,0 +1,10 @@
+Precision : l'exemple a disparu du message (le shell a interprete les accents
+graves comme une commande). La phrase se lit :
+
+  « Le jour ou quelqu'un rend un libelle dynamique -- par exemple
+    label: "👤 " + f.va  au lieu de  label: "👤 Fiche"  -- la faille nait
+    SANS UN MOT. »
+
+C'est tout l'enjeu : le nom de VA vient du NOM DU LIEN, et ce sont les VA qui
+creent leurs liens eux-memes. La chaine est complete de leur clavier jusqu'au
+HTML du centre de controle.
