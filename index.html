@@ -684,7 +684,7 @@
        par aucun formateur d'argent : c'est le seul endroit du fichier où des
        montants serveur sortent sans `money()` ni test de `HIDE` ;
      • #classement porte « 🎭 Hors classement », d'où l'on ouvre la fiche de tes
-       comptes perso (Bot, Clhoe) — la fiche dit elle-même « visible seulement
+       comptes perso (les deux, hors equipe) — la fiche dit elle-même « visible seulement
        ici et dans le serveur privé CEO » ;
      • #rachat affiche le brut par fan dans une infobulle (attribut `title`),
        que le masquage du texte visible ne couvre pas. */
@@ -1645,7 +1645,7 @@
   .rn-total{border-top:1px solid var(--line-2);margin-top:2px;padding-top:11px;font-weight:700;font-size:15px}
   .rn-proj{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.6}
   .rn-proj b{color:var(--text);font-weight:600}
-  /* Comparateur de modèles (Layla vs Zoe) */
+  /* Comparateur de modèles (Nova vs Iris) */
   .vs-sel{margin-left:auto;display:inline-flex;gap:8px;flex-wrap:wrap}
   .vs-sel select{font:inherit;font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
   .vs-sel select:focus{border-color:var(--acc)}
@@ -2104,7 +2104,7 @@
     <div class="logo"><svg viewBox="0 0 100 100" fill="none"><defs><linearGradient id="lunev" x1="0.2" y1="0" x2="0.45" y2="1"><stop offset="0" stop-color="#cfd4e8" stop-opacity=".5"/><stop offset="1" stop-color="#cfd4e8" stop-opacity=".03"/></linearGradient></defs><g transform="rotate(-15 50 50)"><path d="M 66 12 A 39 39 0 1 0 66 88 A 35 35 0 1 1 66 12 Z" fill="url(#lunev)"/><path d="M 66 12 A 39 39 0 1 0 66 88" stroke="#b9bfdd" stroke-width="3" stroke-linecap="round" fill="none"/></g></svg></div>
     <h2>Centre de contrôle</h2>
     <p>Connecte-toi pour voir tes chiffres.</p>
-    <input id="pwUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Identifiant (andre / manon)" />
+    <input id="pwUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Identifiant" />
     <input id="pw" type="password" inputmode="text" autocomplete="current-password" placeholder="Mot de passe" />
     <button id="pwGo">Entrer</button>
     <div class="err" id="pwErr"></div>
@@ -2846,8 +2846,8 @@
     <div class="al-head">🛡️ Anti-Leak <span class="al-tag">protège le contenu de tes modèles</span></div>
     <div class="al-intro">Ajoute chaque modèle avec <b>tous ses pseudos</b> (lien OnlyFans, @Instagram, nom de scène…). Le radar cherche en boucle si son contenu fuite sur le web, te prévient ici avec les détails, et envoie le retrait DMCA automatiquement.</div>
     <div class="al-add">
-      <input id="alName" placeholder="Modèle (ex : Layla)" autocomplete="off" />
-      <input id="alAlias" placeholder="Pseudos séparés par virgules (onlyfans.com/layla, @layla_ig, Layla Rose)" autocomplete="off" />
+      <input id="alName" placeholder="Modèle (ex : Nova)" autocomplete="off" />
+      <input id="alAlias" placeholder="Pseudos séparés par virgules (onlyfans.com/nova, @nova_ig, Nova Rose)" autocomplete="off" />
       <button class="act al-btn" id="alAdd">＋ Surveiller</button>
       <button class="act al-btn" id="alScan" title="Chercher maintenant, sans attendre le prochain passage automatique">🔍 Scanner</button>
     </div>
@@ -3052,7 +3052,7 @@ const TOOLS = [
 
 /* Démo (tant que le cerveau n'est pas activé) — avec tendances + courbes. */
 const DEMO = {
-  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]},vas:[{va:"Welzy",subs:120,pay:60},{va:"Prince",subs:88,pay:44},{va:"Yohan",subs:66,pay:33}]},
+  "stats-tracker":{status:"online",metrics:{subsQuinzaine:274,aPayer:137},prev:{subsQuinzaine:241,aPayer:120.5},series:{subsQuinzaine:[28,35,19,42,31,45,18]},vas:[{va:"Nael",subs:120,pay:60},{va:"Milo",subs:88,pay:44},{va:"Sacha",subs:66,pay:33}]},
   "clipfusion-perso":{status:"online",metrics:{drives7d:128,views7d:2400000},series:{views7d:[280000,310000,350000,300000,410000,390000,360000]}},
   "noctra-finance":{status:"online",metrics:{profitMonth:1640,subs:188}},
   "noctra-ig-worker":{status:"online",metrics:{postsJour:9,comptesActifs:12,comptesKo:0,alertesATraiter:0},prev:{postsJour:7},series:{postsJour:[4,7,9,12,10,8,9]}},
@@ -4105,11 +4105,11 @@ async function loadOnlyChat(){
   // ⭐⭐ COURSE D'ARRIVÉE — bug d'ARGENT (corrigé le 2026-08-07).
   // loadAll() lance tous les chargeurs EN PARALLÈLE. Les panneaux qui comptent
   // l'argent Telegram (camembert « D'où vient l'argent », rentabilité, partage
-  // Ma part/Manon, « Mon année », tuile « Net du mois ») sont dessinés par
+  // Ma part/Ava, « Mon année », tuile « Net du mois ») sont dessinés par
   // renderOM() — donc par le chargeur OnlyMonster. Quand OnlyChat arrivait
   // APRÈS OnlyMonster (fréquent), ces panneaux étaient déjà dessinés SANS
   // Telegram, et renderOnlyChat() ne les rappelait pas : le camembert perdait
-  // « 📲 Layla » / « 📲 Zoe », et surtout le PROFIT et le PARTAGE étaient
+  // « 📲 Nova » / « 📲 Iris », et surtout le PROFIT et le PARTAGE étaient
   // calculés en oubliant les revenus Telegram du mois.
   // On redessine donc tout ce qui dépend de cet argent dès qu'il arrive.
   try{
@@ -4198,7 +4198,7 @@ function renderOcChart(d){
     <div class="cj-days">${days}</div>
     ${best.total>0?`<div class="sv-note">🏆 Meilleur jour : <b>${fr(best.date)}</b> — ${tgMoney(best.total)}.</div>`:""}`;
 }
-// 🆚 Layla vs Zoe (ou tout modèle configuré) : qui convertit le mieux sur
+// 🆚 Nova vs Iris (ou tout modèle configuré) : qui convertit le mieux sur
 // Telegram, d'après le taux d'ouverture des PPV (unlockRatio par modèle).
 // 🏆 Classement des scripts par revenu (top 5, mois en cours) — la version
 // compacte de "Scripts Analytics" côté OnlyChat : le classement seul, pas le
@@ -5316,7 +5316,7 @@ function savePaieRoles(){
   if(old){ if(MANAGERS.indexOf(old)<0){ MANAGERS.push(old); pcRoleSave("ccn_managers",MANAGERS); } try{ localStorage.removeItem("ccn_manager_va"); }catch(_){} } }
 function pcToggleRole(list,key,va){ const i=list.indexOf(va); if(i<0) list.push(va); else list.splice(i,1); pcRoleSave(key,list); savePaieRoles(); }
 // Montant AVEC les centimes (0,5 $) — fmtMoney arrondit à l'entier et cachait
-// les demi-dollars du tarif à 0,50 $/sub (Prince 31,5 affiché « 32 »).
+// les demi-dollars du tarif à 0,50 $/sub (Milo 31,5 affiché « 32 »).
 function pcMoney(v){ if(HIDE) return "••• $"; const n=Math.round((Number(v)||0)*100)/100; return n.toLocaleString("fr-FR",{maximumFractionDigits:2}) + " $"; }
 // Renvoie true si la lecture a réussi — le bouton 🔄 s'en sert pour DIRE si ça a
 // marché. Avant : il rechargeait en silence, exactement le « le rafraîchir fait
@@ -5533,7 +5533,7 @@ function renderPaieCumul(){
   // ✏️ LE JOURNAL SE LIT MAIS NE SE CORRIGE PAS — alors que le serveur sait le
   // faire depuis longtemps (POST /api/hub/pay-history/correct, avec verrou et
   // trace honnête de l'ancienne valeur). Il n'avait simplement aucun bouton.
-  // Cas réel déjà vécu : 192 abonnés payés à Yohan, le clic en compte 199 (7
+  // Cas réel déjà vécu : 192 abonnés payés à Sacha, le clic en compte 199 (7
   // arrivés entre l'observation et le clic). Le repère se corrigeait, le
   // journal gardait « +199 » — c'est-à-dire que le registre censé servir à
   // repérer un bug affichait le bug.
@@ -5556,7 +5556,7 @@ function renderPaieCumul(){
     + `<div class="pcumul-tip">💡 « Payer » avance la base au cumul du jour et prévient le VA du montant dans son ticket. Un clic sur « base » corrige un chiffre faux.</div>`
     + `<details class="pay-hist"><summary>📜 Historique des versements (pour repérer un bug)</summary><div class="pay-h-list">${H}</div></details>`;
   // … et on remet ce qui était tapé. C'est ici que se joue la différence entre
-  // « Layla touche 200 $ » et « Layla touche 150 $ ».
+  // « Nova touche 200 $ » et « Nova touche 150 $ ».
   pcRestaurerSaisies(_saisies);
 }
 $("#pcumulBody").addEventListener("click", async e=>{
@@ -6078,7 +6078,7 @@ function renderConcentration(){
   // 🏔️ LE SOCLE — « si j'arrête de recruter demain, il me reste combien ? »
   // Trois sources d'argent des 30 derniers jours ne demandent AUCUNE paie :
   //   · les abonnés déjà acquis d'un VA qui n'en a ramené aucun sur la fenêtre ;
-  //   · `ancienVa` — ⚠️ ce sont les comptes PERSO (Bot/Clhoe), PAS des gens partis
+  //   · `ancienVa` — ⚠️ ce sont les comptes PERSO (comptes perso), PAS des gens partis
   //     (piège déjà documenté) : on les nomme correctement ;
   //   · `horsVa` — les fans venus sans aucun lien de tracking.
   // C'est un PLANCHER : un VA actif encaisse aussi de ses vieux abonnés, ce qu'on
@@ -6415,7 +6415,7 @@ function renderCohortes(){
   // Toutes les valeurs d'argent d'ici sont des DÉPENSES DE FANS mesurées sur
   // OnlyFans, donc du BRUT (avant la commission de 20 %). Or « À faire »
   // (renderRecos) et la fiche VA affichent exactement le même chiffre en NET, et
-  // l'étiquettent « net ». André lisait donc « Yohan 3,40 $ » ici et
+  // l'étiquettent « net ». André lisait donc « Sacha 3,40 $ » ici et
   // « ses fans dépensent 2,72 $ net » deux panneaux plus bas — sans savoir lequel
   // croire. On convertit au FORMATEUR, une fois, pour que rien ne puisse
   // l'oublier (même principe que `fmtLtv`), et on l'étiquette.
@@ -6494,7 +6494,7 @@ function renderRecos(){
     const q=qual.find(x=>x.va===v.va);
     const share=(Number(v.monthSubs)||0)/totMs;
     // 1) Gros volume mais fans à faible dépense -> coacher le ciblage.
-    // Seuil 0,5 (pas 0,4) : Yohan à 1,37 $ vs 3,40 $ de moyenne (40 %) ratait le
+    // Seuil 0,5 (pas 0,4) : Sacha à 1,37 $ vs 3,40 $ de moyenne (40 %) ratait le
     // seuil de 0,01 $ — exactement le cas que ce panneau existe pour montrer.
     if(q&&teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&share>=0.15){
       // ⚠️ `q.avg` et `teamAvg` sont des dépenses de fans, donc du BRUT. Cette
@@ -6504,7 +6504,7 @@ function renderRecos(){
       recos.push({p:1,ico:"🎯",act:`Coache ${v.va} sur le ciblage`,why:`Il amène beaucoup de monde (${Math.round(share*100)}% des subs du mois) mais ses fans dépensent ${money((Number(q.avg)||0)*netRate())} net vs ~${money((Number(teamAvg)||0)*netRate())} en moyenne. Mieux cibler = beaucoup plus d'argent, sans plus de volume.`,va:v.va});
     }
     // 2) Fans de grande qualité mais peu de part -> lui donner plus de trafic.
-    // 8 fans suffisent quand l'écart est net (Welzy : 22,75 $ vs 3,40 $ = ×6,7)
+    // 8 fans suffisent quand l'écart est net (Nael : 22,75 $ vs 3,40 $ = ×6,7)
     // et 30 % de part : à 26 % on veut ENCORE pousser un VA pareil.
     if(q&&teamAvg>0&&(Number(q.avg)||0)>=teamAvg*1.5&&share<0.30&&(Number(q.fans)||0)>=8){
       recos.push({p:1,ico:"🚀",act:`Donne plus de trafic à ${v.va}`,why:`Ses fans dépensent ${money((Number(q.avg)||0)*netRate())} net (${Math.round((q.avg/teamAvg)*100)/100>=2?"plus du double":"bien plus"} que la moyenne ~${money((Number(teamAvg)||0)*netRate())}) mais il ne fait que ${Math.round(share*100)}% du volume. Chaque sub qu'il amène vaut plus.`,va:v.va});
@@ -6829,7 +6829,7 @@ $("#ask").addEventListener("click",e=>{ const b=e.target.closest("[data-bilan]")
     if(listening){ try{ rec.stop(); }catch(e){} return; }
     rec = new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
     rec.onstart=()=>{ listening=true; mic.classList.add("on"); mic.textContent="🔴"; $("#askInput").placeholder="Parle…"; };
-    rec.onend=()=>{ listening=false; mic.classList.remove("on"); mic.textContent="🎤"; $("#askInput").placeholder="Ex : ajoute une tâche à Manon, ou : redémarre le bot SMS"; };
+    rec.onend=()=>{ listening=false; mic.classList.remove("on"); mic.textContent="🎤"; $("#askInput").placeholder="Ex : ajoute une tâche à Ava, ou : redémarre le bot SMS"; };
     rec.onresult=(e)=>{ const txt=e.results[0][0].transcript; $("#askInput").value=txt; doAsk(txt); };
     try{ rec.start(); }catch(e){ listening=false; }
   };
@@ -6860,9 +6860,23 @@ async function loadTip(force){
 { const _t=$("#tipRefresh"); if(_t) _t.onclick=()=>loadTip(true); }
 
 /* ---------- tâches d'équipe (3 listes + tags, sync serveur) ---------- */
+// ⚠️ LA SEULE LIGNE DE CE FICHIER QUI PORTE ENCORE LE PRÉNOM D'UN TIERS.
+// Elle est FONCTIONNELLE : `whoFromUser()` rapproche le nom d'utilisateur de
+// connexion de l'une de ces deux entrées pour savoir à qui appartient la
+// colonne de tâches. La remplacer par « Moi / Associée » casserait ce
+// rapprochement pour la personne qui se connecte.
+// Tout le reste du fichier a été anonymisé le 12/09 (90 lignes : démo,
+// commentaires, exemples, fixtures) parce que ce dépôt est PUBLIC et que la
+// page entière est servie sur fadeflux.github.io — mesuré, 1,17 Mo téléchargés
+// sans compte ni jeton.
+// Celle-ci ne peut pas l'être de la même façon : elle demande de sortir le
+// dépôt du public, ou de faire venir les noms du serveur (qui les connaît déjà,
+// via HUB_USERS, derrière le jeton).
 const NAMES = { moi:"Andre", other:"Manon" };   // Noctra ; côté Shinra = { moi:"Andre", other:"Ghoulz" }
 const AVATARS = { moi:"🧑‍💻", other:"🧑‍🚀" };
-// Identité = login : "andre" -> moi, "manon" -> other (dérivé du nom d'utilisateur si le serveur ne le donne pas)
+// Identité = login : le nom d'utilisateur est rapproché de NAMES ci-dessus
+// (dérivé du nom d'utilisateur si le serveur ne le donne pas). Les identifiants
+// eux-mêmes ne sont PAS écrits ici : ce fichier est servi publiquement.
 function whoFromUser(u){ const ul=String(u||"").toLowerCase().trim(); for(const k in NAMES){ if((NAMES[k]||"").toLowerCase()===ul) return k; } return null; }
 function fillMe(){ try{ const w=(typeof WHO!=="undefined")?WHO:"moi"; const el=document.getElementById("taskMeName"); if(el) el.textContent=NAMES[w]||"—"; const av=document.getElementById("taskMeAv"); if(av) av.textContent=AVATARS[w]||"🙂"; }catch(e){} }
 const TK_KEYS = ["moi","other","general"];
@@ -7230,7 +7244,7 @@ const OM_PERIODES = [
   {k:"j7",    t:"7 j",          court:"sur 7 jours"},
   {k:"today", t:"Aujourd'hui",  court:"aujourd'hui"},
 ];
-const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Layla:{net:300,subs:50},Zoe:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Layla:{net:380,subs:62},Zoe:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Layla:{net:350,subs:58},Zoe:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Layla:{net:450,subs:70},Zoe:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Layla:{net:90,subs:22},Zoe:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Layla:{net:578,subs:77},Zoe:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Layla:{net:578,subs:77,ltv:7.51,marge:540},Zoe:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Yohan",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Prince",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Chloe",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Welzy",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
+const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Nova:{net:300,subs:50},Iris:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Nova:{net:380,subs:62},Iris:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Nova:{net:350,subs:58},Iris:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Nova:{net:450,subs:70},Iris:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Nova:{net:90,subs:22},Iris:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Nova:{net:578,subs:77},Iris:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Nova:{net:578,subs:77,ltv:7.51,marge:540},Iris:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Sacha",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Milo",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Nyx",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Nael",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 // Ce que tu touches vraiment ≈ brut × 80 % (20 % OnlyFans). ⚠️ 2026-08-23 :
 // c'était 78 % (20 % OF + 2 % Skrill), mais André N'UTILISE PAS Skrill pour
 // Noctra — ces 2 % n'existent pas ici et rabotaient tous les chiffres nets.
@@ -7682,7 +7696,7 @@ function lireMontant(txt, opts) {
 //     DU MOIS — c'est la référence, avec le commentaire « perso exclu, sinon
 //     l'image partagée classait le #1… » ;
 //   • l'état des lieux imprimable (l.~7813) ne filtrait RIEN : un compte perso de
-//     l'opérateur (marqué `unpaid`, jamais payé — « Bot », « Clhoe ») pouvait
+//     l'opérateur (marqué `unpaid`, jamais payé — les comptes perso) pouvait
 //     être sacré « Meilleur VA du mois » sur une feuille qu'on imprime et qu'on
 //     montre ;
 //   • la « Revue de la SEMAINE » (l.~9627) ne triait même pas : elle décernait
@@ -7776,7 +7790,7 @@ function renderOM(){
   $("#omModels").innerHTML = ["all"].concat(models).map(m=>`<button data-om="${escapeHtml(m)}" class="${m===OM_MODEL?'on':''}">${m==="all"?"Tout":escapeHtml(m)}</button>`).join("");
   let net,subsMonth;
   // ⚠️ `net` reste NULL si le modele n'a pas de montant mesure (repli sans API) :
-  // le `||0` d'avant affichait « Net du mois · Layla : 0,00 $ » comme une mesure,
+  // le `||0` d'avant affichait « Net du mois · Nova : 0,00 $ » comme une mesure,
   // alors que la tuile LTV juste a cote affichait deja « — » sur la MEME source.
   if(OM_MODEL!=="all" && d.models[OM_MODEL]){ net=(d.models[OM_MODEL].net==null?null:d.models[OM_MODEL].net); subsMonth=d.models[OM_MODEL].subs||0; }
   else { net=d.totals.netMonth; subsMonth=d.totals.subsMonth; }
@@ -7804,7 +7818,7 @@ function renderOM(){
     ${(()=>{
       // ⚠️ CORRIGÉ le 2026-08-24 (captures d'André) : sur l'onglet d'un modèle,
       // ces trois tuiles affichaient les chiffres de TOUTE l'équipe — « Subs
-      // semaine : 332 » sur Layla ET sur Zoe. Sous un filtre, un chiffre non
+      // semaine : 332 » sur Nova ET sur Iris. Sous un filtre, un chiffre non
       // filtré se lit comme un chiffre filtré : c'est un mensonge involontaire.
       // Un vieux serveur n'envoie pas ces champs -> fmtInt affiche « — »,
       // jamais le chiffre d'équipe déguisé.
@@ -7844,16 +7858,16 @@ function renderOM(){
         return ` · <span class="${mpa>=0?'pos':'neg'}" title="Marge du mois ÷ abonnés payés. C'est le chiffre à comparer entre modèles : le total, lui, favorise toujours le plus gros.">${(mpa>=0?"+":"−")}${String(Math.abs(mpa)).replace(".",",")} $/abonné</span>`;
       })()}</div><div class="om-model-marge ${(ko||d.models[m].marge==null)?'':(d.models[m].marge>=0?'pos':'neg')}">Marge ${(ko||d.models[m].marge==null)?"—":(d.models[m].marge>=0?'+':'')+omMoney(d.models[m].marge,cur)}</div></div>`).join("")}</div>`:"";
   // Classement FILTRÉ par modèle : « Tout » = cumul de chaque VA (d.vas) ;
-  // « Layla »/« Zoe » = ce que chaque VA a fait SUR CE modèle uniquement.
+  // « Nova »/« Iris » = ce que chaque VA a fait SUR CE modèle uniquement.
   // ⚠️ Si le modèle sélectionné n'a pas de `.vas` (cerveau pas encore à jour), on
-  // NE retombe PAS sur le global sous un titre « sur Layla » (chiffres faux) :
+  // NE retombe PAS sur le global sous un titre « sur Nova » (chiffres faux) :
   // filtreDispo=false -> message dédié.
   const filtreDispo = (OM_MODEL==="all") || !!(d.models && d.models[OM_MODEL] && Array.isArray(d.models[OM_MODEL].vas));
   const modeleObj = (OM_MODEL!=="all" && d.models)?d.models[OM_MODEL]:null;
   // ⚠️ SUR UN ONGLET MODÈLE, LES PÉRIODES ÉTAIENT INTERDITES — parce que
   // `d.models[X].vas` (le classement par modèle) ne porte pas de fenêtres. Or
   // depuis le 2026-09-07 le flux principal `d.vas` ventile ses fenêtres par
-  // modèle : on peut donc répondre « sur Layla, sur 30 j, qui a encaissé ? ».
+  // modèle : on peut donc répondre « sur Nova, sur 30 j, qui a encaissé ? ».
   // ⚠️ CE QU'ON NE SAIT PAS, ET QU'ON N'INVENTERA PAS : la ventilation porte
   // l'ARGENT et les PAYEURS, pas les SUBS AMENÉS. Sur un onglet modèle + une
   // fenêtre, la colonne « subs amenés » n'existe donc pas — on l'enlève et on le
@@ -7866,7 +7880,7 @@ function renderOM(){
   // 📅 Fenêtre choisie. Deux garde-fous :
   //   • le détail par modèle n'a PAS de ventilation par fenêtre -> on force
   //     « Toujours » plutôt que d'afficher des colonnes vides (un 0 se lirait
-  //     comme « ce VA n'a rien ramené sur Layla en 7 j », ce qui serait faux) ;
+  //     comme « ce VA n'a rien ramené sur Nova en 7 j », ce qui serait faux) ;
   //   • le serveur peut être plus vieux que la page (déploiement en cours) : sans
   //     `periodes`, on le DIT au lieu d'afficher des zéros.
   // ⚠️ Disponibilité par FENÊTRE. Avant on ne testait que l'existence de l'objet
@@ -8085,8 +8099,8 @@ function renderOM(){
       +`</div>`;
   };
   // 🎭 « SUR QUEL MODÈLE ? » — demande d'André du 2026-09-07.
-  // Le panneau disait « Welzy 14 $ · 3 payeurs » sans jamais dire si c'était sur
-  // Zoe ou sur Layla. Un VA travaille souvent sur deux modèles : le total seul
+  // Le panneau disait « Nael 14 $ · 3 payeurs » sans jamais dire si c'était sur
+  // Iris ou sur Nova. Un VA travaille souvent sur deux modèles : le total seul
   // ne permet pas de savoir lequel marche, donc ni où le pousser, ni quel
   // modèle porte vraiment son chiffre.
   // Le cerveau ventile désormais le MÊME argent par modèle (le détail
@@ -8113,7 +8127,7 @@ function renderOM(){
     if(ko) return "";
     // 🎭 SUR UN ONGLET MODÈLE, CE PANNEAU DISPARAISSAIT PUREMENT ET SIMPLEMENT
     // (`if(OM_MODEL!=="all") return ""`). C'est exactement là qu'André le
-    // cherchait : « sur Layla, qui m'a ramené des subs qui ont payé ? ». Le
+    // cherchait : « sur Nova, qui m'a ramené des subs qui ont payé ? ». Le
     // classement, lui, EST bien filtré sur le modèle — mais il montre le cumul
     // depuis le début, pas qui a sorti la carte aujourd'hui.
     // Le classement par modèle vient de `d.models[X].vas`, qui ne porte pas les
@@ -8131,7 +8145,7 @@ function renderOM(){
     };
     // Le cerveau met une minute à recalculer après un déploiement : tant que la
     // ventilation n'est pas là, mieux vaut le DIRE que d'afficher un panneau vide
-    // qui se lirait comme « personne n'a payé sur Layla ».
+    // qui se lirait comme « personne n'a payé sur Nova ».
     if(surModele){
       const aDesFenetres=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today);
       const aLaVentilation=(d.vas||[]).some(v=>v&&v.periodes&&v.periodes.today&&v.periodes.today.parModele);
@@ -8164,7 +8178,7 @@ function renderOM(){
     // onglet modèle, où elle annoncerait un total qui ne correspond à rien de ce
     // qui est affiché au-dessus.
     const rec=surModele?"":reconcile("today");
-    // 🔒 PERSO (hors équipe : Bot / Clhoe) — leur dépense DU JOUR, montrée DANS
+    // 🔒 PERSO (hors équipe : comptes perso) — leur dépense DU JOUR, montrée DANS
     // la rangée du haut « comme les autres » (demande d'André 29/08), mais
     // clairement marquée 🔒 et JAMAIS fondue dans le total d'équipe. Source = le
     // détail par compte du payload principal (d.totals.ancienVa.today.parVa) :
@@ -8188,7 +8202,7 @@ function renderOM(){
       return {chips:chips,tot:arr.reduce((a,e)=>a+(e.rev||0),0),n:arr.length};
     })();
     const noteBase=`Argent dépensé aujourd'hui${surModele?` <b>sur ${escapeHtml(OM_MODEL)}</b>`:""} par les abonnés que chacun a amenés — <b>y compris ceux arrivés il y a des jours ou des semaines</b>. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.`
-      +(persoBloc.n?` Les <b>🔒 perso</b> (Bot, Clhoe) sont tes comptes à toi — montrés à part, jamais dans le total de l'équipe.`:"");
+      +(persoBloc.n?` Les <b>🔒 perso</b> (tes deux comptes perso) sont tes comptes à toi — montrés à part, jamais dans le total de l'équipe.`:"");
     // Ni équipe ni perso n'a encaissé : on le DIT, au lieu d'un « 0 $ par 0 abonné ».
     const surTitre=surModele?` · sur ${escapeHtml(OM_MODEL)}`:"";
     if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui${surTitre}</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
@@ -8252,13 +8266,13 @@ function renderOM(){
       ? `<div class="sv-note" style="margin-top:6px">🧮 <b>Sur ${escapeHtml(OM_MODEL)}, ${escapeHtml(perInfo.court)}</b> : ce que les abonnés amenés par chacun ont dépensé <b>chez ce modèle</b>, anciens compris, et combien d'entre eux ont réellement payé.<br>⚠️ Le nombre de <b>subs amenés</b> n'est pas ventilé par modèle sur une période — il n'est pas mesuré, donc il n'est pas affiché (un 0 se lirait « il n'a ramené personne »). Il reste juste, tous modèles confondus, sur l'onglet <b>Tout</b>.</div>`
       : `<div class="sv-note" style="margin-top:6px">🧮 La colonne <b>$</b> compte <b>tout l'argent encaissé ${escapeHtml(perInfo.court)} par les abonnés qu'il a amenés</b>, même s'ils étaient arrivés bien avant. Un VA peut donc afficher <b>0 sub amené</b> et quand même de l'argent : c'est lui qui a ramené ces abonnés, ça lui est compté.</div>`);
   // Détail par modèle pas encore calculé (cerveau pas à jour) : message honnête
-  // plutôt que le classement global sous un titre « sur Layla ».
+  // plutôt que le classement global sous un titre « sur Nova ».
   // 🔒 Bot / Chloé au MÊME format que les VA, pour comparer la rentabilité d'un
   // coup d'œil (demande d'André). Volontairement SOUS le tableau et marquées :
   // elles ne sont ni payées ni classées et n'entrent dans AUCUN total d'équipe
   // (elles restent archivées côté serveur — c'est ce qui les tient hors des
   // salons que les VA voient). Uniquement sur « Tout » : leur détail par modèle
-  // n'est pas ventilé, l'afficher sous un titre « sur Layla » serait faux.
+  // n'est pas ventilé, l'afficher sous un titre « sur Nova » serait faux.
   const horsRows=(function(){
     if(OM_MODEL!=="all") return "";
     // Bot / Chloé n'ont pas de ventilation par fenêtre : plutôt que d'inventer
@@ -8267,7 +8281,7 @@ function renderOM(){
     const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
     if(!ents.length) return "";
     // 🤖 UNE LIGNE PAR BOT, PAS UNE LIGNE PAR COMPTE (demande d'André, 07/09 :
-    // « Bot-insta Zoe et Layla c'est UN bot, bot-twitter c'est un AUTRE bot »).
+    // « Bot-insta Iris et Nova c'est UN bot, bot-twitter c'est un AUTRE bot »).
     // Ses liens s'appellent « Bot / Instagram » et « Bot / Twitter » sur deux
     // comptes OF : le premier segment étant le même, l'attribution range tout
     // sous un seul VA « Bot » et l'argent des deux bots se retrouvait mélangé.
@@ -8341,7 +8355,7 @@ function renderOM(){
     // « — » muet sur TOUTE la ligne = on ne sait pas dire pourquoi. On distingue
     // « pas encore calculé » (le serveur le dit avec argentPret) de « pas de revenus ».
     const heAttente = (typeof HORS_EQUIPE_DATA!=="undefined" && HORS_EQUIPE_DATA && HORS_EQUIPE_DATA.argentPret===false)
-      ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ <b>Les tirets ci-dessus ne sont PAS des zéros.</b> Les montants et la LTV de tes bots et de Clhoe se calculent encore côté serveur (c'est normal juste après un redémarrage) — ils apparaîtront <b>tout seuls</b> d'ici une minute. Les abonnés, eux, sont justes.</div>`
+      ? `<div class="sv-note" style="margin-top:6px;color:#facc15">⏳ <b>Les tirets ci-dessus ne sont PAS des zéros.</b> Les montants et la LTV de tes bots et de Nyx se calculent encore côté serveur (c'est normal juste après un redémarrage) — ils apparaîtront <b>tout seuls</b> d'ici une minute. Les abonnés, eux, sont justes.</div>`
       // ⚠️ L'AUTRE CAS, celui qui ne se répare pas tout seul : l'argent EST
       // lisible, mais aucun dollar n'est attribué à ces noms. C'est un problème
       // de NOM, pas de revenus — et il vivait jusqu'ici dans un journal serveur
@@ -8383,7 +8397,7 @@ function renderOM(){
     const li=(lbl,val,aide)=>`<div class="omv-row"><span class="omv-rank"></span><span class="omv-lbl" title="${aide||""}">${lbl}</span><span class="omv-s">${val!=null?fmtInt(val)+" sub"+(val>1?"s":""):"—"}</span></div>`;
     return `<div class="om-hors-head">🧮 D'où viennent TOUS tes abonnés (depuis le début)</div>`
       +li("Ton équipe (VA payés)", equipe, "Somme des abonnés amenés par les VA du classement ci-dessus.")
-      +li("Tes comptes perso (Bot + Clhoe)", perso, "Jamais payés : tout ce qu'ils rapportent est de la marge.")
+      +li("Tes comptes perso (les deux)", perso, "Jamais payés : tout ce qu'ils rapportent est de la marge.")
       +(autres!=null&&autres>0?li("Autres liens", autres, "Rattachés à un lien de tracking, mais à personne de la liste (ancien VA, lien non nommé)."):"")
       +li("Venus seuls (sans lien)", sansLien, "Abonnés arrivés sans passer par un lien de tracking : ni l'équipe ni les bots ne les ont amenés.")
       +`<div class="omv-row" style="border-top:1px solid var(--line);font-weight:600"><span class="omv-rank">Σ</span><span class="omv-lbl">TOTAL réel</span><span class="omv-s">${reel!=null?fmtInt(reel)+" sub"+(reel>1?"s":""):"—"}</span></div>`
@@ -8628,7 +8642,7 @@ async function relanceGhost(va, btn){
   }catch(e){ btn.textContent="⚠️"; btn.disabled=false; }
 }
 $("#ghosts").addEventListener("click",e=>{ const g=e.target.closest("[data-ghost]"); if(g){ relanceGhost(g.getAttribute("data-ghost"), g); } });
-// ---------- Mode duo : qui a fait quoi aujourd'hui (Andre / Manon) ----------
+// ---------- Mode duo : qui a fait quoi aujourd'hui (Andre / Ava) ----------
 function renderDuo(){
   const panel=$("#duo"); if(!panel) return;
   if(typeof TASKS==="undefined"){ panel.style.display="none"; return; }
@@ -8650,7 +8664,7 @@ function renderDuo(){
   $("#duoBody").innerHTML=`<div class="duo-grid">${col("moi")}${col("other")}</div>`;
 }
 // (Anniversaires VA : fusionnés dans « Événements & dates » — option « chaque année ».)
-// ---------- Comparateur de modèles (Layla vs Zoe dans le temps) ----------
+// ---------- Comparateur de modèles (Nova vs Iris dans le temps) ----------
 let VS_A=null, VS_B=null;
 function renderVersus(){
   const panel=$("#versus"); if(!panel) return;
@@ -9362,7 +9376,7 @@ function renderSplit(){
 }
 // ⛔ LES CHIFFRES DE DÉMO NE SERVENT QU'À LA VITRINE (pas de cerveau configuré).
 // Ils ne doivent JAMAIS apparaître en cas de panne : ce sont des montants
-// inventés (720 $, Welzy à 22,83× de ROI) portant les VRAIS prénoms des VA, sans
+// inventés (720 $, Nael à 22,83× de ROI) portant les VRAIS prénoms des VA, sans
 // rien qui les distingue de vraies données. Une coupure réseau affichait donc un
 // mois entier de chiffres qui n'ont jamais existé — pire qu'un zéro, parce que
 // c'est plausible. En panne : on le DIT, on n'invente pas.
@@ -9891,7 +9905,7 @@ function makeRankCard(){
   const g=x.createRadialGradient(540,-120,60,540,320,760); g.addColorStop(0,acc); g.addColorStop(1,"rgba(10,10,10,0)"); x.globalAlpha=.3; x.fillStyle=g; x.fillRect(0,0,1080,760); x.globalAlpha=1;
   x.fillStyle="#fff"; x.font="bold 62px Inter,Arial,sans-serif"; x.fillText("🏆 Classement VA",70,140);
   x.fillStyle=acc; x.font="600 32px Inter,Arial,sans-serif"; x.fillText(new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"}),70,196);
-  // ⚠️ Image PARTAGÉE aux VA : trier par subs DU MOIS, exclure le PERSO (Bot/Clhoe
+  // ⚠️ Image PARTAGÉE aux VA : trier par subs DU MOIS, exclure le PERSO (comptes perso
   // ne doivent JAMAIS apparaître dans une image vue par les VA) — sinon podium en
   // ordre serveur + comptes perso exposés. Même base que makeMonthReport/renderClassement.
   const om=(typeof OM_DATA!=="undefined"&&OM_DATA)||{};
@@ -10123,8 +10137,8 @@ let COACH_TEXT="", COACH_ACTION="";
 // Un VA PUBLIE et amène du trafic ; il ne parle jamais aux abonnés (il n'est pas
 // chatteur). Si l'action porte sur les abonnés eux-mêmes, elle est POUR TOI :
 // on n'affiche pas « Écrire à … », qui enverrait au VA une consigne impossible.
-// (Vécu : « appelle Welzy pour lui demander de relancer ses abonnés inactifs ».)
-// On teste le verbe AVEC son objet dans la même proposition : « relance Welzy » est
+// (Vécu : « appelle Nael pour lui demander de relancer ses abonnés inactifs ».)
+// On teste le verbe AVEC son objet dans la même proposition : « relance Nael » est
 // une consigne normale, « relance ses abonnés » ne l'est pas.
 const ACT_CHAT=/(relanc\w*|r[ée]activ\w*|r[ée]engag\w*|r[ée]veill\w*|fid[ée]lis\w*|convertir|[ée]cri\w*|envo\w*|message\w*|\bDM\b|\bPPV\b|sexting)[^.,;!?\n]{0,30}?(abonn[ée]s?|\bfans?\b|\bsubs?\b|(?:les|des|ses|leurs)\s+(?:inactifs?|dormants?))/i;
 // Retrouve le VA visé par l'action du jour (le coach le nomme dans sa phrase).
@@ -10198,7 +10212,7 @@ async function sendVaMessage(btn, va, message){
     const j=await r.json().catch(()=>({}));
     // ⚠️ « Envoyé » était un MENSONGE : le message est mis en FILE, et le bot
     // Discord ne la relève que toutes les VA_RELANCE_POLL_SEC secondes. Le bouton
-    // affichait « ✔ Envoyé à Welzy » alors que rien n'était encore parti — on
+    // affichait « ✔ Envoyé à Nael » alors que rien n'était encore parti — on
     // regarde le ticket, il est vide, on croit que le bouton est cassé.
     if(r.ok && j.ok && j.added>0){ btn.textContent="📬 En file d'attente"; if(typeof toast==="function") toast("📬 Message en file", va+" le recevra dans son fil d'ici une minute."); }
     else if(r.ok && j.ok && j.partis && j.partis.length){
@@ -10215,11 +10229,11 @@ async function sendVaMessage(btn, va, message){
     else { btn.textContent="⚠️ Échec"; btn.disabled=false; }
   }catch(e){ btn.textContent="⚠️ Échec"; btn.disabled=false; }
 }
-// 🎤 Répondre au coach à l'oral (« j'ai appelé Welzy, elle est malade ») :
+// 🎤 Répondre au coach à l'oral (« j'ai appelé Nael, elle est malade ») :
 // l'assistant comprend et met à jour tes tâches en conséquence.
 function coachVoiceReply(){
   if(typeof voiceAsk!=="function") return;
-  // {mem:true} : ta réponse passe AUSSI par la mémoire du coach — « Prince est
+  // {mem:true} : ta réponse passe AUSSI par la mémoire du coach — « Milo est
   // en vacances » dit une fois à voix haute, et il s'en souvient les jours suivants.
   voiceAsk(COACH_ACTION ? "Contexte : l'action que je devais faire aujourd'hui est « "+COACH_ACTION+" ». Ma réponse : " : "", {mem:true});
 }
@@ -10258,7 +10272,7 @@ function renderCoachMemInto(z){
   // Classes (pas d'ids) : les deux vues coexistent dans le DOM, des ids
   // dupliqués rendraient getElementById imprévisible. CSS mis à jour en face.
   z.innerHTML=`<div class="cm-list">${notes.map(puce).join("")}</div>
-    <div class="cm-add"><input class="cm-txt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Prince en vacances jusqu'à lundi)">
+    <div class="cm-add"><input class="cm-txt" maxlength="200" placeholder="🧠 Apprends-lui un truc (ex : Milo en vacances jusqu'à lundi)">
       <select class="cm-dur" title="Combien de temps le coach doit s'en souvenir"><option value="7">7 jours</option><option value="30">1 mois</option><option value="0">Toujours</option></select>
       <button class="mn-act-btn cm-go">Retenir</button></div>`;
   const envoyer=async()=>{
@@ -10307,9 +10321,9 @@ function addCoachAction(btn){
   try{
     tkNorm();
     // 🔁 ANTI-DOUBLON. Le coach propose souvent des variantes de la même action
-    // (« Écris à Welzy pour… » / « Envoie un message à Welzy pour… ») : un tap
+    // (« Écris à Nael pour… » / « Envoie un message à Nael pour… ») : un tap
     // chaque matin empilait des quasi-doublons qui bouchaient la liste (c'est
-    // comme ça que la tâche Welzy a dormi 21 jours à côté de ses clones).
+    // comme ça que la tâche Nael a dormi 21 jours à côté de ses clones).
     // Doublon = une tâche coach OUVERTE qui cite la MÊME personne, ou un texte
     // quasi identique. On préfère le dire plutôt qu'empiler.
     const norm=s=>(typeof gsNorm==="function"?gsNorm(s):String(s||"").toLowerCase());
@@ -10574,7 +10588,7 @@ function showMorning(){ COACH_MODE="morning"; renderMorning(); $("#morning").cla
 function showEvening(){ COACH_MODE="evening"; COACH_TEXT=""; renderMorning(); $("#morning").classList.add("show"); loadBrief(); loadBriefHistory(); }
 function closeMorning(){ stopSpeaking(); $("#morning").classList.remove("show"); if(COACH_MODE==="evening") localStorage.setItem("ccn_evening",todayStr()); else localStorage.setItem("ccn_morning",todayStr()); }
 // 🔒 L'écran du matin/soir affiche le CA en clair et s'ouvrait PAR-DESSUS la
-// vue associé (z-index supérieur) → Manon voyait les chiffres au chargement.
+// vue associé (z-index supérieur) → Ava voyait les chiffres au chargement.
 function showMorningIfNew(){ if(!TOKEN || document.body.classList.contains("assoc-mode")) return;
   // Le soir (≥ 20h local), on propose le coach du soir 1×/jour ; sinon le matin.
   if(new Date().getHours()>=20){ if(!EVENING_SHOWN){ EVENING_SHOWN=true; if(localStorage.getItem("ccn_evening")!==todayStr()) showEvening(); } return; }
@@ -13002,7 +13016,7 @@ function renderBusFactor(){
     <div class="bf-score"><div class="bf-score-v">${score} %</div><div class="bf-score-l">des tâches suivies sont automatisées${autoKo.length?` <span title="${autoKo.map(x=>x.t+" : "+(x.pourquoi||"en panne")).join(" · ").replace(/"/g,"&quot;")}" style="color:#f87171">· ${autoKo.length} en panne</span>`:""}</div></div>
     <div class="bf-h">🤖 Tourne tout seul (${auto.length})</div>${auto.map(a=>`<div class="bf-item ok">${a}</div>`).join("")}
     <div class="bf-h">✋ Dépend de toi (${manuel.length})</div>${manuel.map(m=>`<div class="bf-item"><span>${escapeHtml(m.t)}</span>${m.deleg?'<span class="bf-tag ok">délégable</span>':'<span class="bf-tag">toi seul</span>'}</div>`).join("")}
-    <div class="bf-away">🏖️ <b>Si tu pars une semaine :</b> ${deleg.length?`délègue à Manon → ${deleg.map(t=>escapeHtml(t)).join(" ; ")}.`:"peu de choses bloquent."} ${nouv?`Les DMCA (${nouv}) `:"Les décisions stratégiques "}t'attendront à ton retour.</div>`;
+    <div class="bf-away">🏖️ <b>Si tu pars une semaine :</b> ${deleg.length?`délègue à Ava → ${deleg.map(t=>escapeHtml(t)).join(" ; ")}.`:"peu de choses bloquent."} ${nouv?`Les DMCA (${nouv}) `:"Les décisions stratégiques "}t'attendront à ton retour.</div>`;
   try{ fixPairs(); }catch(e){}
 }
 
@@ -13074,7 +13088,7 @@ function renderDecisions(){
       } else outHtml=`<div class="dj-impact muted">📌 Verdict 14 j : pas assez d'historique avant cette décision pour comparer.</div>`;
     }
     return `<div class="dj-row"><div class="dj-date">${d.date?escapeHtml((typeof fmtJourFr==="function"?fmtJourFr(d.date):d.date)):"—"}</div><div class="dj-body"><div class="dj-txt">${escapeHtml(d.text)}</div>${impHtml}${outHtml}</div><button class="dj-del" data-djdel="${escapeHtml(d.id)}">✕</button></div>`;
-  }).join(""):`<div class="cac-intro">Note tes décisions (« coupé le VA X », « changé l'accroche de Layla »). Le dashboard te montrera ensuite l'effet sur ton CA — pour apprendre de tes choix.</div>`;
+  }).join(""):`<div class="cac-intro">Note tes décisions (« coupé le VA X », « changé l'accroche de Nova »). Le dashboard te montrera ensuite l'effet sur ton CA — pour apprendre de tes choix.</div>`;
   body.innerHTML=`<div class="dj-form"><input type="date" id="djDate" value="${today}"><input id="djText" placeholder="Ex : coupé le VA X, changé l'accroche…"><button class="mn-act-btn" id="djAdd">＋</button></div>${list}`;
   { const b=$("#djAdd"); if(b) b.onclick=addDecision; }
   { const t=$("#djText"); if(t) t.addEventListener("keydown",e=>{ if(e.key==="Enter") addDecision(); }); }
@@ -13207,9 +13221,9 @@ function renderRachat(){
   // qui a juste du trafic moyen.
   let suspects="";
   // ⚠️ On ne juge QUE les VA PAYÉS du classement : les perso / hors-équipe
-  // (Chloe = « Insta Perso », Bot…) ont naturellement une conversion basse et ne
+  // (le compte « Insta Perso », Bot…) ont naturellement une conversion basse et ne
   // trichent pas pour un classement — les inclure ferait un faux positif garanti
-  // (mesuré : Chloe 3 %, valeur 0,09). Ils ne sont pas dans OM_DATA.vas (filtrés
+  // (mesuré : Nyx 3 %, valeur 0,09). Ils ne sont pas dans OM_DATA.vas (filtrés
   // côté serveur) ou y sont marqués `unpaid`.
   const paidSet=new Set(((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid).map(v=>v.va));
   const elig=(d.vas||[]).filter(v=>v.pctPayeur!=null && v.arrives>=15 && paidSet.has(v.va));
@@ -13871,7 +13885,7 @@ function renderPie(){
   // `revenusPartiels` — que renderOM et renderRenta signalent par un bandeau.
   // Ici, `Number(null)||0` valait 0, puis `.filter(e=>e[1]>0)` le SUPPRIMAIT de
   // la liste : le total était sous-estimé, les parts des autres gonflées, et
-  // rien ne le disait. « Je n'ai pas pu lire Zoe » n'est pas « Zoe a rapporté 0 ».
+  // rien ne le disait. « Je n'ai pas pu lire Iris » n'est pas « Iris a rapporté 0 ».
   const _illisibles=Object.keys(models).filter(m=>models[m] && models[m].net==null);
   let entries=Object.keys(models).map(m=>[m,(Number(models[m].net)||0)*netRate()]).filter(e=>e[1]>0);
   // Telegram PAR MODÈLE = sources de revenus à part entière, à côté d'OnlyFans.
@@ -14177,7 +14191,7 @@ function voiceAsk(prefixe, opts){
     const envoi=(typeof prefixe==="string"&&prefixe)?(prefixe+q):q;
     toast("🗣️ « "+q+" »","L'assistant réfléchit…");
     // 🧠 Réponse au coach : en parallèle, l'IA décide si ta phrase contient un
-    // fait à retenir (« Prince est en vacances ») — indépendant de l'assistant,
+    // fait à retenir (« Milo est en vacances ») — indépendant de l'assistant,
     // qui peut échouer sans faire perdre la mémoire.
     if(opts&&opts.mem&&TOKEN){
       fetch(HUB_BASE+"/api/hub/coach-memoire/auto",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({texte:q})})
@@ -14744,8 +14758,8 @@ function openVaCard(vaName){
   const stat=(l,val,s)=>`<div class="vacard-stat"><div class="l">${l}</div><div class="v">${val}</div>${s?`<div class="s">${s}</div>`:""}</div>`;
   const ov=document.createElement("div"); ov.className="ppick";
   // ⚠️ AJOUTÉ le 2026-08-23 — la fiche montre TOUJOURS les chiffres tous
-  // modèles confondus, même quand on a cliqué depuis l'onglet « Layla » ou
-  // « Zoe ». On lisait donc « 40 subs » dans le tableau filtré et « 152 subs »
+  // modèles confondus, même quand on a cliqué depuis l'onglet « Nova » ou
+  // « Iris ». On lisait donc « 40 subs » dans le tableau filtré et « 152 subs »
   // sur la fiche ouverte d'un clic, sans rien pour expliquer l'écart. On le dit.
   const filtreActif = (typeof OM_MODEL!=="undefined" && OM_MODEL && OM_MODEL!=="all");
   ov.innerHTML=`<div class="ppick-box"><h3>👤 ${escapeHtml(vaName)}${v.unpaid?' <span class="mn-msg-note">· perso, jamais payée</span>':''}</h3>
@@ -14782,7 +14796,7 @@ function openVaCard(vaName){
       // que ce que tu verses au VA est du cash bien réel. Or OnlyFans prélève
       // 20 % : comparer du brut à du versé surévalue le rendement d'autant.
       // Vérifié sur l'équipe actuelle : personne ne bascule (tous largement
-      // rentables), mais Welzy s'affichait « 16,4 $ pour 1 $ versé » au lieu de
+      // rentables), mais Nael s'affichait « 16,4 $ pour 1 $ versé » au lieu de
       // 12,8 $. Et surtout, toute la bande où `versé < brut < versé/0,78` était
       // étiquetée « rentable, garde-le » alors que le VA PERD de l'argent une
       // fois la commission déduite. On tranche donc sur le NET.
@@ -14933,7 +14947,7 @@ function openVaCard(vaName){
   // 🗒️ #9 notes : sauvegarde auto (debounce) quand on tape.
   { const box=ov.querySelector("#vaNoteBox"), saved=ov.querySelector("#vaNoteSaved"); if(box){ let nt=null; box.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(()=>{ if(typeof vaNoteSet==="function") vaNoteSet(vaName, box.value); if(saved){ saved.textContent=(typeof vaNoteEtat==="function")?vaNoteEtat():"✓ enregistré"; setTimeout(()=>{ saved.textContent=""; },1500); } },500); }); } }
   // 📎 Les liens cumulés (une requête pour tous les VA, cachée). Rend visible
-  // que les 3 (bientôt 50) liens de Yohan comptent tous sur un seul « Yohan ».
+  // que les 3 (bientôt 50) liens de Sacha comptent tous sur un seul « Sacha ».
   chargeVaLiens().then(L=>{
     const z=ov.querySelector("#vlZone"); if(!z) return;
     const info=L&&L.parVa&&L.parVa[vaName];
@@ -15267,7 +15281,7 @@ const ESSENTIEL_MASQUES=[
   // Santé des VA : 6 panneaux répondaient à « qui va bien / qui décroche ? ».
   // On garde 📈 Trajectoire (la courbe, la plus complète) + 🏆 Classement.
   "decroche","varisque","burnout","opportunites","ghosts",
-  // Modèles : le tableau OnlyMonster affiche DÉJÀ la ligne Layla/Zoe.
+  // Modèles : le tableau OnlyMonster affiche DÉJÀ la ligne Nova/Iris.
   // On garde 🎭 Modèles ; ⚔️ Versus et 🥧 Répartition redisent la même chose.
   "versus","pie",
   // Gamification : agréable, mais ne change aucune décision.
@@ -15285,7 +15299,7 @@ const ESSENTIEL_MASQUES=[
   // monde, donc le « coût par abonné » est identique pour chaque VA.
   // 💳 Valeur d'un abonné = la colonne LTV du tableau, re-triée.
   "cac","subval",
-  // 🎯 VA × modèle = le filtre Layla/Zoe du tableau OnlyMonster, en double.
+  // 🎯 VA × modèle = le filtre Nova/Iris du tableau OnlyMonster, en double.
   "vamodel",
   // 📊 Anomalies ⊂ 🔍 Patterns cachés (même idée, moins de contexte).
   "anomalies",
@@ -15387,7 +15401,7 @@ function openPanelPicker(){
 { const b=$("#panels"); if(b) b.onclick=openPanelPicker; }
 applyHiddenPanels();
 
-/* ---------- 🎭 tes modèles en un coup d'œil (Layla, Zoe…) ---------- */
+/* ---------- 🎭 tes modèles en un coup d'œil (Nova, Iris…) ---------- */
 function renderModeles(){
   const panel=$("#modeles"); if(!panel) return;
   const d=(typeof OM_DATA!=="undefined"&&OM_DATA)||null;

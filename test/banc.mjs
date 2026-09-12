@@ -67,12 +67,12 @@ const V=verifie;
   const m = neuf(()=>({payments:[]}), 60);          // le serveur repond la photo AVANT le paiement
   const lecture = m.loadPayments();                  // part a t=0, repond a t=60ms
   await new Promise(r=>setTimeout(r,10));
-  m.payVa("Welzy", 150);                             // l'operateur clique a t=10ms
-  const apresClic = m.isPaid("Welzy");
+  m.payVa("Nael", 150);                             // l'operateur clique a t=10ms
+  const apresClic = m.isPaid("Nael");
   await lecture; await new Promise(r=>setTimeout(r,80));
   verifie("le clic Payer survit a une lecture deja en vol",
-    apresClic && m.isPaid("Welzy"),
-    "Welzy est redevenu 'a payer' -> second clic -> DOUBLE PAIEMENT (paye="+m.isPaid("Welzy")+")");
+    apresClic && m.isPaid("Nael"),
+    "Nael est redevenu 'a payer' -> second clic -> DOUBLE PAIEMENT (paye="+m.isPaid("Nael")+")");
   verifie("le cahier reste lisible malgre la reponse ecartee", m.PAYMENTS_LOADED===true, "PAYMENTS_LOADED="+m.PAYMENTS_LOADED);
 }
 
@@ -97,7 +97,7 @@ const V=verifie;
   const m = neuf(()=>({payments:[]}), 60);
   const l = m.loadPayments();
   await new Promise(r=>setTimeout(r,10));
-  m.payVa("Welzy",150);
+  m.payVa("Nael",150);
   await l; await new Promise(r=>setTimeout(r,80));
   verifie("le serveur a bien recu le paiement", reseau.includes("POST"), "aucun POST : la paie n'existerait que sur cet ecran");
 }
@@ -106,22 +106,22 @@ const V=verifie;
 // ================= 1) objectif par VA : une faute de frappe ne doit rien effacer
 {
   const bloc = morceau("function setVaGoal(va){", "// 🪄 Appliquer les objectifs");
-  let VA_GOALS={Welzy:40}, sauve=0, toasts=[];
+  let VA_GOALS={Nael:40}, sauve=0, toasts=[];
   const f = new Function("VA_GOALS","prompt","suggestVaGoal","saveVaGoals","toast","OM_DATA","renderOM",
     bloc + "; return setVaGoal;");
-  const faire = (saisie)=>{ toasts=[]; return f(VA_GOALS, ()=>saisie, ()=>null, ()=>{sauve++;}, (a,b)=>toasts.push(a), null, ()=>{})("Welzy"); };
+  const faire = (saisie)=>{ toasts=[]; return f(VA_GOALS, ()=>saisie, ()=>null, ()=>{sauve++;}, (a,b)=>toasts.push(a), null, ()=>{})("Nael"); };
 
   faire("5o");   // lettre o au lieu du zero
-  V("« 5o » ne SUPPRIME pas l'objectif", VA_GOALS.Welzy===40, "objectif devenu "+JSON.stringify(VA_GOALS.Welzy)+" (il valait 40)");
+  V("« 5o » ne SUPPRIME pas l'objectif", VA_GOALS.Nael===40, "objectif devenu "+JSON.stringify(VA_GOALS.Nael)+" (il valait 40)");
   V("et l'operateur est prevenu", toasts.length>0, "aucun message : la disparition est silencieuse");
   faire("50 subs");
-  V("« 50 subs » ne supprime pas non plus", VA_GOALS.Welzy===40, "objectif devenu "+JSON.stringify(VA_GOALS.Welzy));
+  V("« 50 subs » ne supprime pas non plus", VA_GOALS.Nael===40, "objectif devenu "+JSON.stringify(VA_GOALS.Nael));
   faire("50");
-  V("un vrai nombre passe toujours", VA_GOALS.Welzy===50, "objectif = "+JSON.stringify(VA_GOALS.Welzy));
+  V("un vrai nombre passe toujours", VA_GOALS.Nael===50, "objectif = "+JSON.stringify(VA_GOALS.Nael));
   faire("");
-  V("vider le champ retire bien l'objectif (geste explicite)", VA_GOALS.Welzy===undefined, "reste "+JSON.stringify(VA_GOALS.Welzy));
-  VA_GOALS.Welzy=40; faire("0");
-  V("taper 0 retire bien l'objectif", VA_GOALS.Welzy===undefined, "reste "+JSON.stringify(VA_GOALS.Welzy));
+  V("vider le champ retire bien l'objectif (geste explicite)", VA_GOALS.Nael===undefined, "reste "+JSON.stringify(VA_GOALS.Nael));
+  VA_GOALS.Nael=40; faire("0");
+  V("taper 0 retire bien l'objectif", VA_GOALS.Nael===undefined, "reste "+JSON.stringify(VA_GOALS.Nael));
 }
 
 // ================= 2) Telegram : la saisie retenue ne doit pas disparaitre
@@ -299,7 +299,7 @@ const V=verifie;
     return { dates: api.DATES, envois };
   };
 
-  const r1 = await faire([], [{id:"a",text:"Anniv Welzy",date:"2026-10-01",yearly:true}]);
+  const r1 = await faire([], [{id:"a",text:"Anniv Nael",date:"2026-10-01",yearly:true}]);
   V("premier chargement : ce qui n existait que sur l appareil est GARDE",
     r1.dates.length===1 && r1.dates[0].id==="a",
     "la date locale a disparu : ce commit aurait efface l historique d Andre");
@@ -315,7 +315,7 @@ const V=verifie;
   V("et rien n est repousse inutilement", r2.envois.length===0, "POST parasite");
 
   const r3 = await faire([{id:"s1",texte:"RDV compta",date:"2026-11-05",chaqueAnnee:false}],
-                         [{id:"a",text:"Anniv Welzy",date:"2026-10-01",yearly:true}]);
+                         [{id:"a",text:"Anniv Nael",date:"2026-10-01",yearly:true}]);
   V("les deux cotes fusionnent, aucun ne gagne contre l autre",
     r3.dates.length===2 && r3.dates.some(d=>d.id==="s1") && r3.dates.some(d=>d.id==="a"),
     JSON.stringify(r3.dates.map(d=>d.id)));
@@ -334,9 +334,9 @@ const V=verifie;
   const now = Date.now(), moisDernier = now - 40*86400000;
 
   const r = faire([
-    { va:"Welzy", subsPay:400, prime:150, manager:0,  leader:0,  ts: now },
-    { va:"Yohan", subsPay:300, prime:0,   manager:75, leader:50, ts: now },
-    { va:"Prince",subsPay:200, prime:900, manager:0,  leader:0,  ts: moisDernier },   // AUTRE mois
+    { va:"Nael", subsPay:400, prime:150, manager:0,  leader:0,  ts: now },
+    { va:"Sacha", subsPay:300, prime:0,   manager:75, leader:50, ts: now },
+    { va:"Milo",subsPay:200, prime:900, manager:0,  leader:0,  ts: moisDernier },   // AUTRE mois
   ], MK);
   V("seules les primes du MOIS EN COURS comptent", r.total===275,
     "total="+r.total+" (attendu 275 : 150 + 75 + 50 ; les 900 du mois dernier ne comptent pas)");
@@ -371,8 +371,8 @@ const V=verifie;
   const faire = (PCUMUL) => new Function("PCUMUL", bloc + "; return duReellement;")(PCUMUL)();
 
   const base = { total: 850, primesTotal: 0, vas: [
-    { va:"Welzy",  base: 1200, nouveaux: 40, aPayer: 500 },
-    { va:"Yohan",  base: 900,  nouveaux: 28, aPayer: 350 },
+    { va:"Nael",  base: 1200, nouveaux: 40, aPayer: 500 },
+    { va:"Sacha",  base: 900,  nouveaux: 28, aPayer: 350 },
     { va:"Bot",    base: null, nouveaux: 0,  aPayer: 0, unpaid: true },   // perso : jamais paye
   ]};
   const r = faire(base);
@@ -383,7 +383,7 @@ const V=verifie;
   // ⚠️ Le controle qui compte : cote serveur, un VA sans repere de paie vaut
   // EXACTEMENT 0 dans le total. La verite est « je ne sais pas ». Annoncer 850
   // comme un montant ferme, c est preparer 850 et en devoir davantage.
-  const orphelin = faire(Object.assign({}, base, { vas: base.vas.concat([{ va:"Prince", base:null, nouveaux:60, aPayer:0 }]) }));
+  const orphelin = faire(Object.assign({}, base, { vas: base.vas.concat([{ va:"Milo", base:null, nouveaux:60, aPayer:0 }]) }));
   V("un VA sans repere de paie transforme le total en PLANCHER",
     orphelin && orphelin.plancher===true && orphelin.sansBase===1,
     "sans ce drapeau la tuile affiche un montant ferme qui est faux : "+JSON.stringify(orphelin));
@@ -423,13 +423,13 @@ const V=verifie;
     "sans ca, le panneau se cache et le silence passe pour « tout va bien »");
   V("et le motif suit", ko && /500/.test(ko.raison||""), JSON.stringify(ko));
 
-  const ok = faire({ok:true}, {parVa:{Welzy:[10,8,4]}, labels:["a","b","c"]});
+  const ok = faire({ok:true}, {parVa:{Nael:[10,8,4]}, labels:["a","b","c"]});
   V("une vraie mesure reste une vraie mesure", ok && ok.mesure===true && ok.perime===false, JSON.stringify(ok));
 
   // Cas piege : ca a marche tout a l heure, la derniere tentative a echoue.
   // On garde les chiffres (mieux que rien) sans les faire passer pour frais.
   const vieux = faire({ok:false, raison:"pas de reseau"},
-                      {parVa:{Welzy:[10,8,4]}, labels:["a","b","c"], _perime:true});
+                      {parVa:{Nael:[10,8,4]}, labels:["a","b","c"], _perime:true});
   V("des chiffres gardes apres un echec sont marques perimes",
     vieux && vieux.mesure===true && vieux.perime===true, JSON.stringify(vieux));
   V("... mais on n efface pas ce qu on sait deja",
@@ -879,22 +879,22 @@ const V=verifie;
   const JOUR = 86400000;
   const ilYA = (n) => new Date(Date.parse(AUJOURDHUI + "T00:00:00Z") - n*JOUR).toISOString().slice(0,10);
 
-  const om = { vas: [{ va: "Welzy" }, { va: "Yohan" }] };
+  const om = { vas: [{ va: "Nael" }, { va: "Sacha" }] };
 
   // Un inscrit qui n a rien produit doit ressortir, avec ses jours.
-  const r = faire(om, { "Prince": ilYA(12), "Welzy": ilYA(300) }, []).attente();
-  V("un inscrit qui n a rien produit ressort", r.length===1 && r[0].va==="Prince", JSON.stringify(r));
+  const r = faire(om, { "Milo": ilYA(12), "Nael": ilYA(300) }, []).attente();
+  V("un inscrit qui n a rien produit ressort", r.length===1 && r[0].va==="Milo", JSON.stringify(r));
   V("... avec le nombre de jours depuis son arrivee", r[0].jours===12, "jours=" + r[0].jours);
   V("un VA qui produit deja n est PAS dans la liste d attente",
-    !r.some(x => x.va==="Welzy"), "sa date d arrivee est juste une date, pas une alerte");
+    !r.some(x => x.va==="Nael"), "sa date d arrivee est juste une date, pas une alerte");
 
   // ⚠️ LE CONTROLE QUI COMPTE : la liste des VA n est pas encore lue. Repondre
   // « personne ne tarde » sans avoir regarde, c est le faux vert habituel.
   V("liste des VA non lue = null, PAS une liste vide",
-    faire(null, { "Prince": ilYA(12) }, []).attente()===null,
+    faire(null, { "Milo": ilYA(12) }, []).attente()===null,
     "une liste vide se lirait « tout le monde a demarre »");
   V("idem si `vas` n est pas un tableau",
-    faire({ vas: "boom" }, { "Prince": ilYA(3) }, []).attente()===null, "reponse malformee");
+    faire({ vas: "boom" }, { "Milo": ilYA(3) }, []).attente()===null, "reponse malformee");
 
   // Un VA archive (parti) ne doit pas etre signale comme « ne demarre pas ».
   V("un VA parti n est pas signale comme tardif",
@@ -908,7 +908,7 @@ const V=verifie;
 
   // Le rapprochement se fait sur le nom, insensible a la casse et aux espaces.
   V("le rapprochement ignore casse et espaces",
-    faire(om, { "  welzy ": ilYA(5) }, []).attente().length===0,
+    faire(om, { "  nael ": ilYA(5) }, []).attente().length===0,
     "sinon un espace en trop cree un doublon fantome");
 
   // Les plus anciens en tete : ce sont eux qui posent question.
@@ -1105,10 +1105,10 @@ const V=verifie;
   }
   {
     const c = await lire({ recue:true, muette:false, ageMin:1,
-      etat:{ lisible:true, planificateur:true, quarantaine:2, quarantaineNoms:["zoe","lina"],
+      etat:{ lisible:true, planificateur:true, quarantaine:2, quarantaineNoms:["iris","lina"],
              challenges:1, comptes:12 } });
     V("des comptes en quarantaine : voyant orange", c.status === "warn", JSON.stringify(c));
-    V("... et on sait QUI", /zoe/.test(c.note||"") && /lina/.test(c.note||""), c.note);
+    V("... et on sait QUI", /iris/.test(c.note||"") && /lina/.test(c.note||""), c.note);
     V("... et combien sont bloques par Instagram", c.metrics.challenges === 1, JSON.stringify(c.metrics));
   }
   {
