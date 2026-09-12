@@ -1622,4 +1622,108 @@ const V=verifie;
     "le controle ne reconnait plus la forme qu il surveille");
 }
 
+// ================= RADAR ANTI-FUITE : l'ecran ne double pas un courrier, et ne ment pas
+// ⚠️ (12/09) Le serveur refuse maintenant un second DMCA (409). Mais l'ecran,
+// sur toute reponse non-OK, OUVRAIT L'EMAIL PRE-REMPLI : il invitait a renvoyer
+// le meme courrier a la main. Et « Ignorer », « Infos DMCA enregistrees »
+// s'affichaient avant de savoir si le serveur avait accepte.
+{
+  const attendre = (ms)=>new Promise(r=>setTimeout(r,ms));
+  // La fonction a pu devenir `async` : on reprend le mot-cle s'il precede.
+  const morceauFn = (debut, fin)=>{ const i=src.indexOf(debut); const b=morceau(debut, fin); return (i>=6 && src.slice(i-6,i)==="async ") ? "async "+b : b; };
+  const blocDmca = morceau("async function sendLeakDmca(id){", "renderWatch(); renderLeaks(); renderIdentity();");
+  function monterDmca(reponse, delai){
+    const etat = { toasts:[], posts:0, mailto:0 };
+    const LEAKS=[{id:"f1", model:"Modele-Test", url:"https://ex.test/1", host:"ex.test", status:"new"}];
+    const IDENTITY={name:"A", address:"B", email:"c@d.test"};
+    const fetch=()=>{ etat.posts++; return new Promise(res=>setTimeout(()=>res(reponse()), delai||5)); };
+    const f = new Function("LEAKS","IDENTITY","idComplete","fetch","TOKEN","HUB_BASE","toast","renderLeaks","openDmcaMailto","$",
+      blocDmca + "; return sendLeakDmca;");
+    const send = f(LEAKS, IDENTITY, i=>!!(i&&i.name&&i.address&&i.email), fetch, "jeton", "http://x",
+      (a,b)=>etat.toasts.push(a+" | "+(b||"")), ()=>{}, ()=>{ etat.mailto++; }, ()=>null);
+    return { etat, send, LEAKS };
+  }
+  {
+    const m = monterDmca(()=>({ok:false,status:409,json:async()=>({dejaEnvoye:true,to:"abuse@ex.test",error:"DMCA déjà envoyé il y a 2 min — pas de second courrier"})}));
+    await m.send("f1");
+    V("DMCA deja envoye : l email pre-rempli ne s ouvre PAS", m.etat.mailto===0,
+      "l ecran ouvre un email pour renvoyer le meme courrier a la main");
+    V("... et l ecran dit pourquoi", m.etat.toasts.some(t=>/déjà/.test(t)), m.etat.toasts.join(" / ")||"aucun message");
+  }
+  {
+    const m = monterDmca(()=>({ok:false,status:409,json:async()=>({busy:true,error:"un envoi est déjà en cours pour cette fuite"})}));
+    await m.send("f1");
+    V("envoi DMCA deja en cours ailleurs : pas d email pre-rempli non plus", m.etat.mailto===0, "email ouvert");
+  }
+  {
+    const m = monterDmca(()=>({ok:true,status:200,json:async()=>({ok:true,sent:true,to:"abuse@ex.test"})}), 40);
+    await Promise.all([m.send("f1"), m.send("f1")]);
+    V("deux clics sur DMCA : UNE seule demande d envoi", m.etat.posts===1, m.etat.posts+" demandes parties");
+  }
+  {
+    const m = monterDmca(()=>({ok:true,status:200,json:async()=>({ok:true,sent:true,to:"abuse@ex.test"})}), 5);
+    await m.send("f1");
+    V("un envoi reussi reste affiche « envoye » (garde-fou du banc)", m.LEAKS[0].status==="sent" && m.etat.mailto===0, JSON.stringify(m.LEAKS[0]));
+  }
+
+  // --- « Ignorer » / « Traite » refuse par le serveur ---
+  {
+    const bloc = morceauFn("function setLeakStatus(id,status){", '{ const b=$("#alAdd");');
+    const LEAKS=[{id:"f1",status:"new"}]; const toasts=[];
+    const fetch=()=>Promise.resolve({ok:false,status:503,json:async()=>({error:"liste illisible"})});
+    const f=new Function("LEAKS","renderLeaks","TOKEN","HUB_BASE","fetch","toast", bloc+"; return setLeakStatus;");
+    const set=f(LEAKS,()=>{},"jeton","http://x",fetch,(a,b)=>toasts.push(a+" | "+(b||"")));
+    await set("f1","ignored"); await attendre(10);
+    V("statut refuse par le serveur : l ecran revient en arriere", LEAKS[0].status==="new",
+      "l ecran affiche « "+LEAKS[0].status+" » alors que rien n est enregistre");
+    V("... et le dit", toasts.length>0, "aucun message");
+  }
+
+  // --- bouton « Scanner » ---
+  {
+    const bloc = morceau('{ const b=$("#alScan");', '{ const a=$("#alAlias");');
+    function monterScan(reponse){
+      const toasts=[]; const bouton={textContent:"Scanner",disabled:false,onclick:null};
+      const f=new Function("$","TOKEN","HUB_BASE","fetch","toast","loadLeaks", bloc+"; return null;");
+      f(()=>bouton,"jeton","http://x",()=>Promise.resolve(reponse()),(a,b)=>toasts.push(a+" | "+(b||"")),()=>{});
+      return {bouton,toasts};
+    }
+    {
+      const m=monterScan(()=>({ok:false,status:409,json:async()=>({busy:true,error:"un scan est déjà en cours"})}));
+      await m.bouton.onclick();
+      V("scan deja en cours : on le dit, ce n est pas une panne",
+        m.toasts.some(t=>/déjà/.test(t)) && !m.toasts.some(t=>/impossible/i.test(t)), m.toasts.join(" / "));
+      V("... et le bouton redevient cliquable", m.bouton.disabled===false, "bouton bloque");
+    }
+    {
+      const m=monterScan(()=>({ok:true,status:200,json:async()=>({ok:true,scanned:5,found:0,models:1})}));
+      await m.bouton.onclick();
+      V("1 modele surveille : l ecran dit « 1 modèle », pas le nombre de requetes",
+        m.toasts.some(t=>/\b1 modèle\b/.test(t)) && !m.toasts.some(t=>/5 modèles/.test(t)), m.toasts.join(" / "));
+    }
+    {
+      const m=monterScan(()=>({ok:true,status:200,json:async()=>({ok:true,scanned:0,found:0,models:0,coupe:true})}));
+      await m.bouton.onclick();
+      V("radar coupe cote serveur : on ne pretend pas qu aucun modele n est surveille",
+        m.toasts.some(t=>/coupé/.test(t)) && !m.toasts.some(t=>/Aucun modèle/.test(t)), m.toasts.join(" / "));
+    }
+  }
+
+  // --- infos du titulaire (obligatoires pour l'envoi automatique) ---
+  {
+    const bloc = morceauFn("function saveIdentity(){", "async function loadIdentity(){");
+    const champs={dmName:"A",dmCompany:"",dmAddress:"B",dmPhone:"",dmEmail:"c@d.test",dmSign:""};
+    const $=(sel)=>({value:champs[sel.slice(1)]||"", textContent:""});
+    const toasts=[];
+    const f=new Function("$","localStorage","TOKEN","HUB_BASE","fetch","renderIdentity","toast","idComplete",
+      "let IDENTITY={};"+bloc+"; return saveIdentity;");
+    const save=f($,{setItem(){}},"jeton","http://x",()=>Promise.resolve({ok:false,status:500,json:async()=>({})}),
+      ()=>{},(a,b)=>toasts.push(a+" | "+(b||"")),i=>!!(i&&i.name&&i.address&&i.email));
+    await save(); await attendre(10);
+    V("infos DMCA refusees par le serveur : l ecran ne dit PAS « enregistrées »",
+      // On vise le message de SUCCES, pas le mot : « NON enregistrées » le contient aussi.
+      !toasts.some(t=>/^⚖️ Infos DMCA enregistrées/.test(t)) && toasts.some(t=>/NON/.test(t)), toasts.join(" / ")||"aucun message");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

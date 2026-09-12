@@ -4753,7 +4753,24 @@ function addWatch(){
   $("#alName").value=""; $("#alAlias").value=""; $("#alName").focus();
   if(typeof toast==="function") toast("🛡️ Surveillance activée", n||aliases[0]);
 }
-function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.status=status; renderLeaks(); if(TOKEN){ fetch(HUB_BASE+"/api/hub/leaks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id,status:status})}).catch(()=>{}); } }
+// ⚠️ FAUX ACCUSÉ DE RÉCEPTION (12/09) : le nouveau statut s'affichait et la
+// réponse du serveur n'était jamais regardée. Un refus (base momentanément
+// indisponible, liste illisible) laissait « ignorée » à l'écran alors que rien
+// n'était enregistré — la fuite revenait « nouvelle » au prochain chargement.
+async function setLeakStatus(id,status){
+  const l=LEAKS.find(x=>x.id===id); const avant=l?l.status:undefined;
+  if(l) l.status=status; renderLeaks();
+  if(!TOKEN) return;
+  let ok=false, pourquoi="";
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/leaks",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id,status:status})});
+    ok=r.ok;
+    if(!ok){ const j=await r.json().catch(()=>({})); pourquoi=j.error||("HTTP "+r.status); }
+  }catch(e){ pourquoi=(e&&e.message)||"réseau"; }
+  if(ok) return;
+  if(l) l.status=avant; renderLeaks();
+  if(typeof toast==="function") toast("⚠️ Statut NON enregistré","Le serveur a refusé ("+pourquoi+"). La fuite garde son ancien statut.");
+}
 { const b=$("#alAdd"); if(b) b.onclick=addWatch; }
 // 🔍 SCANNER MAINTENANT. La route `/api/hub/leak-scan` existe depuis toujours,
 // et son commentaire côté serveur dit noir sur blanc « bouton "Scanner" sur le
@@ -4766,13 +4783,25 @@ function setLeakStatus(id,status){ const l=LEAKS.find(x=>x.id===id); if(l) l.sta
     try{
       const r=await fetch(HUB_BASE+"/api/hub/leak-scan",{method:"POST",headers:{"x-hub-token":TOKEN}});
       const j=await r.json().catch(()=>({}));
+      // Un scan tourne déjà (passage automatique de :07, autre appareil) : ce
+      // n'est pas une panne, et en relancer un doublerait les courriers DMCA.
+      if(r.status===409 && j.busy){
+        if(typeof toast==="function") toast("🔍 Un scan tourne déjà","Les résultats apparaîtront ici d'ici quelques minutes.");
+        return;
+      }
       if(!r.ok) throw new Error("HTTP "+r.status);
       // On dit ce qui a été RÉELLEMENT fait. « Scan lancé » sans chiffre laisse
       // croire qu'il a cherché même quand aucun modèle n'est surveillé.
+      // ⚠️ `scanned` compte les REQUÊTES (environ 5 par modèle), pas les
+      // modèles : l'écran annonçait « 5 modèles passés au radar » pour UN seul.
+      // Le nombre de modèles est `models`.
       if(typeof toast==="function"){
-        if(!j.scanned) toast("🔍 Rien à chercher","Aucun modèle surveillé — ajoute-en un au-dessus.");
-        else toast("🔍 "+j.scanned+" modèle"+(j.scanned>1?"s":"")+" passé"+(j.scanned>1?"s":"")+" au radar",
-                   j.found?(j.found+" fuite"+(j.found>1?"s":"")+" trouvée"+(j.found>1?"s":"")+" — voir ci-dessous"):"Aucune nouvelle fuite. ✅");
+        const nb = typeof j.models==="number" ? j.models : null;
+        const trouve = j.found?(j.found+" fuite"+(j.found>1?"s":"")+" trouvée"+(j.found>1?"s":"")+" — voir ci-dessous"):"Aucune nouvelle fuite. ✅";
+        if(j.coupe) toast("🔍 Radar coupé","Le radar anti-fuite est désactivé sur le serveur : rien n'a été cherché.");
+        else if(nb===0 || (nb===null && !j.scanned)) toast("🔍 Rien à chercher","Aucun modèle surveillé — ajoute-en un au-dessus.");
+        else if(nb===null) toast("🔍 Radar passé", trouve);
+        else toast("🔍 "+nb+" modèle"+(nb>1?"s":"")+" passé"+(nb>1?"s":"")+" au radar", trouve);
       }
       if(typeof loadLeaks==="function") loadLeaks();
     }catch(e){
@@ -4799,11 +4828,21 @@ function renderIdentity(){
   Object.keys(f).forEach(k=>{ const el=$("#"+f[k]); if(el) el.value=IDENTITY[k]||""; });
   const st=$("#dmState"); if(st) st.textContent = idComplete(IDENTITY) ? "✅ complètes" : "⚠️ à remplir";
 }
-function saveIdentity(){
+// ⚠️ FAUX ACCUSÉ DE RÉCEPTION (12/09) : « Infos DMCA enregistrées — prêt pour
+// l'envoi auto » s'affichait AVANT la réponse du serveur. Or c'est la copie du
+// SERVEUR que lit l'envoi automatique : un envoi raté laissait croire le radar
+// armé alors que chaque fuite repartait en « infos incomplètes », sans courrier.
+async function saveIdentity(){
   IDENTITY={ name:$("#dmName").value.trim(), company:$("#dmCompany").value.trim(), address:$("#dmAddress").value.trim(), phone:$("#dmPhone").value.trim(), email:$("#dmEmail").value.trim(), signature:$("#dmSign").value.trim() };
   localStorage.setItem("ccn_dmca_id",JSON.stringify(IDENTITY));
-  if(TOKEN){ fetch(HUB_BASE+"/api/hub/leak-identity",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({identity:IDENTITY})}).catch(()=>{}); }
-  renderIdentity(); if(typeof toast==="function") toast("⚖️ Infos DMCA enregistrées", idComplete(IDENTITY)?"prêt pour l'envoi auto":"complète nom+adresse+email");
+  renderIdentity();
+  if(!TOKEN){ if(typeof toast==="function") toast("⚖️ Infos DMCA gardées sur cet appareil","connecte-toi pour activer l'envoi auto"); return; }
+  let ok=false;
+  try{ const r=await fetch(HUB_BASE+"/api/hub/leak-identity",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({identity:IDENTITY})}); ok=r.ok; }
+  catch(e){ ok=false; }
+  if(typeof toast!=="function") return;
+  if(ok) toast("⚖️ Infos DMCA enregistrées", idComplete(IDENTITY)?"prêt pour l'envoi auto":"complète nom+adresse+email");
+  else toast("⚠️ Infos DMCA NON enregistrées sur le serveur","Gardées sur cet appareil seulement : l'envoi automatique ne les a pas. Réessaie.");
 }
 async function loadIdentity(){ if(TOKEN){ try{ const r=await fetch(HUB_BASE+"/api/hub/leak-identity",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); if(j.identity&&typeof j.identity==="object"){ IDENTITY=j.identity; localStorage.setItem("ccn_dmca_id",JSON.stringify(IDENTITY)); } } }catch(e){} } renderIdentity(); }
 { const b=$("#dmSave"); if(b) b.onclick=saveIdentity; }
@@ -4819,25 +4858,48 @@ function openDmcaMailto(l){
 async function sendLeakDmca(id){
   const l=LEAKS.find(x=>x.id===id); if(!l) return;
   if(!idComplete(IDENTITY)){ if(typeof toast==="function") toast("⚖️ Remplis tes infos DMCA","nom + adresse + email obligatoires"); const box=$("#antileak"); if(box) box.scrollIntoView({block:"center"}); return; }
+  // ⚠️ UN COURRIER JURIDIQUE NE PART QU'UNE FOIS (12/09). Le bouton restait
+  // cliquable pendant l'envoi, qui prend plusieurs secondes : deux clics = deux
+  // mises en demeure au même hébergeur.
+  if(DMCA_EN_COURS.has(id)){ if(typeof toast==="function") toast("⏳ Envoi déjà en cours", l.model||""); return; }
   if(TOKEN){
+    DMCA_EN_COURS.add(id);
     try{
       const r=await fetch(HUB_BASE+"/api/hub/leak-dmca",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({id:id})});
+      // 409 = déjà envoyé à l'instant, ou un envoi en cours (scan automatique,
+      // autre appareil). Surtout PAS d'email pré-rempli derrière : ce serait
+      // inviter à renvoyer le même courrier à la main.
+      if(r.status===409){
+        const j=await r.json().catch(()=>({}));
+        if(j.dejaEnvoye){ l.status="sent"; if(j.to) l.dmcaTo=j.to; renderLeaks(); }
+        if(typeof toast==="function") toast("📤 Pas de second courrier", j.error||"Un envoi est déjà en cours pour cette fuite.");
+        return;
+      }
       if(r.ok){ const j=await r.json(); if(j.to) l.dmcaTo=j.to;
         if(j.sent){ l.status="sent"; l.dmcaTs=Date.now(); renderLeaks(); if(typeof toast==="function") toast("📤 DMCA envoyé",l.model+" → "+(j.to||"")); return; }
         // Pas envoyé : on DIT pourquoi (sinon on ouvre un mail générique sans savoir quoi réparer).
         if(j.reason && typeof toast==="function"){
-          const pourquoi={ "no_resend_key":"L'envoi automatique n'est pas configuré (clé d'email manquante).",
+          // Les codes que le serveur renvoie VRAIMENT : `no_mail_configured` et
+          // `identity_incomplete` s'affichaient bruts, faute d'être dans la table.
+          const pourquoi={ "no_mail_configured":"L'envoi automatique n'est pas configuré (aucune boîte d'envoi : Gmail ou Resend).",
+                           "identity_incomplete":"Tes infos de titulaire sont incomplètes SUR LE SERVEUR (nom, adresse, email) — enregistre-les à nouveau.",
+                           "no_gmail":"La boîte Gmail d'envoi n'est pas utilisable.",
+                           "timeout":"Le service d'envoi n'a pas répondu à temps.",
+                           "no_resend_key":"L'envoi automatique n'est pas configuré (clé d'email manquante).",
                            "no_abuse":"Impossible de trouver l'adresse « abuse » de l'hébergeur.",
                            "unknown_host":"Hébergeur inconnu — je ne sais pas à qui écrire." }[j.reason] || String(j.reason);
           toast("✉️ Envoi auto impossible", pourquoi+" J'ouvre l'email pré-rempli.");
         }
       }
     }catch(e){}
+    finally{ DMCA_EN_COURS.delete(id); }
   }
   // Envoi auto indisponible (pas de clé Resend) → ouvre l'email pré-rempli
   openDmcaMailto(l);
   if(typeof toast==="function") toast("📤 Email DMCA prêt","vérifie et envoie · ou active l'envoi auto (Resend)");
 }
+// Fuites dont l'envoi DMCA est en vol (voir sendLeakDmca).
+const DMCA_EN_COURS=new Set();
 renderWatch(); renderLeaks(); renderIdentity();
 
 /* ---------- mes raccourcis + ouvrir ma routine ---------- */
