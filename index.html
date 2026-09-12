@@ -5176,13 +5176,19 @@ function unpayVa(va){
   const p=curPeriod();
   PAYMENTS=PAYMENTS.filter(x=>!(x.va===va && x.period===p)); savePayments({retrait:{va:va, period:p}}); renderPaie(LAST);
   if(!TOKEN) return;
+  // ⚠️ (13/09) Un ÉCHEC de cette annulation ne s'affichait pas (`.catch(()=>{})`,
+  // et un 503 était lu comme une réponse normale sans drapeau) : le VA avait
+  // peut-être déjà reçu « paie envoyée », personne ne le corrigeait, et l'écran
+  // ne disait rien. C'est précisément le cas que cette route existe pour éviter.
+  const _nonCorrige=(pourquoi)=>{ if(typeof toast==="function") toast("⚠️ Correction NON envoyée",
+    va+" a peut-être déjà reçu « paie envoyée » et ne sera PAS corrigé ("+pourquoi+"). Préviens-le toi-même."); };
   fetch(HUB_BASE+"/api/hub/pay-notify/cancel",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},
     body:JSON.stringify({va:va, period:p})})
-    .then(r=>r.json()).then(j=>{
-      if(typeof toast!=="function") return;
-      if(j && j.correctionEnvoyee) toast("↩️ Correction envoyée", va+" avait déjà été prévenu : le bot lui dit que le versement n'est pas parti.");
-      else if(j && j.retireeDeLaFile) toast("↩️ Annulé à temps", va+" n'a jamais reçu le message de paie.");
-    }).catch(()=>{});
+    .then(r=>{ if(!r.ok){ _nonCorrige("erreur "+r.status); return null; } return r.json(); }).then(j=>{
+      if(!j || typeof toast!=="function") return;
+      if(j.correctionEnvoyee) toast("↩️ Correction envoyée", va+" avait déjà été prévenu : le bot lui dit que le versement n'est pas parti.");
+      else if(j.retireeDeLaFile) toast("↩️ Annulé à temps", va+" n'a jamais reçu le message de paie.");
+    }).catch(()=>_nonCorrige("pas de réseau"));
 }
 function _assocVide(idPanneau, idCorps){
   // ⚠️ EN VUE ASSOCIÉ, CES PANNEAUX ÉTAIENT SEULEMENT CACHÉS PAR DU CSS.
@@ -7497,7 +7503,7 @@ function bilanPrevision(d, money){
 // ⚠️ Le calcul reste ICI. Le refaire côté serveur créerait un DEUXIÈME compte
 // de résultat — le piège des jumeaux qui a produit le voyant vert menteur et le
 // filtre à moitié appliqué. Le serveur ne fait que garder ce qu'on lui envoie.
-let PNL_HIST=null, PNL_ENVOYE_LE=null;
+let PNL_HIST=null, PNL_ENVOYE_LE=null, PNL_REESSAI_APRES=0;
 async function loadPnl(){
   if(!TOKEN) return;
   try{
@@ -7517,10 +7523,16 @@ function noterPnl(l){
   // calculé sur une source qui n'a pas répondu, c'est graver une contre-vérité
   // dans un historique fait pour être relu dans six mois.
   if(l.caBrut==null) return;
+  if(Date.now() < PNL_REESSAI_APRES) return;
   PNL_ENVOYE_LE=l.d;
+  // ⚠️ Seule une panne RÉSEAU faisait réessayer : un refus du serveur (503 « non
+  // enregistré ») résout le fetch sans erreur, et le jour passait pour noté.
+  // On lit la réponse. Un refus d'autorisation (compte associé) ne se réessaie
+  // pas ; une panne, si — mais pas toutes les 60 s.
+  const _echec=()=>{ PNL_ENVOYE_LE=null; PNL_REESSAI_APRES=Date.now()+5*60000; };
   fetch(HUB_BASE+"/api/hub/pnl",{method:"POST",
     headers:{"content-type":"application/json","x-hub-token":TOKEN},
-    body:JSON.stringify(l)}).catch(()=>{ PNL_ENVOYE_LE=null; });   // échec : on réessaiera
+    body:JSON.stringify(l)}).then(r=>{ if(!r.ok && r.status!==401 && r.status!==403) _echec(); }).catch(_echec);
 }
 // Le profit FINAL des mois terminés : le dernier relevé de chaque mois.
 // `null` si l'historique n'a pas été lu — « absent ≠ 0 ».
@@ -9124,7 +9136,13 @@ function renderRenta(){
   // incomplet qu'un profit amputé d'un montant inventé.
   const profitReel=profitNet-ocFee-((primesMois&&primesMois.total>0)?primesMois.total:0);
   // On fige ce qu'on vient d'afficher, une fois par jour.
+  // ⚠️ CE RELEVÉ N'A JAMAIS ÉTÉ ENVOYÉ (vu le 13/09). Il lisait `ko` et `t`, deux
+  // noms copiés d'une autre fonction et qui n'existent pas ici : ReferenceError
+  // au premier champ, avalé par le `catch` juste en dessous. Depuis le 09/09, le
+  // « compte de résultat figé mois par mois » n'a pas reçu une seule ligne — et
+  // le 1er du mois, il n'y aurait eu aucun résultat de septembre à relire.
   try{
+    const ko=(typeof revKo==="function")?revKo():false, t=d.totals||{};
     if(typeof noterPnl==="function" && typeof jourServeur==="function"){
       noterPnl({ d:String(jourServeur()).slice(0,10),
         caBrut:(ko||t.netMonth==null)?null:Number(t.netMonth),

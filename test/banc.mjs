@@ -1760,4 +1760,74 @@ const V=verifie;
   }
 }
 
+// ================= COMPTE DE RESULTAT : le releve du jour part VRAIMENT
+// ⚠️ (13/09) Le releve quotidien lisait `ko` et `t`, deux noms copies d'une autre
+// fonction et absents de renderRenta : ReferenceError au premier champ, avale par
+// le `catch` juste dessous. Depuis le 09/09, AUCUNE ligne n'avait ete envoyee —
+// le banc 22 verifiait la relecture d'un historique… que rien ne remplissait.
+// Et un refus du serveur (503) ne faisait jamais reessayer : seul un echec RESEAU
+// remettait le jour « a noter ».
+{
+  let bloc = null;
+  try { bloc = morceau("  // On fige ce qu'on vient d'afficher, une fois par jour.", "  // 🧾 #7"); } catch (e) { bloc = null; }
+  V("le releve du jour est dans renderRenta", !!bloc);
+  if (bloc) {
+    const notes = [];
+    const d = { totals: { netMonth: 5000, margeMonth: 1800 } };
+    new Function("d", "revKo", "noterPnl", "jourServeur", "netRate", "coutOutils", "_rw", "primesMois", "ocFee", "tgMonth", "profitReel",
+      bloc)(d, () => false, (l) => notes.push(l), () => "2026-09-13", () => 0.8, 120, null, { total: 50 }, 90, 300, 1400);
+    V("le releve part (noterPnl est appele)", notes.length === 1, notes.length + " appel — le journal ne recoit rien");
+    V("... avec le CA lu, pas null", notes[0] && notes[0].caBrut === 5000 && notes[0].caNet === 4000, JSON.stringify(notes[0]));
+    const muet = [];
+    new Function("d", "revKo", "noterPnl", "jourServeur", "netRate", "coutOutils", "_rw", "primesMois", "ocFee", "tgMonth", "profitReel",
+      bloc)(d, () => true, (l) => muet.push(l), () => "2026-09-13", () => 0.8, 120, null, null, 90, 300, 1400);
+    V("revenus muets : le CA part a null (jamais un faux chiffre)", muet[0] && muet[0].caBrut === null, JSON.stringify(muet[0]));
+  }
+  let fNoter = null;
+  try { fNoter = morceau("let PNL_HIST=null", "// Le profit FINAL des mois"); } catch (e) { fNoter = null; }
+  V("l envoi du releve est la", !!fNoter);
+  if (fNoter) {
+    let appels = 0, maintenant = 1757750000000;
+    const vraiNow = Date.now; Date.now = () => maintenant;
+    try {
+      const noter = new Function("TOKEN", "HUB_BASE", "fetch", "renderRenta",
+        fNoter + "; return noterPnl;")("jeton", "http://x", () => { appels++; return Promise.resolve({ ok: false, status: 503 }); }, () => {});
+      const l = { d: "2026-09-13", caBrut: 5000 };
+      noter(l); await new Promise((r) => setTimeout(r, 0));
+      noter(l); await new Promise((r) => setTimeout(r, 0));
+      V("un refus du serveur ne fait pas marteler (pas de 2e envoi dans la minute)", appels === 1, appels + " envois");
+      maintenant += 6 * 60000;
+      noter(l); await new Promise((r) => setTimeout(r, 0));
+      V("... mais le jour n est PAS considere comme note : on reessaie plus tard", appels === 2, appels + " envoi(s) — le jour est perdu");
+    } finally { Date.now = vraiNow; }
+  }
+}
+
+// ================= ANNULER UNE PAIE : un echec de la correction se VOIT
+// ⚠️ (13/09) Le VA a peut-etre deja recu « paie envoyee ». Si l'annulation
+// echouait (503, reseau), `.catch(()=>{})` et un 503 lu comme une reponse
+// normale : aucun message, et personne ne corrigeait le VA.
+{
+  let fUnpay = null;
+  try { fUnpay = morceau("function unpayVa(va){", "function _assocVide("); } catch (e) { fUnpay = null; }
+  V("annuler une paie est la", !!fUnpay);
+  if (fUnpay) {
+    const essai = async (reponse) => {
+      const toasts = [];
+      const f = new Function("PAYMENTS", "savePayments", "renderPaie", "LAST", "curPeriod", "TOKEN", "HUB_BASE", "fetch", "toast",
+        fUnpay + "; return unpayVa;")([{ va: "VaTest", period: "2026-09-A" }], () => {}, () => {}, {}, () => "2026-09-A", "jeton", "http://x",
+        reponse, (a, b) => toasts.push(a + " | " + (b || "")));
+      f("VaTest");
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+      return toasts;
+    };
+    const t503 = await essai(() => Promise.resolve({ ok: false, status: 503, json: async () => ({ error: "file illisible" }) }));
+    V("serveur qui refuse : l ecran dit que le VA n est PAS corrige", t503.some((x) => /NON envoy/.test(x)), t503.join(" / ") || "aucun message");
+    const tReseau = await essai(() => Promise.reject(new Error("hors ligne")));
+    V("pas de reseau : idem", tReseau.some((x) => /NON envoy/.test(x)), tReseau.join(" / ") || "aucun message");
+    const tOk = await essai(() => Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, retireeDeLaFile: 1 }) }));
+    V("succes : « annule a temps », sans fausse alerte", tOk.length === 1 && /temps/.test(tOk[0]), tOk.join(" / "));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
