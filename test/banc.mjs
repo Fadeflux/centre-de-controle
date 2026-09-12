@@ -1214,4 +1214,99 @@ const V=verifie;
   }
 }
 
+
+// ══ 26. LE BLOC-NOTES : « enregistre » ne doit pas mentir ════════════════════
+// Il n'ecrivait que dans le navigateur en affichant « ✓ enregistre ». Vidage du
+// navigateur, autre machine ou telephone -> bloc-notes vide, sans un mot.
+// Ce qui compte maintenant :
+//   - on n'ENVOIE RIEN avant d'avoir LU (sinon une lecture ratee suivie d'une
+//     frappe pousse un texte vide par-dessus le vrai) ;
+//   - le mot affiche correspond a ce qui s'est REELLEMENT passe ;
+//   - le serveur fait reference au chargement, SAUF si on a deja tape.
+{
+  const corps = morceau('{ const np=$("#npText"); if(np){', 'np.addEventListener("input",()');
+  const code = corps + '; return { npPousser, saveNp, np, lu:()=>NP_LU }; } }';
+
+  const monter = (opts) => {
+    const champs = { "#npText": { value: opts.local || "" }, "#npSaved": { textContent:"", style:{} } };
+    const envois = [];
+    const faux$ = (s) => champs[s] || null;
+    const stock = { data:{}, getItem(k){ return (k in this.data)?this.data[k]:null; },
+                    setItem(k,v){ this.data[k]=String(v); } };
+    if(opts.local!=null) stock.data["ccn_notepad"]=opts.local;
+    const fauxFetch = async (url, o) => {
+      envois.push({ url, methode:(o&&o.methode)||(o&&o.method)||"GET", corps:o&&o.body });
+      if(o && o.method === "POST") {
+        if(opts.postKo) throw new Error("reseau");
+        return { ok:true, json: async () => ({ ok:true }) };
+      }
+      if(opts.lectureKo) throw new Error("muet");
+      return { ok:true, json: async () => ({ texte: opts.serveur==null?"":opts.serveur }) };
+    };
+    const api = new Function("$","TOKEN","HUB_BASE","fetch","localStorage","setTimeout","clearTimeout", code)(
+      faux$, opts.token===undefined?"jeton":opts.token, "http://x", fauxFetch, stock,
+      (f)=>{ return 0; }, ()=>{});
+    return { api, envois, champs, stock };
+  };
+  const souffler = () => new Promise(r=>setImmediate(r));
+
+  {
+    // Hors ligne : rien ne part, et le mot ne promet pas le cerveau.
+    const m = monter({ token:"", local:"mes notes" });
+    await m.api.saveNp();
+    V("bloc-notes hors ligne : rien n est envoye",
+      m.envois.length === 0, JSON.stringify(m.envois));
+    V("... et le mot ne dit pas « enregistre » tout court",
+      /cet appareil seulement/.test(m.champs["#npSaved"].textContent), m.champs["#npSaved"].textContent);
+    V("... mais le texte est bien garde en local",
+      m.stock.getItem("ccn_notepad") === "mes notes", m.stock.getItem("ccn_notepad"));
+  }
+  {
+    // LE CONTROLE QUI COMPTE : lecture ratee -> on n'ecrase PAS le cerveau.
+    const m = monter({ local:"brouillon local", lectureKo:true });
+    await souffler();
+    m.envois.length = 0;
+    await m.api.saveNp();
+    V("lecture ratee : aucune ECRITURE a l aveugle",
+      !m.envois.some(e => e.methode === "POST" || /POST/.test(String(e.methode))),
+      "un texte serait parti par-dessus le vrai : " + JSON.stringify(m.envois));
+    V("... et il le DIT au lieu de faire semblant",
+      /pas encore synchronis/.test(m.champs["#npSaved"].textContent), m.champs["#npSaved"].textContent);
+  }
+  {
+    // Lecture reussie : le serveur fait reference.
+    const m = monter({ local:"vieux", serveur:"texte du cerveau" });
+    await souffler(); await souffler();
+    V("au chargement, le cerveau fait reference",
+      m.champs["#npText"].value === "texte du cerveau", m.champs["#npText"].value);
+    V("... et le local est remis a jour",
+      m.stock.getItem("ccn_notepad") === "texte du cerveau", m.stock.getItem("ccn_notepad"));
+    V("... et la lecture est marquee reussie", m.api.lu() === true);
+  }
+  {
+    // Apres lecture, une frappe part vraiment, et le mot est mérité.
+    const m = monter({ local:"", serveur:"a" });
+    await souffler(); await souffler();
+    m.envois.length = 0;
+    m.champs["#npText"].value = "ab";
+    await m.api.saveNp();
+    V("apres lecture, la frappe part au cerveau",
+      m.envois.some(e => /bloc-notes/.test(e.url)) && /"ab"/.test(String(m.envois[0].corps||"")),
+      JSON.stringify(m.envois));
+    V("... et « ✓ enregistre » n est dit qu apres confirmation",
+      m.champs["#npSaved"].textContent.indexOf("enregistr") >= 0, m.champs["#npSaved"].textContent);
+  }
+  {
+    // Envoi refuse : le mot doit le dire, pas mentir.
+    const m = monter({ local:"", serveur:"a", postKo:true });
+    await souffler(); await souffler();
+    m.champs["#npText"].value = "perdu ?";
+    await m.api.saveNp();
+    V("envoi refuse : le mot avoue l echec",
+      /NON envoy/.test(m.champs["#npSaved"].textContent), m.champs["#npSaved"].textContent);
+    V("... et le texte reste garde en local",
+      m.stock.getItem("ccn_notepad") === "perdu ?", m.stock.getItem("ccn_notepad"));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

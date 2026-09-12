@@ -14009,7 +14009,52 @@ function renderCal(){
 renderCal();
 
 /* ---------- bloc-notes ---------- */
-{ const np=$("#npText"); if(np){ np.value=localStorage.getItem("ccn_notepad")||""; let nt=null; const saveNp=()=>{ localStorage.setItem("ccn_notepad",np.value); const s=$("#npSaved"); if(s){ s.textContent="✓ enregistré"; setTimeout(()=>{ s.textContent=""; },1500); } }; np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(saveNp,400); });
+{ const np=$("#npText"); if(np){
+  /* ⚠️ LE BLOC-NOTES NE VIVAIT QUE DANS CE NAVIGATEUR, et le panneau affichait
+     « ✓ enregistré ». Vidage du navigateur, autre machine ou téléphone →
+     bloc-notes vide, sans un mot. Ses deux voisins immédiats se synchronisaient
+     pourtant déjà (notes VA, tâches). Même famille que le « Sauvegardé »
+     mensonger de Finance (08/25) : un mot rassurant sur une écriture qui ne
+     part nulle part.
+
+     ⚠️ ON N ENVOIE RIEN AVANT D AVOIR LU. Sinon une lecture ratée (cerveau
+     muet) suivie d une frappe pousserait un texte vide PAR-DESSUS le vrai.
+     Même règle que les notes VA : un drapeau retient l écriture jusqu à la
+     première lecture réussie.
+
+     ⚠️ ET LE MOT DIT LA VÉRITÉ : « ✓ enregistré » seulement quand le cerveau a
+     confirmé ; sinon « ✓ sur cet appareil seulement ». */
+  let NP_LU=false, NP_SALE=false, nt=null, npt=null;
+  const npDire=(txt,couleur)=>{ const s=$("#npSaved"); if(!s) return;
+    s.textContent=txt; s.style.color=couleur||""; clearTimeout(npt);
+    npt=setTimeout(()=>{ s.textContent=""; },2500); };
+  np.value=localStorage.getItem("ccn_notepad")||"";        // affichage instantané
+  const npPousser=async()=>{
+    if(!TOKEN||!HUB_BASE){ npDire("✓ sur cet appareil seulement","#facc15"); return; }
+    if(!NP_LU){ NP_SALE=true; npDire("⏳ pas encore synchronisé","#facc15"); return; }
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/bloc-notes",{method:"POST",
+        headers:{"content-type":"application/json","x-hub-token":TOKEN},
+        body:JSON.stringify({texte:np.value})});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      npDire("✓ enregistré");
+    }catch(e){ npDire("⚠ NON envoyé au cerveau — gardé sur cet appareil","#f87171"); }
+  };
+  const saveNp=()=>{ try{ localStorage.setItem("ccn_notepad",np.value); }catch(e){} npPousser(); };
+  (async()=>{
+    if(!TOKEN||!HUB_BASE) return;
+    try{
+      const r=await fetch(HUB_BASE+"/api/hub/bloc-notes",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+      if(!r.ok) return;                                     // on ne touche à rien : le local reste
+      const j=await r.json(); const srv=String((j&&j.texte)||"");
+      NP_LU=true;
+      // Le serveur fait référence, SAUF si on a déjà tapé depuis l ouverture :
+      // dans ce cas c est la frappe qui gagne, et on la pousse.
+      if(NP_SALE){ npPousser(); return; }
+      if(srv!==np.value){ np.value=srv; try{ localStorage.setItem("ccn_notepad",srv); }catch(e){} }
+    }catch(e){ /* cerveau muet : le bloc-notes local reste affiché */ }
+  })();
+  np.addEventListener("input",()=>{ clearTimeout(nt); nt=setTimeout(saveNp,400); });
   // 🎤 Note vocale : dicte et ça s'ajoute au bloc-notes (avec la date).
   const npm=$("#npMic"); const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(npm){ if(!SR){ npm.style.display="none"; } else { let nrec=null, nlisten=false;
