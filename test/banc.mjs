@@ -1879,4 +1879,49 @@ const V=verifie;
   }
 }
 
+console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence dans ce dépôt public ==");
+{
+  // ⚠️ (13/09) Un commentaire nommait encore une autre agence. Le dépôt est PUBLIC.
+  // Liste rangée sous forme d'EMPREINTES (sha256 tronqué) : ce banc n'en contient aucun.
+  const { createHash } = await import("node:crypto");
+  const INTERDITS = new Set([
+    "00139528c9a24aca","01ddadf7b03c336f","04240809cca78a0f","05195963bbd10343","09f49cafe12120ec",
+    "0a4eb1fdb8f1de5c","0b76fb9711d4f3d8","0e4b2cc962efb28b","117b26ccb8fb4ed5","13d63234821e9ec8",
+    "13f30f775fb6824a","164d9b3b7b836b0e","1b5c1d3c9d8e2808","23c8aa36106a6d89","2404fdeb34a79ea4",
+    "2487c0f0728a2861","28fed7d40ff88a12","2b842d2a5611cb20","2db0f8a45c44969b","2defd355f601a479",
+    "2e4f57816bec2d5e","2f93527f7fca966a","32a1e3443a1dffd6","33dd18b47a2bda2f","382177b9b31af811",
+    "3ba7c23a8258e08a","3fa53103bb563186","40031618ad9bd84b","4026e2a877f67b34","40903c59d19feef1",
+    "414b0a2f58514c75","4367104d4aa5846c","438782d2eda360ba","440b88f9b52836bc","44bcdaca8c456ca1",
+    "4631f91f323c23a5","47acf82a48cfa5c3","4812789f7130fd12","4b4e7d5db7fc6173","4ca70efcf4260452",
+    "4f6105e2260d1223","4f98636470ed11df","5045d78495fc49a1","528f14167d47cc13","5784034037cfe682",
+    "5ccf3e630657cfb9","6203340e0745473e","62eb92cbf5bb53a0","698c828d52949145","6a61e9feada0b195",
+    "6d8e16e0018bdd1e","70dd997c29c18374","728950ef277f75b7","798b671317f292c1","7a857235760e4737",
+    "7b3ca3e426cd521f","7cdf8a37974a5a2b","7d4aa40fd654b74d","84ff7a86c49a362e","869dcf48aa1b92b0",
+    "873573645c587e10","88a1ad27d99e95f7","88fec672bcb8d0dc","8acf1bbe8739a2c7","8c9158fef04d879f",
+    "8f71957826707804","91e224dd42a264c9","91e52721fc76ee51","928d73f0b47bf95b","940fcb01712ac8d7",
+    "944e5ce46de06912","945085b11ad89f21","94a602a952c9818f","97cb5901c79692f4","9901972c0fd08a3d",
+    "9a9d685f1d13235e","9b8290893d287b6b","9c156250567a8006","a387c1ca4f96e5bf","ad7007f508bc8dc3",
+    "ae6346a0de0fadc9","af4fda792dbbdb79","b3cab839150a5147","b4642f312dcd065b","b48db56e9315a39c",
+    "b52e38a9e394d71f","b6888bbd34591be4","b9ac732af2aa0b0b","ba8a36f7c57d1648","bb565a3ddd1cd230",
+    "bc1b180e87561b99","c3f523bbf225edca","c64fa36ebda6e4a5","c6fde3bee3cc22b1","c7d6d115b53ecda5",
+    "c9c57ae36dd11c95","cd172b28ea547ba3","cd3a54125ac34d97","cd58e30ca91c31ad","ceeea83e61d92f92",
+    "d12d7420fab77062","d24068c25bc64c59","d3b87062116daf52","d3f13b5690574a95","d3f1c4c0abc8b49b",
+    "d5b1009bdf5cb6fc","d74484802927e141","d77c1280eb9ca1ca","d8502596a6d79611","dd35109949907845",
+    "de0ad2a8beed214f","dfc3f1949c56273c","e050e474330b5980","e415bceda0a4df86","e6382b487b75248d",
+    "e83f8deafb192805","e9abc5b847a266cf","ec0c02715c499e46","ec1186f266c2d30e","ee22404ac207812e",
+    "eff3cc26e4b119c3","f0359bf18e00412f","f05169c93460d65e","f074af7ea0860046","f3b6a2c5c5e9d873",
+    "f688f2bd1b183566","f773094574a105ec","f8c78d89c3f2eecd","ff235c3f71bd089b",
+  ]);
+  const interdits = (texte) => [...new Set((String(texte).match(/(?<!\d)\d{17,20}(?!\d)|[A-Z]+(?![a-z])|[A-Z]?[a-zà-ÿ]+/g) || [])
+    .filter((m) => INTERDITS.has(createHash("sha256").update(m.toLowerCase()).digest("hex").slice(0, 16))))];
+  const racine = new URL("..", import.meta.url);
+  const trouves = [];
+  for (const f of ["index.html", "README.md", "manifest.json", "sw.js", "test/banc.mjs"]) {
+    const u = new URL(f, racine);
+    if (!fs.existsSync(u)) continue;
+    fs.readFileSync(u, "utf8").split("\n").forEach((l, n) => { if (interdits(l).length) trouves.push(f + ":" + (n + 1)); });
+  }
+  V("aucun nom ni identifiant d'une autre agence", trouves.length === 0, trouves.join(", "));
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
