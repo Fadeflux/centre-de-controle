@@ -13512,6 +13512,7 @@ function renderSanteComptes(){
   const ete=(d&&Array.isArray(d.eteints))?d.eteints:null;
   if(!d||((sus==null||!sus.length)&&(ete==null||!ete.length))){ p.style.display="none"; return; }
   p.style.display="block";
+  const _assocSc=document.body.classList.contains("assoc-mode");
   let html="";
   if(ete&&ete.length){
     html+=`<div class="sv-head">📉 Comptes en train de s'éteindre — ${ete.length}</div>`
@@ -13523,12 +13524,48 @@ function renderSanteComptes(){
   if(sus&&sus.length){
     html+=`<div class="sv-head" style="margin-top:${ete&&ete.length?"12px":"0"}">🕵️ Comptes qui ne ressemblent pas à des comptes de VA — ${sus.length}</div>`
       +sus.slice(0,10).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
-        +`<span class="sv-cell"><b>${fmtInt(x.followers)}</b> followers · ${x.posts30?`<b>${x.posts30}</b> posts / ${fmtInt(x.vues30)} vues sur 30 j`:"aucun post sur 30 j"}</span>`
+        +`<span class="sv-cell"><b>${fmtInt(x.followers)}</b> followers · ${x.posts30?`<b>${x.posts30}</b> posts / ${fmtInt(x.vues30)} vues sur 30 j`:"aucun post sur 30 j"}`
+        // Bouton d'écriture : jamais en vue associé (le serveur refuse de toute façon).
+        +`${_assocSc?"":` <button class="mn-act-btn" data-exclure="${escapeHtml(x.username)}" style="padding:2px 8px;font-size:11px;margin-left:6px" title="Ce compte n'appartient pas au VA : ses reels trouvés par le robot ne comptent plus pour lui, et il n'est plus suivi">Sortir des stats</button>`}</span>`
         +`<span class="sv-part ${x.danger==="poste"?"bad":"mid"}">${x.danger==="poste"?"⚠️ poste":"muet"}</span></div>`).join("")
-      +`<div class="sv-note">Un compte de farm a une médiane de <b>7 à 45</b> followers ; au-delà de ${fmtInt(d.seuilSuspect)}, c'est probablement une page de modèle ou une référence mal rangée. <b>Rien n'est détaché automatiquement</b> : s'il y en a un qui n'appartient pas au VA, dis-le à Claude et il le détache — un « ⚠️ poste » fausse déjà les vues de son VA aujourd'hui.</div>`;
+      +`<div class="sv-note">Un compte de farm a une médiane de <b>7 à 45</b> followers ; au-delà de ${fmtInt(d.seuilSuspect)}, c'est probablement une page de modèle ou une référence mal rangée. <b>Rien n'est détaché automatiquement</b> : si l'un n'appartient pas au VA, « Sortir des stats » retire ses reels trouvés par le robot des chiffres du VA et arrête de le suivre (les reels collés par un VA dans Discord ne sont pas touchés, et c'est réversible) — un « ⚠️ poste » fausse déjà les vues de son VA aujourd'hui.</div>`;
   }
   $("#santecomptesBody").innerHTML=html;
+  $("#santecomptesBody").querySelectorAll("[data-exclure]").forEach(b=>{ b.onclick=()=>exclureCompteSuspect(b.getAttribute("data-exclure"), b); });
   try{ fixPairs(); }catch(e){}
+}
+// 🚫 « Sortir des stats » : le compte n'appartient pas au VA. Le serveur fait tout
+// dans une transaction (voir exclureCompte côté cerveau) ; on n'annonce le succès
+// QU'AVEC sa réponse, et ses chiffres — jamais avant, jamais inventés.
+async function exclureCompteSuspect(username, btn){
+  const x=((typeof SANTEC_DATA!=="undefined"&&SANTEC_DATA&&SANTEC_DATA.suspects)||[]).find(s=>s&&s.username===username);
+  if(!x || !TOKEN) return;
+  const va=x.va||"son VA";
+  const msg=`Sortir @${username} des stats de ${va} ?\n\n`
+    +`• ${fmtInt(x.followers)} abonnés : ce n'est pas un compte de VA.\n`
+    +`• Ses reels trouvés par le robot (${fmtInt(x.posts30||0)} sur 30 j, ${fmtInt(x.vues30||0)} vues) ne compteront plus pour ${va} ; les totaux des jours concernés sont recalculés.\n`
+    +`• Le compte n'est plus suivi et ne sera plus réactivé tout seul.\n`
+    +`• Les reels collés à la main par un VA dans Discord ne sont PAS touchés.\n\n`
+    +`Rien n'est effacé : c'est réversible.`;
+  if(!confirm(msg)) return;
+  if(btn){ btn.disabled=true; btn.textContent="⏳"; }
+  let r=null, j={};
+  try{
+    r=await fetch(HUB_BASE+"/api/hub/sante-comptes/exclure",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({username:username})});
+    try{ j=await r.json(); }catch(_){ j={}; }
+  }catch(e){ r=null; }
+  if(!r){
+    if(typeof toast==="function") toast("❌ Pas de réponse du serveur","Rien n'est confirmé : recharge le panneau avant de réessayer.");
+  } else if(!r.ok || !j || j.ok!==true){
+    if(typeof toast==="function") toast("❌ Rien n'a été changé",(j&&j.error)||("le serveur a refusé (code "+r.status+")"));
+  } else if(typeof toast==="function"){
+    toast("✅ "+(j.compte||("@"+username))+" sorti des stats",
+      `${fmtInt(j.postsRetires)} reel${j.postsRetires>1?"s":""} retiré${j.postsRetires>1?"s":""} des chiffres de ${j.va||va}`
+      +(j.postsVaGardes?` · ${fmtInt(j.postsVaGardes)} collé${j.postsVaGardes>1?"s":""} par un VA gardé${j.postsVaGardes>1?"s":""}`:"")
+      +((j.recalculsEchoues&&j.recalculsEchoues.length)?` · ⚠️ totaux de ${j.recalculsEchoues.length} jour(s) pas recalculés : ils se referont cette nuit`:""));
+  }
+  if(btn){ btn.disabled=false; btn.textContent="Sortir des stats"; }
+  try{ await loadSanteComptes(); }catch(_){}
 }
 
 // 📋 NOTE DU JOUR SUR 100 (idée 17, validée le 24/08)

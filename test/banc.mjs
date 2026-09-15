@@ -2018,4 +2018,42 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("Qui depense : le nom du bot est ecrit sur la puce", /\$\{e\.bot\?` · \$\{escapeHtml\(e\.bot\)\}`:""\}/.test(src), "e.bot jamais affiche");
 }
 
+// ================= SANTE DES COMPTES : « SORTIR DES STATS » N ANNONCE QUE CE QUI EST FAIT
+// Le 15/09 la seule facon d agir sur un compte suspect etait de le demander a Claude.
+// Le bouton ecrit sur les stats d un VA : on verifie qu il n annonce JAMAIS un succes
+// sans la reponse du serveur, et qu il n existe pas en vue associe.
+{
+  let blocX = "";
+  try { blocX = morceau("async function exclureCompteSuspect(", "// 📋 NOTE DU JOUR SUR 100"); } catch (e) {}
+  verifie("Sortir des stats : le geste existe", !!blocX, "exclureCompteSuspect absente");
+  if (blocX) {
+    const jouer = async (reponse, confirme) => {
+      const toasts = [], appels = []; let relu = 0;
+      const f = new Function("SANTEC_DATA", "TOKEN", "HUB_BASE", "confirm", "fetch", "toast", "fmtInt", "loadSanteComptes",
+        blocX + "; return exclureCompteSuspect;")(
+        { suspects: [{ username: "pagepublique", va: "VaTest", followers: 835203, posts30: 10, vues30: 995477 }] },
+        "jeton", "http://x", () => confirme,
+        async (u, o) => { appels.push({ u, o }); if (reponse === "reseau") throw new Error("coupure"); return { ok: reponse.status < 400, status: reponse.status, json: async () => reponse.corps }; },
+        (a, b) => toasts.push(a + " | " + b), (n) => String(n), async () => { relu++; });
+      await f("pagepublique", null);
+      return { toasts, appels, relu };
+    };
+    const ok = await jouer({ status: 200, corps: { ok: true, compte: "@pagepublique", va: "VaTest", postsRetires: 10, postsVaGardes: 0, recalculsEchoues: [] } }, true);
+    verifie("Sortir des stats : POST vers la bonne route", ok.appels.length === 1 && /\/api\/hub\/sante-comptes\/exclure$/.test(ok.appels[0].u) && ok.appels[0].o.method === "POST", JSON.stringify(ok.appels.map(a => a.u)));
+    verifie("Sortir des stats : succes annonce avec les chiffres du serveur", ok.toasts.length === 1 && /^✅/.test(ok.toasts[0]) && /10 reels retirés/.test(ok.toasts[0]), ok.toasts.join(" // "));
+    verifie("Sortir des stats : le panneau se relit apres", ok.relu === 1, "panneau pas relu");
+    const refuse = await jouer({ status: 409, corps: { error: "pas un compte suspect" } }, true);
+    verifie("Sortir des stats : refus du serveur = « rien n a ete change »", refuse.toasts.length === 1 && /Rien n'a été changé/.test(refuse.toasts[0]) && !/✅/.test(refuse.toasts[0]), refuse.toasts.join(" // "));
+    const menteur = await jouer({ status: 200, corps: { error: "bizarre" } }, true);
+    verifie("Sortir des stats : 200 sans ok:true n est PAS un succes", !menteur.toasts.some(t => /✅/.test(t)), menteur.toasts.join(" // "));
+    const coupe = await jouer("reseau", true);
+    verifie("Sortir des stats : coupure = rien n est confirme", coupe.toasts.length === 1 && /Pas de réponse/.test(coupe.toasts[0]), coupe.toasts.join(" // "));
+    const annule = await jouer({ status: 200, corps: { ok: true } }, false);
+    verifie("Sortir des stats : annuler la confirmation n envoie rien", annule.appels.length === 0 && annule.toasts.length === 0, "requete partie sans confirmation");
+  }
+  const iR = src.indexOf("function renderSanteComptes(");
+  const corpsR = iR < 0 ? "" : src.slice(iR, src.indexOf("\nasync function exclureCompteSuspect(", iR));
+  verifie("Sortir des stats : bouton absent en vue associe", /_assocSc\?"":/.test(corpsR) && /classList\.contains\("assoc-mode"\)/.test(corpsR), "bouton d ecriture visible par l associee");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
