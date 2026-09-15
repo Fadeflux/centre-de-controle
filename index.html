@@ -11040,6 +11040,10 @@ async function loadProxy(force){
     if(r2.ok) PROXY_DATA_GB=await r2.json();
   }catch(e){}
   renderProxy(); if(typeof renderActions==="function") renderActions();
+  // La carte « Proxy » du catalogue lit PROXY_DATA_GB dans render() : sans ce
+  // rappel, elle restait sur « — » jusqu'au tour de boucle suivant, et sans fin
+  // sur un onglet en arrière-plan (boucles en pause). Même geste que loadSms.
+  try{ if(typeof LAST!=="undefined"&&LAST&&typeof render==="function") render(LAST); }catch(e){}
 }
 function renderProxy(){
   const panel=$("#proxy"), body=$("#proxyBody"); if(!panel||!body) return;
@@ -13617,7 +13621,8 @@ function renderTgVa(){
   $("#tgvaBody").innerHTML=(rows||`<div class="sv-note">Des entrées, mais aucun lien nommé pour l'instant.</div>`)
     +blocMem
     +`${d.horsCanal?`<div class="sv-note">💡 <b>${fmtInt(d.horsCanal.payeurs)}</b> payeur${d.horsCanal.payeurs>1?"s":""} OnlyChat (${money(d.horsCanal.depense)}) ne sont <b>jamais passés par un lien tracké</b> — arrivés avant le traqueur, ou directement au bot. Le tableau du haut ne montre que ce qui est <b>attribuable</b> ; ça se remplit tout seul avec les nouvelles entrées.</div>`:""}`
-    +`${d.onlychatLu===false?`<div class="sv-note" style="color:#facc15">⚠️ OnlyChat n'a pas répondu : entrées justes, dépenses non mesurées (« — », pas zéro).</div>`:""}`;
+    +`${d.onlychatLu===false?`<div class="sv-note" style="color:#facc15">⚠️ OnlyChat n'a pas répondu : entrées justes, dépenses non mesurées (« — », pas zéro).</div>`:""}`
+    +`${d.onlychatAgeMin!=null?`<div class="sv-note">🕒 Dépenses lues il y a ${fmtInt(d.onlychatAgeMin)} min : OnlyChat a limité les lectures, elles se remettent à jour toutes seules.</div>`:""}`;
   try{ fixPairs(); }catch(e){}
 }
 

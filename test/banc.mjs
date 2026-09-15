@@ -1924,4 +1924,23 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   V("aucun nom ni identifiant d'une autre agence", trouves.length === 0, trouves.join(", "));
 }
 
+// ================= LES CARTES NOURRIES EN ARRIERE-PLAN SE REDESSINENT A L ARRIVEE
+// render() lit SMS_DATA et PROXY_DATA_GB pour remplir les cartes du catalogue.
+// loadSms rappelait render(LAST) a l arrivee des chiffres ; loadProxy NON : la carte
+// « Proxy » restait sur « — » jusqu au tour suivant, et sans fin sur un onglet en
+// arriere-plan (mesure le 15/09 : 57 Go et 225 jours recus, carte a « — »).
+{
+  const src = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const corps = (nom) => {
+    const i = src.indexOf("async function " + nom + "(");
+    if (i < 0) return "";
+    const fins = [src.indexOf("\nasync function ", i + 10), src.indexOf("\nfunction ", i + 10)].filter((x) => x > 0);
+    return src.slice(i, fins.length ? Math.min(...fins) : i + 4000);
+  };
+  for (const nom of ["loadProxy", "loadSms"]) {
+    verifie(nom + " redessine les cartes a l arrivee des chiffres", /render\(LAST\)/.test(corps(nom)), "render(LAST) absent de " + nom);
+  }
+  verifie("Telegram par VA : l age des depenses OnlyChat est dit", /onlychatAgeMin!=null/.test(src), "note d age absente");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
