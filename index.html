@@ -4069,6 +4069,9 @@ let ONLYCHAT_DATA = null, ONLYCHAT_FAILS = 0;
 // « le serveur recalcule » : ni un succès ni une panne. Sans ce drapeau, cet
 // état passait pour un succès et faisait taire le bandeau (voir tgIncertain).
 let ONLYCHAT_CALCUL = false;
+// OnlyChat non branché sur ce déploiement : la saisie manuelle du Telegram fait
+// alors foi (le relevé du compte de résultat en a besoin pour savoir s'il peut noter).
+let ONLYCHAT_NON_BRANCHE = false;
 async function loadOnlyChat(){
   if(!TOKEN) return;
   let ok=false;
@@ -4091,8 +4094,8 @@ async function loadOnlyChat(){
       // déclencher son rate-limit et re-faire disparaître Telegram. Même garde
       // que loadOM (_omRetry).
       if(j && j.computing){ ok=true; ONLYCHAT_CALCUL=true; if(!window._ocComputingTimer){ window._ocComputingTimer=setTimeout(function(){ window._ocComputingTimer=null; loadOnlyChat(); },8000); } }
-      else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; ONLYCHAT_CALCUL=false; }
-      else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; ONLYCHAT_CALCUL=false; }
+      else if(j && j.nonConfigure){ ONLYCHAT_DATA=null; ok=true; ONLYCHAT_CALCUL=false; ONLYCHAT_NON_BRANCHE=true; }
+      else if(j && j.totalRevenue!=null){ ONLYCHAT_DATA=j; ok=true; ONLYCHAT_CALCUL=false; ONLYCHAT_NON_BRANCHE=false; }
       // sinon (réponse inattendue) : on ne touche à rien, compté comme échec plus bas
     }
   }catch(e){}
@@ -5433,6 +5436,14 @@ async function loadPaieCumul(){
     if(PCUMUL) PCUMUL._perime=true;
   }
   renderPaieCumul();
+  // ⚠️ (15/09) Le journal des primes et la paie au cumul arrivent souvent APRÈS le
+  // premier dessin des panneaux qui les lisent : « Rentabilité du mois » affichait
+  // « Primes & parts versées — » jusqu'au tour suivant (sans fin sur un onglet en
+  // arrière-plan, boucles en pause), le partage entre associés comptait sans les
+  // primes, et les cartes « à payer » gardaient l'état d'avant. Même geste que
+  // loadProxy / loadSms / l'arrivée d'OnlyChat.
+  try{ if(typeof renderRenta==="function") renderRenta(); if(typeof renderSplit==="function") renderSplit(); }catch(e){}
+  try{ if(typeof LAST!=="undefined"&&LAST&&typeof render==="function") render(LAST); }catch(e){}
   return ok;
 }
 // ⚠️ LE RAFRAÎCHISSEMENT DE 60 s VIDAIT LES CASES D'ARGENT.
@@ -7517,6 +7528,29 @@ async function loadPnl(){
     if(typeof renderRenta==="function") renderRenta();
   }catch(e){}
 }
+// ⚠️ (15/09) LE RELEVÉ DU JOUR PARTAIT AU PREMIER DESSIN, AVANT QUE TOUT SOIT LÀ.
+// renderRenta tourne dès qu'OnlyMonster répond ; le journal des primes, le
+// Telegram (OnlyChat), la facture Railway et la liste des coûts arrivent souvent
+// APRÈS — et `noterPnl` n'envoie qu'une fois par session. Mesuré en production :
+// sur les 4 premiers jours notés (12→15/09), 3 figés SANS les primes (`primes:
+// null`, rien déduit du profit) et le 12/09 SANS le Telegram (`tg: 0`). Or le
+// dernier relevé d'un mois EST son résultat final. Rend la liste de ce qui manque
+// encore ; tant qu'elle n'est pas vide, on ne note rien : un jour absent vaut
+// mieux qu'un jour faux (et le serveur accepte qu'on réécrive le jour même).
+function pnlEntreesManquantes(primesMois, rw){
+  const m=[];
+  if(primesMois==null) m.push("primes");
+  // Telegram connu : lu chez OnlyChat ; ou OnlyChat non branché (la saisie
+  // manuelle fait foi) ; ou OnlyChat lâché mais une saisie manuelle du mois existe.
+  const tgLu=(typeof ONLYCHAT_DATA!=="undefined" && ONLYCHAT_DATA && ONLYCHAT_DATA.totalRevenue!=null)
+    || (typeof ONLYCHAT_NON_BRANCHE!=="undefined" && ONLYCHAT_NON_BRANCHE)
+    || (typeof ONLYCHAT_FAILS!=="undefined" && ONLYCHAT_FAILS>=3 && typeof tgIncertain==="function" && !tgIncertain());
+  if(!tgLu) m.push("telegram");
+  if(rw==null) m.push("railway");
+  if(typeof COSTS_LOADED!=="undefined" && !COSTS_LOADED) m.push("couts");
+  if(typeof OM_DATA!=="undefined" && OM_DATA && OM_DATA.revenusPartiels) m.push("revenus partiels");
+  return m;
+}
 function noterPnl(l){
   if(!TOKEN || !l || !l.d) return;
   // Une seule écriture par jour et par session : renderRenta tourne toutes les
@@ -9146,7 +9180,10 @@ function renderRenta(){
   // le 1er du mois, il n'y aurait eu aucun résultat de septembre à relire.
   try{
     const ko=(typeof revKo==="function")?revKo():false, t=d.totals||{};
-    if(typeof noterPnl==="function" && typeof jourServeur==="function"){
+    // Pas de relevé tant qu'une entrée manque (voir pnlEntreesManquantes) : il
+    // partira à un dessin suivant, quand tout sera arrivé.
+    if(typeof noterPnl==="function" && typeof jourServeur==="function"
+       && !(typeof pnlEntreesManquantes==="function" && pnlEntreesManquantes(primesMois,_rw).length)){
       noterPnl({ d:String(jourServeur()).slice(0,10),
         caBrut:(ko||t.netMonth==null)?null:Number(t.netMonth),
         caNet:(ko||t.netMonth==null)?null:Math.round(Number(t.netMonth)*netRate()),
@@ -10952,6 +10989,8 @@ async function loadRailway(){
     const r=await fetch(HUB_BASE+"/api/hub/railway-cost",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
     RW_DATA=await r.json(); renderRailway();
+    // La facture Railway entre dans le compte de résultat : il doit suivre.
+    if(typeof renderRenta==="function") renderRenta();
   }catch(e){}
 }
 function renderRailway(){

@@ -1955,4 +1955,40 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("Tresorerie : l age est affiche dans le panneau", /\$\{ageSolde\}/.test(corps), "ageSolde non insere");
 }
 
+// ================= LE RELEVE DU COMPTE DE RESULTAT ATTEND SES ENTREES
+// Mesure en production le 15/09 : 3 des 4 premiers jours figes SANS les primes
+// (journal pas encore lu au premier dessin) et le 12/09 SANS le Telegram. Le
+// dernier releve d un mois est son resultat final : on ne note plus rien tant
+// qu une entree manque, et les chargeurs redessinent le compte de resultat.
+{
+  let blocP = "";
+  try { blocP = morceau("function pnlEntreesManquantes(", "function noterPnl("); } catch (e) {}
+  verifie("releve P&L : la garde des entrees existe", !!blocP, "pnlEntreesManquantes absente");
+  if (blocP) {
+    const faire = (o) => new Function("ONLYCHAT_DATA","ONLYCHAT_NON_BRANCHE","ONLYCHAT_FAILS","tgIncertain","COSTS_LOADED","OM_DATA",
+      blocP + "; return pnlEntreesManquantes;")(o.oc, o.nb, o.fails, () => o.incertain, o.couts, o.om)(o.primes, o.rw);
+    const tout = { oc: { totalRevenue: 10 }, nb: false, fails: 0, incertain: false, couts: true, om: {}, primes: { total: 0 }, rw: { aAjouter: 0 } };
+    const avec = (p) => Object.assign({}, tout, p);
+    verifie("releve P&L : tout est la = on note", faire(tout).length === 0, JSON.stringify(faire(tout)));
+    verifie("releve P&L : journal des primes pas lu = on attend", faire(avec({ primes: null })).includes("primes"), "releve fige sans les primes");
+    verifie("releve P&L : Telegram pas encore arrive = on attend", faire(avec({ oc: null })).includes("telegram"), "releve fige avec Telegram = 0");
+    verifie("releve P&L : OnlyChat non branche = la saisie manuelle fait foi", !faire(avec({ oc: null, nb: true })).includes("telegram"), "jamais note sans OnlyChat");
+    verifie("releve P&L : OnlyChat lache mais saisie manuelle du mois = on note", !faire(avec({ oc: null, fails: 3, incertain: false })).includes("telegram"), "bloque a tort");
+    verifie("releve P&L : OnlyChat lache sans saisie = on attend", faire(avec({ oc: null, fails: 3, incertain: true })).includes("telegram"), "releve sur un Telegram inconnu");
+    verifie("releve P&L : facture Railway pas lue = on attend", faire(avec({ rw: null })).includes("railway"), "Railway ignore");
+    verifie("releve P&L : couts pas encore lus = on attend", faire(avec({ couts: false })).includes("couts"), "couts ignores");
+    verifie("releve P&L : revenus partiels = on attend", faire(avec({ om: { revenusPartiels: true } })).includes("revenus partiels"), "un minimum fige comme resultat");
+  }
+  const corpsDe = (nom) => {
+    const i = src.indexOf("function " + nom + "(");
+    if (i < 0) return "";
+    const fins = [src.indexOf("\nfunction ", i + 10), src.indexOf("\nasync function ", i + 10)].filter((x) => x > 0);
+    return src.slice(i, fins.length ? Math.min(...fins) : i + 6000);
+  };
+  verifie("releve P&L : renderRenta ne note qu avec toutes les entrees", /pnlEntreesManquantes\(primesMois,_rw\)/.test(corpsDe("renderRenta")), "noterPnl non garde");
+  verifie("loadPaieCumul redessine le compte de resultat et les cartes", /renderRenta\(\)/.test(corpsDe("loadPaieCumul")) && /render\(LAST\)/.test(corpsDe("loadPaieCumul")), "primes « — » jusqu au tour suivant");
+  verifie("loadRailway redessine le compte de resultat", /renderRenta\(\)/.test(corpsDe("loadRailway")), "facture Railway absente du compte de resultat");
+  verifie("OnlyChat non branche est retenu", /ONLYCHAT_NON_BRANCHE=true/.test(src), "drapeau jamais pose");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
