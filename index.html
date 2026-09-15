@@ -10874,13 +10874,19 @@ function renderBadges(){
 // il ne déclenche aucun virement : l'API OnlyMonster n'a aucun endpoint de
 // retrait, et un mouvement d'argent doit rester une action humaine.
 // (OnlyFans refuse l'iframe -> onglet externe, comme DiddySMS/Getatext.)
-let TRES_DATA=null;
+let TRES_DATA=null, _tresRelances=0;
 async function loadTresorerie(){
   if(!TOKEN) return;
   try{
     const r=await fetch(HUB_BASE+"/api/hub/tresorerie",{headers:{"x-hub-token":TOKEN}});
     if(!r.ok) return;
     TRES_DATA=await r.json(); renderTresorerie();
+    // Le serveur sert le dernier solde connu pendant qu'il relit OnlyFans : s'il est
+    // ancien, on revient chercher le nouveau dans 45 s plutôt qu'au tour suivant
+    // (5 min). Au plus 4 fois d'affilée, pour ne pas tourner en rond si ça échoue.
+    const ma=Number(TRES_DATA&&TRES_DATA.mesureAt)||0;
+    if(ma && Date.now()-ma>16*60000){ if(_tresRelances<4){ _tresRelances++; setTimeout(loadTresorerie,45000); } }
+    else _tresRelances=0;
   }catch(e){}
 }
 function renderTresorerie(){
@@ -10914,10 +10920,20 @@ function renderTresorerie(){
     ? `<div class="sv-note" style="color:#f87171">⚠️ Total incomplet : je n'ai pas pu lire
        ${escapeHtml((d.manquants||[]).join(", "))}. Il y a <b>plus</b> que ce montant.</div>`
     : "";
+  // ⚠️ (15/09) Le serveur rend désormais TOUT DE SUITE le dernier solde connu et
+  // relit OnlyFans en arrière-plan (avant : ~27 s d'attente à chaque expiration
+  // du cache). Ce solde a donc un âge : au-delà du cache normal (15 min), on le dit.
+  const ageSolde=(function(){
+    const ma=Number(d.mesureAt)||0; if(!ma) return "";
+    const min=Math.floor((Date.now()-ma)/60000);
+    if(min<16) return "";
+    const age=min<60?("il y a "+min+" min"):("il y a "+Math.round(min/60)+" h");
+    return `<div class="sv-note"${min>=60?' style="color:#facc15"':''}>${min>=60?"⚠️":"🕒"} Solde mesuré ${age} : je le relis, il se met à jour tout seul.</div>`;
+  })();
 
   $("#tresBody").innerHTML=`
     <div class="tr-top"><span class="tr-big">${money(d.dispo)}</span><span class="tr-lbl">${d.partiel?"au minimum (lecture incomplète)":"retirables maintenant"}</span></div>
-    ${alerte}
+    ${alerte}${ageSolde}
     ${d.attente?`<div class="tr-lbl">+ ${money(d.attente)} en route${delai?` (dispo après ${delai} j)`:""}${d.minRetrait?` · minimum ${money(d.minRetrait)} par retrait`:""}</div>`:""}
     <div style="margin-top:10px">${lignes}</div>
     <div class="sv-note">${note}</div>

@@ -1943,4 +1943,16 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("Telegram par VA : l age des depenses OnlyChat est dit", /onlychatAgeMin!=null/.test(src), "note d age absente");
 }
 
+// ================= TRESORERIE : LE SOLDE SERVI TOUT DE SUITE DIT SON AGE
+// Depuis le 15/09 le serveur rend le dernier solde connu pendant qu il relit
+// OnlyFans (avant : ~27 s d attente). Un solde ancien affiche sans son age serait
+// un « a jour » implicite : le panneau doit lire mesureAt et le dire.
+{
+  const src = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const i = src.indexOf("function renderTresorerie(");
+  const corps = i < 0 ? "" : src.slice(i, src.indexOf("\nfunction ", i + 10));
+  verifie("Tresorerie : l age du solde est lu (mesureAt)", /d\.mesureAt/.test(corps), "mesureAt absent de renderTresorerie");
+  verifie("Tresorerie : l age est affiche dans le panneau", /\$\{ageSolde\}/.test(corps), "ageSolde non insere");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
