@@ -8246,6 +8246,32 @@ function renderOM(){
   // sous le nom plutôt qu'en infobulle : au doigt, un survol n'existe pas.
   // Un modèle nommé « ? » = compte sans nom de modèle côté source. On le dit
   // au lieu de le répartir au hasard ou de le faire disparaître.
+  // 🤖 « DE QUEL BOT ? » (demande d'André, 15/09 : « ça me dit pas de quel bot,
+  // celui de Insta ou de Twitter ou TikTok ? »). Ses bots portent tous le nom
+  // « Bot » (liens « Bot / instagram », « Bot / Twitter »…) : le cerveau ventile
+  // leur dépense par plateforme ÉCRITE dans le lien. Une puce par bot ; la somme
+  // des puces retombe sur le total du compte (même passe côté serveur). Sans
+  // ventilation (cerveau pas encore à jour, ou lien sans plateforme écrite comme
+  // « Insta Perso ») : une seule puce, comme avant — on ne devine jamais.
+  function persoPucesParBot(pv, surModele, modele){
+    const NOMS={instagram:"Insta",twitter:"Twitter",tiktok:"TikTok",threads:"Threads",geelark:"Geelark",_:"autre lien"};
+    const out=[];
+    Object.keys(pv||{}).forEach(raw=>{
+      const e=pv[raw]||{}, nom=e.display||raw;
+      const pp=e.parPlateforme, cles=pp?Object.keys(pp):[];
+      if(cles.length){
+        cles.forEach(pf=>{
+          const x=pp[pf]||{};
+          const src=surModele?((x.parModele||{})[modele]||null):x;
+          if(src) out.push({nom:nom, bot:NOMS[pf]||pf, rev:src.rev, payeurs:src.payeurs, parModele:surModele?null:x.parModele});
+        });
+      } else {
+        const src=surModele?((e.parModele||{})[modele]||null):e;
+        if(src) out.push({nom:nom, bot:null, rev:src.rev, payeurs:src.payeurs, parModele:surModele?null:e.parModele});
+      }
+    });
+    return out.filter(x=>x&&x.rev>0).sort((a,b)=>b.rev-a.rev);
+  }
   function ligneModeles(pm, cur){
     if(!pm) return "";
     const ks=Object.keys(pm).filter(k=>pm[k] && (Number(pm[k].rev)||0)!==0)
@@ -8324,18 +8350,15 @@ function renderOM(){
     // là où HORS_EQUIPE_DATA se charge à part et arrivait trop tard (ligne vide).
     const persoBloc=(function(){
       const pv=(d.totals&&d.totals.ancienVa&&d.totals.ancienVa.today&&d.totals.ancienVa.today.parVa)||{};
-      const arr=Object.keys(pv).map(raw=>{
-          const e=pv[raw];
-          // Sur un onglet modèle, on ne montre que la part de CE modèle.
-          const src=surModele?((e.parModele||{})[OM_MODEL]||null):e;
-          return src?{nom:e.display||raw,rev:src.rev,payeurs:src.payeurs,parModele:surModele?null:e.parModele}:null;
-        }).filter(e=>e&&e.rev>0).sort((a,b)=>b.rev-a.rev);
+      // Une puce par bot (Insta / Twitter / TikTok) ; sur un onglet modèle, seulement
+      // la part de CE modèle (voir persoPucesParBot).
+      const arr=persoPucesParBot(pv, surModele, OM_MODEL);
       if(!arr.length) return {chips:"",tot:0,n:0};
       const chips=`<span class="om-spend-perso-lbl" title="Tes comptes perso, hors équipe">🔒 Perso :</span>`
         +arr.map(e=>{
-          const haut=`<span class="om-spend-top"><b>${escapeHtml(e.nom)}</b> ${omMoney((e.rev||0)*netRate(),cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`;
+          const haut=`<span class="om-spend-top"><b>${escapeHtml(e.nom)}${e.bot?` · ${escapeHtml(e.bot)}`:""}</b> ${omMoney((e.rev||0)*netRate(),cur)}${e.payeurs==null?"":` <i>· ${fmtInt(e.payeurs)} payeur${e.payeurs>1?"s":""}</i>`}</span>`;
           const mods=ligneModeles(e.parModele,cur);
-          return `<span class="om-spend-c perso he-va${mods?" avecmod":""}" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe) — voir sa fiche">${haut}${mods}</span>`;
+          return `<span class="om-spend-c perso he-va${mods?" avecmod":""}" data-he="${escapeHtml(e.nom)}" title="Compte perso (hors équipe)${e.bot?` — bot ${escapeHtml(e.bot)}`:""} — voir sa fiche">${haut}${mods}</span>`;
         }).join("");
       return {chips:chips,tot:arr.reduce((a,e)=>a+(e.rev||0),0),n:arr.length};
     })();

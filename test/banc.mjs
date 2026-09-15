@@ -1991,4 +1991,31 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("OnlyChat non branche est retenu", /ONLYCHAT_NON_BRANCHE=true/.test(src), "drapeau jamais pose");
 }
 
+// ================= QUI DEPENSE : DE QUEL BOT VIENT L ARGENT ?
+// Demande d Andre le 15/09 : la puce disait « Bot 24 $ » sans dire si c etait le
+// bot Insta, Twitter ou TikTok. Le cerveau ventile par plateforme ecrite du lien.
+{
+  let blocB = "";
+  try { blocB = morceau("function persoPucesParBot(", "function ligneModeles("); } catch (e) {}
+  verifie("Qui depense : la fonction des puces par bot existe", !!blocB, "persoPucesParBot absente");
+  if (blocB) {
+    const puces = new Function(blocB + "; return persoPucesParBot;")();
+    const pv = { Bot: { display: "Bot", rev: 42, payeurs: 2, parModele: { ModeleA: { rev: 30, payeurs: 1 }, ModeleB: { rev: 12, payeurs: 1 } },
+      parPlateforme: { instagram: { rev: 30, payeurs: 1, parModele: { ModeleA: { rev: 30, payeurs: 1 } } },
+                       twitter: { rev: 12, payeurs: 1, parModele: { ModeleB: { rev: 12, payeurs: 1 } } } } },
+      Clhoe: { display: "Clhoe", rev: 20, payeurs: 1, parModele: { ModeleA: { rev: 20, payeurs: 1 } } } };
+    const tout = puces(pv, false, "all");
+    verifie("Qui depense : une puce par bot, avec son nom", tout.length === 3 && tout.some(x => x.nom === "Bot" && x.bot === "Insta" && x.rev === 30) && tout.some(x => x.nom === "Bot" && x.bot === "Twitter" && x.rev === 12), JSON.stringify(tout));
+    verifie("Qui depense : les puces d un bot additionnent son total", tout.filter(x => x.nom === "Bot").reduce((a, x) => a + x.rev, 0) === 42, "somme fausse");
+    verifie("Qui depense : sous chaque bot, le modele de CE bot", (tout.find(x => x.bot === "Insta") || {}).parModele && Object.keys(tout.find(x => x.bot === "Insta").parModele).join() === "ModeleA", "modele melange entre bots");
+    verifie("Qui depense : compte sans plateforme ecrite = une puce entiere, sans bot invente", tout.some(x => x.nom === "Clhoe" && x.bot === null), "plateforme devinee");
+    const surB = puces(pv, true, "ModeleB");
+    verifie("Qui depense : onglet modele = seulement la part de ce modele, par bot", surB.length === 1 && surB[0].bot === "Twitter" && surB[0].rev === 12, JSON.stringify(surB));
+    const ancien = puces({ Bot: { display: "Bot", rev: 30, payeurs: 1 } }, false, "all");
+    verifie("Qui depense : cerveau pas encore a jour = une puce, comme avant", ancien.length === 1 && ancien[0].bot === null, JSON.stringify(ancien));
+    verifie("Qui depense : un bot a 0 $ n affiche pas de puce", puces({ Bot: { display: "Bot", rev: 5, parPlateforme: { instagram: { rev: 5, payeurs: 1 }, twitter: { rev: 0, payeurs: 0 } } } }, false, "all").length === 1, "puce a 0 $");
+  }
+  verifie("Qui depense : le nom du bot est ecrit sur la puce", /\$\{e\.bot\?` · \$\{escapeHtml\(e\.bot\)\}`:""\}/.test(src), "e.bot jamais affiche");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
