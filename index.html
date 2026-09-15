@@ -13527,7 +13527,7 @@ function renderSanteComptes(){
         +`<span class="sv-cell"><b>${fmtInt(x.followers)}</b> followers · ${x.posts30?`<b>${x.posts30}</b> posts / ${fmtInt(x.vues30)} vues sur 30 j`:"aucun post sur 30 j"}`
         // Bouton d'écriture : jamais en vue associé (le serveur refuse de toute façon).
         +`${_assocSc?"":` <button class="mn-act-btn" data-exclure="${escapeHtml(x.username)}" style="padding:2px 8px;font-size:11px;margin-left:6px" title="Ce compte n'appartient pas au VA : ses reels trouvés par le robot ne comptent plus pour lui, et il n'est plus suivi">Sortir des stats</button>`}</span>`
-        +`<span class="sv-part ${x.danger==="poste"?"bad":"mid"}">${x.danger==="poste"?"⚠️ poste":"muet"}</span></div>`).join("")
+        +`<span class="sv-part ${(x.horsSuivi||x.danger==="poste")?"bad":"mid"}" ${x.horsSuivi?`title="Plus suivi, mais ses reels trouvés par le robot comptent encore pour le VA"`:""}>${x.horsSuivi?"⚠️ exclu, encore compté":(x.danger==="poste"?"⚠️ poste":"muet")}</span></div>`).join("")
       +`<div class="sv-note">Un compte de farm a une médiane de <b>7 à 45</b> followers ; au-delà de ${fmtInt(d.seuilSuspect)}, c'est probablement une page de modèle ou une référence mal rangée. <b>Rien n'est détaché automatiquement</b> : si l'un n'appartient pas au VA, « Sortir des stats » retire ses reels trouvés par le robot des chiffres du VA et arrête de le suivre (les reels collés par un VA dans Discord ne sont pas touchés, et c'est réversible) — un « ⚠️ poste » fausse déjà les vues de son VA aujourd'hui.</div>`;
   }
   $("#santecomptesBody").innerHTML=html;
