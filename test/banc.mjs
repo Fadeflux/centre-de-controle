@@ -2056,4 +2056,41 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("Sortir des stats : bouton absent en vue associe", /_assocSc\?"":/.test(corpsR) && /classList\.contains\("assoc-mode"\)/.test(corpsR), "bouton d ecriture visible par l associee");
 }
 
+// ================= PAIE AU CUMUL : LE BOUTON DIT CE QUI PART VRAIMENT
+// 16/09 : « Payer 25 $ » affiche alors que 50 $ de part manager etaient tapes a
+// cote (le serveur les additionne) ; et rien ne disait depuis quand on comptait.
+{
+  const blocLM = morceau("function lireMontant(txt, opts) {", "function alerteVersementIncertain(");
+  let blocM = "", blocD = "";
+  try { blocM = morceau("function pcMontantLigne(", "function pcMajMontants("); } catch (e) {}
+  try { blocD = morceau("function pcDepuisTexte(", "function renderPaieCumul("); } catch (e) {}
+  verifie("Paie au cumul : le calcul du montant d une ligne existe", !!blocM, "pcMontantLigne absente");
+  if (blocM) {
+    const ligne = new Function("ESPACES", blocLM + ";" + blocM + "; return pcMontantLigne;")(/[\s  ]/g);
+    const a = ligne(25, ["", "50", ""]);
+    verifie("Paie au cumul : 25 $ de subs + 50 $ de manager = bouton a 75 $", a.total === 75 && a.extras === 50 && !a.illisible, JSON.stringify(a));
+    const b = ligne(76, ["137,50"]);
+    verifie("Paie au cumul : une prime tapee au clavier francais compte", b.total === 213.5, JSON.stringify(b));
+    const c = ligne(25, ["cinquante"]);
+    verifie("Paie au cumul : une case illisible = « + ? », pas un montant invente", c.illisible === true && c.total === 25, JSON.stringify(c));
+    const d0 = ligne(25, []);
+    verifie("Paie au cumul : sans saisie, le bouton garde la part des subs", d0.total === 25 && d0.extras === 0, JSON.stringify(d0));
+  }
+  verifie("Paie au cumul : la phrase « depuis ta derniere paie » existe", !!blocD, "pcDepuisTexte absente");
+  if (blocD) {
+    const depuis = new Function(blocD + "; return pcDepuisTexte;")();
+    const t0 = Date.UTC(2026, 7, 30, 23, 4), t1 = Date.UTC(2026, 7, 30, 23, 8);
+    const txt = depuis([{ va: "A", base: 1, baseTs: t0 }, { va: "B", base: 2, baseTs: t1 }, { va: "Perso", unpaid: true, base: 3, baseTs: 5 }], Date.UTC(2026, 8, 16, 11, 0));
+    verifie("Paie au cumul : une paie groupee = une seule date affichee", /dernière paie ici, le <b>/.test(txt) && /dernier relevé des liens, le <b>/.test(txt), txt);
+    const ecart = depuis([{ va: "A", base: 1, baseTs: Date.UTC(2026, 7, 1) }, { va: "B", base: 2, baseTs: Date.UTC(2026, 7, 30) }], null);
+    verifie("Paie au cumul : paies a des dates differentes = on le dit", /de chacun/.test(ecart) && !/relevé des liens, le/.test(ecart), ecart);
+    verifie("Paie au cumul : aucun repere date = rien d affirme", depuis([{ va: "A", base: null }], null) === "", "phrase inventee sans date");
+  }
+  const iP = src.indexOf("function renderPaieCumul(");
+  const corpsP = iP < 0 ? "" : src.slice(iP, src.indexOf("\n$(\"#pcumulRefresh\")", iP));
+  verifie("Paie au cumul : les libelles suivent la saisie (au dessin, a la frappe, a « reprendre »)",
+    /pcRestaurerSaisies\(_saisies\);\s*pcMajMontants\(\);/.test(corpsP) && /addEventListener\("input"/.test(corpsP) && /inp\.focus\(\);\s*pcMajMontants\(\);/.test(corpsP),
+    "un chemin ne recalcule pas le bouton");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

@@ -5495,6 +5495,53 @@ function pcRestaurerSaisies(saved){
 // n'est écrasé que par une lecture RÉELLE (un champ vidé à la main revient
 // vide, il ne ressuscite pas).
 let _PC_SAISIES={};
+// 💶 (16/09) « PAYER 25 $ » AVEC 50 $ DE PART MANAGER TAPÉS À CÔTÉ.
+// Le bouton et le TOTAL ne montraient que la part des abonnés. La prime et les
+// parts tapées partaient bien (le serveur les additionne, la confirmation les
+// détaille), mais l'écran disait 25 $ pour un versement de 75 $, et le total du
+// jour était faux d'autant. On recalcule à chaque frappe avec la MÊME lecture que
+// le versement (lireMontant) ; une case illisible rend « + ? », jamais un chiffre.
+function pcMontantLigne(subsPart, saisies){
+  let extras=0, illisible=false;
+  (saisies||[]).forEach(function(brut){
+    const s=String(brut==null?"":brut).trim(); if(!s) return;
+    const r=(typeof lireMontant==="function")?lireMontant(s,{min:0,max:100000,signeAutorise:false}):{ok:false};
+    if(r&&r.ok) extras+=Math.max(0,Number(r.valeur)||0); else illisible=true;
+  });
+  extras=Math.round(extras*100)/100;
+  return { total:Math.round(((Number(subsPart)||0)+extras)*100)/100, extras:extras, illisible:illisible };
+}
+function pcMajMontants(){
+  const body=$("#pcumulBody"); if(!body) return;
+  let extrasTot=0, illisible=false;
+  body.querySelectorAll(".pv-row").forEach(function(r){
+    const b=r.querySelector("[data-pcpay]");
+    if(!b || b.disabled) return;   // chiffres périmés, versement en cours ou à vérifier : on ne touche pas au libellé
+    const g=function(sel){ const el=r.querySelector(sel); return el?el.value:""; };
+    const m=pcMontantLigne(b.getAttribute("data-amt"), [g(".pc-prime"),g(".pc-manager"),g(".pc-leader")]);
+    extrasTot+=m.extras; if(m.illisible) illisible=true;
+    b.textContent="Payer "+pcMoney(m.total)+(m.illisible?" + ?":"");
+  });
+  const t=body.querySelector(".pv-total [data-total]"); if(!t) return;
+  const tot=Math.round(((Number(t.getAttribute("data-total"))||0)+extrasTot)*100)/100;
+  t.innerHTML=pcMoney(tot)+((t.getAttribute("data-inconnu")==="1"||illisible)?' <span class="ob-sub">+ ?</span>':'')
+    +(extrasTot>0?`<span class="ob-sub" style="display:block">dont ${pcMoney(extrasTot)} de primes et parts tapées</span>`:"");
+}
+// 📅 « On est bien d'accord que c'est depuis la dernière fois que j'ai payé ? »
+// (André, 16/09). Oui : depuis le dernier « Payer » de CHAQUE VA ici, jusqu'au
+// dernier relevé des liens. Rien ne l'écrivait : on le dit, avec les dates.
+function pcDepuisTexte(vas, releveA){
+  const fmt=function(ts){ const d=new Date(ts); return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); };
+  const dates=(vas||[]).filter(function(v){ return v&&!v.unpaid&&v.base!=null&&Number(v.baseTs)>0; }).map(function(v){ return Number(v.baseTs); });
+  if(!dates.length) return "";
+  const min=Math.min.apply(null,dates), max=Math.max.apply(null,dates);
+  const depuis=(max-min<6*3600*1000)
+    ? `depuis ta dernière paie ici, le <b>${fmt(max)}</b>`
+    : `depuis la dernière paie de chacun (entre le <b>${fmt(min)}</b> et le <b>${fmt(max)}</b> — la date de chacun est au survol de « base »)`;
+  const r=Number(releveA);
+  const jusqua=(r>0)?` jusqu'au dernier relevé des liens, le <b>${fmt(r)}</b>`:" jusqu'au dernier relevé des liens";
+  return `<div class="pcumul-tip" style="margin:0 0 8px">📅 Abonnés arrivés ${depuis}${jusqua}.</div>`;
+}
 function renderPaieCumul(){
   const _lu = pcLireSaisies();
   Object.keys(_lu).forEach(function(va){ _PC_SAISIES[va]=_lu[va]; });
@@ -5552,7 +5599,8 @@ function renderPaieCumul(){
         +`<button class="pv-pay-btn" data-pcbase="${nom}"${pcPerime?' disabled title="Chiffres pas à jour — clique 🔄 avant"':''}>Définir la base</button></div>`;
     }
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
-    const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Corriger la base = cumul à ta dernière paie">base ${fmtInt(v.base)}</span>`;
+    const _dBase=(Number(v.baseTs)>0)?new Date(Number(v.baseTs)).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+    const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Cumul de ${nom} à ta dernière paie${_dBase?" ("+_dBase+")":""} — clique pour corriger">base ${fmtInt(v.base)}</span>`;
     // ⚠️ Une prime posée depuis Discord n'apparaît PAS dans le montant ci-contre :
     // ce sont deux registres séparés (of_bonuses côté Discord, hub_pay_history ici).
     // Elle était donc structurellement oubliée au moment du virement. On l'affiche,
@@ -5623,7 +5671,7 @@ function renderPaieCumul(){
         + ((x.attendu!=null&&x.obtenu!=null)?` <span class="ob-sub">(lignes ${pcMoney(x.attendu)}, total affiché ${pcMoney(x.obtenu)})</span>`:"")).join("<br>")
       + `<div style="margin-top:4px;opacity:.85">Ne prépare pas de virement sur ce chiffre tant que ce n'est pas compris.</div></div>`;
   })();
-  const mgrSel=cohBanner+perimeBanner+renomBanner+partiBanner+primeBanner+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
+  const mgrSel=cohBanner+perimeBanner+renomBanner+partiBanner+primeBanner+pcDepuisTexte(vas, d&&d.releveA)+`<div class="pcumul-mgr">👔 <b>manager</b> · 🧭 <b>team leader</b> <span class="pcumul-mgr-note">— clique le rôle sur une ligne pour l'activer (plusieurs possibles) ; il reçoit alors une part en plus</span></div>`;
   const total=Number(d.total)||0;
   const nbApayer=vas.filter(v=>!v.unpaid && v.base!=null && (Number(v.nouveaux)||0)>0).length;
   // ⚠️ LE TOTAL COMPTAIT 0 $ POUR UN VA SANS REPÈRE DE PAIE. Côté serveur :
@@ -5653,7 +5701,7 @@ function renderPaieCumul(){
       +`</div>`;
   }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
   $("#pcumulBody").innerHTML = mgrSel + rows
-    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay">${pcMoney(total)}${sansBase.length?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note"></span></div>`
+    + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay" data-total="${total}" data-inconnu="${sansBase.length?1:0}">${pcMoney(total)}${sansBase.length?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note"></span></div>`
     + (sansBase.length
       ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-top:8px">⚠️ <b>${sansBase.length} VA</b> ${sansBase.length>1?"n'ont":"n'a"} pas de repère de paie (${sansBase.slice(0,4).map(v=>escapeHtml(v.va)).join(", ")}${sansBase.length>4?"…":""}) : ${sansBase.length>1?"ils comptent":"il compte"} <b>0 $</b> dans le total ci-dessus. Ce n'est pas « rien à payer » — clique « Définir la base » sur ${sansBase.length>1?"leurs lignes":"sa ligne"}.</div>`
       : "")
@@ -5662,7 +5710,11 @@ function renderPaieCumul(){
   // … et on remet ce qui était tapé. C'est ici que se joue la différence entre
   // « Nova touche 200 $ » et « Nova touche 150 $ ».
   pcRestaurerSaisies(_saisies);
+  pcMajMontants();   // les montants tapés et restaurés comptent dans les libellés
 }
+$("#pcumulBody").addEventListener("input", e=>{
+  if(e.target && e.target.closest && e.target.closest(".pc-prime,.pc-manager,.pc-leader")) pcMajMontants();
+});
 $("#pcumulBody").addEventListener("click", async e=>{
   // 🎁 « reprendre » : recopie la prime Discord dans la case prime de la ligne.
   // On n'écrit rien et on ne pré-remplit pas tout seul : geste explicite = zéro
@@ -5678,6 +5730,7 @@ $("#pcumulBody").addEventListener("click", async e=>{
       // plus parce que le temps a passé, mais parce qu'elle a été versée.
       inp.setAttribute("data-primeids", take.getAttribute("data-ids")||"");
       inp.focus();
+      pcMajMontants();   // une valeur posée par le code ne déclenche pas « input »
     }
     else toast("Ce VA n'a aucun abonné à payer pour l'instant — la prime seule ne se verse pas ici.");
     return;
