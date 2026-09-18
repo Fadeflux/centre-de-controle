@@ -2343,4 +2343,56 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("Jour par jour : clic sur un jour, sur le tableau, et calendrier", src.includes('closest("[data-omjour]")') && src.includes('closest("[data-om7j]")') && src.includes('closest("[data-omjourdate]")'), "ecouteurs absents");
 }
 
+{
+  // 💶 (18/09) PRIME PAYÉE DEUX FOIS. Après « Payer », la ligne du VA n'a plus de
+  // cases (0 nouvel abonné) : les montants tapés restaient dans _PC_SAISIES, et
+  // revenaient PRÉ-REMPLIS (avec les primes Discord « reprises ») dès que ce VA
+  // refaisait des abonnés — le bouton affichait « Payer X+prime ».
+  const iP = src.indexOf('const pay=e.target.closest("[data-pcpay]");');
+  const jP = iP >= 0 ? src.indexOf('const base=e.target.closest("[data-pcbase]");', iP) : -1;
+  const corpsP = (iP >= 0 && jP > iP) ? src.slice(iP, jP) : "";
+  verifie("Paie : un versement réussi oublie les montants tapés pour ce VA (sinon la prime revient pré-remplie)",
+    /if\(j&&j\.ok\)\{ delete _PC_SAISIES\[va\];/.test(corpsP) && /if\(j2&&j2\.ok\)\{ delete _PC_SAISIES\[va\];/.test(corpsP),
+    corpsP ? "saisies gardées après versement" : "gestionnaire du bouton Payer introuvable");
+}
+
+{
+  // ⏱️ (18/09) FILE D'ATTENTE + DÉLAI. Les délais (20 s, 15 s) étaient posés par
+  // l'appelant AVANT la file : file chargée (ouverture, ~150 lectures), la lecture
+  // était annulée sans avoir été envoyée → « cerveau injoignable ». On fait tourner
+  // la VRAIE file (extraite de la page) avec un faux réseau.
+  const i0 = src.indexOf("var MAX_LECTURES = 12");
+  const i1 = src.indexOf("window.fetch = function(u, o){", i0);
+  const corpsFile = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("File : le code de la file est trouvé", corpsFile.length > 0, "file introuvable");
+  if (corpsFile) {
+    const enCours = [];
+    const brut = (u, o) => new Promise((res, rej) => {
+      const e = { u, fini: false, res: () => { e.fini = true; res({ ok: true, u }); } };
+      enCours.push(e);
+      if (o && o.signal) o.signal.addEventListener("abort", () => { if (!e.fini) { e.fini = true; rej(new Error("annulée")); } }, { once: true });
+    });
+    const fab = new Function("brut", corpsFile + "\nreturn lancer;");
+    const lancer = fab(brut);
+    const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+    // 12 lectures lentes occupent la file ; la 13e demande 150 ms de délai.
+    for (let i = 0; i < 12; i++) lancer("/api/lente" + i, {}, "/api/lente" + i).catch(() => {});
+    let issue = "en attente";
+    lancer("/api/hub/onlymonster-jours", { delaiMs: 150 }, "/api/hub/onlymonster-jours")
+      .then(() => { issue = "reçue"; }, () => { issue = "annulée"; });
+    await attendre(300);                               // plus que le délai, toujours dans la file
+    verifie("File : une lecture qui ATTEND son tour n'est pas annulée par son délai", issue === "en attente", issue);
+    enCours.slice(0, 12).forEach((e) => e.res());       // les lentes finissent : elle part
+    await attendre(20);
+    const partie = enCours.find((e) => e.u === "/api/hub/onlymonster-jours");
+    verifie("File : … elle part quand une place se libère", !!partie, enCours.map((e) => e.u).join());
+    await attendre(300);
+    verifie("File : … et son délai court depuis son DÉPART (annulée si le serveur ne répond pas)", issue === "annulée", issue);
+  }
+  verifie("File : les trois lectures bornées passent le délai à la file (delaiMs), plus de minuterie avant la file",
+    src.includes('"/api/hub/onlymonster-jours",{headers:{"x-hub-token":TOKEN},cache:"no-store",delaiMs:20000}')
+    && src.includes('"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store",delaiMs:20000}')
+    && src.includes('"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN},delaiMs:15000}'), "minuterie encore posée avant la file");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

@@ -2975,8 +2975,21 @@ const REFRESH_MS = 60000;
       var sig = o && o.signal;
       function fin(){ enVol--; lectureSuivante(); }
       var t = { fini: false, partir: function(){
-        var p;
-        try{ p = brut(u, o); }catch(e){ p = Promise.reject(e); }
+        var p, o2 = o, minuteur = null;
+        // ⏱️ (18/09) `delaiMs` : le délai d'une lecture court à partir de son DÉPART,
+        // pas de son entrée dans la file. Posé par l'appelant (setTimeout + abort),
+        // il courait pendant l'attente : file chargée (ouverture, ~150 lectures),
+        // une lecture de 20 s était annulée AVANT d'être envoyée — « cerveau
+        // injoignable » exactement quand le serveur est chargé.
+        var ms = o ? Number(o.delaiMs) : 0;
+        if(ms > 0 && typeof AbortController !== "undefined"){
+          var ctl = new AbortController();
+          if(sig) sig.addEventListener("abort", function(){ try{ ctl.abort(sig.reason); }catch(e){} }, { once: true });
+          minuteur = setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, ms);
+          o2 = Object.assign({}, o, { signal: ctl.signal });
+        }
+        try{ p = brut(u, o2); }catch(e){ p = Promise.reject(e); }
+        if(minuteur) p.then(function(){ clearTimeout(minuteur); }, function(){ clearTimeout(minuteur); });
         p.then(resolve, reject).then(fin, fin);
       }};
       if(sig){
@@ -5965,7 +5978,10 @@ $("#pcumulBody").addEventListener("click", async e=>{
     try{
       const r=await fetch(HUB_BASE+"/api/hub/paie-cumul/pay",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({va, prime, manager, leader, primesReglees})});
       const j=await r.json();
-      if(j&&j.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")+(j.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")+(j.cahierKo?" · ⚠️ PAS inscrit au cahier — coche-le à la main, sinon il sera relancé comme impayé":"")); await loadPaieCumul(); }
+      // 💶 (18/09) Versé : on OUBLIE ce qui avait été tapé pour ce VA. Sinon la
+      // prime (et les primes Discord « reprises ») revenait pré-remplie dès qu'il
+      // refaisait des abonnés — « Payer X+prime », prime payée deux fois.
+      if(j&&j.ok){ delete _PC_SAISIES[va]; if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j.amount||0)}`+((Number(j.prime)||0)>0?` · ${pcMoney(j.prime)} prime`:"")+((Number(j.manager)||0)>0?` · ${pcMoney(j.manager)} manager`:"")+((Number(j.leader)||0)>0?` · ${pcMoney(j.leader)} leader`:"")+(j.notified?" · VA prévenu":"")+(j.sautNonVerifie?" · ⚠️ contrôle anti-saut NON effectué":"")+(j.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")+(j.cahierKo?" · ⚠️ PAS inscrit au cahier — coche-le à la main, sinon il sera relancé comme impayé":"")); await loadPaieCumul(); }
       else if(j && j.saut && j.detail){
         // Saut anormal détecté : on EXPLIQUE (detail) et on propose de confirmer,
         // sinon le paiement de ce VA était impossible depuis le dashboard.
@@ -5980,7 +5996,7 @@ Confirmer quand même le paiement de ${va} ?`)){
             // Mêmes avertissements que la branche normale : cette branche-ci les
             // perdait tous (contrôle anti-saut, historique) alors que c'est justement
             // celle où l'on force un paiement malgré une alerte.
-            if(j2&&j2.ok){ if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")+(j2.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); return; }
+            if(j2&&j2.ok){ delete _PC_SAISIES[va]; if(typeof toast==="function") toast("💸 Payé",`${va} — ${pcMoney(j2.amount||0)}`+(j2.notified?" · VA prévenu":"")+(j2.histOk===false?" · ⚠️ versement NON inscrit à l'historique":"")); await loadPaieCumul(); return; }
             alert("Erreur : "+((j2&&(j2.detail||j2.error))||"inconnue"));
           }catch(err){ alerteVersementIncertain(va); }
         }
@@ -9952,11 +9968,8 @@ async function loadOmJours(){
   if(!HUB_URL || !TOKEN || OM_JOURS_CHARGE) return;
   OM_JOURS_CHARGE=true; OM_JOURS_ESSAI=Date.now();
   try{
-    const _ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
-    const _to=_ctrl?setTimeout(function(){ try{ _ctrl.abort(); }catch(e){} },20000):null;
-    let r;
-    try{ r=await fetch(HUB_BASE+"/api/hub/onlymonster-jours",{headers:{"x-hub-token":TOKEN},cache:"no-store",signal:_ctrl?_ctrl.signal:undefined}); }
-    finally{ if(_to) clearTimeout(_to); }
+    // 20 s comptées à partir du DÉPART de la lecture, pas de son entrée dans la file.
+    const r=await fetch(HUB_BASE+"/api/hub/onlymonster-jours",{headers:{"x-hub-token":TOKEN},cache:"no-store",delaiMs:20000});
     if(!r.ok){ OM_JOURS_ERR="le cerveau a répondu "+r.status; return; }
     const j=await r.json();
     if(j && j.data){ OM_JOURS=j.data; OM_JOURS_AT=Date.now(); OM_JOURS_ERR=""; }
@@ -9981,11 +9994,8 @@ async function _loadOM(){
   try{
     // Requête BORNÉE : sans ça, une requête qui ne retombe jamais garde le
     // verrou ci-dessus (voir loadOM) et fige tous les panneaux d'argent.
-    const _ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
-    const _to=_ctrl?setTimeout(function(){ try{ _ctrl.abort(); }catch(e){} },20000):null;
-    let r;
-    try{ r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store",signal:_ctrl?_ctrl.signal:undefined}); }
-    finally{ if(_to) clearTimeout(_to); }
+    // 20 s comptées à partir du DÉPART de la lecture, pas de son entrée dans la file.
+    const r=await fetch(HUB_BASE+"/api/hub/onlymonster",{headers:{"x-hub-token":TOKEN},cache:"no-store",delaiMs:20000});
     if(!r.ok){ omEchec(); if(!OM_DATA) omIndispo("Chiffres injoignables (le cerveau a répondu "+r.status+")."); else majFraicheurOM(); return; }
     const j=await r.json();
     // ⚠️ UN SEUL retry en vol : la boucle 60 s rappelle loadOM, et chaque appel
@@ -15225,8 +15235,8 @@ async function runDiagnostic(){
   ov.addEventListener("click",e=>{ if(e.target===ov||e.target.closest("[data-diagclose]")) ov.remove(); });
   document.body.appendChild(ov);
   try{
-    const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 15000);   // le probe proxy peut traîner → timeout
-    const r=await fetch(HUB_BASE+"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN},signal:ctrl.signal}); clearTimeout(to);
+    // 15 s (le probe proxy peut traîner), comptées à partir du DÉPART de la lecture.
+    const r=await fetch(HUB_BASE+"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN},delaiMs:15000});
     const j=await r.json(); const body=ov.querySelector("#diagBody"); if(!body) return;
     if(!r.ok||!Array.isArray(j.checks)){ body.innerHTML=`<div class="ppick-sub">${escapeHtml(j.error||"Diagnostic indisponible.")}</div>`; return; }
     const ic={ok:"🟢",warn:"🟠",bad:"🔴"};
