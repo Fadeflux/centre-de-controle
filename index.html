@@ -226,6 +226,9 @@
        relance fan (📋), relance ghost — quasi intappables au doigt sinon. */
     .omv-goal-set, .fr-msg, .gh-relance{ min-height:38px !important; padding-top:8px !important; padding-bottom:8px !important; }
     .om-per{ gap:8px; }
+    .om-jours-b{ padding-top:9px !important; padding-bottom:9px !important; }
+    .om-jours-d{ padding-top:8px; padding-bottom:8px; }
+    .om-7j-j{ padding:8px 6px; }
     .sec-chip{ padding-top:9px !important; padding-bottom:9px !important; }
     /* 🏆 Classement VA : sur 375px, 7 colonnes écrasaient le NOM à ~4px (invisible).
        On met le rang + le nom sur la 1re ligne (nom pleine largeur), les stats
@@ -1466,6 +1469,34 @@
   .om-spend-perso-lbl{display:inline-flex;align-items:baseline;font-size:11.5px;font-weight:600;color:var(--faint);margin:0 3px 6px 4px;opacity:.9}
   .om-spend-teamtag{font-weight:400;color:var(--faint);font-size:12px}
   .om-spend-n{color:var(--faint);font-size:11.5px;margin-top:2px}
+  /* 📅 Le jour du panneau « Qui dépense » + le tableau des 7 jours (18/09) */
+  .om-jours{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+  .om-jours-b{background:var(--card2,#17171b);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;transition:.12s}
+  .om-jours-b:hover:not(:disabled){color:var(--fg,#fff);border-color:#3a3a42}
+  .om-jours-b.on{background:var(--accent,#6366f1);border-color:var(--accent,#6366f1);color:#fff}
+  .om-jours-b:disabled{opacity:.35;cursor:default}
+  .om-jours-d{background:var(--card2,#17171b);border:1px solid var(--line);color:var(--fg,#fff);border-radius:8px;padding:3px 8px;font:inherit;font-size:12px;color-scheme:dark;min-width:0}
+  .om-jours-w{color:#facc15 !important}
+  .om-spend.om-spend-passe{border-left-color:var(--accent,#9aa2d8)}
+  .om-spend-c.zero{background:rgba(148,163,184,.06);border-color:rgba(148,163,184,.22)}
+  .om-spend-c i.om-sub{color:#34d399}
+  .om-7j{margin:-2px 0 10px}
+  .om-7j-t{background:none;border:0;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 0;text-align:left}
+  .om-7j-t:hover{color:var(--fg,#fff)}
+  .om-7j-w{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:4px 0 4px}
+  .om-7j-tab{border-collapse:collapse;width:100%;font-size:12px}
+  .om-7j-tab th,.om-7j-tab td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+  .om-7j-tab th:first-child{text-align:left;position:sticky;left:0;background:var(--card2,#17171b);z-index:1}
+  .om-7j-tab thead th{color:var(--faint);font-weight:600}
+  .om-7j-tab td.vide{color:var(--faint)}
+  .om-7j-tab td.sel{background:rgba(154,162,216,.12)}
+  .om-7j-tab td.tot{font-weight:700}
+  .om-7j-tab tr.eq th,.om-7j-tab tr.eq td{font-weight:700;border-bottom:0}
+  .om-7j-tab i{display:block;font-style:normal;font-size:10.5px;color:#34d399}
+  .om-7j-tab [data-vacard]{cursor:pointer}
+  .om-7j-j{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 5px;border-radius:6px}
+  .om-7j-j:hover,.om-7j-j.on{color:var(--fg,#fff)}
+  .om-7j-j.on{background:rgba(154,162,216,.18)}
   .om-rec{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
   .om-rec-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
   .om-rec-l{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:3px 0;color:var(--muted)}
@@ -7517,6 +7548,15 @@ const OM_PERIODES = [
   {k:"j7",    t:"7 j",          court:"sur 7 jours"},
   {k:"today", t:"Aujourd'hui",  court:"aujourd'hui"},
 ];
+// 📅 « QUI A DÉPENSÉ » UN AUTRE JOUR (demande du 18/09 : « hier j'ai pas pu
+// regarder et je sais pas grâce à qui j'ai fait de l'argent »). null = aujourd'hui, le
+// panneau tel qu'il était ; sinon 'AAAA-MM-JJ', lu dans /api/hub/onlymonster-jours (les
+// 30 derniers jours, rangés jour par jour par le cerveau). Pas mémorisé d'une visite à
+// l'autre : à l'ouverture, on veut aujourd'hui. Le tableau des 7 jours, lui, garde son
+// état ouvert/fermé.
+let OM_JOUR = null;
+let OM_JOURS = null, OM_JOURS_AT = 0, OM_JOURS_ESSAI = 0, OM_JOURS_CHARGE = false, OM_JOURS_ERR = "";
+let OM_7J_OUVERT = (function(){ try{ return localStorage.getItem("ccn_om7j")!=="0"; }catch(e){ return true; } })();
 const DEMO_OM = { currency:"$", forecast:{net:{value:1480,low:1290,high:1670,perDay:49.3,method:"smart"},subs:{value:290,low:250,high:330,perDay:9.7,method:"smart"},margeMonth:1335}, history:[{month:"02/26",net:410,subs:88,byModel:{Nova:{net:300,subs:50},Iris:{net:110,subs:38}}},{month:"03/26",net:520,subs:110,byModel:{Nova:{net:380,subs:62},Iris:{net:140,subs:48}}},{month:"04/26",net:480,subs:102,byModel:{Nova:{net:350,subs:58},Iris:{net:130,subs:44}}},{month:"05/26",net:610,subs:128,byModel:{Nova:{net:450,subs:70},Iris:{net:160,subs:58}}},{month:"06/26",net:130,subs:40,byModel:{Nova:{net:90,subs:22},Iris:{net:40,subs:18}}},{month:"07/26",net:720,subs:142,byModel:{Nova:{net:578,subs:77},Iris:{net:142,subs:65}}}], totals:{netMonth:720,netLastMonth:130,netLastMonthToDate:610,netTotal:3200,margeMonth:649,ltv:2.5,subsTotal:280,subsMonth:142,subsWeek:120,subsDay:6}, models:{Nova:{net:578,subs:77,ltv:7.51,marge:540},Iris:{net:142,subs:65,ltv:2.18,marge:110}}, vas:[{va:"Sacha",subs:152,rev:154,ltv:1.01,marge:78,roi:1.03},{va:"Milo",subs:79,rev:124,ltv:1.57,marge:85,roi:2.14},{va:"Nyx",subs:61,rev:0,ltv:0,marge:0,roi:null,unpaid:true},{va:"Nael",subs:48,rev:572,ltv:11.92,marge:548,roi:22.83}] };
 // Ce que tu touches vraiment ≈ brut × 80 % (20 % OnlyFans). ⚠️ 2026-08-23 :
 // c'était 78 % (20 % OF + 2 % Skrill), mais André N'UTILISE PAS Skrill pour
@@ -8067,6 +8107,117 @@ function renderDataHealth(){
   el.className="dh on "+cls;
   el.textContent=txt;
 }
+/* ── 📅 « QUI A DÉPENSÉ » UN AUTRE JOUR (demande du 18/09) ─────────────────────
+   « Hier j'ai pas pu regarder et je sais pas grâce à qui j'ai fait de l'argent —
+   j'aime bien le savoir pour voir si la personne travaille bien. »
+   Le cerveau range les 30 derniers jours de paiements jour par jour : même partage
+   que le panneau du jour (équipe, 🔒 perso, sans lien), plus les abonnés amenés CE
+   jour-là par chaque VA — l'argent d'un jour vient aussi de fans arrivés avant, les
+   subs disent le travail du jour.
+   Fonctions PURES (tout arrive en paramètre) : le banc les rejoue telles quelles.
+   ⚠️ Quand on ne sait pas, on le dit — jamais un faux 0. */
+function omJourDecale(j, n){ const d=new Date(j+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+const _OM_JC=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+const _OM_JL=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const _OM_ML=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+function omLibelleJour(j, auj){
+  const d=new Date(j+"T00:00:00Z");
+  const date=_OM_JL[d.getUTCDay()]+" "+d.getUTCDate()+" "+_OM_ML[d.getUTCMonth()];
+  return { court:_OM_JC[d.getUTCDay()]+" "+d.getUTCDate(),
+           long:(j===auj)?"aujourd'hui":(j===omJourDecale(auj,-1)?"hier ("+date+")":"le "+date) };
+}
+function omBarreJours(J, auj, jour){
+  const sel=jour||auj;
+  const min=(J&&Array.isArray(J.jours)&&J.jours.length)?J.jours[0]:omJourDecale(auj,-29);
+  const hier=omJourDecale(auj,-1), prev=omJourDecale(sel,-1), next=omJourDecale(sel,1);
+  const cle=(j)=>(j>=auj?"auj":j);
+  return `<div class="om-jours" role="group" aria-label="Choisir le jour">`
+    +`<button class="om-jours-b" data-omjour="${cle(prev)}"${prev<min?" disabled":""} title="Jour d'avant" aria-label="Jour d'avant">◀</button>`
+    +`<button class="om-jours-b${sel===auj?" on":""}" data-omjour="auj">Aujourd'hui</button>`
+    +`<button class="om-jours-b${sel===hier?" on":""}" data-omjour="${hier}">Hier</button>`
+    +`<input class="om-jours-d" type="date" data-omjourdate min="${min}" max="${auj}" value="${sel}" aria-label="Choisir une date">`
+    +`<button class="om-jours-b" data-omjour="${cle(next)}"${sel>=auj?" disabled":""} title="Jour d'après" aria-label="Jour d'après">▶</button>`
+    +`</div>`;
+}
+// Le panneau « Qui dépense » pour un jour PASSÉ. `persoFn` = persoPucesParBot et
+// `modsFn` = ligneModeles (les puces 🔒 perso et la ligne « sur quel modèle »).
+function omSpendJour(J, jour, auj, surModele, modele, cur, persoFn, modsFn){
+  const lib=omLibelleJour(jour, auj), titre=lib.long.charAt(0).toUpperCase()+lib.long.slice(1);
+  const surTitre=surModele?` · sur ${escapeHtml(modele)}`:"";
+  if(!J) return `<div class="om-spend vide">💸 <b>${escapeHtml(titre)}${surTitre}</b> — le détail jour par jour se charge…</div>`;
+  if(J.muet) return `<div class="om-spend vide" style="border-left-color:#facc15">💸 <b>${escapeHtml(titre)}</b> — les revenus n'ont pas pu être lus : ce n'est <b>pas</b> zéro.</div>`;
+  const e=J.parJour&&J.parJour[jour];
+  if(!e) return `<div class="om-spend vide">💸 <b>${escapeHtml(titre)}</b> — pas de détail pour ce jour : le cerveau garde les 30 derniers jours.</div>`;
+  const pj=(x)=>x?(surModele?((x.parModele||{})[modele]||null):x):null;
+  const lignes=Object.keys(e.vas||{}).map(va=>({va:va, x:e.vas[va], p:pj(e.vas[va])}));
+  const payants=lignes.filter(o=>o.p&&o.p.rev).sort((a,b)=>b.p.rev-a.p.rev);
+  // Des subs sans argent ce jour-là : il a travaillé, on le montre. Sur « Tout »
+  // seulement : les subs ne sont pas ventilés par modèle.
+  const auTravail=surModele?[]:lignes.filter(o=>!(o.p&&o.p.rev)&&o.x&&o.x.subs).sort((a,b)=>b.x.subs-a.x.subs);
+  // Chaque total = la SOMME DES MONTANTS AFFICHÉS (arrondis au dollar) : l'en-tête, les
+  // puces et l'addition du bas tombent juste à l'œil (sinon 246 $ en tête, « équipe 247 $ »
+  // en bas pour le même argent — vu en vrai).
+  const rn=(v)=>Math.round((Number(v)||0)*netRate());
+  const totEq=payants.reduce((a,o)=>a+rn(o.p.rev),0);
+  let nb=0, nbInconnu=false; payants.forEach(o=>{ if(o.p.payeurs==null) nbInconnu=true; else nb+=o.p.payeurs; });
+  const subs=(o)=>(!surModele&&o.x&&o.x.subs)?` <i class="om-sub">· +${fmtInt(o.x.subs)} sub${o.x.subs>1?"s":""}</i>`:"";
+  const puce=(o)=>{
+    const p=o.p||{}, argent=!!p.rev;
+    const haut=`<span class="om-spend-top"><b>${escapeHtml(o.va)}</b> ${omMoney(rn(p.rev),cur)}${(argent&&p.payeurs!=null)?` <i>· ${fmtInt(p.payeurs)} payeur${p.payeurs>1?"s":""}</i>`:""}${subs(o)}</span>`;
+    const mods=(!surModele&&argent&&modsFn)?modsFn(p.parModele,cur):"";
+    return `<span class="om-spend-c${mods?" avecmod":""}${argent?"":" zero"}" data-vacard="${escapeHtml(o.va)}" title="Voir sa fiche">${haut}${mods}</span>`;
+  };
+  const perso=persoFn?persoFn(((e.anciens||{}).parVa)||{}, surModele, modele):[];
+  const chipsPerso=perso.length?(`<span class="om-spend-perso-lbl" title="Tes comptes perso, hors équipe">🔒 Perso :</span>`
+    +perso.map(x=>`<span class="om-spend-c perso he-va" data-he="${escapeHtml(x.nom)}" title="Compte perso (hors équipe) — voir sa fiche"><span class="om-spend-top"><b>${escapeHtml(x.nom)}${x.bot?` · ${escapeHtml(x.bot)}`:""}</b> ${omMoney(rn(x.rev),cur)}${x.payeurs==null?"":` <i>· ${fmtInt(x.payeurs)} payeur${x.payeurs>1?"s":""}</i>`}</span></span>`).join("")):"";
+  const tete=payants.length
+    ? `💸 Qui a dépensé ${escapeHtml(lib.long)}${surTitre} — <b>${omMoney(totEq,cur)}</b>${nbInconnu?"":` par ${fmtInt(nb)} abonné${nb>1?"s":""}`}<span class="om-spend-teamtag"> · net · équipe</span>`
+    : `💸 ${escapeHtml(titre)}${surTitre} — aucun abonné rattaché à un VA de l'équipe n'a payé.`;
+  // 🧾 L'addition du jour (sur « Tout ») : équipe + perso + fans sans lien, chacun tel
+  // qu'affiché au-dessus.
+  let rec="";
+  if(!surModele && e.brut!=null){
+    const persoNet=perso.reduce((a,x)=>a+rn(x.rev),0), horsNet=rn((e.hors||{}).rev);
+    rec=`<div class="om-spend-n">🧾 Total net OnlyFans ce jour-là : <b>${omMoney(totEq+persoNet+horsNet,cur)}</b> = équipe ${omMoney(totEq,cur)}${persoNet?` + perso ${omMoney(persoNet,cur)}`:""}${horsNet?` + abonnés sans lien de VA ${omMoney(horsNet,cur)}`:""}.</div>`;
+  }
+  const alertes=(J.complet===false?`<div class="om-spend-n om-jours-w">⚠️ Un compte OnlyMonster n'a pas répondu à la dernière lecture : ces montants sont des <b>minimums</b>.</div>`:"")
+    +((!surModele&&e.subsMesures===false)?`<div class="om-spend-n om-jours-w">Les abonnés amenés ce jour-là n'ont pas pu être lus : « +N subs » manque, ce n'est pas zéro.</div>`:"");
+  const note=`<div class="om-spend-n">Argent dépensé ${escapeHtml(lib.long)} par les abonnés que chacun a amenés — y compris ceux arrivés avant. Montants <b>nets</b>, après les ${pctComm()} de commission OnlyFans.${surModele?"":" « +N subs » = abonnés amenés ce jour-là."}</div>`;
+  return `<div class="om-spend om-spend-passe"><div class="om-spend-h">${tete}</div>`
+    +payants.map(puce).join("")+auTravail.map(puce).join("")+chipsPerso+note+rec+alertes+`</div>`;
+}
+// Les 7 jours jusqu'au jour choisi, VA par VA : qui fait payer, qui amène des abonnés.
+// Les montants sont arrondis AVANT d'être additionnés : lignes et colonnes tombent
+// juste à l'écran.
+function omTableau7j(J, sel, auj, surModele, modele, cur, ouvert){
+  if(!J||!J.parJour) return "";
+  const jours=[]; for(let i=6;i>=0;i--){ const j=omJourDecale(sel,-i); if(J.parJour[j]) jours.push(j); }
+  if(!jours.length) return "";
+  const pj=(x)=>x?(surModele?((x.parModele||{})[modele]||null):x):null;
+  const rn=(v)=>Math.round((Number(v)||0)*netRate());
+  const val=(j,v)=>{ const x=(J.parJour[j].vas||{})[v], p=pj(x); return { r:rn(p&&p.rev), s:(!surModele&&x&&x.subs)||0 }; };
+  const tot={};
+  jours.forEach(j=>Object.keys(J.parJour[j].vas||{}).forEach(v=>{
+    const c=val(j,v); if(!c.r&&!c.s) return;
+    const t=tot[v]||(tot[v]={r:0,s:0}); t.r+=c.r; t.s+=c.s;
+  }));
+  const noms=Object.keys(tot).sort((a,b)=>(tot[b].r-tot[a].r)||(tot[b].s-tot[a].s)||a.localeCompare(b));
+  const titre=`${ouvert?"▾":"▸"} Les 7 jours${sel===auj?"":" jusqu'au "+omLibelleJour(sel,auj).court}, VA par VA${surModele?" · sur "+escapeHtml(modele):""}`;
+  const bouton=`<button class="om-7j-t" data-om7j aria-expanded="${ouvert?"true":"false"}">${titre}</button>`;
+  if(!ouvert) return `<div class="om-7j">${bouton}</div>`;
+  if(!noms.length) return `<div class="om-7j">${bouton}<div class="om-spend-n">Personne de l'équipe n'a fait payer ni amené d'abonné sur ces 7 jours.</div></div>`;
+  const m=(v)=>omMoney(v,cur), plus=(s)=>s?`<i>+${fmtInt(s)}</i>`:"";
+  const cle=(j)=>(j>=auj?"auj":j);
+  const tete=`<tr><th>VA</th>${jours.map(j=>`<th><button class="om-7j-j${j===sel?" on":""}" data-omjour="${cle(j)}" title="Voir ce jour">${omLibelleJour(j,auj).court}</button></th>`).join("")}<th>7 j</th></tr>`;
+  const corps=noms.map(v=>`<tr><th><span data-vacard="${escapeHtml(v)}" title="Voir sa fiche">${escapeHtml(v)}</span></th>`
+    +jours.map(j=>{ const c=val(j,v); return `<td class="${j===sel?"sel":""}${c.r?"":" vide"}">${c.r?m(c.r):"·"}${plus(c.s)}</td>`; }).join("")
+    +`<td class="tot">${m(tot[v].r)}${plus(tot[v].s)}</td></tr>`).join("");
+  const colR=(j)=>noms.reduce((a,v)=>a+val(j,v).r,0), colS=(j)=>noms.reduce((a,v)=>a+val(j,v).s,0);
+  const totR=noms.reduce((a,v)=>a+tot[v].r,0), totS=noms.reduce((a,v)=>a+tot[v].s,0);
+  const pied=`<tr class="eq"><th>Équipe</th>${jours.map(j=>`<td class="${j===sel?"sel":""}${colR(j)?"":" vide"}">${colR(j)?m(colR(j)):"·"}${plus(colS(j))}</td>`).join("")}<td class="tot">${m(totR)}${plus(totS)}</td></tr>`;
+  return `<div class="om-7j">${bouton}<div class="om-7j-w"><table class="om-7j-tab"><thead>${tete}</thead><tbody>${corps}${pied}</tbody></table></div>`
+    +`<div class="om-spend-n">Montants <b>nets</b> dépensés par les abonnés de chaque VA${surModele?"":" ; en vert, <b>+N</b> = abonnés amenés ce jour-là"}. Touche un jour pour son détail.</div></div>`;
+}
 function renderOM(){
   // Même sans données OM, les panneaux qui dépendent de HIDE doivent être
   // re-rendus (sinon un clic sur 🙈 laissait des montants en clair).
@@ -8451,7 +8602,7 @@ function renderOM(){
   // Toujours affiché (quelle que soit la fenêtre choisie) : c'est la ligne qu'il
   // vient chercher le matin. Un jour sans encaissement le dit franchement au
   // lieu de rester vide, pour qu'on distingue « rien » de « pas encore calculé ».
-  const spendToday=(function(){
+  const spendAujourdhui=(function(){
     if(ko) return "";
     // 🎭 SUR UN ONGLET MODÈLE, CE PANNEAU DISPARAISSAIT PUREMENT ET SIMPLEMENT
     // (`if(OM_MODEL!=="all") return ""`). C'est exactement là qu'André le
@@ -8497,6 +8648,13 @@ function renderOM(){
     const src=(d.vas||[]).filter(v=>pj(v));
     if(!src.length) return "";
     const act=src.filter(v=>pj(v).rev).sort((a,b)=>pj(b).rev-pj(a).rev);
+    // 📅 (18/09) Comme pour les autres jours : les abonnés amenés AUJOURD'HUI (« +N subs »),
+    // et les VA qui en ont amené sans que personne n'ait encore payé — ils ont travaillé.
+    // Sur « Tout » seulement : les subs ne sont pas ventilés par modèle.
+    const subsDe=(v)=>surModele?0:(Number(((v&&v.periodes&&v.periodes.today)||{}).subs)||0);
+    const plusSubs=(v)=>subsDe(v)?` <i class="om-sub">· +${fmtInt(subsDe(v))} sub${subsDe(v)>1?"s":""}</i>`:"";
+    const auTravail=src.filter(v=>!pj(v).rev && subsDe(v)>0).sort((a,b)=>subsDe(b)-subsDe(a));
+    const pucesTravail=auTravail.map(v=>`<span class="om-spend-c zero" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche"><span class="om-spend-top"><b>${escapeHtml(v.va)}</b> ${omMoney(0,cur)}${plusSubs(v)}</span></span>`).join("");
     const tot=act.reduce((a,v)=>a+(pj(v).rev||0),0);
     // Un nombre de payeurs ABSENT n'est pas zéro : on somme les valeurs connues et
     // on retient si l'une manque, pour ne pas écrire « 492 $ par 0 abonné ».
@@ -8530,7 +8688,7 @@ function renderOM(){
       +(persoBloc.n?` Les <b>🔒 perso</b> (tes deux comptes perso) sont tes comptes à toi — montrés à part, jamais dans le total de l'équipe.`:"");
     // Ni équipe ni perso n'a encaissé : on le DIT, au lieu d'un « 0 $ par 0 abonné ».
     const surTitre=surModele?` · sur ${escapeHtml(OM_MODEL)}`:"";
-    if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui${surTitre}</b> — aucun abonné rattaché à un VA n'a encore payé.${rec}</div>`;
+    if(!act.length && !persoBloc.n) return `<div class="om-spend vide">💸 <b>Aujourd'hui${surTitre}</b> — aucun abonné rattaché à un VA n'a encore payé.${pucesTravail?`<div style="margin-top:6px">${pucesTravail}</div>`:""}${rec}</div>`;
     // En-tête = TOTAL ÉQUIPE (les 🔒 perso ne s'y ajoutent pas). Si seul le perso
     // a payé, en-tête neutre pour ne pas afficher « 0 $ par 0 abonné ».
     const tete=act.length
@@ -8539,15 +8697,28 @@ function renderOM(){
     return `<div class="om-spend"><div class="om-spend-h">${tete}</div>`
       +act.map(v=>{
         const t=pj(v);
-        const haut=`<span class="om-spend-top"><b>${escapeHtml(v.va)}</b> ${omMoney((t.rev||0)*netRate(),cur)}${t.payeurs==null?"":` <i>· ${fmtInt(t.payeurs)} payeur${t.payeurs>1?"s":""}</i>`}</span>`;
+        const haut=`<span class="om-spend-top"><b>${escapeHtml(v.va)}</b> ${omMoney((t.rev||0)*netRate(),cur)}${t.payeurs==null?"":` <i>· ${fmtInt(t.payeurs)} payeur${t.payeurs>1?"s":""}</i>`}${plusSubs(v)}</span>`;
         // Sur un onglet modèle, redire le modèle sous chaque nom serait du bruit :
         // il est déjà dans le titre du panneau.
         const mods=surModele?"":ligneModeles(t.parModele,cur);
         return `<span class="om-spend-c${mods?" avecmod":""}" data-vacard="${escapeHtml(v.va)}" title="Voir sa fiche">${haut}${mods}</span>`;
       }).join("")
+      +pucesTravail
       +persoBloc.chips
-      +`<div class="om-spend-n">${noteBase}</div>`
+      +`<div class="om-spend-n">${noteBase}${surModele?"":" « +N subs » = abonnés amenés aujourd'hui."}</div>`
       +rec+`</div>`;
+  })();
+  // 📅 Le même panneau pour un AUTRE jour (voir OM_JOUR), avec sa barre de jours et le
+  // tableau des 7 jours. Sans date du cerveau (démo, cerveau ancien) : le panneau d'avant.
+  const spendToday=(function(){
+    if(ko) return "";
+    const auj=String(d.today||"");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(auj)) return spendAujourdhui;
+    if(OM_JOUR && OM_JOUR>=auj) OM_JOUR=null;          // minuit est passé : le jour choisi est devenu aujourd'hui
+    const surModele=(OM_MODEL!=="all"), J=OM_JOURS;
+    const bloc=OM_JOUR ? omSpendJour(J, OM_JOUR, auj, surModele, OM_MODEL, cur, persoPucesParBot, ligneModeles) : spendAujourdhui;
+    const panne=(!J && OM_JOURS_ERR && (OM_JOUR||OM_7J_OUVERT)) ? `<div class="om-spend-n om-jours-w">Détail jour par jour indisponible : ${escapeHtml(OM_JOURS_ERR)}.</div>` : "";
+    return omBarreJours(J, auj, OM_JOUR) + bloc + omTableau7j(J, OM_JOUR||auj, auj, surModele, OM_MODEL, cur, OM_7J_OUVERT) + panne;
   })();
   // 💶 TOUT CE TABLEAU EST EN NET (2026-09-06). « Généré » était la DERNIÈRE
   // colonne en brut, au milieu de LTV / marge / ROI qui étaient déjà nets — et
@@ -8756,7 +8927,9 @@ function renderOM(){
   // de fraîcheur (#omFresh) est mis à jour JUSTE APRÈS, hors du garde, donc l'âge
   // des chiffres continue d'avancer même quand on saute la reconstruction.
   { const _ob=$("#omBody"); const _h=bandeauKo+tiles+cmpMois+spendToday+modelsRow+vaHead+perBar+vaBloc+(filtreDispo?recFenetre+notePrec+noteAnciens+noteBrut+noteRemb:"")+noteCash+noteArg;
-    if(_ob && _ob._lastHtml!==_h){ _ob.innerHTML=_h; _ob._lastHtml=_h; } }
+    if(_ob && _ob._lastHtml!==_h){ _ob.innerHTML=_h; _ob._lastHtml=_h;
+      // 📅 Le tableau des 7 jours défile sur téléphone : on montre d'abord les jours récents.
+      const _w=_ob.querySelector(".om-7j-w"); if(_w) _w.scrollLeft=_w.scrollWidth; } }
   { const of=$("#omFresh"); if(of) of.innerHTML=(typeof fraicheur==="function")?fraicheur(omMesureAt()):""; }
   try{ renderDataHealth(); }catch(e){}
   renderModeles();
@@ -9772,6 +9945,29 @@ async function loadOM(){
   OM_LOADING=true; OM_LOADING_AT=Date.now();
   try{ return await _loadOM(); } finally{ OM_LOADING=false; }
 }
+// ⚠️ Jamais appelé depuis renderOM : il redessine à la fin, un échec relancerait la
+// lecture à chaque rendu. Seuls la lecture principale (au plus toutes les 2 min tant
+// qu'il n'y a rien, toutes les 5 min ensuite) et un clic sur un jour le déclenchent.
+async function loadOmJours(){
+  if(!HUB_URL || !TOKEN || OM_JOURS_CHARGE) return;
+  OM_JOURS_CHARGE=true; OM_JOURS_ESSAI=Date.now();
+  try{
+    const _ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+    const _to=_ctrl?setTimeout(function(){ try{ _ctrl.abort(); }catch(e){} },20000):null;
+    let r;
+    try{ r=await fetch(HUB_BASE+"/api/hub/onlymonster-jours",{headers:{"x-hub-token":TOKEN},cache:"no-store",signal:_ctrl?_ctrl.signal:undefined}); }
+    finally{ if(_to) clearTimeout(_to); }
+    if(!r.ok){ OM_JOURS_ERR="le cerveau a répondu "+r.status; return; }
+    const j=await r.json();
+    if(j && j.data){ OM_JOURS=j.data; OM_JOURS_AT=Date.now(); OM_JOURS_ERR=""; }
+    else OM_JOURS_ERR="il se prépare côté serveur (quelques minutes après un redémarrage)";
+  }catch(e){ OM_JOURS_ERR="cerveau injoignable"; }
+  finally{ OM_JOURS_CHARGE=false; try{ renderOM(); }catch(_){} }
+}
+function omJoursAPerime(){
+  const age=Date.now()-(OM_JOURS_AT||0), essai=Date.now()-(OM_JOURS_ESSAI||0);
+  return OM_JOURS ? (age>5*60000 && essai>5*60000) : (essai>2*60000);
+}
 async function _loadOM(){
   // ⚠️ `OM_DATA` sert de sentinelle « j'ai de vraies données » (`if(!OM_DATA)
   // omIndispo(...)`), mais il contient les chiffres de DÉMO tant qu'on n'est pas
@@ -9809,6 +10005,7 @@ async function _loadOM(){
       }
     }catch(e){}
     OM_DATA=j.data; OM_FETCHED_AT=Date.now(); omSucces();
+    if(omJoursAPerime()) loadOmJours();   // 📅 « qui a dépensé » jour par jour : en fond
     // ⚠️ CHAQUE rendu est isolé (2026-08-24). Avant, la vingtaine d'appels était
     // enchaînée sur une seule ligne dans le try de loadOM : un seul panneau qui
     // plantait (une donnée absente, un champ que le serveur n'envoie plus)
@@ -9842,12 +10039,30 @@ $("#om").addEventListener("click",e=>{
     if(surFenetre) OM_SORT = (OM_SORT==="subs") ? "rev" : "subs";
     else OM_SORT=OM_SORT==="subs"?"rev":OM_SORT==="rev"?"marge":"subs";
     renderOM(); return; }
+  const jourB=e.target.closest&&e.target.closest("[data-omjour]");
+  if(jourB && !jourB.disabled){
+    const v=jourB.getAttribute("data-omjour");
+    OM_JOUR=(v && v!=="auj" && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : null;
+    if(OM_JOUR && (!OM_JOURS || omJoursAPerime())) loadOmJours();
+    renderOM(); return; }
+  if(e.target.closest&&e.target.closest("[data-om7j]")){
+    OM_7J_OUVERT=!OM_7J_OUVERT; try{ localStorage.setItem("ccn_om7j",OM_7J_OUVERT?"1":"0"); }catch(_){}
+    if(OM_7J_OUVERT && !OM_JOURS) loadOmJours();
+    renderOM(); return; }
   const perB=e.target.closest&&e.target.closest("[data-omper]");
   if(perB && !perB.disabled){ OM_PERIODE=perB.getAttribute("data-omper"); try{localStorage.setItem("ccn_om_periode",OM_PERIODE);}catch(_){} renderOM(); return; }
   const vaCard=e.target.closest&&e.target.closest("[data-vacard]");
   if(vaCard){ const nom=vaCard.getAttribute("data-vacard"); /* repli `gsGo` retiré le 13/09 : il n'a jamais existé dans cette page */ if(typeof openVaCard==="function") openVaCard(nom); return; }
   if(e.target.closest("#omLaunch")){ e.preventDefault(); launchOmApp(); return; }
   const m=e.target.closest("[data-om]"); if(m){ OM_MODEL=m.getAttribute("data-om"); renderOM(); }
+});
+// 📅 Le calendrier du panneau « Qui dépense » (voir OM_JOUR).
+$("#om").addEventListener("change",e=>{
+  const di=e.target.closest&&e.target.closest("[data-omjourdate]"); if(!di) return;
+  const v=String(di.value||""), auj=String((OM_DATA&&OM_DATA.today)||"");
+  OM_JOUR=(/^\d{4}-\d{2}-\d{2}$/.test(v) && v<auj) ? v : null;
+  if(OM_JOUR && (!OM_JOURS || omJoursAPerime())) loadOmJours();
+  renderOM();
 });
 
 /* ---------- barre d'onglets (les outils s'ouvrent DANS le site) ---------- */

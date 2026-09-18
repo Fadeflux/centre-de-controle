@@ -2260,4 +2260,87 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   }
 }
 
+// ================= QUI A DEPENSE, JOUR PAR JOUR (18/09) : hier et les 30 derniers jours
+// Demande d Andre : « hier j ai pas pu regarder et je sais pas grace a qui j ai fait de
+// l argent ». On rejoue les fonctions du panneau sur un jeu de donnees connu.
+{
+  let bloc = "", puces = "", mods = "";
+  try { bloc = morceau("function omJourDecale(", "function renderOM("); } catch (e) {}
+  try { puces = morceau("function persoPucesParBot(", "function ligneModeles("); } catch (e) {}
+  try { mods = morceau("function ligneModeles(", "// 💸 « Qui dépense aujourd'hui »"); } catch (e) {}
+  verifie("Jour par jour : les fonctions du panneau existent", !!(bloc && puces && mods), "omJourDecale/omSpendJour/omTableau7j absentes");
+  if (bloc && puces && mods) {
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const fmtInt = (v) => isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString("fr-FR") : "—";
+    const omMoney = (v, cur) => Math.round(Number(v) || 0).toLocaleString("fr-FR") + " " + (cur || "$");
+    const f = new Function("escapeHtml", "fmtInt", "omMoney", "netRate", "pctComm",
+      bloc + puces + mods + "; return { omJourDecale, omLibelleJour, omBarreJours, omSpendJour, omTableau7j, persoPucesParBot, ligneModeles };")(
+      esc, fmtInt, omMoney, () => 0.8, () => "20 %");
+    const AUJ = "2026-09-18", HIER = "2026-09-17";
+    const J = { at: Date.now(), today: AUJ, complet: true, jours: [], parJour: {} };
+    for (let i = 29; i >= 0; i--) { const j = f.omJourDecale(AUJ, -i); J.jours.push(j); J.parJour[j] = { vas: {}, anciens: { rev: 0, parVa: {} }, hors: { rev: 0, payeurs: 0 }, brut: 0, subsMesures: true }; }
+    J.parJour[HIER] = {
+      vas: {
+        VaUn: { rev: 93, payeurs: 1, subs: 12, parModele: { ModeleB: { rev: 93, payeurs: 1 } } },
+        VaDeux: { rev: 51, payeurs: 2, parModele: { ModeleA: { rev: 15, payeurs: 1 }, ModeleB: { rev: 36, payeurs: 1 } } },
+        VaTrois: { rev: 0, payeurs: 0, subs: 4 },
+        "<img src=x onerror=alert(1)>": { rev: 5, payeurs: 1, parModele: { ModeleA: { rev: 5, payeurs: 1 } } },
+      },
+      anciens: { rev: 11, parVa: { Bot: { rev: 11, payeurs: 1, display: "Bot", parPlateforme: { instagram: { rev: 11, payeurs: 1 } } } } },
+      hors: { rev: 7, payeurs: 1 }, brut: 167, subsMesures: true,
+    };
+    J.parJour["2026-09-16"].subsMesures = false;
+    J.parJour["2026-09-15"].vas = { VaUn: { rev: 40.4, payeurs: 1, subs: 3 }, VaDeux: { rev: 10.4, payeurs: 1, subs: 1 } };
+    J.parJour[AUJ].vas = { VaUn: { rev: 20, payeurs: 1, subs: 2 } };
+    const h = f.omSpendJour(J, HIER, AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles);
+    verifie("Jour par jour : hier a son nom et sa date", h.includes("Qui a dépensé hier (jeudi 17 septembre)"), h.slice(0, 160));
+    verifie("Jour par jour : total net de l equipe et nombre d abonnes qui ont paye", h.includes("<b>119 $</b> par 4 abonnés"), h.slice(0, 260));
+    const pos = (s) => h.indexOf(s);
+    verifie("Jour par jour : les VA du plus gros au plus petit, ceux sans argent a la fin", pos(">VaUn<") < pos(">VaDeux<") && pos(">VaDeux<") < pos("&lt;img") && pos("&lt;img") < pos(">VaTrois<"), [pos(">VaUn<"), pos(">VaDeux<"), pos("&lt;img"), pos(">VaTrois<")].join());
+    verifie("Jour par jour : les abonnes amenes ce jour-la sont ecrits", h.includes("+12 subs") && h.includes("+4 subs"), "subs absents");
+    verifie("Jour par jour : un VA sans argent mais avec des subs est montre (il a travaille)", /om-spend-c zero" data-vacard="VaTrois"/.test(h), "VaTrois absent");
+    verifie("Jour par jour : le detail par modele sous le VA", /VaDeux<\/b>[\s\S]*?om-spend-mods[\s\S]*?ModeleB<\/b> 29 \$/.test(h), "modeles absents");
+    verifie("Jour par jour : les comptes perso a part, avec leur bot", h.includes("🔒 Perso") && h.includes("Bot · Insta"), "perso absent");
+    verifie("Jour par jour : l addition du jour tombe juste (equipe + perso + sans lien)", h.includes("<b>134 $</b> = équipe 119 $ + perso 9 $ + abonnés sans lien de VA 6 $"), (h.match(/🧾[^<]*<b>[^<]*<\/b>[^<]*/) || [""])[0]);
+    verifie("Jour par jour : un nom de VA ne peut pas injecter de balise", !h.includes("<img src=x") && h.includes("&lt;img src=x"), "nom non echappe");
+    // Vu en vrai le 18/09 : 212 et 96 $ bruts -> 169,6 + 76,8 = 246,4 (« 246 $ » en tete)
+    // mais l addition deduite d un total arrondi donnait « equipe 247 $ ». Chaque total =
+    // la somme des montants AFFICHES.
+    const J2 = { complet: true, jours: [HIER], parJour: { [HIER]: { vas: { VaA: { rev: 212, payeurs: 4 }, VaB: { rev: 96, payeurs: 3 } },
+      anciens: { rev: 24, parVa: { Bot: { rev: 24, payeurs: 1, display: "Bot" } } }, hors: { rev: 18, payeurs: 1 }, brut: 350, subsMesures: true } } };
+    const h2 = f.omSpendJour(J2, HIER, AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles);
+    verifie("Jour par jour : l en-tete et l addition disent le MEME chiffre, arrondis compris", h2.includes("<b>247 $</b> par 7 abonnés") && h2.includes("<b>280 $</b> = équipe 247 $ + perso 19 $ + abonnés sans lien de VA 14 $"), (h2.match(/— <b>[^<]*<\/b>/) || [""])[0] + " | " + (h2.match(/🧾[^<]*<b>[^<]*<\/b>[^<]*/) || [""])[0]);
+    const z = f.omSpendJour(J, HIER, AUJ, true, "ModeleB", "$", f.persoPucesParBot, f.ligneModeles);
+    verifie("Jour par jour : onglet modele = la part de ce modele, sans subs (non ventiles)", z.includes("sur ModeleB") && z.includes("<b>103 $</b> par 2 abonnés") && !z.includes("VaTrois") && !z.includes("subs</i>") && !z.includes("🧾"), z.slice(0, 220));
+    verifie("Jour par jour : jour sans paiement = dit, pas un panneau vide", f.omSpendJour(J, "2026-09-10", AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles).includes("aucun abonné rattaché à un VA de l'équipe n'a payé"), "jour vide muet");
+    verifie("Jour par jour : subs illisibles = dit, jamais 0", f.omSpendJour(J, "2026-09-16", AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles).includes("n'ont pas pu être lus"), "subs illisibles tus");
+    verifie("Jour par jour : au-dela de 30 jours = pas de detail, le dire", f.omSpendJour(J, "2026-08-01", AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles).includes("30 derniers jours"), "jour hors fenetre");
+    verifie("Jour par jour : detail pas encore charge = « se charge », pas « 0 $ »", f.omSpendJour(null, HIER, AUJ, false, "all", "$").includes("se charge"), "chargement");
+    verifie("Jour par jour : revenus muets = « pas zero »", f.omSpendJour({ muet: true }, HIER, AUJ, false, "all", "$").includes("<b>pas</b> zéro"), "muet");
+    verifie("Jour par jour : un compte OnlyMonster muet = montants minimums, dit", f.omSpendJour(Object.assign({}, J, { complet: false }), HIER, AUJ, false, "all", "$", f.persoPucesParBot, f.ligneModeles).includes("minimums"), "partiel tu");
+    const b0 = f.omBarreJours(J, AUJ, null), b1 = f.omBarreJours(J, AUJ, HIER), bMin = f.omBarreJours(J, AUJ, J.jours[0]);
+    verifie("Barre des jours : aujourd hui choisi, « jour d apres » desactive", /om-jours-b on" data-omjour="auj"/.test(b0) && /data-omjour="auj" disabled title="Jour d'après"/.test(b0) && b0.includes(`data-omjour="${HIER}" title="Jour d'avant"`), b0);
+    verifie("Barre des jours : depuis hier, « jour d apres » ramene a aujourd hui", /class="om-jours-b on" data-omjour="2026-09-17">Hier/.test(b1) && /data-omjour="auj" title="Jour d'après"/.test(b1), b1);
+    verifie("Barre des jours : le 1er des 30 jours ne recule plus, le calendrier est borne", /disabled title="Jour d'avant"/.test(bMin) && bMin.includes(`min="${J.jours[0]}" max="${AUJ}"`), bMin);
+    const t7 = f.omTableau7j(J, AUJ, AUJ, false, "all", "$", true);
+    const lignes = (t7.match(/<tr>/g) || []).length;
+    verifie("7 jours : une colonne par jour, un clic par jour", (t7.match(/data-omjour=/g) || []).length === 7 && t7.includes('data-omjour="auj"') && t7.includes(`data-omjour="${HIER}"`), (t7.match(/data-omjour="[^"]+"/g) || []).join());
+    verifie("7 jours : une ligne par VA actif + l en-tete", lignes === 1 + 4, lignes);
+    const welzy = (t7.match(/data-vacard="VaUn"[\s\S]*?<\/tr>/) || [""])[0];
+    verifie("7 jours : le total 7 j d un VA = la somme de ses cases arrondies", welzy.includes('<td class="tot">122 $<i>+17</i></td>'), welzy);
+    const eq = (t7.match(/<tr class="eq">[\s\S]*?<\/tr>/) || [""])[0];
+    verifie("7 jours : la ligne equipe additionne les cases affichees (hier : 74 + 41 + 4)", eq.includes("119 $<i>+16</i>") && eq.includes('<td class="tot">'), eq);
+    verifie("7 jours : ferme = seulement le bouton", !f.omTableau7j(J, AUJ, AUJ, false, "all", "$", false).includes("<table"), "tableau affiche ferme");
+    verifie("7 jours : sur un modele, pas de subs (non ventiles par modele)", !f.omTableau7j(J, AUJ, AUJ, true, "ModeleB", "$", true).includes("<i>+"), "subs sur un modele");
+  }
+  // Branchement : le panneau utilise ces fonctions ; la lecture n est JAMAIS lancee
+  // depuis renderOM (elle redessine a la fin : un echec relancerait en boucle).
+  const iR = src.indexOf("function renderOM(){"), jR = src.indexOf("\nfunction ", iR + 20);
+  const corpsR = (iR >= 0 && jR > iR) ? src.slice(iR, jR) : "";
+  verifie("Jour par jour : le panneau affiche la barre, le jour choisi et les 7 jours", /omBarreJours\(J, auj, OM_JOUR\)/.test(corpsR) && /omSpendJour\(J, OM_JOUR/.test(corpsR) && /omTableau7j\(J, OM_JOUR\|\|auj/.test(corpsR), "branchement absent");
+  verifie("Jour par jour : renderOM ne lance jamais la lecture (pas de boucle)", corpsR.length > 0 && !corpsR.includes("loadOmJours("), "loadOmJours dans renderOM");
+  verifie("Jour par jour : la lecture principale rafraichit le detail en fond", /if\(omJoursAPerime\(\)\) loadOmJours\(\);/.test(src) && src.includes('"/api/hub/onlymonster-jours"'), "rafraichissement absent");
+  verifie("Jour par jour : clic sur un jour, sur le tableau, et calendrier", src.includes('closest("[data-omjour]")') && src.includes('closest("[data-om7j]")') && src.includes('closest("[data-omjourdate]")'), "ecouteurs absents");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
