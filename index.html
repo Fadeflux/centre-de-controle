@@ -2920,6 +2920,45 @@ const REFRESH_MS = 60000;
   var brut = window.fetch.bind(window);
   var refusees = Object.create(null);
   window._oublierRefus = function(){ refusees = Object.create(null); };
+
+  // ⚡ FILE D'ATTENTE DES LECTURES (18/09). L'ouverture de la page lance ~150 lectures au
+  // cerveau D'UN COUP (en HTTP/2, toutes partent ensemble). Mesuré le 17/09 à 04:06 : elles
+  // sont tombées sur la réserve de connexions à la base, pleine — 45 tuiles vides pendant
+  // 7,6 s, puis abandonnées au rechargement. Désormais au plus MAX_LECTURES lectures sont en
+  // vol ; les suivantes attendent leur tour, dans l'ordre où la page les demande (les tuiles
+  // du haut d'abord). Les ACTIONS (POST : payer, exclure, noter…) ne font JAMAIS la queue,
+  // et une lecture abandonnée pendant l'attente ne part jamais.
+  var MAX_LECTURES = 12, enVol = 0, enAttente = [];
+  function lectureSuivante(){
+    while(enVol < MAX_LECTURES && enAttente.length){
+      var t = enAttente.shift();
+      if(t.fini) continue;                       // abandonnée pendant l'attente
+      t.fini = true; enVol++;
+      t.partir();
+    }
+  }
+  function lancer(u, o, s){
+    var methode = ((o && o.method) || "GET").toUpperCase();
+    if(methode !== "GET" || s.indexOf("/api/") < 0) return brut(u, o);
+    return new Promise(function(resolve, reject){
+      var sig = o && o.signal;
+      function fin(){ enVol--; lectureSuivante(); }
+      var t = { fini: false, partir: function(){
+        var p;
+        try{ p = brut(u, o); }catch(e){ p = Promise.reject(e); }
+        p.then(resolve, reject).then(fin, fin);
+      }};
+      if(sig){
+        if(sig.aborted){ reject(sig.reason || new DOMException("Aborted", "AbortError")); return; }
+        sig.addEventListener("abort", function(){
+          if(!t.fini){ t.fini = true; reject(sig.reason || new DOMException("Aborted", "AbortError")); }
+        }, { once: true });
+      }
+      enAttente.push(t);
+      lectureSuivante();
+    });
+  }
+
   window.fetch = function(u, o){
     var s, cle;
     try{
@@ -2930,7 +2969,7 @@ const REFRESH_MS = 60000;
           { status: 403, headers: { "content-type": "application/json" } }));
       }
     }catch(e){ return brut(u, o); }
-    return brut(u, o).then(function(r){
+    return lancer(u, o, s).then(function(r){
       // ⚠️ SEUL UN REFUS DE RÔLE EST DÉFINITIF. Mémoriser n'importe quel 403
       // rendait ce filtre dangereux : un hoquet de passerelle ou de pare-feu
       // aurait éteint un panneau pour TOUTE la session, sans un mot — le défaut

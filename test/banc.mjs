@@ -2093,4 +2093,47 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
     "un chemin ne recalcule pas le bouton");
 }
 
+// ---- FILE D'ATTENTE DES LECTURES (18/09) : 12 en vol au plus, les actions passent, l'abandon ne part pas ----
+{
+  const iF = src.indexOf("(function(){\n  var brut = window.fetch.bind(window);");
+  const jF = iF < 0 ? -1 : src.indexOf("// ⚡ AJOUTÉ le 2026-08-23", iF);
+  if (iF < 0 || jF < 0) { verifie("File d'attente : enveloppe de fetch trouvee", false, "introuvable"); }
+  else {
+    const code = src.slice(iF, jF);
+    let enVol = 0, maxVu = 0;                        // LECTURES (GET) en vol ; les actions passent devant exprès
+    const parties = [], liberer = [];
+    const faux = (u, o) => {
+      const methode = (o && o.method) || "GET";
+      parties.push(methode + " " + u);
+      const lecture = methode === "GET";
+      if (lecture) { enVol++; maxVu = Math.max(maxVu, enVol); }
+      return new Promise((res) => liberer.push(() => { if (lecture) enVol--; res({ status: 200 }); }));
+    };
+    const win = { fetch: faux };
+    new Function("window", "Response", "DOMException", code)(win, globalThis.Response, globalThis.DOMException);
+    const lectures = Array.from({ length: 40 }, (_, i) => win.fetch("http://x/api/hub/t" + i, {}));
+    await new Promise((r) => setTimeout(r, 5));
+    const avantOuverture = parties.length;
+    verifie("File d'attente : au plus 12 lectures en vol a l'ouverture", maxVu <= 12 && avantOuverture <= 12, maxVu + " en vol, " + avantOuverture + " parties");
+    win.fetch("http://x/api/hub/payer", { method: "POST" });
+    await new Promise((r) => setTimeout(r, 5));
+    verifie("File d'attente : une action (POST) part tout de suite, file pleine ou non", parties.includes("POST http://x/api/hub/payer"), parties.slice(-2).join(" | "));
+    const ctrl = new AbortController();
+    const abandon = win.fetch("http://x/api/hub/abandon", { signal: ctrl.signal }).then(() => "resolue", () => "rejetee");
+    ctrl.abort();
+    const verdict = await Promise.race([abandon, new Promise((r) => setTimeout(() => r("toujours en attente"), 200))]);
+    verifie("File d'attente : lecture abandonnee pendant l'attente = rejetee", verdict === "rejetee", verdict);
+    let tours = 0;
+    while ((liberer.length || parties.filter((p) => p.startsWith("GET")).length < 40) && tours++ < 500) {
+      const f = liberer.shift(); if (f) f();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    const rep = await Promise.all(lectures);
+    const ordre = parties.filter((p) => p.startsWith("GET")).map((p) => p.split("/t")[1]).join(",");
+    verifie("File d'attente : les 40 lectures aboutissent, dans l'ordre demande", rep.length === 40 && rep.every((r) => r && r.status === 200) && ordre === Array.from({ length: 40 }, (_, i) => i).join(","), ordre);
+    verifie("File d'attente : la lecture abandonnee n'est jamais partie", !parties.some((p) => p.includes("abandon")), parties.filter((p) => p.includes("abandon")).join(" | "));
+    verifie("File d'attente : jamais plus de 12 en vol sur toute la sequence", maxVu <= 12, maxVu);
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
