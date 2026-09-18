@@ -98,6 +98,9 @@ const JOURS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function nb(v){ if(v === null || v === undefined || v === "") return null; const n = Number(v); return isFinite(n) ? n : null; }
 function val(v){ const n = nb(v); return n === null ? "—" : String(n); }
+function fmtI(v){ const n = nb(v); return n === null ? "—" : n.toLocaleString("fr-FR"); }   // 12 345 (idée 1 : vues)
+// Vues par compte (idée 1) — même source que l'entonnoir du centre : { insta_minuscule -> {vues,visites,clics,tauxClic} }
+let VUES = {};
 function jourDe(a, m, j){ return JOURS_FR[new Date(Date.UTC(a, m - 1, j)).getUTCDay()]; }
 /** Heure de New York (fuseau RÉEL des comptes, spoofés US) pour une heure MURALE de Paris.
     Correct été comme hiver : on cherche l'instant UTC qui, affiché à Paris, donne (a,mo,j,h,mi),
@@ -163,6 +166,7 @@ function rendre(v){
           <div><span>File sur ${esc(horizon)} jours</span>${inconnu ? "—" : prog + " / " + val(voulus)}</div>
           <div><span>Dans les 24 h</span>${esc(val(c.h24))}</div>
           <div class="large"><span>Prochain post</span>${c.prochain ? esc(quand(c.prochain)) : (inconnu ? "—" : "aucun")}</div>
+          <div class="large"><span>👁 Audience (public)</span>${(function(){ const vd = VUES[ig.toLowerCase()]; return (!vd || vd.vues == null) ? "vues pas encore mesurées" : `<b>${fmtI(vd.vues)}</b> vues${vd.visites != null ? ` → <b>${fmtI(vd.visites)}</b> visites bio` : ""}${vd.clics != null ? ` → <b>${fmtI(vd.clics)}</b> clics OF` : ""}`; })()}</div>
         </div>
         <div class="barre" title="${inconnu ? "inconnu" : pct + " %"}"><i style="width:${pct}%"></i></div>
         ${ps.map(p => `<div class="msg ${p.niveau === "critique" ? "ko" : ""}">${esc(String(p.texte).replace(ig + " : ", ""))}</div>`).join("")}
@@ -234,6 +238,17 @@ async function charger(){
     if(!r.ok) throw new Error("le cerveau a répondu " + r.status);
     const v = await r.json();
     DERNIER = v; LU_A = Date.now();
+    // idée 1 : vues par compte — MÊME source que l'entonnoir du centre. Best-effort : un échec ici
+    // ne casse jamais l'affichage OneUp (VUES reste ce qu'il était / vide -> « pas encore mesurées »).
+    try{
+      const rv = await fetch(HUB_URL + "/entonnoir-comptes", { headers: { "x-hub-token": tok }, cache: "no-store" });
+      if(rv.ok){
+        const dv = (await rv.json()).data || {};
+        const map = {};
+        (dv.comptes || []).concat(dv.comptesSansPont || []).forEach(c => { if(c && c.insta) map[String(c.insta).toLowerCase()] = c; });
+        VUES = map;
+      }
+    }catch(_){}
     alerte.innerHTML = "";
     zone.innerHTML = rendre(v);
     pied.textContent = piedDePage(v);
