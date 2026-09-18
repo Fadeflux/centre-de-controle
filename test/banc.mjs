@@ -2136,4 +2136,128 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   }
 }
 
+// ================= ONEUP (18/09) : la carte ne parle que des problemes CRITIQUES, jamais de vert par defaut
+{
+  verifie("OneUp : carte dans les outils, qui ouvre la page OneUp", /\{ id:"oneup",[^\n]*openUrl:"oneup\.html"/.test(src), "entree TOOLS absente");
+  verifie("OneUp : l'etat est lu avec celui de la ferme, en parallele", /Promise\.all\(\[fermeDansLesCartes\(tools\), oneupDansLesCartes\(tools\)\]\)/.test(src), "appel absent");
+  let code = null;
+  try { code = morceau("async function oneupDansLesCartes(tools){", "/* ⚠️ LE JETON EXPIRÉ"); }
+  catch (e) { verifie("OneUp : fonction de la carte trouvee", false, e.message); }
+  if (code) {
+    const fmtInt = (v) => isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString("fr-FR") : "—";
+    const essai = async (reponse) => {
+      const tools = {};
+      const f = new Function("TOKEN", "HUB_BASE", "fetch", "fmtInt", code + "; return oneupDansLesCartes;")("jeton", "http://x", async () => reponse, fmtInt);
+      await f(tools);
+      return tools.oneup;
+    };
+    const rep = (corps, status) => ({ ok: (status || 200) < 400, status: status || 200, json: async () => corps });
+    const sain = { recue: true, ageMin: 3, etat: { comptes: [{ ig: "a", programmes: 63, voulus: 63 }, { ig: "b", programmes: 40, voulus: 42 }] },
+                   problemes: [{ niveau: "compte", compte: "b", texte: "b : file incomplète" }] };
+    let c = await essai(rep(sain));
+    verifie("OneUp : etat sain -> vert, sans note (les problemes de compte restent sur la page OneUp)",
+      c && c.status === "online" && !c.note && c.metrics.file === "103 / 105" && c.metrics.comptes === 2 && c.metrics.ageMin === 3, JSON.stringify(c));
+    c = await essai(rep({ recue: false, etat: null, problemes: [{ niveau: "critique", texte: "Aucune nouvelle du worker OneUp (état jamais reçu)" }] }));
+    verifie("OneUp : jamais recu -> inconnu (pas vert), chiffres « — »",
+      c && c.status === "unknown" && /jamais reçu/.test(c.note) && c.metrics.file === null && c.metrics.ageMin === null, JSON.stringify(c));
+    c = await essai(rep(Object.assign({}, sain, { problemes: [
+      { niveau: "critique", compte: "a", texte: "a : aucun reel programmé dans les 24 prochaines heures" },
+      { niveau: "compte", texte: "détail de page" }] })));
+    verifie("OneUp : probleme critique -> « a voir », le probleme en toutes lettres, sans le detail de page",
+      c && c.status === "warn" && /aucun reel programmé/.test(c.note) && !/détail de page/.test(c.note), JSON.stringify(c));
+    c = await essai(rep({ recue: true, ageMin: 2, etat: { comptes: [{ ig: "a", programmes: null, voulus: 63 }, { ig: "b", programmes: 42, voulus: 42 }] }, problemes: [] }));
+    verifie("OneUp : un compte illisible -> total « — », jamais un total faux", c && c.metrics.file === null, JSON.stringify(c && c.metrics));
+    c = await essai(rep({}, 401));
+    verifie("OneUp : refus du cerveau -> la carte n'est pas inventee", c === undefined, JSON.stringify(c));
+  }
+}
+
+// ================= BRIEF (18/09) : un probleme CONNU n'est pas un silence
+{
+  let code = null;
+  try { code = morceau("function outilsParEtat(data, live){", "function renderBrief("); }
+  catch (e) { verifie("Brief : tri des outils par etat trouve", false, e.message); }
+  if (code) {
+    const f = new Function(code + "; return outilsParEtat;")();
+    const live = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+    const r = f({ a: { status: "offline" }, b: { status: "warn", note: "compte X : aucun reel" }, c: { status: "unknown" }, d: { status: "online" } }, live);
+    const ids = (l) => l.map((t) => t.id).join();
+    verifie("Brief : « warn » = a voir, « unknown » = muet, « offline » = hors ligne",
+      ids(r.aVoir) === "b" && ids(r.muets) === "c" && ids(r.horsLigne) === "a", JSON.stringify({ aVoir: ids(r.aVoir), muets: ids(r.muets), horsLigne: ids(r.horsLigne) }));
+  }
+  const iB = src.indexOf("function renderBrief(");
+  const corps = iB >= 0 ? src.slice(iB, iB + 7000) : "";
+  verifie("Brief : la ligne « A voir » nomme l'outil ET son probleme ; « tout tourne » seulement sans rien a voir",
+    /À voir<\/b> : \$\{aVoir\.map/.test(corps) && corps.includes("if(!off && !muets.length && !aVoir.length) s.push(`tous tes outils tournent`)"), "absent");
+}
+
+// ================= SERVICE WORKER (18/09) : une copie hors-ligne PAR PAGE
+{
+  const SW = process.argv[3] || new URL("../sw.js", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+  const swSrc = fs.readFileSync(SW, "utf8");
+  const ecoute = {}, magasin = new Map();
+  const cle = (k) => (typeof k === "string" ? k : k.url);
+  const cache = { put: async (k, r) => { magasin.set(cle(k), r); }, addAll: async () => {} };
+  const fauxCaches = { open: async () => cache, match: async (k) => magasin.get(cle(k)), keys: async () => [], delete: async () => true };
+  const soi = { addEventListener: (t, f) => { ecoute[t] = f; }, location: { origin: "https://site.test" }, skipWaiting() {}, clients: { claim: async () => {} }, registration: {} };
+  let delai = 0;
+  const pages = { "https://site.test/cc/oneup.html": "ONEUP", "https://site.test/cc/": "CENTRE" };
+  const reponse = (corps) => ({ ok: true, status: 200, corps, clone() { return this; } });
+  const fauxFetch = (req) => new Promise((ok) => setTimeout(() => ok(reponse(pages[cle(req)])), delai));
+  new Function("self", "caches", "fetch", "clients", "Response", swSrc)(soi, fauxCaches, fauxFetch, {}, globalThis.Response);
+  const naviguer = async (url) => {
+    let p = null;
+    ecoute.fetch({ request: { method: "GET", url, mode: "navigate" }, respondWith: (x) => { p = x; } });
+    const r = await p;
+    await new Promise((ok) => setTimeout(ok, 20));       // laisse les mises en cache se faire
+    return r && r.corps;
+  };
+  magasin.set("./index.html", reponse("CENTRE-copie"));
+  const vu = await naviguer("https://site.test/cc/oneup.html");
+  verifie("SW : ouvrir la page OneUp sert la page OneUp", vu === "ONEUP", vu);
+  verifie("SW : ... sans remplacer la copie hors-ligne du CENTRE", (magasin.get("./index.html") || {}).corps === "CENTRE-copie", (magasin.get("./index.html") || {}).corps);
+  magasin.set("./index.html", reponse("CENTRE-copie"));
+  magasin.set("./oneup.html", reponse("ONEUP-copie"));
+  delai = 3000;                                          // reseau lent : on sert la copie de LA page demandee
+  const lent = await naviguer("https://site.test/cc/oneup.html");
+  verifie("SW : reseau lent -> la copie de la page OneUp, pas celle du centre", lent === "ONEUP-copie", lent);
+  delai = 0;
+  const centre = await naviguer("https://site.test/cc/");
+  verifie("SW : le centre sert et range toujours SA copie", centre === "CENTRE" && (magasin.get("./index.html") || {}).corps === "CENTRE", (magasin.get("./index.html") || {}).corps);
+}
+
+// ================= PAGE ONEUP (18/09) : rendu, echappement, « — » pour l'inconnu
+{
+  const PAGE = new URL("../oneup.html", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+  let html = null;
+  try { html = fs.readFileSync(PAGE, "utf8"); } catch (e) { verifie("Page OneUp : fichier present", false, e.message); }
+  if (html) {
+    const i = html.indexOf("// === RENDU"), j = html.indexOf("// === FIN RENDU ===");
+    verifie("Page OneUp : bloc de rendu trouve", i > 0 && j > i, i + "/" + j);
+    const csp = (/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html) || [])[1] || "";
+    verifie("Page OneUp : CSP, appels reseau limites au cerveau, aucun script externe",
+      /connect-src https:\/\/stats-tracker-prive-production\.up\.railway\.app;/.test(csp) && /object-src 'none'/.test(csp) && !/script-src[^;]*https?:/.test(csp), csp);
+    verifie("Page OneUp : meme session que le centre, aucun nom de compte en dur (depot public)",
+      html.includes('localStorage.getItem("ccn_token")') && !/layla|zoe\.|layyla/i.test(html), "");
+    const { rendre, piedDePage } = new Function(html.slice(i, j) + "; return { rendre, piedDePage };")();
+    const rien = rendre({ recue: false });
+    verifie("Page OneUp : rien recu -> ni vert ni rouge, « on ne sait pas »", /rien envoyé/.test(rien) && !/✅|🛑/.test(rien), rien);
+    const etat = { recue: true, ageMin: 4, etat: { horizon: 7, comptes: [
+        { ig: "compte.a", identite: "ID1", rps: 3, voulus: 63, programmes: 60, h24: 9, prochain: "2026-09-18 13:17", jours: { "2026-09-18": 6, "2026-09-19": 9 } },
+        { ig: "<img src=x onerror=alert(1)>", identite: "ID2", rps: 2, voulus: 42, programmes: null, h24: null, prochain: null, jours: null } ],
+      identites: { ID1: { videos: 143 } },
+      echecs: { total: 1, anciens: 2, fenetre_h: 48, recents: [{ ig: "compte.a", quand: "2026-09-18 02:10", message: "Video <b>refusée</b>" }] } },
+      problemes: [{ niveau: "critique", texte: "1 post(s) OneUp en échec à la publication (48 dernières heures)" },
+                  { niveau: "compte", compte: "compte.a", texte: "compte.a : file incomplète, 60/63 reels programmés sur 7 jours" }] };
+    const h = rendre(etat);
+    verifie("Page OneUp : le probleme critique est en tete, en rouge", /bandeau ko/.test(h) && h.indexOf("en échec à la publication") < h.indexOf("Comptes"), "");
+    verifie("Page OneUp : le probleme de compte est sur SA carte", /compte\.a<\/div>[\s\S]*file incomplète, 60\/63/.test(h), "");
+    verifie("Page OneUp : prochain post lisible (heure de Paris)", h.includes("ven 18 à 13:17"), "");
+    verifie("Page OneUp : noms et messages echappes (aucune balise injectee)", !h.includes("<img src=x") && h.includes("&lt;img src=x") && !h.includes("<b>refusée</b>"), "");
+    verifie("Page OneUp : compte illisible -> « — » (jamais 0) et pas de pastille verte", /pastille "><\/span>&lt;img/.test(h) && />—<\/td>/.test(h), "");
+    verifie("Page OneUp : posts echoues recents ET anciens dits", h.includes("2 échecs de plus de 48 h") && h.includes("ven 18 à 02:10"), "");
+    verifie("Page OneUp : l'age de l'etat est dit", /il y a 4 min/.test(piedDePage(etat)), piedDePage(etat));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

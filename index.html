@@ -3022,6 +3022,16 @@ const TOOLS = [
     metrics:[{k:"subsQuinzaine",l:"Subs quinzaine",f:fmtInt},{k:"aPayer",l:"À payer",f:fmtMoney}] },
   { id:"clipfusion-perso", world:"noctra", cat:"Noctra", name:"ClipFusion Perso", icon:"C", openUrl:"https://clipfusionperso-production.up.railway.app",
     metrics:[{k:"drives7d",l:"Drives 7j",f:fmtInt},{k:"views7d",l:"Vues 7j",f:fmtBig}] },
+  // 📅 ONEUP (18/09) — le worker cloud qui programme les reels Instagram une semaine à
+  // l'avance. Demande : dans le centre, « juste s'il y a un problème » ; le détail des comptes
+  // (file jour par jour, prochain post, vidéos sources, échecs) vit sur la page OneUp, qui
+  // s'ouvre d'ici. État poussé par le worker toutes les 10 min (voir `oneupDansLesCartes`).
+  { id:"oneup",       world:"noctra", cat:"Noctra", name:"OneUp", icon:"📅", openUrl:"oneup.html",
+    metrics:[
+      {k:"file",    l:"Reels programmés (7 j)", f:v=>String(v)},
+      {k:"comptes", l:"Comptes",                f:v=>fmtInt(v)},
+      {k:"ageMin",  l:"Vu il y a",              f:v=>v+" min"},
+    ] },
   { id:"noctra-finance",   world:"noctra", cat:"Noctra", name:"Noctra Finance", icon:"◆", openUrl:"https://fadeflux.github.io/noctra-finance/",
     metrics:[{k:"profitMonth",l:"Profit du mois",f:fmtMoney},{k:"caMonth",l:"CA du mois",f:fmtMoney},{k:"subs",l:"Subs",f:fmtInt}] },
   // ⚠️ `comptesActifs` AJOUTÉ le 05/09. La carte annonçait « 128 comptes bloqués »
@@ -3369,6 +3379,12 @@ function mesuresManquantes(){
       dire("Ferme iPhone","le panneau n'a pas parlé au cerveau — son état est inconnu");
   }catch(e){}
 
+  try{
+    const o=(typeof LAST!=="undefined"&&LAST)?LAST["oneup"]:null;
+    if(o && o.metrics && o.metrics.ageMin==null)
+      dire("OneUp","le worker n'a pas parlé au cerveau — on ne sait pas si les reels sont programmés");
+  }catch(e){}
+
   return out;
 }
 
@@ -3404,6 +3420,18 @@ function nextAction(data, live){
   if(t) return {icon:"📝", text:t.t, urgent:false};
   return {icon:"✅", text:"Tout est à jour — rien d'urgent", urgent:false};
 }
+/* (18/09) Trois états, trois phrases : hors ligne (mort), à voir (un problème CONNU,
+   que la carte nomme), muet (pas de nouvelles). « warn » était rangé avec les muets,
+   sous « pas de nouvelles » — le contraire de ce qu'il dit : « OneUp : compte X, aucun
+   reel dans les 24 h » serait sorti en « ❔ muet ». */
+function outilsParEtat(data, live){
+  const etat = t=>(data[t.id]||{}).status;
+  return {
+    horsLigne: live.filter(t=>etat(t)==="offline"),
+    aVoir:     live.filter(t=>etat(t)==="warn"),
+    muets:     live.filter(t=>{ const s=etat(t); return s!=="online" && s!=="offline" && s!=="warn"; }),
+  };
+}
 function renderBrief(data, live, onCount, stInW){
   STREAK = computeStreak();
   // ⚠️ TROIS COMPTAGES DIFFÉRENTS DU MÊME FAIT, DANS LE MÊME ÉCRAN.
@@ -3416,11 +3444,10 @@ function renderBrief(data, live, onCount, stInW){
   // n'était fausse ; elles ne parlaient simplement pas de la même chose.
   // Et celle-ci ne NOMMAIT rien, alors que la bannière rouge nomme les siens.
   // Une seule définition, et deux phrases distinctes qui NOMMENT.
-  const horsLigne = live.filter(t=>(data[t.id]||{}).status==="offline");
-  const muets = live.filter(t=>{ const st2=(data[t.id]||{}).status; return st2!=="online" && st2!=="offline"; });
+  const { horsLigne, aVoir, muets } = outilsParEtat(data, live);
   const off = horsLigne.length;
-  // La météo tient compte des deux, mais un muet pèse moins qu'un mort.
-  const meteo = (off===0 && !muets.length) ? "ok" : (off>=2 ? "bad" : "warn");
+  // La météo tient compte des trois, mais un muet ou un « à voir » pèse moins qu'un mort.
+  const meteo = (off===0 && !muets.length && !aVoir.length) ? "ok" : (off>=2 ? "bad" : "warn");
   const st = data["stats-tracker"] || {};
   const subsDelta = (stInW && st.prev && st.metrics && st.metrics.subsQuinzaine!=null) ? st.metrics.subsQuinzaine - (st.prev.subsQuinzaine||0) : null;
   const today = (stInW && st.series && st.series.subsQuinzaine && st.series.subsQuinzaine.length) ? st.series.subsQuinzaine[st.series.subsQuinzaine.length-1] : null;
@@ -3443,8 +3470,9 @@ function renderBrief(data, live, onCount, stInW){
   if (_duObs) s.push(`<b>${fmtMoney(_duObs.total)}${_duObs.plancher?" +?":""}</b> à payer maintenant`);
   else if (!_assoc && stInW && st.metrics && st.metrics.aPayer!=null) s.push(`<b>${fmtMoney(st.metrics.aPayer)}</b> à payer sur la quinzaine`);
   if(off) s.push(`<b>⚠️ ${off} outil${off>1?"s":""} hors ligne</b> : ${horsLigne.map(t=>escapeHtml(t.name)).join(", ")}`);
+  if(aVoir.length) s.push(`<b>🟡 À voir</b> : ${aVoir.map(t=>{ const n=(data[t.id]||{}).note; return escapeHtml(t.name)+(n?(" — "+escapeHtml(String(n).slice(0,160))):""); }).join(" · ")}`);
   if(muets.length) s.push(`<b>❔ ${muets.length} muet${muets.length>1?"s":""}</b> : ${muets.map(t=>escapeHtml(t.name)).join(", ")} <span class="ob-sub">(pas de nouvelles — ce n'est pas « en panne », mais pas « ça va » non plus)</span>`);
-  if(!off && !muets.length) s.push(`tous tes outils tournent`);
+  if(!off && !muets.length && !aVoir.length) s.push(`tous tes outils tournent`);
   const nTodo = TODOS.filter(t=>!t.d).length;
   if (nTodo>0) s.push(`<b>${nTodo}</b> tâche${nTodo>1?"s":""} à faire`);
   if (STREAK>0) s.push(`🔥 <b>${STREAK}</b> j${STREAK_GOAL?" 🎯":""}`);
@@ -3539,6 +3567,48 @@ async function fermeDansLesCartes(tools){
   return tools;
 }
 
+/* ── OneUp dans les cartes (18/09) ────────────────────────────────────────
+   Le worker OneUp (Railway) pousse son état toutes les 10 min, relayé par
+   ClipFusion ; le cerveau le garde et en tire les problèmes. Demande : dans le
+   centre, « juste s'il y a un problème ». La carte ne parle donc que des
+   problèmes CRITIQUES (plus rien de programmé, worker muet, posts en échec…) ;
+   les problèmes de comptes (file incomplète, peu de vidéos) sont sur la page
+   OneUp. ⚠️ JAMAIS DE VERT PAR DÉFAUT : rien reçu = « je ne sais pas ». */
+async function oneupDansLesCartes(tools){
+  if(!TOKEN || !HUB_BASE || !tools) return tools;
+  try{
+    const r = await fetch(HUB_BASE+"/api/hub/oneup-etat",{headers:{"x-hub-token":TOKEN},cache:"no-store"});
+    if(!r.ok) return tools;                     // on n'invente rien : la carte reste « — »
+    const v = await r.json(), e = (v && v.etat) || {};
+    const recue = !!(v && v.recue);
+    const crit = (Array.isArray(v && v.problemes) ? v.problemes : [])
+      .filter(p=>p && p.niveau==="critique").map(p=>String(p.texte||""));
+    let status = "unknown", note = "";
+    if(!recue){
+      note = "jamais reçu — le worker OneUp n'a pas encore parlé au cerveau";
+    } else if(crit.length){
+      status = "warn";
+      note = crit.slice(0,2).join(" · ") + (crit.length>2 ? " · +"+(crit.length-2)+" autre(s), détail sur la page OneUp" : "");
+    } else {
+      status = "online";
+    }
+    // « Programmés / voulus » additionné sur les comptes — seulement si TOUS sont connus :
+    // un compte illisible compté pour 0 ferait un total faux.
+    const comptes = Array.isArray(e.comptes) ? e.comptes : [];
+    let prog = 0, voulus = 0, connu = comptes.length > 0;
+    comptes.forEach(c=>{
+      if(!c || c.programmes==null || c.voulus==null) connu = false;
+      else { prog += Number(c.programmes)||0; voulus += Number(c.voulus)||0; }
+    });
+    tools["oneup"] = { status:status, note:note, metrics:{
+      file:    (recue && connu) ? (fmtInt(prog)+" / "+fmtInt(voulus)) : null,
+      comptes: recue ? comptes.length : null,
+      ageMin:  recue ? v.ageMin : null,       // null -> « — », jamais « 0 min »
+    }};
+  }catch(_){ /* jamais bloquer le rendu des autres cartes pour celle-ci */ }
+  return tools;
+}
+
 /* ⚠️ LE JETON EXPIRÉ ENFERMAIT DEHORS. Mesuré : le centre fait 147 appels au
    cerveau et SEPT seulement savent reconnaître un refus d'authentification.
    Avec un jeton périmé, l'ouverture de la page en tirait ~50 d'un coup, tous
@@ -3585,7 +3655,9 @@ async function load(){
     if(OFFLINE_TIMER){ clearTimeout(OFFLINE_TIMER); OFFLINE_TIMER=null; }
     IS_LIVE = true;
     const tools = j.tools || {};
-    await fermeDansLesCartes(tools);     // la ferme pousse son état ; elle n'est pas dans /api/hub
+    // La ferme et OneUp poussent leur état ; ils ne sont pas dans /api/hub. En parallèle :
+    // chacune écrit sa propre carte, et aucune ne bloque le rendu si elle échoue.
+    await Promise.all([fermeDansLesCartes(tools), oneupDansLesCartes(tools)]);
     render(tools);
     try{ localStorage.setItem("ccn_lastdata", JSON.stringify(tools)); }catch(_){}
     $("#sub").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) + " · mis à jour à l'instant";

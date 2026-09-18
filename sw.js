@@ -32,6 +32,12 @@ self.addEventListener('fetch', function (e) {
   // caches.open/c.put juste en dessous) qui sert de secours hors-ligne, pas
   // celui du navigateur.
   if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.endsWith('/')) {
+    // ⚠️ UNE COPIE PAR PAGE (18/09). Toute page HTML était rangée sous './index.html', et
+    // c'est './index.html' que la course ci-dessous servait. Tant qu'il n'y avait qu'une
+    // page, c'était pareil. Depuis la page OneUp (oneup.html) : l'ouvrir aurait REMPLACÉ la
+    // copie hors-ligne du centre par la page OneUp, et un réseau lent aurait servi le
+    // centre à la place de la page OneUp.
+    const page = url.pathname.endsWith('.html') ? './' + url.pathname.split('/').pop() : './index.html';
     e.respondWith((async function () {
       // ⚠️ ON ATTENDAIT LE RESEAU SANS AUCUNE LIMITE DE TEMPS. Le repli sur le
       // cache n'existait que dans le `catch`, c'est-a-dire uniquement quand la
@@ -43,7 +49,7 @@ self.addEventListener('fetch', function (e) {
       // On fait donc une COURSE : si le reseau n'a pas repondu en 2,5 s et qu'on
       // a une copie, on sert la copie TOUT DE SUITE. La requete reseau continue
       // en fond et met le cache a jour pour la fois d'apres.
-      const copie = await caches.match('./index.html');
+      const copie = await caches.match(page);
       try {
         const reseau = fetch(req, { cache: 'no-store' });
         if (copie) {
@@ -54,7 +60,7 @@ self.addEventListener('fetch', function (e) {
           if (gagnant === 'lent') {
             // Le reseau traine : on sert la copie, et on laisse la requete finir.
             reseau.then(function (r) {
-              if (r && r.ok) caches.open(CACHE).then(function (c) { c.put('./index.html', r.clone()).catch(function () {}); });
+              if (r && r.ok) caches.open(CACHE).then(function (c) { c.put(page, r.clone()).catch(function () {}); });
             }).catch(function () {});
             return copie;
           }
@@ -65,10 +71,10 @@ self.addEventListener('fetch', function (e) {
         // GitHub Pages (500) ou une page d'erreur (404) devenait sinon le repli
         // hors-ligne, et le dashboard s'ouvrait sur cette page d'erreur tant
         // qu'un chargement reussi ne l'avait pas remplacee.
-        if (net && net.ok) { const c = await caches.open(CACHE); c.put('./index.html', net.clone()).catch(function () {}); }
+        if (net && net.ok) { const c = await caches.open(CACHE); c.put(page, net.clone()).catch(function () {}); }
         return net;
       } catch (err) {
-        return copie || (await caches.match('./')) || Response.error();
+        return copie || (page === './index.html' ? await caches.match('./') : null) || Response.error();
       }
     })());
     return;

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0d13" />
+<!-- Même filet que le centre : aucun script externe, appels réseau limités au cerveau. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://stats-tracker-prive-production.up.railway.app; object-src 'none'; base-uri 'none'" />
+<title>OneUp — Noctra</title>
+<link rel="icon" href="icon.svg" />
+<style>
+  :root{
+    --bg:#0c0d13; --surface:#13141b; --surface-2:#1a1b25; --line:#23242f; --line-2:#313340;
+    --text:#f6f5f8; --muted:#9d9ca8; --faint:#63626e;
+    --acc:#9aa2d8; --ok:#4ade80; --down:#f87171; --warn:#f0b429;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;overflow-x:clip}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+    padding:max(16px,env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom))}
+  main{max-width:980px;margin:0 auto}
+  header{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em}
+  .sous{color:var(--muted);font-size:13px}
+  .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  button,.lien{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2);border-radius:10px;
+    padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap}
+  button:hover,.lien:hover{border-color:var(--acc)}
+  a{color:var(--acc)}
+  .bandeau{border-radius:var(--radius);padding:12px 14px;margin:0 0 14px;border:1px solid var(--line);background:var(--surface);font-size:14px}
+  .bandeau.ok{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+  .bandeau.ko{border-color:color-mix(in srgb,var(--down) 55%,var(--line));background:color-mix(in srgb,var(--down) 8%,var(--surface))}
+  .bandeau.aw{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+  .bandeau b{display:block;margin-bottom:3px}
+  .bandeau ul{margin:4px 0 0;padding-left:18px}
+  section{margin:20px 0}
+  h2{font-size:12.5px;margin:0 0 8px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .carte{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .carte.ko{border-color:color-mix(in srgb,var(--down) 55%,var(--line))}
+  .carte.aw{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+  .nom{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+  .pastille{width:9px;height:9px;border-radius:50%;background:var(--faint);flex-shrink:0}
+  .pastille.ok{background:var(--ok)} .pastille.ko{background:var(--down)} .pastille.aw{background:var(--warn)}
+  .ident{color:var(--muted);font-size:12.5px}
+  .chiffres{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:14px}
+  .chiffres span{color:var(--muted);display:block;font-size:11.5px}
+  .large{grid-column:1/-1}
+  .barre{height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+  .barre i{display:block;height:100%;background:var(--acc)}
+  .msg{font-size:12.5px;color:var(--warn);overflow-wrap:anywhere}
+  .msg.ko{color:var(--down)}
+  .tableau{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:7px 9px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+  th{color:var(--muted);font-weight:600;font-size:12px;background:var(--surface)}
+  td{background:var(--bg)}
+  td.vide{color:var(--down);font-weight:700}
+  .note{color:var(--faint);font-size:12px;margin-top:6px}
+  .liste{margin:0;padding-left:18px;font-size:13px}
+  .liste li{margin:3px 0;overflow-wrap:anywhere}
+  footer{color:var(--faint);font-size:12px;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>📅 OneUp</h1>
+      <div class="sous">Les reels Instagram programmés une semaine à l'avance · heures de Paris (le fuseau du compte OneUp)</div>
+    </div>
+    <div class="actions">
+      <button id="relire" type="button">↻ Actualiser</button>
+      <a class="lien" href="https://www.oneupapp.io/" target="_blank" rel="noopener">Ouvrir OneUp ↗</a>
+    </div>
+  </header>
+  <div id="alerte"></div>
+  <div id="contenu"><div class="bandeau">Lecture…</div></div>
+  <footer id="pied"></footer>
+</main>
+<script>
+"use strict";
+/* PAGE ONEUP (18/09) — le détail que le centre ne montre pas.
+   Demande : dans le centre, « juste s'il y a un problème » ; ici, tout : la file de chaque
+   compte jour par jour, le prochain post, les vidéos sources, les échecs.
+   Données : GET /api/hub/oneup-etat — l'état poussé toutes les 10 min par le worker OneUp
+   (relayé par ClipFusion, qui ajoute les vidéos sources), problèmes calculés par le cerveau.
+   Même session que le centre (même site, même jeton).
+   ⚠️ Jamais de vert par défaut, jamais de faux zéro : « — » veut dire « on ne sait pas ». */
+const HUB_URL = "https://stats-tracker-prive-production.up.railway.app/api/hub";
+
+// === RENDU (rejoué par le banc : test/banc.mjs) ===
+const JOURS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function nb(v){ if(v === null || v === undefined || v === "") return null; const n = Number(v); return isFinite(n) ? n : null; }
+function val(v){ const n = nb(v); return n === null ? "—" : String(n); }
+function jourDe(a, m, j){ return JOURS_FR[new Date(Date.UTC(a, m - 1, j)).getUTCDay()]; }
+/** "2026-09-18 13:17" -> "ven 18 à 13:17" (heure de Paris, telle que OneUp l'affiche). */
+function quand(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(s || ""));
+  return m ? jourDe(+m[1], +m[2], +m[3]) + " " + (+m[3]) + " à " + m[4] + ":" + m[5] : "—";
+}
+function jourCourt(k){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(k));
+  return m ? jourDe(+m[1], +m[2], +m[3]) + " " + (+m[3]) : esc(k);
+}
+
+function rendre(v){
+  if(!v || !v.recue){
+    return `<div class="bandeau"><b>❔ Le worker OneUp n'a encore rien envoyé</b>Tant qu'il n'a pas parlé, on ne sait pas si les reels sont programmés : ce n'est ni « tout va bien » ni « en panne ».</div>`;
+  }
+  const e = v.etat || {};
+  const probs = (Array.isArray(v.problemes) ? v.problemes : []).filter(p => p && p.texte);
+  const crit = probs.filter(p => p.niveau === "critique");
+  const comptes = Array.isArray(e.comptes) ? e.comptes : [];
+  const idents = (e.identites && typeof e.identites === "object") ? e.identites : {};
+  const horizon = val(e.horizon);
+  let h = "";
+
+  if(crit.length){
+    h += `<div class="bandeau ko"><b>🛑 ${crit.length} problème${crit.length > 1 ? "s" : ""} à régler</b><ul>${crit.map(p => `<li>${esc(p.texte)}</li>`).join("")}</ul></div>`;
+  } else {
+    const aVoir = probs.length;
+    h += `<div class="bandeau ok"><b>✅ Tout est programmé</b>Rien d'urgent côté OneUp${aVoir ? " — " + aVoir + " point" + (aVoir > 1 ? "s" : "") + " à surveiller plus bas." : "."}</div>`;
+  }
+
+  // Une carte par compte, avec SES problèmes.
+  const parCompte = {};
+  probs.forEach(p => { if(p.compte) (parCompte[p.compte] = parCompte[p.compte] || []).push(p); });
+  if(comptes.length){
+    h += `<section><h2>Comptes</h2><div class="grille">` + comptes.map(c => {
+      const ig = String(c.ig || "?");
+      const ps = parCompte[ig] || [];
+      const voulus = nb(c.voulus), prog = nb(c.programmes);
+      const inconnu = prog === null;
+      const cls = ps.some(p => p.niveau === "critique") ? "ko" : ps.length ? "aw" : (inconnu ? "" : "ok");
+      const pct = (voulus && !inconnu) ? Math.max(0, Math.min(100, Math.round(prog / voulus * 100))) : 0;
+      const videos = nb((idents[c.identite] || {}).videos);
+      const rps = nb(c.rps);
+      return `<div class="carte ${cls === "ok" ? "" : cls}">
+        <div class="nom"><span class="pastille ${cls}"></span>${esc(ig)}</div>
+        <div class="ident">${esc(c.identite || "?")} · ${videos === null ? "vidéos sources : —" : videos + " vidéos sources"} · ${rps === null ? "—" : rps} reel${rps > 1 ? "s" : ""} par shift</div>
+        <div class="chiffres">
+          <div><span>File sur ${esc(horizon)} jours</span>${inconnu ? "—" : prog + " / " + val(voulus)}</div>
+          <div><span>Dans les 24 h</span>${esc(val(c.h24))}</div>
+          <div class="large"><span>Prochain post</span>${c.prochain ? esc(quand(c.prochain)) : (inconnu ? "—" : "aucun")}</div>
+        </div>
+        <div class="barre" title="${inconnu ? "inconnu" : pct + " %"}"><i style="width:${pct}%"></i></div>
+        ${ps.map(p => `<div class="msg ${p.niveau === "critique" ? "ko" : ""}">${esc(String(p.texte).replace(ig + " : ", ""))}</div>`).join("")}
+      </div>`;
+    }).join("") + `</div></section>`;
+  }
+
+  // La file jour par jour.
+  const jours = [];
+  comptes.forEach(c => Object.keys((c.jours && typeof c.jours === "object") ? c.jours : {}).forEach(k => { if(jours.indexOf(k) < 0) jours.push(k); }));
+  jours.sort();
+  if(jours.length){
+    h += `<section><h2>Reels programmés, jour par jour</h2><div class="tableau"><table><thead><tr><th>Compte</th>`
+      + jours.map(k => `<th>${jourCourt(k)}</th>`).join("") + `</tr></thead><tbody>`
+      + comptes.map(c => `<tr><td>${esc(c.ig)}</td>` + jours.map(k => {
+          if(!c.jours || typeof c.jours !== "object") return `<td>—</td>`;   // liste illisible : on ne sait pas
+          const n = nb(c.jours[k]) || 0;
+          return `<td class="${n === 0 ? "vide" : ""}">${n}</td>`;
+        }).join("") + `</tr>`).join("")
+      + `</tbody></table></div><div class="note">La file couvre ${esc(horizon)} jours glissants : le premier et le dernier jour sont donc partiels. Un 0 rouge au milieu = un jour sans aucun reel pour ce compte.</div></section>`;
+  }
+
+  // Posts que OneUp n'a pas réussi à publier.
+  const ech = e.echecs || {};
+  const recents = Array.isArray(ech.recents) ? ech.recents : [];
+  const total = nb(ech.total), anciens = nb(ech.anciens);
+  if(total === null){
+    h += `<section><h2>Posts en échec</h2><div class="note">La liste des échecs n'a pas pu être lue au dernier passage : on ne sait pas.</div></section>`;
+  } else if(total || anciens){
+    h += `<section><h2>Posts en échec</h2>`
+      + (recents.length ? `<ul class="liste">${recents.map(r => `<li><b>${esc(r.ig)}</b> — ${r.quand ? esc(quand(r.quand)) : "date inconnue"}${r.message ? " — " + esc(r.message) : ""}</li>`).join("")}</ul>` : "")
+      + (anciens ? `<div class="note">${anciens} échec${anciens > 1 ? "s" : ""} de plus de ${esc(val(ech.fenetre_h))} h ${anciens > 1 ? "restent" : "reste"} dans OneUp.</div>` : "")
+      + `<div class="note">Dans OneUp, les posts échoués se relancent ou se suppriment. Le centre signale un échec pendant ${esc(val(ech.fenetre_h))} h.</div></section>`;
+  }
+
+  // Points à surveiller qui ne concernent pas un compte précis.
+  const generaux = probs.filter(p => !p.compte && p.niveau !== "critique");
+  if(generaux.length){
+    h += `<section><h2>À surveiller</h2><ul class="liste">${generaux.map(p => `<li>${esc(p.texte)}</li>`).join("")}</ul></section>`;
+  }
+  return h;
+}
+
+function piedDePage(v){
+  if(!v || !v.recue) return "";
+  const age = nb(v.ageMin);
+  return "État envoyé par le worker " + (age === null ? "à une heure inconnue" : (age < 1 ? "il y a moins d'une minute" : "il y a " + age + " min"))
+    + " (il en envoie un toutes les 10 min) · page relue chaque minute.";
+}
+// === FIN RENDU ===
+
+let DERNIER = null, LU_A = 0;
+function jeton(){ try{ return localStorage.getItem("ccn_token") || ""; }catch(_){ return ""; } }
+async function charger(){
+  const zone = document.getElementById("contenu"), alerte = document.getElementById("alerte"), pied = document.getElementById("pied");
+  const tok = jeton();
+  if(!tok){
+    alerte.innerHTML = ""; pied.textContent = "";
+    zone.innerHTML = `<div class="bandeau"><b>🔑 Connecte-toi d'abord</b>Ouvre le <a href="index.html">centre de contrôle</a> et connecte-toi : cette page utilise la même session.</div>`;
+    return;
+  }
+  try{
+    const r = await fetch(HUB_URL + "/oneup-etat", { headers: { "x-hub-token": tok }, cache: "no-store" });
+    if(r.status === 401){
+      alerte.innerHTML = ""; pied.textContent = "";
+      zone.innerHTML = `<div class="bandeau"><b>🔑 Session expirée</b>Reconnecte-toi dans le <a href="index.html">centre de contrôle</a>, puis reviens ici.</div>`;
+      return;
+    }
+    if(!r.ok) throw new Error("le cerveau a répondu " + r.status);
+    const v = await r.json();
+    DERNIER = v; LU_A = Date.now();
+    alerte.innerHTML = "";
+    zone.innerHTML = rendre(v);
+    pied.textContent = piedDePage(v);
+  }catch(err){
+    // On garde la dernière lecture à l'écran, mais on dit qu'elle vieillit.
+    const depuis = DERNIER ? Math.round((Date.now() - LU_A) / 60000) : null;
+    alerte.innerHTML = `<div class="bandeau aw"><b>⚠️ Lecture impossible</b>${esc(err && err.message || "réseau")}${depuis === null ? " — nouvel essai dans une minute." : " — tu vois la lecture d'il y a " + depuis + " min."}</div>`;
+    if(!DERNIER){ zone.innerHTML = ""; pied.textContent = ""; }
+  }
+}
+document.getElementById("relire").addEventListener("click", charger);
+document.addEventListener("visibilitychange", () => { if(!document.hidden && Date.now() - LU_A > 30000) charger(); });
+charger();
+setInterval(charger, 60000);
+</script>
+</body>
+</html>
