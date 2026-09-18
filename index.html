@@ -6207,19 +6207,32 @@ function horsEquipeLigne(){
   if(!ents.length) return "";
   const cur=((typeof OM_DATA!=="undefined"&&OM_DATA)||{}).currency||"$";
   const money=x=>(typeof HIDE!=="undefined"&&HIDE)?"•••":Math.round(Number(x)||0).toLocaleString("fr-FR")+" "+cur;
-  const rows=ents.map(e=>{
-    const subs=e.subsTotal!=null?fmtInt(e.subsTotal)+" subs":"—";
+  const ligne=(nom, subsN, revBrut, plat)=>{
+    const subs=subsN!=null?fmtInt(subsN)+" subs":"—";
     // Même mesure que la colonne « généré » du classement : donc en net, comme elle.
-    const rev=e.revTotal!=null?money((Number(e.revTotal)||0)*netRate())+" net":"—";
+    const rev=revBrut!=null?money((Number(revBrut)||0)*netRate())+" net":"—";
+    const lib=plat?`${escapeHtml(nom)} <span class="omv-perso">· ${escapeHtml(plat==="_"?"non étiqueté":plat.charAt(0).toUpperCase()+plat.slice(1))}</span>`:escapeHtml(nom);
     return `<div class="cl-row">
-      <span class="cl-medal">🎭</span>
-      <span class="cl-va he-va" data-he="${escapeHtml(e.nom)}" title="Voir le détail">${escapeHtml(e.nom)}</span>
+      <span class="cl-medal">${plat?"🤖":"🎭"}</span>
+      <span class="cl-va he-va" data-he="${escapeHtml(nom)}"${plat?` data-heplat="${escapeHtml(plat)}"`:""} title="Voir le détail">${lib}</span>
       <span class="cl-bar"></span>
       <span class="cl-subs">${subs}</span>
       <span class="cl-pct">${rev}</span>
     </div>`;
+  };
+  // 🤖 UNE LIGNE PAR BOT (demande d'André, 19/09 : « mes bots se sont encore mélangés »).
+  // Cette ligne affichait « 🎭 Bot » = bot Instagram + bot Twitter additionnés. Le
+  // serveur les sépare déjà (parPlateforme, par la plateforme écrite dans le lien) —
+  // même règle que le panneau OnlyMonster. Argent non ventilable (source en repli) :
+  // on garde la ligne entière plutôt que d'afficher des « — » à la place d'un montant.
+  const rows=ents.map(e=>{
+    const pp=e.parPlateforme||null, cles=pp?Object.keys(pp):[];
+    const argentVentile=cles.some(k=>pp[k]&&pp[k].rev!=null);
+    if(cles.length<2 || (e.revTotal!=null && !argentVentile)) return ligne(e.nom, e.subsTotal, e.revTotal, null);
+    return cles.sort((a,b)=>(Number(pp[b].subs)||0)-(Number(pp[a].subs)||0))
+      .map(k=>ligne(e.nom, pp[k].subs, pp[k].rev, k)).join("");
   }).join("");
-  return `<div class="pcumul-tip" style="margin-top:8px">🎭 Hors classement (archivées, pas payées) — clique un nom pour le détail :</div>${rows}`;
+  return `<div class="pcumul-tip" style="margin-top:8px">🎭 Hors classement (pas payés, depuis le début) — chaque bot séparé, clique un nom pour le détail :</div>${rows}`;
 }
 // 📇 fiche Bot/Chloé : MÊME fiche qu'un VA (openVaCard), mais alimentée par
 // HORS_EQUIPE_DATA — elles ne figurent dans AUCUNE des sources habituelles
@@ -8787,9 +8800,6 @@ function renderOM(){
   // n'est pas ventilé, l'afficher sous un titre « sur Nova » serait faux.
   const horsRows=(function(){
     if(OM_MODEL!=="all") return "";
-    // Bot / Chloé n'ont pas de ventilation par fenêtre : plutôt que d'inventer
-    // des 0 sur « 7 j », on les retire de la vue et on dit pourquoi.
-    if(per!=="tout") return `<div class="om-hors-head">🔒 Bot et Chloé n'apparaissent que sur « Toujours » — leur détail par période n'est pas calculé.</div>`;
     const ents=(typeof HORS_EQUIPE_DATA!=="undefined"&&HORS_EQUIPE_DATA&&Array.isArray(HORS_EQUIPE_DATA.entites))?HORS_EQUIPE_DATA.entites:[];
     if(!ents.length) return "";
     // 🤖 UNE LIGNE PAR BOT, PAS UNE LIGNE PAR COMPTE (demande d'André, 07/09 :
@@ -8815,6 +8825,39 @@ function renderOM(){
         +`<span class="omv-roi"><span class="omv-perso">0 paie</span></span>`
         +`</div>`;
     };
+    // 🤖 SUR UNE PÉRIODE (aujourd'hui, 7/14/30 j) : CHAQUE BOT SÉPARÉ, subs ET argent.
+    // Demande d'André (19/09) : « chaque bot ses subs et l'argent généré, séparés —
+    // sur Twitter j'ai fait tant, sur Insta tant — pour savoir quoi scaler ». Avant,
+    // Bot et Chloé disparaissaient de toute période sauf « Toujours ».
+    // · argent : totals.ancienVa[per] — MÊME fenêtre que les VA, rangé par plateforme
+    //   écrite dans le lien du fan (fenêtre lue : absent = 0 $ ; illisible = « — ») ;
+    // · subs : subsParFenetre[per] (hubHorsEquipe, mêmes bornes glissantes) ; fenêtre
+    //   absente = non mesurée = « — », jamais un faux 0.
+    if(per!=="tout"){
+      const anc=(!ko&&d.totals&&d.totals.ancienVa)?d.totals.ancienVa[per]:null;
+      const pvAll=(anc&&anc.parVa)||null;
+      const court=(perInfo&&perInfo.court)||"";
+      const rowsP=ents.map(e=>{
+        const pe=pvAll?(Object.values(pvAll).find(x=>x&&x.display===e.nom)||null):null;
+        const revEnt=pvAll?(pe?(Number(pe.rev)||0):0):null;
+        const sf=(e.subsParFenetre||{})[per];
+        const somme=sf?Object.values(sf).reduce((a,b)=>a+(Number(b)||0),0):null;
+        const pfs=e.parPlateforme?Object.keys(e.parPlateforme):[];
+        const pp=pe&&pe.parPlateforme;
+        // Une seule origine, ou argent de la fenêtre impossible à ventiler : une ligne
+        // entière plutôt que des « — » à la place d'un montant connu.
+        if(pfs.length<2 || (pe && !pp && Number(pe.rev)>0)) return ligneHors(e.nom, somme, revEnt, e.ltv, "");
+        return pfs.map(pf=>({pf, subs: sf?(Number(sf[pf])||0):null,
+            rev: pvAll?(pp&&pp[pf]?(Number(pp[pf].rev)||0):0):null}))
+          .sort((a,b)=>((b.subs||0)-(a.subs||0))||((b.rev||0)-(a.rev||0)))
+          .map(x=>ligneHors(e.nom, x.subs, x.rev, (e.parPlateforme[x.pf]||{}).ltv, "· "+nomPlat(x.pf),
+            x.pf==="_" ? "Liens sans plateforme écrite dans leur nom : je ne devine pas l'origine."
+                       : ("Ce que ce bot a ramené sur "+nomPlat(x.pf)+" "+court+" — clique pour sa fiche"), x.pf))
+          .join("");
+      }).join("");
+      return `<div class="om-hors-head">🔒 Hors équipe — chaque bot séparé, ${escapeHtml(court)} (jamais payés, hors classement et hors totaux)</div>`+rowsP
+        +`<div class="sv-note" style="margin-top:6px">🤖 <b>subs</b> = abonnés arrivés ${escapeHtml(court)} par les liens de ce bot · <b>$</b> = ce qu'ont dépensé ${escapeHtml(court)} les abonnés qu'il a amenés (anciens compris), net · <b>LTV</b> = depuis le début.</div>`;
+    }
     const rows=ents.slice().sort((a,b)=>(Number(b.subsTotal)||0)-(Number(a.subsTotal)||0)).map(e=>{
       const pp=e.parPlateforme||null;
       const cles=pp?Object.keys(pp):[];
@@ -13786,13 +13829,31 @@ function renderRachat(){
   // était colorié « moyen » — celui que ce panneau existe pour signaler.
   const _nr=(typeof netRate==="function")?netRate():0.80;
   const valNet=v=>(v.valeurMoy==null?null:Math.round(Number(v.valeurMoy)*_nr*100)/100);
-  const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null&&v.pctRachat!=null).map(v=>{   // sans le 2e test : « null % rachètent »
+  // 🤖 Le compte « Bot » regroupe un bot Instagram et un bot Twitter : le serveur
+  // donne leur détail (parPlateforme) et on les montre SÉPARÉS (demande d'André,
+  // 19/09 : « mes bots se sont encore mélangés »). Seulement pour les comptes perso
+  // (jamais payés) : un VA de l'équipe reste une seule ligne, comme partout.
+  const _payes=new Set(((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.vas)||[]).filter(v=>!v.unpaid).map(v=>v.va));
+  const _nomPf=k=>k==="_"?"non étiqueté":k.charAt(0).toUpperCase()+k.slice(1);
+  const botsRows=(d.vas||[]).filter(v=>v.parPlateforme && !_payes.has(v.va)).map(v=>Object.keys(v.parPlateforme)
+    .sort((a,b)=>(v.parPlateforme[b].arrives||0)-(v.parPlateforme[a].arrives||0)).map(pf=>{
+      const x=v.parPlateforme[pf];
+      // Sous 15 arrivées les % ne veulent rien dire : on donne les nombres bruts.
+      const detail=(x.pctPayeur!=null&&x.pctRachat!=null)
+        ? `<b>${String(x.pctPayeur).replace(".",",")} %</b> paient · <b>${String(x.pctRachat).replace(".",",")} %</b> rachètent`
+        : `${x.payeurs} ont payé · ${x.racheteurs} ont racheté <span style="opacity:.6">(trop peu pour un %)</span>`;
+      const vn=x.valeurMoy==null?null:Math.round(Number(x.valeurMoy)*_nr*100)/100;
+      return `<div class="sv-row"><span class="sv-name">🤖 ${escapeHtml(v.va)} · ${escapeHtml(_nomPf(pf))}</span>`
+        +`<span class="sv-cell">${x.arrives} arrivés · ${detail}</span>`
+        +`<span class="sv-part ${vn==null?"mid":(vn>=6?"good":(vn<4?"bad":"mid"))}">${vn!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(vn).replace(".",",")+" "+cur):"—"}</span></div>`;
+    }).join("")).join("");
+  const vas=(d.vas||[]).filter(v=>v.pctPayeur!=null&&v.pctRachat!=null&&!(v.parPlateforme&&!_payes.has(v.va))).map(v=>{   // sans le 2e test : « null % rachètent »
     const vn=valNet(v);
     const cls=vn==null?"mid":(vn>=6?"good":(vn<4?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">${escapeHtml(v.va)}</span>`
       +`<span class="sv-cell">${v.arrives} arrivés · <b>${String(v.pctPayeur).replace(".",",")} %</b> paient · <b>${String(v.pctRachat).replace(".",",")} %</b> rachètent</span>`
       +`<span class="sv-part ${cls}" title="Net de la commission OnlyFans — ce qui te reste réellement par abonné">${vn!=null?((typeof HIDE!=="undefined"&&HIDE)?"•••":String(vn).replace(".",",")+" "+cur):"—"}</span></div>`;
-  }).join("");
+  }).join("")+botsRows;
   // 🕵️ Détecteur de FAUX ABONNÉS : un VA qui amène du volume mais dont presque
   // personne ne paie ET dont la valeur moyenne est quasi nulle = soit du trafic de
   // très mauvaise qualité, soit des self-subs qui gonflent son classement. On

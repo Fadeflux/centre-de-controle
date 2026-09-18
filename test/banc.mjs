@@ -2395,4 +2395,31 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
     && src.includes('"/api/hub/diagnostic?run=1",{headers:{"x-hub-token":TOKEN},delaiMs:15000}'), "minuterie encore posée avant la file");
 }
 
+// ================= BOTS SÉPARÉS : le classement ne remélange plus Insta et Twitter
+// Demande d'André (19/09) : « mes bots se sont encore mélangés — chaque bot ses subs
+// et son argent ». La ligne « 🎭 Bot » additionnait le bot Instagram et le bot Twitter.
+{
+  const corps = morceau("function horsEquipeLigne(){", "\n// 📇 fiche Bot/Chloé");
+  const fab = new Function("HORS_EQUIPE_DATA", "OM_DATA", "HIDE", "fmtInt", "netRate", "escapeHtml",
+    corps + "\nreturn horsEquipeLigne;");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const rendre = (data) => fab(data, { currency: "$" }, false, (n) => String(n), () => 0.8, esc)();
+  const bot = { nom: "Bot", subsTotal: 72, revTotal: 389, parPlateforme: {
+    instagram: { subs: 55, rev: 386 }, twitter: { subs: 17, rev: 3 } } };
+  const clhoe = { nom: "Clhoe", subsTotal: 148, revTotal: 1277, parPlateforme: { _: { subs: 148, rev: 1277 } } };
+  const h = rendre({ entites: [bot, clhoe] });
+  const lignes = h.split('<div class="cl-row">').slice(1);
+  verifie("Bots : une ligne PAR bot dans le classement (Instagram, Twitter) + Clhoe", lignes.length === 3, lignes.length + " lignes");
+  verifie("Bots : le bot Instagram a SES subs et SON argent (55 subs, 309 net)",
+    /Instagram[\s\S]*55 subs[\s\S]*309 \$ net/.test(lignes[0] || ""), lignes[0]);
+  verifie("Bots : le bot Twitter a SES subs et SON argent (17 subs, 2 net)",
+    /Twitter[\s\S]*17 subs[\s\S]*2 \$ net/.test(lignes[1] || ""), lignes[1]);
+  verifie("Bots : chaque ligne ouvre la fiche de SON bot (data-heplat)",
+    (lignes[0] || "").includes('data-heplat="instagram"') && (lignes[1] || "").includes('data-heplat="twitter"'), "plateforme absente du clic");
+  // Argent en repli (aucun montant ventilé) : on garde la ligne entière, jamais « — » à la place d'un montant connu.
+  const repli = rendre({ entites: [{ ...bot, parPlateforme: { instagram: { subs: 55, rev: null }, twitter: { subs: 17, rev: null } } }] });
+  verifie("Bots : argent non ventilable -> une seule ligne avec le total connu",
+    repli.split('<div class="cl-row">').length === 2 && /72 subs[\s\S]*311 \$ net/.test(repli), repli);
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
