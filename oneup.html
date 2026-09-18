@@ -146,6 +146,30 @@ function rendre(v){
     h += `<div class="bandeau ok"><b>✅ Tout est programmé</b>Rien d'urgent côté OneUp${aVoir ? " — " + aVoir + " point" + (aVoir > 1 ? "s" : "") + " à surveiller plus bas." : "."}</div>`;
   }
 
+  // Récap des dernières 24 h : ce qui est SORTI (publié), échoué, et programmé pour les 24 h à venir.
+  // Absent (null) ≠ 0 : liste OneUp illisible au dernier passage -> « — », jamais un faux « 0 publié ».
+  const rc = (e.recap && typeof e.recap === "object") ? e.recap : null;
+  if(rc){
+    const pj = nb(rc.publies24), ej = nb(rc.echecs24), gj = nb(rc.programmes24);
+    const rcc = Array.isArray(rc.comptes) ? rc.comptes : [];
+    h += `<section><h2>Récap des dernières 24 h</h2>`
+      + `<div class="chiffres" style="margin-bottom:10px">`
+      + `<div><span>✅ Publiés</span>${pj === null ? "—" : fmtI(pj)}</div>`
+      + `<div><span>❌ En échec</span>${ej === null ? "—" : fmtI(ej)}</div>`
+      + `<div><span>📅 Prévus (24 h)</span>${gj === null ? "—" : fmtI(gj)}</div>`
+      + `</div>`
+      + (rcc.length ? `<div class="tableau"><table><thead><tr><th>Compte</th><th>Publiés</th><th>Échecs</th><th>Prévus 24 h</th></tr></thead><tbody>`
+          + rcc.map(c => {
+              const p = nb(c.publies24), ee = nb(c.echecs24), g = nb(c.programmes24);
+              return `<tr><td>${esc(c.ig)}</td>`
+                + `<td class="${p === 0 ? "vide" : ""}">${p === null ? "—" : p}</td>`
+                + `<td class="${ee && ee > 0 ? "" : "vide"}">${ee === null ? "—" : ee}</td>`
+                + `<td>${g === null ? "—" : g}</td></tr>`;
+            }).join("")
+          + `</tbody></table></div>` : "")
+      + `<div class="note">« Publiés » = reels réellement sortis via OneUp sur 24 h (pas les vues — les comptes farm ne sont pas encore suivis en vues). Un 0 sur « Publiés » un jour de shift = à vérifier.</div></section>`;
+  }
+
   // Une carte par compte, avec SES problèmes.
   const parCompte = {};
   probs.forEach(p => { if(p.compte) (parCompte[p.compte] = parCompte[p.compte] || []).push(p); });
