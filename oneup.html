@@ -71,7 +71,7 @@
   <header>
     <div>
       <h1>📅 OneUp</h1>
-      <div class="sous">Les reels Instagram programmés une semaine à l'avance · heures de Paris (le fuseau du compte OneUp)</div>
+      <div class="sous">Les reels Instagram programmés une semaine à l'avance · heure de Paris + heure de New York (le fuseau RÉEL des comptes)</div>
     </div>
     <div class="actions">
       <button id="relire" type="button">↻ Actualiser</button>
@@ -99,10 +99,25 @@ function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&
 function nb(v){ if(v === null || v === undefined || v === "") return null; const n = Number(v); return isFinite(n) ? n : null; }
 function val(v){ const n = nb(v); return n === null ? "—" : String(n); }
 function jourDe(a, m, j){ return JOURS_FR[new Date(Date.UTC(a, m - 1, j)).getUTCDay()]; }
-/** "2026-09-18 13:17" -> "ven 18 à 13:17" (heure de Paris, telle que OneUp l'affiche). */
+/** Heure de New York (fuseau RÉEL des comptes, spoofés US) pour une heure MURALE de Paris.
+    Correct été comme hiver : on cherche l'instant UTC qui, affiché à Paris, donne (a,mo,j,h,mi),
+    puis on l'affiche à New York (gère le décalage 6 h l'été / 5 h la semaine de bascule DST). */
+function versNY(a, mo, j, h, mi){
+  let utc = Date.UTC(a, mo - 1, j, h, mi);
+  for(let k = 0; k < 2; k++){
+    const p = new Intl.DateTimeFormat("en-US", {timeZone:"Europe/Paris", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(new Date(utc));
+    const g = t => Number(p.find(x => x.type === t).value);
+    const vu = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute"));
+    utc += Date.UTC(a, mo - 1, j, h, mi) - vu;
+  }
+  const p2 = new Intl.DateTimeFormat("en-US", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(new Date(utc));
+  const gh = t => p2.find(x => x.type === t).value;
+  return (gh("hour") === "24" ? "00" : gh("hour")) + ":" + gh("minute");
+}
+/** "2026-09-18 13:17" -> "ven 18 à 13:17 · NY 07:17" (heure de Paris + heure de New York). */
 function quand(s){
   const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(s || ""));
-  return m ? jourDe(+m[1], +m[2], +m[3]) + " " + (+m[3]) + " à " + m[4] + ":" + m[5] : "—";
+  return m ? jourDe(+m[1], +m[2], +m[3]) + " " + (+m[3]) + " à " + m[4] + ":" + m[5] + " · NY " + versNY(+m[1], +m[2], +m[3], +m[4], +m[5]) : "—";
 }
 function jourCourt(k){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(k));
