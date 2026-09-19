@@ -103,13 +103,13 @@ function fmtI(v){ const n = nb(v); return n === null ? "—" : n.toLocaleString(
 // shadowban incluse) ; ces comptes farm n'ayant pas de VA, aucune alerte Discord ne les couvre,
 // donc on l'affiche ICI. Absent -> rien (on n'invente pas un état).
 function badgeSante(s){
-  const m = { green:["🟢","en forme"], yellow:["🟠","à surveiller"], red:["🔴","shadowban probable"] };
+  // Couleur réelle selon l'état (rouge = shadowban probable doit RESSORTIR, pas rendre comme « en forme »).
+  const m = { green:["🟢","en forme","var(--ok)"], yellow:["🟠","à surveiller","var(--warn)"], red:["🔴","shadowban probable","var(--down)"] };
   if(!s || !m[s.sante]) return "";
-  const [ico, txt] = m[s.sante];
+  const [ico, txt, col] = m[s.sante];
   const v7 = nb(s.vues7j), p7 = nb(s.posts7j), js = nb(s.jours_sans_post);
-  const alerte = s.sante === "red" || s.sante === "yellow";
-  return `<div class="large${alerte ? " " : ""}"><span>${ico} Santé du compte</span>`
-    + `<b>${txt}</b>${s.raison ? " — " + esc(s.raison) : ""}`
+  return `<div class="large"><span>${ico} Santé du compte</span>`
+    + `<b style="color:${col}">${txt}</b>${s.raison ? " — " + esc(s.raison) : ""}`
     + `${v7 != null ? ` · ${fmtI(v7)} vues / 7 j` : ""}${p7 != null ? ` (${p7} post${p7 > 1 ? "s" : ""})` : ""}`
     + `${js != null && js >= 2 ? ` · ⚠️ ${js} j sans post` : ""}</div>`;
 }
@@ -177,7 +177,7 @@ function rendre(v){
               const p = nb(c.publies24), ee = nb(c.echecs24), g = nb(c.programmes24);
               return `<tr><td>${esc(c.ig)}</td>`
                 + `<td class="${p === 0 ? "vide" : ""}">${p === null ? "—" : p}</td>`
-                + `<td class="${ee && ee > 0 ? "" : "vide"}">${ee === null ? "—" : ee}</td>`
+                + `<td class="${ee && ee > 0 ? "vide" : ""}">${ee === null ? "—" : ee}</td>`
                 + `<td>${g === null ? "—" : g}</td></tr>`;
             }).join("")
           + `</tbody></table></div>` : "")
