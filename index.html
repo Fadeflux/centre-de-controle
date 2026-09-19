@@ -3627,12 +3627,25 @@ async function oneupDansLesCartes(tools){
     const recue = !!(v && v.recue);
     const crit = (Array.isArray(v && v.problemes) ? v.problemes : [])
       .filter(p=>p && p.niveau==="critique").map(p=>String(p.texte||""));
+    // Comptes farm en shadowban probable (santé rouge, poussée par le worker). Ces comptes n'ont
+    // pas de VA -> aucune alerte ticket ne les couvre ; on les remonte donc ICI, sur la carte que
+    // l'opérateur voit en premier. Jaune = à surveiller (montré seulement s'il n'y a pas déjà du rouge).
+    const comptesEtat = Array.isArray((v && v.etat && v.etat.comptes)) ? v.etat.comptes : [];
+    const rouges = comptesEtat.filter(c=>c && c.sante && c.sante.sante==="red").map(c=>String(c.ig||"?"));
+    const oranges = comptesEtat.filter(c=>c && c.sante && c.sante.sante==="yellow").map(c=>String(c.ig||"?"));
     let status = "unknown", note = "";
     if(!recue){
       note = "jamais reçu — le worker OneUp n'a pas encore parlé au cerveau";
-    } else if(crit.length){
+    } else if(crit.length || rouges.length){
       status = "warn";
-      note = crit.slice(0,2).join(" · ") + (crit.length>2 ? " · +"+(crit.length-2)+" autre(s), détail sur la page OneUp" : "");
+      const bouts = [];
+      if(rouges.length) bouts.push("🔴 shadowban probable : " + rouges.join(", "));
+      bouts.push(...crit.slice(0, rouges.length ? 1 : 2));
+      const reste = crit.length - (rouges.length ? 1 : 2);
+      note = bouts.join(" · ") + (reste>0 ? " · +"+reste+" autre(s), détail sur la page OneUp" : "");
+    } else if(oranges.length){
+      status = "warn";
+      note = "🟠 à surveiller : " + oranges.join(", ") + " — détail sur la page OneUp";
     } else {
       status = "online";
     }
