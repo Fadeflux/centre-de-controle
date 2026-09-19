@@ -2422,4 +2422,37 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
     repli.split('<div class="cl-row">').length === 2 && /72 subs[\s\S]*311 \$ net/.test(repli), repli);
 }
 
+// ================= BOTS dans « Les 7 jours, VA par VA » : à part, en bas, jamais dans « Équipe »
+// Demande d'André (19/09) : « voir aussi les résultats du bot Insta, bot Twitter, bot TikTok…
+// au même endroit, un peu séparés en bas ».
+{
+  const corps = morceau("function omTableau7j(", "\nfunction renderOM(");
+  const jour = (iso, n) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const fab = new Function("omJourDecale", "omLibelleJour", "netRate", "omMoney", "fmtInt", "escapeHtml",
+    corps + "\nreturn omTableau7j;");
+  const t7 = fab(jour, (j) => ({ court: j.slice(5) }), () => 0.8, (v) => v + " $", (n) => String(n),
+    (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])));
+  const J = { parJour: {
+    "2026-09-18": { vas: { Welzy: { rev: 100, subs: 5 } }, bots: [
+      { nom: "Bot", plat: "twitter", rev: 10, payeurs: 1, subs: 1 },
+      { nom: "Bot", plat: "instagram", rev: 30, payeurs: 1, subs: 0 } ] },
+    "2026-09-19": { vas: { Welzy: { rev: 50, subs: 2 } }, bots: [
+      { nom: "Bot", plat: "twitter", rev: 250, payeurs: 1, subs: null },
+      { nom: "Bot", plat: "tiktok", rev: 0, payeurs: 0, subs: 4 } ] },
+  } };
+  const h = t7(J, "2026-09-19", "2026-09-19", false, "all", "$", true);
+  const lignes = h.split(/<tr[^>]*>/).map((x) => x.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+  const eq = lignes.find((l) => l.startsWith("Équipe")) || "";
+  verifie("7 jours : la ligne « Équipe » ne compte PAS les bots (120 $ +7)", /Équipe 80 \$ \+5 40 \$ \+2 120 \$ \+7$/.test(eq), eq);
+  verifie("7 jours : une section bots, en bas, après « Équipe »",
+    h.indexOf("Bots &amp; comptes perso") > h.indexOf(">Équipe<"), "section absente ou mal placée");
+  const tw = lignes.find((l) => /Bot · Twitter/.test(l)) || "", ig = lignes.find((l) => /Bot · Insta/.test(l)) || "",
+    tk = lignes.find((l) => /Bot · TikTok/.test(l)) || "";
+  verifie("7 jours : bot Twitter séparé (8 $ +1, puis 200 $ et subs illisibles « ? »)", /8 \$ \+1 200 \$ \? 208 \$ \?/.test(tw), tw);
+  verifie("7 jours : bot Insta séparé (24 $)", /24 \$ · 24 \$/.test(ig), ig);
+  verifie("7 jours : un bot TikTok apparaît tout seul dès qu'il a des subs", /· \+4 0 \$ \+4/.test(tk), tk);
+  const surModele = t7(J, "2026-09-19", "2026-09-19", true, "Layla", "$", true);
+  verifie("7 jours : pas de section bots sur un onglet modèle (non ventilé par modèle)", !surModele.includes("Bots &amp; comptes perso"), "section présente");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

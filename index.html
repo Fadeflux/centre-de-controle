@@ -8257,7 +8257,42 @@ function omTableau7j(J, sel, auj, surModele, modele, cur, ouvert){
   const colR=(j)=>noms.reduce((a,v)=>a+val(j,v).r,0), colS=(j)=>noms.reduce((a,v)=>a+val(j,v).s,0);
   const totR=noms.reduce((a,v)=>a+tot[v].r,0), totS=noms.reduce((a,v)=>a+tot[v].s,0);
   const pied=`<tr class="eq"><th>Équipe</th>${jours.map(j=>`<td class="${j===sel?"sel":""}${colR(j)?"":" vide"}">${colR(j)?m(colR(j)):"·"}${plus(colS(j))}</td>`).join("")}<td class="tot">${m(totR)}${plus(totS)}</td></tr>`;
-  return `<div class="om-7j">${bouton}<div class="om-7j-w"><table class="om-7j-tab"><thead>${tete}</thead><tbody>${corps}${pied}</tbody></table></div>`
+  // 🤖 LES BOTS, AU MÊME ENDROIT MAIS À PART (demande d'André, 19/09 : « voir aussi les
+  // résultats du bot Insta, bot Twitter, bot TikTok… dans le même tableau, un peu séparés
+  // en bas »). Une ligne par bot (plateforme écrite dans le lien), mêmes colonnes que les
+  // VA : argent net du jour et +abonnés amenés. JAMAIS additionnés à la ligne « Équipe ».
+  // Source : parJour[j].bots (serveur). Absent (ancien serveur) = pas de section ;
+  // `subs: null` = abonnés de ce jour illisibles -> « ? », pas un faux 0. Pas sur un
+  // onglet modèle : leur détail par modèle n'est pas ventilé jour par jour.
+  const botsSec=(function(){
+    if(surModele || !jours.some(j=>Array.isArray(J.parJour[j].bots))) return "";
+    const NOMS_PF={instagram:"Insta",twitter:"Twitter",tiktok:"TikTok",threads:"Threads",geelark:"Geelark"};
+    const cleB=(b)=>b.nom+"|"+(b.plat||"");
+    const libs={}, cells={}, totB={};
+    jours.forEach(j=>(J.parJour[j].bots||[]).forEach(b=>{
+      const k=cleB(b); libs[k]=b;
+      const r=rn(b.rev), s=(b.subs==null)?null:(Number(b.subs)||0);
+      (cells[k]=cells[k]||{})[j]={r,s};
+      const t=totB[k]||(totB[k]={r:0,s:0,sKo:false}); t.r+=r; if(s==null) t.sKo=true; else t.s+=s;
+    }));
+    const cles=Object.keys(totB).filter(k=>totB[k].r||totB[k].s)
+      .sort((a,b)=>(totB[b].r-totB[a].r)||(totB[b].s-totB[a].s)||a.localeCompare(b));
+    const nbCol=jours.length+2;
+    if(!cles.length) return `<tr><th colspan="${nbCol}" style="padding-top:14px;font-weight:600;opacity:.8">🤖 Bots &amp; comptes perso <span style="font-weight:400;opacity:.7">— rien sur ces 7 jours</span></th></tr>`;
+    const lib=(b)=>{
+      const pf=b.plat?(NOMS_PF[b.plat]||(b.plat.charAt(0).toUpperCase()+b.plat.slice(1))):"";
+      return `<span class="he-va" data-he="${escapeHtml(b.nom)}"${b.plat?` data-heplat="${escapeHtml(b.plat)}"`:""} title="Voir sa fiche">${escapeHtml(b.nom)}${pf?` <span class="omv-perso">· ${escapeHtml(pf)}</span>`:""}</span>`;
+    };
+    const plusB=(s)=>s==null?`<i title="Abonnés de ce jour illisibles" style="opacity:.6">?</i>`:plus(s);
+    const lignes=cles.map(k=>`<tr><th>🤖 ${lib(libs[k])}</th>`
+      +jours.map(j=>{ const c=(cells[k]||{})[j]||{r:0,s:0}; return `<td class="${j===sel?"sel":""}${c.r?"":" vide"}">${c.r?m(c.r):"·"}${plusB(c.s)}</td>`; }).join("")
+      +`<td class="tot">${m(totB[k].r)}${totB[k].sKo?plusB(null):plus(totB[k].s)}</td></tr>`).join("");
+    const bR=cles.reduce((a,k)=>a+totB[k].r,0), bS=cles.reduce((a,k)=>a+totB[k].s,0);
+    const totLigne=cles.length>1?`<tr class="eq"><th>Total hors équipe</th>${jours.map(j=>{ const r=cles.reduce((a,k)=>a+(((cells[k]||{})[j]||{}).r||0),0), s=cles.reduce((a,k)=>a+(((cells[k]||{})[j]||{}).s||0),0); return `<td class="${j===sel?"sel":""}${r?"":" vide"}">${r?m(r):"·"}${plus(s)}</td>`; }).join("")}<td class="tot">${m(bR)}${plus(bS)}</td></tr>`:"";
+    return `<tr><th colspan="${nbCol}" style="padding-top:14px;font-weight:600;opacity:.85;border-top:1px dashed var(--line)">🤖 Bots &amp; comptes perso <span style="font-weight:400;opacity:.7">— hors équipe, jamais payés, pas dans le total « Équipe »</span></th></tr>`
+      +lignes+totLigne;
+  })();
+  return `<div class="om-7j">${bouton}<div class="om-7j-w"><table class="om-7j-tab"><thead>${tete}</thead><tbody>${corps}${pied}${botsSec}</tbody></table></div>`
     +`<div class="om-spend-n">Montants <b>nets</b> dépensés par les abonnés de chaque VA${surModele?"":" ; en vert, <b>+N</b> = abonnés amenés ce jour-là"}. Touche un jour pour son détail.</div></div>`;
 }
 function renderOM(){
