@@ -7499,12 +7499,6 @@ function fixPairs(){
 // Les deux noms sont conservés (ils sont appelés à plein d'endroits) mais
 // pointent désormais sur la même logique, donc elles ne peuvent plus diverger.
 function appliqueCategories(){
-  // ⚠️ (25/09) Les boutons « replier » d'une section étaient calculés UNE fois au
-  // démarrage, quand tous les panneaux sont encore vides et masqués : le libellé
-  // mentait (« rouvrir » alors que tout était ouvert) et le bouton restait caché sur
-  // des sections qui, deux secondes plus tard, portaient dix panneaux. On les remet à
-  // jour ici, c'est-à-dire à chaque fois que la page redessine ses sections.
-  try{ majBoutonsSection(); }catch(e){}
   const replies=catCollapsedSet();
   SECNAV_CATS.forEach((_,idx)=>{
     const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
@@ -7520,6 +7514,12 @@ function appliqueCategories(){
     // (mesuré : 720 px de vide sur Telegram avec 2 panneaux) → pleine largeur.
     b.classList.toggle("cat-mono", visibles<=2);
   });
+  // ⚠️ (25/09) Les boutons « replier » d'une section étaient calculés UNE fois au
+  // démarrage, quand tous les panneaux sont encore vides : le libellé mentait et le
+  // bouton restait caché sur des sections qui portent dix panneaux deux secondes plus
+  // tard. On les remet à jour ici — et à la FIN de la passe : mesuré en direct, un
+  // appel en tête lit l'état d'AVANT (7 boutons sur 8 restaient cachés).
+  try{ majBoutonsSection(); }catch(e){}
 }
 function refreshSecHeads(){ appliqueCategories(); }
 // 🗂️ Catégories repliables — tape un en-tête pour cacher tout son contenu

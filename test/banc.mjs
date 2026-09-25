@@ -3031,9 +3031,12 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   // Le libellé des boutons de section doit être recalculé quand la page redessine,
   // pas seulement au démarrage (au démarrage, tous les panneaux sont encore vides).
   const iA = src.indexOf("function appliqueCategories(){");
-  const corpsA = iA >= 0 ? src.slice(iA, iA + 900) : "";
-  verifie("Saut : les boutons « replier » sont remis à jour à chaque redessin",
-    /majBoutonsSection\(\)/.test(corpsA), "appelé seulement au démarrage");
+  const corpsA = iA >= 0 ? src.slice(iA, src.indexOf("function refreshSecHeads", iA)) : "";
+  // ⚠️ Et à la FIN de la passe : mesuré dans le navigateur, un appel en TÊTE lit l'état
+  // d'avant (7 boutons sur 8 restaient cachés alors que les sections étaient pleines).
+  verifie("Saut : les boutons « replier » sont remis à jour à chaque redessin, APRÈS la passe",
+    corpsA.length > 0 && /majBoutonsSection\(\)/.test(corpsA)
+    && corpsA.indexOf("majBoutonsSection()") > corpsA.indexOf("cat-mono"), "appelé trop tôt (ou pas appelé)");
   // Un panneau replié ET sans données ne compte plus comme visible.
   const iP = src.indexOf("function panneauxDeSection(idx){");
   const corpsP = iP >= 0 ? src.slice(iP, src.indexOf("}", src.indexOf("return [...b.querySelectorAll", iP)) + 1) : "";
