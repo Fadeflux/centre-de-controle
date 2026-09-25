@@ -206,6 +206,22 @@
     padding:6px 0 10px;background:color-mix(in srgb,var(--bg) 60%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow-x:auto;scrollbar-width:none}
   #secnav::-webkit-scrollbar{height:0}
   #secnav:empty{display:none}
+  /* 📌 (25/09) L'essentiel reste sous les yeux. Le centre fait 21 000 px : à
+     15 000 px plus bas, plus aucun chiffre d'argent n'était visible. Cette barre
+     reprend EXACTEMENT les tuiles choisies dans ✎ (pas une 2e vérité) et
+     n'apparaît que lorsque le bloc du haut est sorti de l'écran. */
+  .mini-ess{display:none;position:sticky;z-index:6;gap:14px;align-items:center;padding:7px 12px;margin:0 0 12px;
+    border:1px solid var(--line);border-radius:12px;cursor:pointer;
+    background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    overflow-x:auto;scrollbar-width:none}
+  .mini-ess::-webkit-scrollbar{height:0}
+  .mini-ess.on{display:flex}
+  .mini-ess .me-fig{display:flex;gap:6px;align-items:baseline;white-space:nowrap}
+  .mini-ess .me-l{color:var(--muted);font-size:11px}
+  .mini-ess .me-v{font-weight:700;font-size:13px}
+  .mini-ess .me-act{margin-left:auto;white-space:nowrap;font-size:11.5px;color:#f87171;font-weight:600}
+  @media (max-width:640px){ .mini-ess{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--bg) 96%,transparent);gap:12px} }
+  @media print{ .mini-ess{display:none !important} }
   body.framing #secnav{display:none}
   /* ⚠️ Dès qu'un outil est ouvert, .tabbar (collante, top:safe-area) occupe la
      même bande que #secnav : les deux se superposaient et la barre de sections
@@ -911,6 +927,14 @@
   .panel-box.pb-replie>.pb-head::after{content:"▸"}
   .panel-box.pb-replie>.pb-head{margin-bottom:0}
   .panel-box.pb-replie>*:not(.pb-head){display:none !important}
+  /* 📏 (25/09) Les listes à rallonge (Telegram, argent qui dort, qui amène
+     Telegram, comptes) déroulaient jusqu'à 1 500 px de PAGE : on les borne et
+     on défile DANS le panneau. Jamais de coupe silencieuse : tout y est, c'est
+     la fenêtre qui est plus petite. */
+  .liste-max{max-height:min(440px,60vh);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+  .liste-max::-webkit-scrollbar{width:8px}
+  .liste-max::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  @media (max-width:640px){ .liste-max{max-height:70vh} }
   #cal>.pb-head::after{content:""}
   .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
   .pc-cahier{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;padding:1px 6px;white-space:nowrap}
@@ -1768,6 +1792,8 @@
   #sections{margin-top:6px}
   .sec-head{display:flex;align-items:center;gap:12px;margin:0 2px 13px}
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .sec-fold{background:none;border:0;color:var(--faint);font:inherit;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px}
+  .sec-fold:hover{background:var(--surface-2);color:var(--text)}
   .sec-head.pin .t{color:var(--gold)}
   .sec-head .rule{flex:1;height:1px;background:var(--line)}
   /* Catégories physiques repliables — [data-cat-idx] cible SEULEMENT mes 8
@@ -2187,6 +2213,7 @@
 <div class="wrap" id="app">
   <div class="tabbar" id="tabbar"></div>
   <div id="secnav"></div>
+  <div id="miniEss" class="mini-ess" title="Tes chiffres essentiels — tape pour remonter en haut"></div>
   <div id="home">
 <!-- ⚠️ Ce <header class="top"> avait été perdu pendant la réorganisation en
      catégories (le script ne suivait que les <div>) : les règles CSS ligne 79
@@ -2290,7 +2317,7 @@
 
   <aside id="sidebar"></aside>
 
-  <div class="sec-head" id="catHead0" data-cat-idx="0"><span class="t">💰 Argent & rentabilité</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead0" data-cat-idx="0"><span class="t">💰 Argent & rentabilité</span><span class="rule"></span><button class="sec-fold" data-secfold="0" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody0">
 <div class="pair-row">
@@ -2395,7 +2422,7 @@
   </div>
   </div>
 
-  <div class="sec-head" id="catHead1" data-cat-idx="1"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead1" data-cat-idx="1"><span class="t">💬 Telegram (OnlyChat)</span><span class="rule"></span><button class="sec-fold" data-secfold="1" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody1">
 <div class="pair-row">
@@ -2427,22 +2454,22 @@
     <div class="panel-box" id="tgva" style="display:none">
       <div class="pb-head">📲 Qui amène Telegram <span class="cc-lvl" id="tgvaState"></span></div>
       <div class="pb-sub">Les fans entrés dans ton canal par le <b>lien nommé de chaque VA</b>, croisés avec ce qu'ils ont <b>vraiment dépensé</b> sur OnlyChat (identifiant Telegram contre identifiant — pas une estimation). Visible ici uniquement : les VA ne voient jamais Telegram.</div>
-      <div id="tgvaBody"></div>
+      <div id="tgvaBody" class="liste-max"></div>
     </div>
     <div class="panel-box" id="entcomptes" style="display:none">
       <div class="pb-head">🔬 Entonnoir par compte</div>
       <div class="pb-sub">Quel <b>compte Instagram</b> convertit vraiment : ses vues → les visites de sa page bio → les clics vers OnlyFans. Les pages étant identiques, l'écart vient du <b>public</b> que chaque compte amène.</div>
-      <div id="entcomptesBody"></div>
+      <div id="entcomptesBody" class="liste-max"></div>
     </div>
     <div class="panel-box" id="santecomptes" style="display:none">
       <div class="pb-head">🧹 Santé des comptes Instagram</div>
       <div class="pb-sub">Les comptes <b>bridés</b> sur lesquels on poste pour rien, et ceux qui ne ressemblent pas à des comptes de VA.</div>
-      <div id="santecomptesBody"></div>
+      <div id="santecomptesBody" class="liste-max"></div>
     </div>
     <div class="panel-box" id="ocrelance" style="display:none">
       <div class="pb-head">💸 L'argent qui dort (Telegram) <span class="cc-lvl" id="ocrState"></span> <button class="act" id="ocrRefresh">🔄 Actualiser</button></div>
       <div class="pb-sub">Les fans qui parlent à tes modèles mais n'ont <b>jamais payé un dollar</b>, classés par « qui vaut le coup de relancer en premier ». Clique un nom pour ouvrir sa conversation dans OnlyChat.</div>
-      <div id="ocrelanceBody"></div>
+      <div id="ocrelanceBody" class="liste-max"></div>
     </div>
     <div class="panel-box" id="onlychatcoach" style="display:none">
       <div class="pb-head">🎓 Coaching Telegram (IA) <span class="cc-lvl" id="occState"></span> <button class="act" id="occRegen">🔄 Régénérer</button></div>
@@ -2471,7 +2498,7 @@
   </div>
   </div>
 
-  <div class="sec-head" id="catHead2" data-cat-idx="2"><span class="t">💎 Fans</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead2" data-cat-idx="2"><span class="t">💎 Fans</span><span class="rule"></span><button class="sec-fold" data-secfold="2" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody2">
 <div class="pair-row">
@@ -2491,7 +2518,7 @@
     </div>
   </div>
 
-  <div class="sec-head" id="catHead3" data-cat-idx="3"><span class="t">👥 Équipe (VA)</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead3" data-cat-idx="3"><span class="t">👥 Équipe (VA)</span><span class="rule"></span><button class="sec-fold" data-secfold="3" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody3">
 <div class="pair-row">
@@ -2593,7 +2620,7 @@
     </div>
   </div>
 
-  <div class="sec-head" id="catHead4" data-cat-idx="4"><span class="t">📊 Analyse & tendances</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead4" data-cat-idx="4"><span class="t">📊 Analyse & tendances</span><span class="rule"></span><button class="sec-fold" data-secfold="4" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody4">
 <div class="pair-row">
@@ -2672,7 +2699,7 @@
     </div>
   </div>
 
-  <div class="sec-head" id="catHead5" data-cat-idx="5"><span class="t">🧭 À faire & décisions</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead5" data-cat-idx="5"><span class="t">🧭 À faire & décisions</span><span class="rule"></span><button class="sec-fold" data-secfold="5" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody5">
 <div class="pair-row">
@@ -2699,7 +2726,7 @@
   </div>
   </div>
 
-  <div class="sec-head" id="catHead6" data-cat-idx="6"><span class="t">🏆 Motivation & suivi perso</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead6" data-cat-idx="6"><span class="t">🏆 Motivation & suivi perso</span><span class="rule"></span><button class="sec-fold" data-secfold="6" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody6">
 <div class="pair-row">
@@ -2879,7 +2906,7 @@
 
   </div>
 
-  <div class="sec-head" id="catHead7" data-cat-idx="7"><span class="t">🛠 Système</span><span class="rule"></span></div>
+  <div class="sec-head" id="catHead7" data-cat-idx="7"><span class="t">🛠 Système</span><span class="rule"></span><button class="sec-fold" data-secfold="7" title="Replier tous les panneaux de cette section (les titres restent)">replier</button></div>
 
   <div class="cat-body" id="catBody7">
 <div id="sections"></div>
@@ -7440,6 +7467,7 @@ function panReplieEcrire(s){ try{ localStorage.setItem("ccn_panel_replie",JSON.s
 function applyPanReplie(){
   const s=panReplieSet();
   document.querySelectorAll(".panel-box[id]").forEach(p=>p.classList.toggle("pb-replie", s.has(p.id)));
+  try{ majBoutonsSection(); }catch(e){}
 }
 function togglePanReplie(id){ const s=panReplieSet(); s.has(id)?s.delete(id):s.add(id); panReplieEcrire(s); applyPanReplie(); }
 // ⚠️ MÊME PIÈGE QUE LES CATÉGORIES : sauter vers un panneau replié ne bougerait
@@ -7520,9 +7548,36 @@ function scrollToPanel(el){
   deplie ? setTimeout(go,50) : go();
 }
 document.addEventListener("click",e=>{
+  // 🧰 « replier »/« rouvrir » : replie les PANNEAUX de la section (leurs titres
+  // restent lisibles), à ne pas confondre avec taper l'en-tête, qui replie la
+  // section entière. Le bouton ne doit donc PAS déclencher le second.
+  const b=e.target.closest("[data-secfold]");
+  if(b){ e.stopPropagation(); toggleSectionPanneaux(Number(b.getAttribute("data-secfold"))); return; }
   const h=e.target.closest(".sec-head[data-cat-idx]"); if(!h) return;
   toggleCatCollapsed(Number(h.getAttribute("data-cat-idx")));
 });
+// Panneaux (avec un id) d'une section, dans l'ordre de la page.
+function panneauxDeSection(idx){
+  const b=document.getElementById("catBody"+idx); if(!b) return [];
+  return [...b.querySelectorAll(".panel-box[id]")];
+}
+function toggleSectionPanneaux(idx){
+  const pans=panneauxDeSection(idx); if(!pans.length) return;
+  const s=panReplieSet();
+  const tousReplies=pans.every(p=>s.has(p.id));
+  pans.forEach(p=>{ tousReplies ? s.delete(p.id) : s.add(p.id); });
+  panReplieEcrire(s); applyPanReplie(); majBoutonsSection();
+}
+// Le libellé dit ce que le bouton VA faire (et non l'état) : « replier » quand
+// il reste quelque chose d'ouvert, « rouvrir » quand tout est déjà replié.
+function majBoutonsSection(){
+  const s=panReplieSet();
+  document.querySelectorAll("[data-secfold]").forEach(b=>{
+    const pans=panneauxDeSection(Number(b.getAttribute("data-secfold")));
+    b.style.display = pans.length>1 ? "" : "none";
+    b.textContent = (pans.length && pans.every(p=>s.has(p.id))) ? "rouvrir" : "replier";
+  });
+}
 function tkPop(){ try{ if(typeof AUDIO_CTX!=="undefined"){ if(!AUDIO_CTX) AUDIO_CTX=new (window.AudioContext||window.webkitAudioContext)(); const c=AUDIO_CTX,o=c.createOscillator(),g=c.createGain(); o.type="sine"; o.frequency.setValueAtTime(880,c.currentTime); o.frequency.exponentialRampToValueAtTime(1320,c.currentTime+0.07); g.gain.setValueAtTime(0.07,c.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.16); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.18); } }catch(e){} }
 let TK_LAST_EDIT = 0;
 // ⚠️ ONZIÈME LISTE ENTIÈRE ENVOYÉE SANS VERROU DE LECTURE.
@@ -9287,7 +9342,7 @@ function frTitre(plein, mot, montres, total){
 }
 function frRepli(titre, rows, apercu){
   if(!rows) return "";
-  return `<details class="fr-fold"><summary>${escapeHtml(titre)}<span class="fr-fold-n">${apercu||""}</span></summary>${rows}</details>`;
+  return `<details class="fr-fold"><summary>${escapeHtml(titre)}<span class="fr-fold-n">${apercu||""}</span></summary><div class="liste-max">${rows}</div></details>`;
 }
 function renderVips(){
   const panel=$("#vips"), body=$("#vipsBody"); if(!panel||!body) return;
@@ -12884,6 +12939,58 @@ function essTuilesChoisies(){
   const v=lsJSON("ccn_ess_tiles",null);
   return (Array.isArray(v)&&v.length>=2&&v.length<=4)?v:ESS_TUILES_DEFAUT;
 }
+// 📌 BARRE COLLANTE DE L'ESSENTIEL — voir la note CSS. Elle ne calcule RIEN :
+// elle réaffiche les tuiles choisies dans ✎ (une seule source de vérité), avec
+// des libellés courts, plus le nombre d'actions en attente.
+const MINI_ESS_L={netmois:"Net du mois",subsauj:"Subs auj.",apres:"Après la paie",tg:"Telegram",ocsolde:"Solde OnlyChat",apayer:"À payer",subsq:"Subs quinzaine"};
+function placerMiniEss(){
+  const bar=document.getElementById("miniEss"); if(!bar) return;
+  const tb=document.getElementById("tabbar"), sn=document.getElementById("secnav");
+  const hT=(document.body.classList.contains("has-tabs")&&tb&&tb.offsetHeight)||0;
+  const hS=(sn&&sn.offsetHeight)||0;
+  bar.style.top="calc(env(safe-area-inset-top,0px) + "+(hT+hS)+"px)";
+}
+function renderMiniEss(){
+  const bar=document.getElementById("miniEss"); if(!bar) return;
+  if(typeof TOKEN==="undefined" || !TOKEN){ bar.classList.remove("on"); return; }
+  let tuiles=[];
+  try{ const choix=essTuilesChoisies(); tuiles=essTuilesCatalogue().filter(x=>choix.includes(x.k)); }catch(e){ return; }
+  if(!tuiles.length){ bar.classList.remove("on"); return; }
+  const nb=(typeof LAST_ACTIONS!=="undefined"&&Array.isArray(LAST_ACTIONS))?LAST_ACTIONS.length:0;
+  bar.innerHTML=tuiles.map(x=>`<span class="me-fig"><span class="me-l">${escapeHtml(MINI_ESS_L[x.k]||x.l)}</span><span class="me-v">${escapeHtml(String(x.v))}</span></span>`).join("")
+    +(nb?`<span class="me-act">🎯 ${nb} à faire</span>`:"");
+  placerMiniEss();
+}
+function brancherMiniEss(){
+  const bar=document.getElementById("miniEss"), ess=document.getElementById("essentiel");
+  if(!bar) return;
+  bar.addEventListener("click",()=>{ const e=document.getElementById("essentiel"); if(e) e.scrollIntoView({behavior:"smooth",block:"start"}); });
+  window.addEventListener("resize",placerMiniEss);
+  // Sans IntersectionObserver (vieux navigateur) : on la laisse simplement cachée
+  // plutôt que collée en permanence au-dessus du bloc qu'elle répète.
+  if(!("IntersectionObserver" in window) || !ess) return;
+  new IntersectionObserver(es=>{
+    es.forEach(x=>{ bar.classList.toggle("on", !x.isIntersecting && x.boundingClientRect.top<0 && bar.innerHTML!==""); });
+  },{threshold:0}).observe(ess);
+}
+// 📏 PREMIÈRE OUVERTURE SUR UN APPAREIL : les plus longs panneaux secondaires
+// arrivent repliés (sinon 21 000 px à faire défiler avant d'avoir tout vu).
+// UNE SEULE FOIS, et on le DIT — un panneau replié sans un mot, ça se lit comme
+// un panneau disparu.
+const PAN_REPLI_DEPART=["ocrelance","tgva","onlychatcoach","santecomptes","coutopp"];
+function semerReplisDepart(){
+  try{
+    if(localStorage.getItem("ccn_panel_replie_seed")) return;
+    localStorage.setItem("ccn_panel_replie_seed","1");
+    const s=panReplieSet();
+    if(s.size) return;                       // l'opérateur a déjà fait ses propres choix
+    PAN_REPLI_DEPART.forEach(id=>{ if(document.getElementById(id)) s.add(id); });
+    if(!s.size) return;
+    panReplieEcrire(s); applyPanReplie();
+    if(typeof toast==="function") toast("📏 Centre compacté",
+      s.size+" panneaux longs arrivent repliés. Tape le titre d'un panneau pour l'ouvrir ou le fermer ; « replier » à droite d'une section les fait tous d'un coup.");
+  }catch(e){}
+}
 function renderEssentiel(){
   const wrap=$("#essentiel"), hero=$("#essHero"); if(!wrap||!hero) return;
   if(!TOKEN){ wrap.style.display="none"; return; }
@@ -12900,6 +13007,7 @@ function renderEssentiel(){
     +`</div>`;
   { const b=$("#essCfg"); if(b) b.onclick=openEssCfg; }
   wrap.style.display="block";
+  try{ renderMiniEss(); }catch(e){}
 }
 // ✎ Choix des tuiles — 2 minimum (sinon l'accueil ne dit plus rien),
 // 4 maximum (au-delà ça déborde sur téléphone).
@@ -16414,7 +16522,7 @@ try{ appliquerRangements(); }catch(e){ console.error("rangements:",e); }
 applyOrder();
 refreshSecHeads();
 applyCatCollapsed();
-try{ applyPanReplie(); }catch(e){}
+try{ applyPanReplie(); semerReplisDepart(); brancherMiniEss(); }catch(e){}
 try{ initCatSpy(); }catch(e){}
 
 // ⚠️ ON ATTEND DE SAVOIR SI LE JETON EST BON. `load()` est lancée plus haut mais

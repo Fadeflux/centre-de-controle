@@ -2678,4 +2678,89 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   }
 }
 
+// ================= CONFORT : « replier la section », barre collante, repli de départ
+// André (25/09) a choisi les quatre : bouton « replier » par section, barre de
+// l'essentiel toujours visible, listes bornées, gros panneaux repliés au départ.
+{
+  const morc = (a, b) => { const i = src.indexOf(a); const j = i >= 0 ? src.indexOf(b, i) : -1; return (i >= 0 && j > i) ? src.slice(i, j) : ""; };
+  const base = morc("function panReplieSet(){", "function catCollapsedSet()");
+  let TOUT = "";
+  const sect = morc("function panneauxDeSection(idx){", "function tkPop(){");
+  const depart = morc("const MINI_ESS_L=", "function renderEssentiel(){");
+  verifie("Confort : les trois morceaux sont trouvés", !!(base && sect && depart), `base:${base.length} sect:${sect.length} depart:${depart.length}`);
+  if (base && sect && depart) {
+    TOUT = base + sect + depart;
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const faux = (ids, boutons) => {
+      const mem = {};
+      const pans = ids.map((id) => { const p = { id, classes: {} , style:{}}; p.classList = { toggle: (c, on) => { p.classes[c] = !!on; } }; return p; });
+      const btns = (boutons || []).map((b) => ({ idx: b.idx, style: {}, textContent: "", getAttribute: () => String(b.idx) }));
+      const doc = {
+        getElementById: (id) => {
+          if (id.indexOf("catBody") === 0) { const n = id.slice(7); return { querySelectorAll: () => pans.filter((p) => p.sec === n) }; }
+          return pans.find((p) => p.id === id) || null;
+        },
+        querySelectorAll: (sel) => (sel === "[data-secfold]" ? btns : pans),
+        addEventListener: () => {},
+      };
+      const ls = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+      return { pans, btns, mem, doc, ls };
+    };
+    const monter = (w, morceaux) => new Function("document", "localStorage", "toast", "escapeHtml", "TOKEN", "LAST_ACTIONS", "essTuilesChoisies", "essTuilesCatalogue",
+      morceaux + "\nreturn { applyPanReplie, togglePanReplie, panReplieSet, toggleSectionPanneaux, majBoutonsSection, semerReplisDepart, renderMiniEss, panneauxDeSection };")(
+      w.doc, w.ls, (a, b) => w.msg = a + " | " + b, esc, w.TOKEN === undefined ? "jeton" : w.TOKEN, w.actions || [], () => ["netmois", "apres"],
+      () => [{ k: "netmois", l: "Net du mois (est.)", v: "7 545 $" }, { k: "apres", l: "Ce qu'il te resterait après la paie (estimé)", v: "~1 200 $" }, { k: "tg", l: "Telegram ce mois", v: "1 003 $" }]);
+
+    // --- « replier » d'une section entière
+    let w = faux(["om", "onlychat", "tgva"], [{ idx: 2 }]);
+    w.pans.forEach((p) => p.sec = "2");
+    let api = monter(w, TOUT);
+    api.toggleSectionPanneaux(2);
+    verifie("Section : « replier » replie TOUS les panneaux de la section",
+      w.pans.every((p) => p.classes["pb-replie"]) && (w.mem["ccn_panel_replie"] || "").includes("tgva"), JSON.stringify(w.mem));
+    verifie("Section : le bouton dit alors « rouvrir »", w.btns[0].textContent === "rouvrir", w.btns[0].textContent);
+    api.toggleSectionPanneaux(2);
+    verifie("Section : « rouvrir » les rouvre tous", w.pans.every((p) => !p.classes["pb-replie"]) && w.btns[0].textContent === "replier", w.btns[0].textContent);
+    // un seul replié à la main : le bouton doit tout replier (et non basculer au hasard)
+    api.togglePanReplie("onlychat");
+    api.toggleSectionPanneaux(2);
+    verifie("Section : un panneau déjà replié -> le bouton replie tout le reste", w.pans.every((p) => p.classes["pb-replie"]), "basculement partiel");
+    // section à un seul panneau : le bouton ne sert à rien
+    let w1 = faux(["cash"], [{ idx: 3 }]); w1.pans[0].sec = "3";
+    monter(w1, TOUT).majBoutonsSection();
+    verifie("Section : pas de bouton « replier » pour une section à un seul panneau", w1.btns[0].style.display === "none", w1.btns[0].style.display);
+
+    // --- repli de départ (première ouverture sur un appareil)
+    let w2 = faux(["ocrelance", "tgva", "om"], []);
+    let api2 = monter(w2, TOUT);
+    api2.semerReplisDepart();
+    verifie("Départ : à la 1re ouverture, les longs panneaux secondaires sont repliés",
+      w2.pans[0].classes["pb-replie"] && w2.pans[1].classes["pb-replie"] && !w2.pans[2].classes["pb-replie"], JSON.stringify(w2.mem));
+    verifie("Départ : on le DIT (un panneau replié sans un mot = un panneau disparu)", /Centre compacté/.test(w2.msg || ""), w2.msg);
+    // l'opérateur rouvre tout : on ne doit PAS re-replier à la prochaine ouverture
+    w2.mem["ccn_panel_replie"] = "[]";
+    api2.semerReplisDepart();
+    verifie("Départ : une seule fois — ce que l'opérateur a rouvert le reste", w2.mem["ccn_panel_replie"] === "[]", w2.mem["ccn_panel_replie"]);
+    // déjà des choix en mémoire (ancien appareil) : on ne touche à rien
+    let w3 = faux(["ocrelance", "tgva"], []); w3.mem["ccn_panel_replie"] = '["tgva"]';
+    monter(w3, TOUT).semerReplisDepart();
+    verifie("Départ : des choix déjà faits ne sont jamais écrasés", w3.mem["ccn_panel_replie"] === '["tgva"]', w3.mem["ccn_panel_replie"]);
+
+    // --- barre collante de l'essentiel
+    let w4 = faux(["om"], []); w4.actions = [1, 2, 3];
+    const bar = { classes: {}, innerHTML: "", style: {} };
+    bar.classList = { toggle: (c, on) => { bar.classes[c] = !!on; }, remove: (c) => { bar.classes[c] = false; } };
+    w4.doc.getElementById = (id) => (id === "miniEss" ? bar : (id === "tabbar" || id === "secnav" ? { offsetHeight: 40 } : null));
+    w4.doc.body = { classList: { contains: () => false } };
+    monter(w4, TOUT).renderMiniEss();
+    verifie("Barre : elle reprend les tuiles choisies, avec des libellés courts",
+      /Net du mois<\/span><span class="me-v">7 545 \$/.test(bar.innerHTML) && bar.innerHTML.includes("Après la paie") && !bar.innerHTML.includes("Telegram"), bar.innerHTML);
+    verifie("Barre : elle rappelle le nombre d'actions en attente", /3 à faire/.test(bar.innerHTML), bar.innerHTML);
+    let w5 = faux(["om"], []); w5.TOKEN = "";
+    w5.doc.getElementById = () => bar; bar.innerHTML = "";
+    monter(w5, TOUT).renderMiniEss();
+    verifie("Barre : pas connecté -> aucune barre", bar.innerHTML === "" && bar.classes["on"] === false, JSON.stringify(bar.classes));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
