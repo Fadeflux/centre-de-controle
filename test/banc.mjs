@@ -2902,4 +2902,99 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   }
 }
 
+// ================= ARGENT : quatre chiffres qui ne disaient pas la même chose (25/09)
+// Revue de l'écran d'argent. Chacun de ces défauts fait sortir ou espérer de l'argent
+// qui n'est pas là — et chacun se voyait en comparant deux endroits de la MÊME page.
+{
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // --- 1. « Ce qu'il te resterait après la paie » quand l'arriéré n'a PAS été lu.
+  // Le serveur compte l'arriéré inconnu comme ZÉRO (cashFlow.js) : le reste annoncé est
+  // un MAXIMUM. Un seul écran le savait ; caisseSuffit répondait « tu as de quoi ».
+  {
+    const i0 = src.indexOf("function caisseSuffit(");
+    const i1 = i0 >= 0 ? src.indexOf("\nfunction ", i0 + 10) : -1;
+    const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+    verifie("Argent : caisseSuffit est trouvée", corps.length > 0, "introuvable");
+    if (corps) {
+      const f = new Function(corps + "\nreturn caisseSuffit;")();
+      verifie("Argent : trésorerie non lue -> « je ne sais pas » (déjà gardé)",
+        f(600, { tresoIndispo: true, apresPaie: 800 }).etat === "inconnu", "");
+      verifie("Argent : ARRIÉRÉ non lu -> « je ne sais pas » aussi (le reste annoncé est un maximum)",
+        f(600, { retardIndispo: true, resteRetard: null, apresPaie: 800 }).etat === "inconnu",
+        JSON.stringify(f(600, { retardIndispo: true, apresPaie: 800 })));
+      verifie("Argent : tout lu -> le verdict normal revient",
+        f(600, { apresPaie: 800 }).etat === "ok" && f(900, { apresPaie: 800 }).etat === "depasse", "");
+    }
+  }
+
+  // --- 2. « Généré depuis le début » : une saisie Telegram du jour effaçait le mois.
+  {
+    const i0 = src.indexOf("function tgHistMonth(");
+    const i1 = src.indexOf("function meilleurMoisComplet(", i0);
+    const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+    verifie("Argent : le cumul depuis le début est trouvé", corps.includes("function caNetTotal(){"), "introuvable");
+    if (corps.includes("function caNetTotal(){")) {
+      const mkMois = (d) => d.toISOString().slice(0, 7);
+      const monter = (tgrev, oc) => new Function("OM_DATA", "TGREV", "ONLYCHAT_DATA", "netRate", "tgMonthLabel",
+        corps + "\nreturn { caNetTotal, tgHistMonth };")(
+        { totals: { netTotal: 120000 }, history: [{ month: mkMois(new Date(Date.now() - 86400000 * 40)) }, { month: mkMois(new Date()) }] },
+        tgrev, oc, () => 0.8, (d) => mkMois(new Date(d)));
+      const moisEnCours = mkMois(new Date());
+      const moisDernier = mkMois(new Date(Date.now() - 86400000 * 40));
+      const sansSaisie = monter([], { totalRevenue: 1003, totalRevenueLastMonth: 900 }).caNetTotal();
+      const avecSaisie = monter([{ ts: Date.now(), amount: 1 }], { totalRevenue: 1003, totalRevenueLastMonth: 900 }).caNetTotal();
+      verifie("Argent : taper 1 $ de Telegram aujourd'hui ne fait plus PERDRE le mois entier",
+        Math.abs(avecSaisie - sansSaisie) < 1.5, "sans=" + sansSaisie + " avec=" + avecSaisie);
+      verifie("Argent : le cumul contient bien le Telegram du mois en cours ET du mois dernier",
+        Math.round(sansSaisie) === Math.round(120000 * 0.8 + 1003 + 900), String(sansSaisie));
+      // OnlyChat muet : la saisie manuelle du mois en cours compte, elle ne s'annule pas
+      const muet = monter([{ ts: Date.now(), amount: 1003 }], null).caNetTotal();
+      verifie("Argent : OnlyChat muet -> le montant saisi à la main est bien compté",
+        Math.round(muet) === Math.round(120000 * 0.8 + 1003), String(muet));
+      // deux saisies le même mois : additionnées une fois, pas deux
+      const deux = monter([{ ts: Date.now(), amount: 500 }, { ts: Date.now(), amount: 503 }], null).caNetTotal();
+      verifie("Argent : deux saisies le même mois s'additionnent (et ne sont pas comptées deux fois)",
+        Math.round(deux) === Math.round(120000 * 0.8 + 1003), String(deux));
+    }
+  }
+
+  // --- 3. Profit : le 30 du mois, « à date » et « fin de mois » doivent tomber pareil.
+  {
+    // On vise le bloc du COMPTE DE RESULTAT (il y a plusieurs `const day=` dans la page) :
+    // on part du commentaire qui le precede, unique.
+    const iAnc = src.indexOf("Le jour vient du SERVEUR (cf. jourDuMoisServeur)");
+    const i0 = iAnc >= 0 ? src.indexOf(String.fromCharCode(10), iAnc) + 1 : -1;
+    const i1 = i0 >= 0 ? src.indexOf("const projProfitReel=", i0) : -1;
+    const i2 = i1 >= 0 ? src.indexOf("\n", i1) : -1;
+    const corps = (i0 >= 0 && i2 > i0) ? src.slice(i0, i2) : "";
+    verifie("Argent : le bloc profit du compte de résultat est trouvé", corps.length > 0, "introuvable");
+    if (corps) {
+      const calc = (jour) => new Function("d", "margeMonth", "tgMonth", "netMonth", "coutOutils", "primesMois",
+        "coutRailwayMois", "onlychatFee", "netRate", "jourDuMoisServeur", "joursDuMoisServeur", "localStorage",
+        corps + "\nreturn { profitReel, projProfitReel };")(
+        { forecast: null }, 5000 * (jour / 30), 1000 * (jour / 30), 6250 * (jour / 30), 180,
+        { total: 275 }, () => ({ aAjouter: 240 }), () => 0, () => 0.8, () => jour, () => 30, { getItem: () => null });
+      const fin = calc(30);
+      verifie("Argent : le dernier jour du mois, le profit « à date » et la projection tombent pareil",
+        Math.abs(fin.profitReel - fin.projProfitReel) <= 1, "à date=" + fin.profitReel + " projection=" + fin.projProfitReel);
+      const debut = calc(10);
+      verifie("Argent : … et en cours de mois la projection reste au-dessus (il reste des jours)",
+        debut.projProfitReel > debut.profitReel, "à date=" + debut.profitReel + " projection=" + debut.projProfitReel);
+    }
+  }
+
+  // --- 4. Le simulateur annonce « le mois FINIRAIT vers » : il doit partir de la fin
+  // de mois, pas du cumul à ce jour (écart mesuré : ×3 au 10 du mois).
+  {
+    const i0 = src.indexOf("function renderSim(");
+    const i1 = i0 >= 0 ? src.indexOf("\nfunction renderSim3(", i0) : src.length;
+    const corps = (i0 >= 0) ? src.slice(i0, i1 > i0 ? i1 : i0 + 9000) : "";
+    const lignes = (corps.match(/const finMois=.*$/gm) || []);
+    verifie("Argent : les deux phrases « le mois finirait vers » sont trouvées", lignes.length === 2, String(lignes.length));
+    verifie("Argent : elles partent de la projection de FIN de mois, pas du cumul à ce jour",
+      lignes.length === 2 && lignes.every((l) => /projNetMois\(\)/.test(l) && !/caNetMois\(\)\+/.test(l)), lignes.join(" | "));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

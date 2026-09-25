@@ -13,7 +13,7 @@
      peut donc pas interdire l'inline sans la reecrire ; mais on ferme le reste —
      aucun script EXTERNE, aucun <base>, aucun <object>, et les appels reseau
      limites au cerveau. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://stats-tracker-prive-production.up.railway.app https://stats-tracker.up.railway.app; object-src 'none'; base-uri 'none'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://stats-tracker-prive-production.up.railway.app; object-src 'none'; base-uri 'none'" />
 <title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
@@ -8085,7 +8085,11 @@ function caisseSuffit(aSortir, cash){
   const d=cash;
   // « absent ≠ 0 » : trésorerie non lue, ce n'est pas « il n'y a rien », et ce
   // n'est pas « tout va bien » non plus. On le dit.
-  if(!d || d.error || d.tresoIndispo || d.apresPaie==null) return { etat:"inconnu", aSortir:Math.round(x*100)/100 };
+  // ⚠️ (25/09) `retardIndispo` manquait ici. Le serveur calcule `apresPaie` en
+  // comptant l'arriéré NON LU comme zéro (cashFlow.js) : le reste annoncé est donc
+  // TROP HAUT, et cette fonction répondait « ok, tu as de quoi » au partage entre
+  // associés. Frère oublié de `tresoIndispo`, qui, lui, était bien testé.
+  if(!d || d.error || d.tresoIndispo || d.retardIndispo || d.apresPaie==null) return { etat:"inconnu", aSortir:Math.round(x*100)/100 };
   const reste=Number(d.apresPaie);
   if(!isFinite(reste)) return { etat:"inconnu", aSortir:Math.round(x*100)/100 };
   return {
@@ -9500,11 +9504,22 @@ function renderGhosts(){
   $("#ghostsBody").innerHTML=`<div class="gh-intro">Aucun sub ni production depuis ≥ ${d.ghostDays} jours. Peut-être partis sans prévenir — vérifie, ou relance-les dans leur ticket.</div>${rows}`;
   if(typeof fixPairs==="function") fixPairs();
 }
+// ⚠️ (25/09) CE BOUTON ENVOYAIT UN VRAI MESSAGE, SANS UN MOT. Un clic sur
+// « 💬 Relancer » postait tout de suite dans le ticket Discord du VA : aucune
+// confirmation, et le texte envoyé n'était montré NULLE PART — impossible de
+// savoir ce que le VA allait lire, ni de rattraper un clic de travers sur
+// téléphone. Tous ses frères demandent avant (relance de salon, redémarrage de
+// bot, versement…). Le texte est sorti en constantes pour être MONTRÉ avant.
+const REL_FANTOME_TITRE = "👋 On te voit plus, tout va bien ?";
+const REL_FANTOME_CORPS = "Hey, ça fait un moment qu'on n'a pas vu d'activité de ta part 👀. Tout va bien ? Si tu es toujours dispo, remets-toi en route aujourd'hui 💪. Si tu as un souci (compte, contenu, perso…), dis-le nous ici, on t'aide.";
 async function relanceGhost(va, btn){
   if(!TOKEN) return;
+  if(!confirm("Envoyer une relance à " + va + " ?\n\n"
+    + "« " + REL_FANTOME_TITRE + " »\n" + REL_FANTOME_CORPS
+    + "\n\nCe message part dans SON ticket Discord, tout de suite.")) return;
   const old=btn.textContent; btn.disabled=true; btn.textContent="⏳";
   try{
-    const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({items:[{va:va,title:"👋 On te voit plus, tout va bien ?",body:"Hey, ça fait un moment qu'on n'a pas vu d'activité de ta part 👀. Tout va bien ? Si tu es toujours dispo, remets-toi en route aujourd'hui 💪. Si tu as un souci (compte, contenu, perso…), dis-le nous ici, on t'aide.",reason:"fantome"}]})});
+    const r=await fetch(HUB_BASE+"/api/hub/va-relance",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({items:[{va:va,title:REL_FANTOME_TITRE,body:REL_FANTOME_CORPS,reason:"fantome"}]})});
     const j=await r.json();
     if(j.ok && Number(j.added)>0){ btn.textContent="✅ Envoyé"; }
     else if(j.ok && j.partis && j.partis.length){ btn.textContent="⛔ VA parti"; if(typeof toast==="function") toast("⛔ Non envoyé","Ce VA n'a plus de ticket (parti de l'équipe)."); }
@@ -9693,27 +9708,27 @@ function projNetMois(){ return projBrutOF()*netRate()+tgProjMois(); }
 // 50 000 $ » de l'autre, sur le même écran.
 function caNetTotal(){
   const t=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.totals)||{});
-  const curLbl=(typeof tgMonthLabel==="function")?tgMonthLabel(new Date()):"";
-  const past=(typeof TGREV!=="undefined"&&Array.isArray(TGREV)?TGREV:[])
-    .filter(x=>(typeof tgMonthLabel==="function")&&tgMonthLabel(new Date(x.ts||0))!==curLbl)
-    .reduce((a,x)=>a+(Number(x.amount)||0),0);
-  // Le Telegram du mois PRÉCÉDENT est connu (tgHistMonth sait le rendre) mais
-    // n'était ajouté que pour le mois EN COURS : il apparaissait donc dans la barre
-    // d'août de « Mon année » et manquait dans le cumul juste au-dessus — la somme
-    // des barres ne tombait pas sur le total affiché à côté d'elles. On interroge
-    // chaque mois de l'historique, en évitant de recompter ceux déjà dans TGREV.
-    let tgAuto=0;
-    try{
-      const hist=((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.history)||[]);
-      const dejaManuel=new Set((typeof TGREV!=="undefined"&&Array.isArray(TGREV)?TGREV:[])
-        .map(x=>(typeof tgMonthLabel==="function")?tgMonthLabel(new Date(x.ts||0)):null).filter(Boolean));
-      hist.forEach(h=>{ if(!h||!h.month||dejaManuel.has(h.month)) return;
-        tgAuto+=(typeof tgHistMonth==="function")?(Number(tgHistMonth(h.month))||0):0; });
-      if(!hist.some(h=>h&&h.month===curLbl) && !dejaManuel.has(curLbl)){
-        tgAuto+=(typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0;
-      }
-    }catch(e){ tgAuto=(typeof tgHistMonth==="function")?(Number(tgHistMonth(curLbl))||0):0; }
-  const tgAll=past+tgAuto;
+  // ⚠️ (25/09) UNE SAISIE TELEGRAM DU JOUR FAISAIT PERDRE TOUT LE MOIS.
+  // L'ancienne version additionnait, d'un côté, les saisies manuelles des mois
+  // PASSÉS (le mois en cours volontairement exclu) et, de l'autre, les mois de
+  // l'historique « pas déjà saisis à la main ». Dès qu'une saisie manuelle portait
+  // la date du jour, le mois en cours tombait dans les deux trous à la fois : plus
+  // compté à gauche (exclu), plus compté à droite (considéré « déjà manuel »).
+  // Mesuré : taper 1 $ de revenu Telegram faisait BAISSER le cumul de ~1 004 $.
+  // Et c'est exactement le geste que le bandeau rouge demande quand OnlyChat est
+  // muet (« si tu connais le montant, saisis-le »).
+  // `tgHistMonth(mois)` est DÉJÀ la source unique d'un mois : OnlyChat quand il
+  // répond (mois en cours, mois précédent), la saisie manuelle sinon. On liste donc
+  // tous les mois connus, et on additionne cette source-là, une fois chacun.
+  const moisConnus=new Set();
+  try{
+    ((typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.history)||[]).forEach(h=>{ if(h&&h.month) moisConnus.add(h.month); });
+    ((typeof TGREV!=="undefined"&&Array.isArray(TGREV))?TGREV:[]).forEach(x=>{
+      const l=(typeof tgMonthLabel==="function")?tgMonthLabel(new Date(x.ts||0)):null; if(l) moisConnus.add(l); });
+    const cur=(typeof tgMonthLabel==="function")?tgMonthLabel(new Date()):null; if(cur) moisConnus.add(cur);
+  }catch(e){}
+  let tgAll=0;
+  moisConnus.forEach(l=>{ tgAll+=(typeof tgHistMonth==="function")?(Number(tgHistMonth(l))||0):0; });
   return (Number(t.netTotal)||0)*netRate()+tgAll;
 }
 function meilleurMoisComplet(history){
@@ -9820,7 +9835,12 @@ function renderHistory(){
     // « source unique » ne l'était que de nom, et les deux auraient divergué au
     // premier changement. On appelle le helper, et on garde le détail Telegram
     // pour le sous-titre.
-  const tgAllTime=tgPast+tgHistMonth(curLbl);
+  // ⚠️ (25/09) Le sous-titre gardait l'ancienne formule faite à la main : il
+  // détaillait un total qui n'était plus celui affiché juste au-dessus (tout le
+  // Telegram des mois passés mesuré par OnlyChat y manquait — 900 $ dans le cas
+  // mesuré). On reprend le total du helper et on en retire la part OnlyFans : le
+  // détail tombe donc forcément sur le grand chiffre.
+  const tgAllTime=Math.max(0, Math.round(((typeof caNetTotal==="function")?caNetTotal():0) - (tot.netTotal||0)*netRate()));
   const genereNet=(typeof caNetTotal==="function")?caNetTotal():((tot.netTotal||0)*netRate()+tgAllTime);
   const genereTot=revKo()?"—":(HIDE?"•••":omMoney(genereNet,cur));
   // Même règle : le sous-titre dit d'OÙ vient l'argent, pas son brut.
@@ -9891,7 +9911,20 @@ function renderRenta(){
   // dim/day (au 3 du mois, ×10) — la prévision de profit partait très négative.
   // On projette donc la marge, puis on retire les coûts d'outils UNE fois.
   const projMarge=(day>0?Math.round(margeMonth/day*dim):margeMonth);
-  const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils+projTg):Math.round(projMarge-coutOutils+projTg);
+  // ⚠️ (25/09) LA PROJECTION OUBLIAIT RAILWAY ET LES PRIMES. Le profit à date, juste
+  // au-dessus, retire les deux ; la projection ne retirait que les outils. Le repère
+  // qui tranche : le 30 du mois, « = Profit net estimé » et « fin de mois : ~X de
+  // profit net » doivent tomber sur le MÊME chiffre — il n'y a plus rien à projeter.
+  // Ils étaient séparés de (facture Railway + primes versées), soit des centaines de
+  // dollars sur le même écran, pour le même mois.
+  // `rwMois` et les primes sont des sorties d'un mois COMPLET (comme `coutOutils`) :
+  // on les retire une fois, sans prorata et sans les projeter — on ne devine pas les
+  // primes à venir. Si la source est muette (null), on ne retire rien et la ligne
+  // « — » du tableau le dit déjà.
+  const rwMois=(_rw&&_rw.aAjouter)||0;
+  const primesDejaVersees=(primesMois&&primesMois.total>0)?primesMois.total:0;
+  const projProfit=(F&&F.margeMonth!=null)?Math.round(F.margeMonth-coutOutils-rwMois-primesDejaVersees+projTg)
+:Math.round(projMarge-coutOutils-rwMois-primesDejaVersees+projTg);
   // `commission` sert UNIQUEMENT à la LIGNE d'affichage « − Commission OnlyFans »
   // (le pas brut→net). On ne la re-soustrait PAS du profit : margeMonth (et donc
   // profitNet) est DÉJÀ net de commission. La retirer une 2e fois sous-estimait le
@@ -10020,7 +10053,7 @@ function renderRenta(){
 // Il vivait dans `ccn_tax_rate` (localStorage) et NULLE PART ailleurs — alors
 // que la clé serveur `hub_tax_rate` figure dans la liste de sauvegarde depuis le
 // 23/08. Deux pertes silencieuses :
-//   1. `seDeconnecter` efface `ccn_tax_rate` (il est dans _CLES_SENSIBLES) et la
+//   1. `seDeconnecter` efface `ccn_tax_rate` (il n'est pas dans la liste blanche d'affichage, donc il part) et la
 //      question posée ne parle que du mot de passe : le taux part sans un mot,
 //      et la ligne « Vraiment à toi » disparaît du P&L sans explication ;
 //   2. la sauvegarde promettait de le protéger et ne sauvegardait rien.
@@ -12782,7 +12815,7 @@ function audioSummary(){
   if(!ko && arr>0) parts.push("Ce mois, tu es à environ "+mm(arr)+" net.");
   if(om.totals.subsDay!=null) parts.push(om.totals.subsDay+" nouveaux abonnés aujourd'hui, "+(om.totals.subsMonth||0)+" ce mois.");
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
-  if(cd&&!cd.error&&cd.apresPaie!=null){ const a=Math.round((Number(cd.apresPaie)||0)/100)*100; parts.push("Après la prochaine paie, il te resterait environ "+mm(a)+"."); }
+  if(cd&&!cd.error&&cd.apresPaie!=null){ const a=Math.round((Number(cd.apresPaie)||0)/100)*100; parts.push((cd.retardIndispo?"L'arriéré de paie n'a pas pu être lu, donc au mieux : après la prochaine paie, il te resterait environ ":"Après la prochaine paie, il te resterait environ ")+mm(a)+"."); }
   if(!ko&&Array.isArray(om.vas)){ const t=om.vas.find(v=>v&&!v.unpaid); if(t) parts.push(t.va+" porte l'équipe en ce moment."); }
   if(typeof DECROCHE_FLAGS!=="undefined"&&DECROCHE_FLAGS.length) parts.push("Pense à relancer "+DECROCHE_FLAGS[0].va+", il ralentit.");
   parts.push("Bonne journée !");
@@ -12883,6 +12916,9 @@ function buildActions(){
   const eur=v=>HIDE?"••• $":Math.round(Math.abs(Number(v)||0)).toLocaleString("fr-FR")+" $";
   const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null;
   if(cd && !cd.error){
+    // ⚠️ Arriéré non lu : le « reste » est trop haut, donc l'alerte « cash serré »
+    // ne se déclenche PAS alors que c'est justement le cas à surveiller. On le dit.
+    if(cd.retardIndispo) push(2,"🟡",`Arriéré de paie non lu : le « reste après la paie » est un maximum, pas une mesure`,"cash");
     if(cd.apresPaie!=null && Number(cd.apresPaie)<0) push(3,"🔴",`Cash serré : il te manquera ${eur(cd.apresPaie)} pour tout payer`,"cash");
     if(Number(cd.resteRetard)>0){ const noms=(cd.restantsPrev||[]).slice(0,3).map(o=>o.va).join(", "); push(2,"💸",`Quinzaine passée pas soldée : ${eur(cd.resteRetard)}${noms?` (${noms})`:""}`,"cash",{kind:"jump",panel:"paie",label:"💸 Payer"}); }
   }
@@ -12997,7 +13033,12 @@ function essTuilesCatalogue(){
     // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
     {k:"netmois", src:"om", ok:dispo.om, l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
     {k:"subsauj", src:"om", ok:dispo.om, l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
-    {k:"apres", src:"cash", ok:dispo.cash,   l:"Ce qu'il te resterait après la paie (estimé)", v:(cd&&!cd.error&&cd.apresPaie!=null)?("~"+money(cd.apresPaie)):"—"},
+    // ⚠️ Arriéré non lu : `apresPaie` est un MAXIMUM (l'arriéré y compte pour zéro).
+    // On l'écrit « au plus », et la tuile porte son ⏳ : un chiffre trop haut sous un
+    // badge vert, c'est la pire des combinaisons sur une tuile d'accueil.
+    {k:"apres", src:"cash", ok:dispo.cash && !(cd&&cd.retardIndispo),
+     l:"Ce qu'il te resterait après la paie (estimé)",
+     v:(cd&&!cd.error&&cd.apresPaie!=null)?((cd.retardIndispo?"au plus ~":"~")+money(cd.apresPaie)):"—"},
     {k:"tg", src:"oc", ok:dispo.oc,      l:"Telegram ce mois",   v:(oc&&oc.totalRevenue!=null)?tgMoney(oc.totalRevenue):(tgM>0?tgMoney(tgM):"—")},
     {k:"ocsolde", src:"oc", ok:dispo.oc, l:"Solde OnlyChat",     v:(oc&&oc.solde!=null)?(tgMoney(oc.solde)+(oc.soldeJoursRestants!=null?" · ~"+oc.soldeJoursRestants+" j":"")):"—"},
     {k:"apayer", src:"st", ok:dispo.st,  l:"À payer si tu soldais la quinzaine",v:(st.aPayer!=null)?money(st.aPayer):"—"},
@@ -13826,7 +13867,7 @@ function ruleMetricVal(k){
   if(k==="ca_mois") return (ko||t.netMonth==null)?undefined:Number(t.netMonth);
   if(k==="subs_jour") return t.subsDay!=null?Number(t.subsDay):undefined;
   if(k==="subs_mois") return t.subsMonth!=null?Number(t.subsMonth):undefined;
-  if(k==="cash_apres_paie"){ const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null; return (cd&&!cd.error&&!cd.tresoIndispo&&cd.apresPaie!=null)?Number(cd.apresPaie):undefined; }
+  if(k==="cash_apres_paie"){ const cd=(typeof CASH_DATA!=="undefined")?CASH_DATA:null; /* arriéré non lu -> valeur trop haute : on ne déclenche pas une alerte sur un chiffre faux */ return (cd&&!cd.error&&!cd.tresoIndispo&&!cd.retardIndispo&&cd.apresPaie!=null)?Number(cd.apresPaie):undefined; }
   return undefined;
 }
 function ruleTriggered(r){
@@ -14943,7 +14984,12 @@ function renderSim(){
     const intro = per==="jour"
       ? `<b>${n}</b> subs de plus par VA et <b>par jour</b>, sur les <b>${joursRestants}</b> jours qui restent = <b>${parVa}</b> subs par VA (${cnt} VA)`
       : `<b>${n}</b> subs de plus par VA d'ici la fin du mois (${cnt} VA)`;
-    const finMois=(typeof caNetMois==="function")?(caNetMois()+revNet):(netM*netRate()+revNet);
+    // ⚠️ (25/09) On partait de `caNetMois()` — le cumul À CE JOUR — pour une phrase
+    // qui dit « le mois FINIRAIT vers ». Le mois s'arrêtait donc aujourd'hui : au 10
+    // d'un mois de 30, le simulateur annonçait ~7 500 $ pendant que la Rentabilité
+    // et le simulateur 3 mois annonçaient ~22 600 $ pour le même mois. Même base que
+    // partout ailleurs : `projNetMois()` (fin de mois, Telegram compris).
+    const finMois=(typeof projNetMois==="function")?(projNetMois()+revNet):(netM*netRate()+revNet);
     $("#simAddRes").innerHTML=`${intro}, à ta LTV moyenne ${money(ltvNet)} (nette) :<br>`
       +`<span class="sim-verdict ${revNet>=0?"pos":"neg"}">${signe(revNet)} de revenus nets</span> · <span style="color:var(--muted)">${money(pay)} de paie</span> → <b class="sim-verdict ${marge>=0?"pos":"neg"}">${signe(marge)} de marge</b>`
       +`<br>le mois finirait vers <b>${money(finMois)}</b> net.`;
@@ -14956,7 +15002,8 @@ function renderSim(){
     const k=parseFloat(mu.value)||2, subs=Number(v.monthSubs)||0, add=Math.round(subs*(k-1));
     const ltv=Number((om.totals||{}).ltv)||0, ltvNet=ltv*netRate();
     const rev=add*ltv, revNet=rev*netRate(), pay=v.unpaid?0:add*tarifVaReel(), marge=revNet-pay;   /* tout en NET, comme « + de subs » : revenus nets, marge = revenus nets − paie */
-    const finMois=(typeof caNetMois==="function")?(caNetMois()+revNet):((Number((om.totals||{}).netMonth)||0)*netRate()+revNet);
+    // Même base que « + de subs » ci-dessus : fin de mois, pas cumul à ce jour.
+    const finMois=(typeof projNetMois==="function")?(projNetMois()+revNet):((Number((om.totals||{}).netMonth)||0)*netRate()+revNet);
     const lbl=k===2?"le double":(k===3?"le triple":"+50 %");
     if(!subs){ $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> n'a pas encore de sub ce mois — rien à projeter.`; return; }
     $("#simMultRes").innerHTML=`<b>${escapeHtml(v.va)}</b> est à <b>${subs}</b> subs ce mois. En faisant ${lbl} : <b>+${add}</b> subs.<br>`
@@ -15373,10 +15420,36 @@ function toggleConvo(){
    disent rien de l'argent, et les réenregistrer à chaque connexion serait pénible.
    Les listes en attente d'envoi sont vérifiées AVANT : partir avec de l'argent
    tapé et non envoyé, c'est le perdre. */
-const _CLES_SENSIBLES = ["ccn_token","ccn_role","ccn_who","ccn_name","ccn_noms",
-  "ccn_payments","ccn_costs","ccn_tgrev","ccn_va_notes","ccn_decisions","ccn_rules",
-  "ccn_lastdata","ccn_split","ccn_assoc","ccn_assoc_prevhide","ccn_manager_va",
-  "ccn_goal","ccn_obj_goal","ccn_onlychat_goal","ccn_tax_rate","ccn_reminders","ccn_todos"];
+/* ⚠️ (25/09) C'ETAIT UNE LISTE NOIRE — ET ELLE AVAIT DU RETARD. Le bouton promet
+   « à faire si tu prêtes ce téléphone », mais tout ce qui avait été ajouté depuis
+   restait sur l'appareil : `ccn_dmca_id` (ton nom, ton adresse postale, ton
+   téléphone, ton e-mail et ta signature de déclaration DMCA), `ccn_leakwatch`
+   (les noms de modèles et leurs liens), `ccn_tasks`, `ccn_notepad`, `ccn_routines`,
+   `ccn_shortcuts`, `ccn_dates`, les records et les cartes du matin/soir.
+   Une liste noire doit être tenue à jour à chaque nouvelle clé : elle finit
+   toujours par mentir. On inverse : on garde une LISTE BLANCHE de réglages
+   d'AFFICHAGE, et TOUT le reste en `ccn_*` part. Une clé nouvelle est donc
+   effacée par défaut — le sens sûr.
+   Ce qu'on garde ne dit rien de l'argent ni de personne : ordre et repli des
+   panneaux, onglet actif, zoom, tuiles choisies, mode discret (qui PROTÈGE). */
+const _CLES_AFFICHAGE = ["ccn_accueil","ccn_activetab","ccn_cat_collapsed","ccn_ess_tiles",
+  "ccn_express","ccn_hidden_panels","ccn_hide","ccn_jrfold","ccn_last_cat","ccn_om_periode",
+  "ccn_order","ccn_panel_replie","ccn_panel_replie_seed","ccn_panels_choix","ccn_pins",
+  "ccn_rangements","ccn_scroll","ccn_tip","ccn_tkview","ccn_zoom"];
+function _effacerDonneesLocales(){
+  // On collecte AVANT de supprimer : retirer une clé pendant qu'on énumère décale
+  // les index et en laisse passer une sur deux (piège déjà payé plus bas).
+  var garder = {}; _CLES_AFFICHAGE.forEach(function(k){ garder[k] = true; });
+  var aVider = [];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if(k && k.indexOf("ccn_") === 0 && !garder[k]) aVider.push(k);
+    }
+  }catch(e){}
+  aVider.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+  return aVider.length;
+}
 function seDeconnecter(){
   try{
     if(typeof _argentEnAttente==="function" && _argentEnAttente()){
@@ -15386,20 +15459,9 @@ function seDeconnecter(){
     if(!confirm("Se déconnecter de cet appareil ?\n\n"
       +"Il faudra retaper le mot de passe pour revoir tes chiffres. "
       +"À faire si tu prêtes ce téléphone, ou sur un ordinateur qui n'est pas le tien.")) return;
-    _CLES_SENSIBLES.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
-    // Les montants du partage sont stockés par mois : ccn_split_w_2026-09, etc.
-    // On parcourt avec l'API standard `length` / `key(i)` — `Object.keys` marche
-    // sur le localStorage d'un navigateur, mais ce n'est pas le contrat de Storage.
-    // On collecte AVANT de supprimer : retirer une clé pendant qu'on énumère
-    // décale les index et en laisse passer une sur deux.
-    try{
-      var aVider=[];
-      for(var i=0;i<localStorage.length;i++){
-        var k=localStorage.key(i);
-        if(k && k.indexOf("ccn_split_w_")===0) aVider.push(k);
-      }
-      aVider.forEach(function(k){ localStorage.removeItem(k); });
-    }catch(e){}
+    // `_effacerDonneesLocales` balaie TOUT le `ccn_*` hors affichage : les montants
+    // du partage rangés par mois (`ccn_split_w_2026-09`) partent avec le reste.
+    _effacerDonneesLocales();
   }catch(e){}
   location.reload();
 }
@@ -15487,7 +15549,7 @@ async function couperToutesLesSessions(){
     alert("❌ La coupure n'a PAS eu lieu (" + (e.message||"réseau") + ").\n\nPersonne n'a été déconnecté.");
     return;
   }
-  _CLES_SENSIBLES.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+  _effacerDonneesLocales();
   location.reload();
 }
 { const b=$("#sessionsCut"); if(b) b.onclick=couperToutesLesSessions; }
