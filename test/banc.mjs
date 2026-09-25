@@ -3175,4 +3175,27 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     /nbLiensSansPont\)>0/.test(src) && /sans compte Instagram en face/.test(src), "moitié toujours muette");
 }
 
+// ================= LES OUTILS OUVERTS DANS LE CENTRE DONNAIENT UN CADRE BLANC (25/09)
+// Mesuré dans le navigateur : chaque ouverture déclenchait une violation « frame-src ».
+// La CSP n'avait pas de frame-src, donc les cadres retombaient sur default-src 'self'.
+{
+  const csp = (src.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || "";
+  verifie("Cadres : la CSP est trouvée", csp.length > 0, "absente");
+  const frame = (csp.match(/frame-src ([^;]+)/) || [])[1] || "";
+  verifie("Cadres : la CSP autorise les outils ouverts DANS le centre", frame.length > 0, "frame-src absent");
+  // Chaque outil ouvert en interne doit être dans la liste : sinon cadre blanc, sans message.
+  const i0 = src.indexOf("const TOOLS = ["), i1 = src.indexOf("\n];", i0);
+  const bloc = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  const manquants = [];
+  bloc.split("\n  { id:").forEach((t) => {
+    const u = (t.match(/openUrl:"([^"]+)"/) || [])[1];
+    if (!u || /external:true/.test(t)) return;
+    let o = ""; try { o = new URL(u).origin; } catch (e) { return; }
+    if (o !== "https://fadeflux.github.io" && frame.indexOf(o) < 0) manquants.push(o);
+  });
+  verifie("Cadres : chaque outil ouvert en interne est autorisé (aucun cadre blanc)",
+    bloc.length > 0 && manquants.length === 0, manquants.join(", "));
+  verifie("Cadres : la liste reste FERMÉE (pas de joker https:)", !/frame-src[^;]*\*|frame-src[^;]*https:(\s|;|$)/.test(csp), frame);
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

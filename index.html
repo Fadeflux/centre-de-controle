@@ -11,9 +11,13 @@
      page elle-meme, avec le bon jeton et la bonne origine — sans rien afficher.
      `script-src 'self' 'unsafe-inline'` : la page a tout son JS en ligne, on ne
      peut donc pas interdire l'inline sans la reecrire ; mais on ferme le reste —
+     ⚠️ (25/09) `frame-src` était ABSENT : les cadres retombaient sur `default-src
+     'self'`, donc ouvrir un outil DANS le centre donnait un cadre BLANC, sans le
+     moindre message (mesuré : violation `frame-src` à chaque clic). La liste ci-
+     dessous est fermée : seulement les outils qu'on ouvre en interne.
      aucun script EXTERNE, aucun <base>, aucun <object>, et les appels reseau
      limites au cerveau. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://stats-tracker-prive-production.up.railway.app; object-src 'none'; base-uri 'none'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://stats-tracker-prive-production.up.railway.app; frame-src 'self' https://stats-tracker-prive-production.up.railway.app https://clipfusionperso-production.up.railway.app https://noctra-ig-worker-production.up.railway.app https://noctra-tw-worker-production.up.railway.app https://grindperform.up.railway.app; object-src 'none'; base-uri 'none'" />
 <title>Noctra — Contrôle</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" />
