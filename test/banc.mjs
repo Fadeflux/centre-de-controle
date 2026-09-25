@@ -2505,4 +2505,42 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   }
 }
 
+// ================= ENTONNOIR PAR COMPTE : 92 comptes sur 107 étaient invisibles
+// (25/09) Le panneau « page bio -> OnlyFans » n'affichait que les 15 premiers comptes,
+// sans le dire. Mesuré sur les vraies données d'André : 107 comptes reliés envoyés par
+// le serveur, 15 à l'écran. Et comme le tri est par vues, les comptes dont les vues ne
+// sont pas encore mesurées tombaient TOUJOURS dans les 92 cachés.
+{
+  const i0 = src.indexOf("function renderEntComptes(){");
+  const i1 = i0 >= 0 ? src.indexOf("\n// 🧹 SANTÉ DES COMPTES INSTAGRAM", i0) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Entonnoir comptes : le panneau est trouvé", corps.length > 0, "renderEntComptes introuvable");
+  if (corps) {
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const rendre = (d) => {
+      let html = "";
+      const faux = (id) => ({ style: {}, set innerHTML(v) { if (id === "#entcomptesBody") html = v; }, get innerHTML() { return html; } });
+      const fab = new Function("$", "ENTC_DATA", "escapeHtml", "fmtInt", "fixPairs", corps + "\nrenderEntComptes(); ");
+      fab(faux, d, esc, (n) => String(Math.round(Number(n) || 0)), () => {});
+      return html;
+    };
+    const comptes = [];
+    for (let i = 0; i < 107; i++) comptes.push({ insta: "cpt" + i, va: "VA", vues: 107 - i, visites: 30, clics: 20, tauxClic: 66 });
+    comptes[106].vues = null;                       // vues pas encore mesurées : toujours en bas du tri
+    const sp = []; for (let i = 0; i < 20; i++) sp.push({ insta: "sp" + i, vues: 100 - i });
+    const h = rendre({ comptes, comptesSansPont: sp, nbRelies: 107, nbComptesSansPont: 34, gmsOk: true });
+    verifie("Entonnoir comptes : les 107 comptes sont dans la page (aucun jeté en silence)",
+      (h.match(/class="sv-row"/g) || []).length === 107, (h.match(/class="sv-row"/g) || []).length + " lignes");
+    verifie("Entonnoir comptes : 15 en tête, le reste derrière un « Voir les 92 autres »",
+      h.indexOf("<details") > 0 && h.slice(0, h.indexOf("<details")).match(/class="sv-row"/g).length === 15
+      && h.includes("Voir les 92 autres comptes reliés"), "repli absent");
+    verifie("Entonnoir comptes : le compte sans vues mesurées est joignable, et le dit",
+      h.includes("@cpt106") && h.includes("vues pas encore mesurées"), "compte sans vues perdu");
+    verifie("Entonnoir comptes : les comptes pas encore reliés aussi (6 + le reste, avec le total)",
+      (h.match(/@sp\d+/g) || []).length === 20 && /Voir 14 de plus \(sur 34\)/.test(h), "sans-pont tronqué");
+    const petit = rendre({ comptes: comptes.slice(0, 9), comptesSansPont: sp.slice(0, 3), nbRelies: 9, nbComptesSansPont: 3 });
+    verifie("Entonnoir comptes : peu de comptes -> aucun repli inutile", !petit.includes("<details"), "repli affiché pour rien");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

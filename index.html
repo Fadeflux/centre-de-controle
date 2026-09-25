@@ -1642,6 +1642,10 @@
   .hb-chart{display:flex;align-items:flex-end;justify-content:center;gap:10px;height:132px;padding:6px 2px 0}
   .hb{flex:1 1 0;max-width:96px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
   .sv-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--line);font-size:13px;flex-wrap:wrap}
+  .ent-plus>summary{cursor:pointer;color:var(--muted);font-size:12.5px;padding:8px 0;list-style:none}
+  .ent-plus>summary::-webkit-details-marker{display:none}
+  .ent-plus>summary::before{content:"▸ "}
+  .ent-plus[open]>summary::before{content:"▾ "}
   .sv-row:last-child{border-bottom:0}
   .sv-name{font-weight:600;min-width:78px}
   .sv-cell{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -14040,14 +14044,24 @@ function renderEntComptes(){
   if(!d||((!d.comptes||!d.comptes.length)&&!d.nbComptesSansPont)){ p.style.display="none"; return; }
   p.style.display="block";
   const pctFr=v=>v==null?"—":String(v).replace(".",",")+" %";
-  const rows=(d.comptes||[]).slice(0,15).map(c=>{
+  // ⚠️ (25/09) Les 15 premiers comptes SEULEMENT étaient affichés, sans le dire :
+  // 107 comptes reliés → 92 invisibles, et comme le tri est par vues, les comptes
+  // dont les vues ne sont pas encore mesurées (donc 0) tombaient toujours dedans.
+  // On garde les 15 plus gros en tête, le reste est à un clic, et on dit combien.
+  const ligneCompte=(c)=>{
     // page→OF sous la médiane équipe (~76 %) = le public de CE compte est froid.
     const cls=c.tauxClic==null?"mid":(c.tauxClic>=76?"good":(c.tauxClic<60?"bad":"mid"));
     return `<div class="sv-row"><span class="sv-name">@${escapeHtml(c.insta)} <span style="opacity:.55">· ${escapeHtml(c.va||"?")}</span></span>`
       +`<span class="sv-cell">${c.vues==null?"vues pas encore mesurées":`<b>${fmtInt(c.vues)}</b> vues`} → <b>${fmtInt(c.visites)}</b> visites bio → <b>${fmtInt(c.clics)}</b> clics OF</span>`
       +`<span class="sv-part ${cls}" title="Part des visiteurs de sa page bio qui cliquent jusqu'à OnlyFans">${pctFr(c.tauxClic)}</span></div>`;
-  }).join("");
-  const sansPont=(d.comptesSansPont||[]).slice(0,6).map(c=>`<span class="om-spend-c" style="cursor:default">@${escapeHtml(c.insta)} <i>· ${fmtInt(c.vues)} vues</i></span>`).join("");
+  };
+  const tousC=(d.comptes||[]);
+  const rows=tousC.slice(0,15).map(ligneCompte).join("")
+    +(tousC.length>15?`<details class="ent-plus"><summary>Voir les ${fmtInt(tousC.length-15)} autres comptes reliés</summary>${tousC.slice(15).map(ligneCompte).join("")}</details>`:"");
+  const tousSP=(d.comptesSansPont||[]);
+  const spCase=(c)=>`<span class="om-spend-c" style="cursor:default">@${escapeHtml(c.insta)} <i>· ${fmtInt(c.vues)} vues</i></span>`;
+  const sansPont=tousSP.slice(0,6).map(spCase).join("")
+    +(tousSP.length>6?`<details class="ent-plus"><summary>Voir ${fmtInt(tousSP.length-6)} de plus${(d.nbComptesSansPont||0)>tousSP.length?` (sur ${fmtInt(d.nbComptesSansPont)})`:""}</summary><div>${tousSP.slice(6).map(spCase).join("")}</div></details>`:"");
   $("#entcomptesBody").innerHTML=(rows||`<div class="sv-note">Aucun compte relié pour l'instant.</div>`)
     +`<div class="sv-note">🔗 <b>${fmtInt(d.nbRelies)}</b> compte${(d.nbRelies||0)>1?"s":""} relié${(d.nbRelies||0)>1?"s":""} · <b>${fmtInt(d.nbComptesSansPont)}</b> compte${(d.nbComptesSansPont||0)>1?"s":""} avec des vues mais <b>sans lien relié</b> — le pont se remplit tout seul à chaque lien créé via le bot Discord. Pour relier un vieux compte : recrée simplement son lien via le bot.</div>`
     +(sansPont?`<div class="sv-head" style="margin-top:10px">Plus gros comptes pas encore reliés</div><div>${sansPont}</div>`:"")
