@@ -1090,6 +1090,21 @@
   .pay-h-row:last-child{border-bottom:0}
   .pay-h-d{color:var(--muted);margin-left:auto;font-size:12px}
   .pay-h-a{font-weight:600;min-width:60px;text-align:right}
+  /* Historique des versements : un bloc par jour de paie (25/09) */
+  .pay-h-sum{color:var(--muted);font-size:12px;margin:6px 0 10px}
+  .pay-h-grp{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--surface-2)}
+  .pay-h-grp>summary{display:flex;gap:10px;align-items:center;cursor:pointer;list-style:none;padding:8px 10px;font-size:13px;font-weight:600}
+  .pay-h-grp>summary::-webkit-details-marker{display:none}
+  .pay-h-grp>summary::before{content:"▸";color:var(--muted);font-weight:400}
+  .pay-h-grp[open]>summary::before{content:"▾"}
+  .pay-h-grp[open]>summary{border-bottom:1px solid var(--line)}
+  .pay-h-grp .pay-h-row{padding:6px 10px}
+  .pay-h-j{min-width:92px}
+  .pay-h-gn{color:var(--muted);font-weight:400;font-size:12px}
+  .pay-h-gt{margin-left:auto;font-weight:700}
+  .pay-h-va{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pay-h-grp .pay-h-n{min-width:74px}
+  .pay-h-grp .pay-h-corr{min-width:46px;text-align:right}
   .goal-row{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
   .goal-row select{flex:1;min-width:130px}
   .goal-row input{flex:1;min-width:110px;font:inherit;font-size:14px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none}
@@ -5415,7 +5430,11 @@ function renderPaie(data){
   }).join("");
   const aPayer = vas.filter(v=>!v.unpaid);
   const paidCount = aPayer.filter(v=>isPaid(v.va)).length;
-  const hist = PAYMENTS.slice(0,15).map(p=>`<div class="pay-h-row"><span>${escapeHtml(p.va)}</span><span class="pay-h-d">${new Date(p.ts).toLocaleDateString("fr-FR")}</span><span class="pay-h-a">${fmtCur(p.amount)}</span></div>`).join("") || `<div class="tk-empty">Aucun paiement encore.</div>`;
+  // ⚠️ (25/09) Coupé aux 15 dernières lignes SANS LE DIRE, et à plat : au-delà de
+  // deux quinzaines, le reste du cahier devenait invisible. Même présentation que
+  // l'autre historique : un bloc par jour de paie, avec son total.
+  const hist = versementsParJourHtml((typeof PAYMENTS_LOADED !== "undefined" && !PAYMENTS_LOADED) ? null : PAYMENTS,
+    { money: fmtCur, vide: "Aucun paiement encore." });
   // 📊 PRÉVISION DE PAIE : au rythme actuel de la quinzaine, ce que tu paieras à
   // la fin. « total » = dû à cet instant ; on projette sur les jours restants
   // pour anticiper la sortie de trésorerie (pas de surprise le jour de la paie).
@@ -5710,6 +5729,59 @@ function pcDepuisTexte(vas, releveA){
   const jusqua=(r>0)?` jusqu'au dernier relevé des liens, le <b>${fmt(r)}</b>`:" jusqu'au dernier relevé des liens";
   return `<div class="pcumul-tip" style="margin:0 0 8px">📅 Abonnés arrivés ${depuis}${jusqua}.</div>`;
 }
+// 📜 HISTORIQUE DES VERSEMENTS — regroupé par JOUR DE PAIE.
+// ⚠️ (25/09) Deux défauts, remontés par André (« pas bien organisé, et je ne vois pas
+// les versements de juillet comme s'il n'y en avait pas ») :
+//   1. l'écran coupait la liste aux 20 dernières lignes SANS LE DIRE : au-delà de trois
+//      quinzaines, le reste du journal devenait invisible — dans le registre qui sert
+//      justement à repérer un bug (le serveur en envoie jusqu'à 200) ;
+//   2. une seule liste à plat, une date répétée sur chaque ligne, aucun total par paie.
+// Désormais : un bloc par jour de paie (le plus récent ouvert), nombre de VA, total
+// versé et abonnés payés dans l'en-tête, lignes triées du plus gros montant au plus
+// petit. Journal ILLISIBLE (serveur muet) ≠ « aucun versement » : on le dit.
+function versementsParJourHtml(lignes, opts) {
+  opts = opts || {};
+  if (lignes === null) {
+    return `<div class="sv-note" style="border-left:3px solid #facc15">⚠️ <b>Journal de paie illisible</b> (le serveur n'a pas répondu). Ce n'est <b>pas</b> « aucun versement » : recharge la page dans un instant.</div>`;
+  }
+  const l = (lignes || []).filter(h => h && (h.va || h.amount != null));
+  if (!l.length) return `<div class="tk-empty">${escapeHtml(opts.vide || "Aucun versement enregistré ici encore.")}</div>`;
+  const jours = new Map();
+  l.forEach(h => {
+    const dt = new Date(h.ts || 0), ok = !isNaN(dt.getTime()) && (Number(h.ts) || 0) > 0;
+    const cle = ok ? dt.toLocaleDateString("fr-FR") : "date inconnue";
+    const g = jours.get(cle) || { cle, ts: ok ? dt.getTime() : 0, l: [] };
+    if (ok) g.ts = Math.max(g.ts, dt.getTime());
+    g.l.push(h);
+    jours.set(cle, g);
+  });
+  const ordre = [...jours.values()].sort((a, b) => b.ts - a.ts);
+  const mnt = (v) => (opts.money ? opts.money(v) : pcMoney(v));
+  const totalTout = l.reduce((a, h) => a + (Number(h.amount) || 0), 0);
+  const subsTout = l.reduce((a, h) => a + (Number(h.subsPaid) || 0), 0);
+  const entete = `<div class="pay-h-sum">${fmtInt(l.length)} versement${l.length > 1 ? "s" : ""} sur <b>${ordre.length}</b> jour${ordre.length > 1 ? "s" : ""} de paie · <b>${mnt(totalTout)}</b>`
+    + `${opts.subs ? ` · ${fmtInt(subsTout)} abonnés payés` : ""}`
+    + `${ordre.length > 1 ? ` <span class="ob-sub">(du ${escapeHtml(ordre[ordre.length - 1].cle)} au ${escapeHtml(ordre[0].cle)})</span>` : ""}</div>`;
+  const blocs = ordre.map((g, i) => {
+    const tot = g.l.reduce((a, h) => a + (Number(h.amount) || 0), 0);
+    const subs = g.l.reduce((a, h) => a + (Number(h.subsPaid) || 0), 0);
+    const rows = g.l.slice().sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0)).map(h => {
+      const corr = (h && h.corrige && h.corrige.avant) ? h.corrige.avant : null;
+      return `<div class="pay-h-row"><span class="pay-h-va">${escapeHtml(h.va || "")}</span>`
+        + (opts.subs ? `<span class="pay-h-n">+${fmtInt(h.subsPaid || 0)} subs</span>` : "")
+        + `<span class="pay-h-a">${mnt(h.amount || 0)}</span>`
+        + (opts.fix ? (corr ? `<span class="pay-h-corr" title="Corrigé — avant : ${fmtInt(corr.subsPaid || 0)} subs, ${mnt(corr.amount || 0)}">corrigé</span>` : `<span class="pay-h-corr"></span>`) : "")
+        + (opts.fix ? (h && h.id ? `<button class="pay-h-fix" data-fixid="${escapeHtml(String(h.id))}" title="Corriger le nombre d'abonnés de cette ligne">✏️</button>` : `<span class="pay-h-fix"></span>`) : "")
+        + `</div>`;
+    }).join("");
+    return `<details class="pay-h-grp"${i === 0 ? " open" : ""}><summary><span class="pay-h-j">${escapeHtml(g.cle)}</span>`
+      + `<span class="pay-h-gn">${g.l.length} VA${opts.subs ? ` · ${fmtInt(subs)} subs` : ""}</span><span class="pay-h-gt">${mnt(tot)}</span></summary>${rows}</details>`;
+  }).join("");
+  return entete + blocs;
+}
+function pcHistoriqueHtml() {
+  return versementsParJourHtml((typeof PCUMUL_HIST !== "undefined") ? PCUMUL_HIST : null, { subs: true, fix: true });
+}
 function renderPaieCumul(){
   const _lu = pcLireSaisies();
   Object.keys(_lu).forEach(function(va){ _PC_SAISIES[va]=_lu[va]; });
@@ -5857,17 +5929,7 @@ function renderPaieCumul(){
   // arrivés entre l'observation et le clic). Le repère se corrigeait, le
   // journal gardait « +199 » — c'est-à-dire que le registre censé servir à
   // repérer un bug affichait le bug.
-  const H=(PCUMUL_HIST||[]).slice(0,20).map(h=>{
-    const dt=new Date(h.ts||0), okd=!isNaN(dt.getTime());
-    const corr=(h&&h.corrige&&h.corrige.avant)?h.corrige.avant:null;
-    return `<div class="pay-h-row"><span>${escapeHtml(h.va||"")}</span>`
-      +`<span class="pay-h-d">${okd?dt.toLocaleDateString("fr-FR"):""}</span>`
-      +`<span class="pay-h-n">+${fmtInt(h.subsPaid||0)} subs</span>`
-      +`<span class="pay-h-a">${pcMoney(h.amount||0)}</span>`
-      +(corr?`<span class="pay-h-corr" title="Corrigé — avant : ${fmtInt(corr.subsPaid||0)} subs, ${pcMoney(corr.amount||0)}">✏️</span>`:"")
-      +(h&&h.id?`<button class="pay-h-fix" data-fixid="${escapeHtml(String(h.id))}" title="Corriger le nombre d'abonnés de cette ligne">✏️</button>`:"")
-      +`</div>`;
-  }).join("") || `<div class="tk-empty">Aucun versement enregistré ici encore.</div>`;
+  const H=pcHistoriqueHtml();
   $("#pcumulBody").innerHTML = mgrSel + rows
     + `<div class="pv-row pv-total"><span class="pv-va">TOTAL à payer</span><span class="pv-subs">${nbApayer} VA</span><span class="pv-pay" data-total="${total}" data-inconnu="${sansBase.length?1:0}">${pcMoney(total)}${sansBase.length?' <span class="ob-sub">+ ?</span>':''}</span><span class="pv-note"></span></div>`
     + (sansBase.length

@@ -2455,4 +2455,54 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   verifie("7 jours : pas de section bots sur un onglet modèle (non ventilé par modèle)", !surModele.includes("Bots &amp; comptes perso"), "section présente");
 }
 
+// ================= HISTORIQUE DES VERSEMENTS : rien de caché, rangé par jour de paie
+// André (25/09) : « je n'arrive pas à voir les virements de juillet vers le 15, comme
+// s'il n'y en avait pas ». Cause : l'écran coupait la liste aux 20 dernières lignes
+// (et 15 dans la fiche de paie) SANS LE DIRE, alors que le serveur en envoie 200.
+{
+  const i0 = src.indexOf("function versementsParJourHtml(lignes, opts) {");
+  const i1 = i0 >= 0 ? src.indexOf("\nfunction pcHistoriqueHtml()", i0) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Historique : l'historique rangé par jour de paie existe", corps.length > 0, "fonction absente (ancienne page : liste coupée en silence)");
+  verifie("Historique : plus aucune coupe silencieuse dans les deux écrans",
+    !/PCUMUL_HIST\s*\|\|\s*\[\]\)\.slice\(0,\s*20\)/.test(src) && !/PAYMENTS\.slice\(0,\s*15\)/.test(src),
+    "une liste est encore tronquée");
+  if (corps) {
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const fab = new Function("escapeHtml", "fmtInt", "pcMoney", corps + "\nreturn versementsParJourHtml;");
+    const rendre = fab(esc, (n) => String(Math.round(Number(n) || 0)), (v) => Math.round(Number(v) || 0) + " $");
+    // 4 jours de paie (dont le 15 juillet), 26 versements : AUCUN ne doit disparaître.
+    const jourDe = (iso) => new Date(iso + "T12:00:00Z").getTime();
+    const lignes = [];
+    [["2026-07-15", 8], ["2026-07-31", 6], ["2026-08-15", 7], ["2026-08-31", 5]].forEach(([d, n]) => {
+      for (let i = 0; i < n; i++) lignes.push({ id: d + "-" + i, va: "VA" + i, amount: 10 + i, subsPaid: i, ts: jourDe(d) });
+    });
+    const h = rendre(lignes, { subs: true, fix: true });
+    verifie("Historique : les 26 versements sont tous là (l'ancienne page en cachait 6)",
+      (h.match(/class="pay-h-row"/g) || []).length === 26, (h.match(/class="pay-h-row"/g) || []).length + " lignes");
+    const j15 = new Date(jourDe("2026-07-15")).toLocaleDateString("fr-FR");
+    const bloc15 = h.split("<details").find((b) => b.includes(">" + j15 + "<")) || "";
+    verifie("Historique : le jour de paie du 15 juillet est visible avec ses 8 versements et son total",
+      bloc15.includes("8 VA") && bloc15.includes("108 $"), j15 + " absent ou total faux");
+    const blocs = h.split("<details").slice(1);
+    verifie("Historique : un bloc par jour de paie, du plus récent au plus ancien", blocs.length === 4, blocs.length + " blocs");
+    verifie("Historique : seul le jour le plus récent est ouvert",
+      blocs[0].startsWith(' class="pay-h-grp" open') && !blocs.slice(1).some((b) => b.includes(" open>")), "ouverture");
+    verifie("Historique : l'en-tête annonce le nombre de versements, de jours, le total et la période",
+      /26 versements sur <b>4<\/b> jours de paie · <b>334 \$<\/b>/.test(h) && h.includes("du " + j15 + " au "), h.slice(0, 260));
+    // dans un jour : du plus gros au plus petit (repérer un montant aberrant d'un coup d'œil)
+    const dedans = blocs[3].split('class="pay-h-va"').slice(1).map((x) => Number((x.match(/pay-h-a">(\d+)/) || [0, 0])[1]));
+    verifie("Historique : dans un jour, les plus gros montants en premier",
+      dedans.length === 8 && dedans.every((v, i) => i === 0 || dedans[i - 1] >= v), dedans.join());
+    // Honnêteté : journal illisible ≠ « aucun versement » (le piège du faux zéro)
+    verifie("Historique : journal illisible (serveur muet) -> on le DIT, pas « aucun versement »",
+      /illisible/.test(rendre(null, { subs: true })) && !/Aucun versement/.test(rendre(null, { subs: true })), rendre(null, {}));
+    verifie("Historique : vraiment vide -> message simple", /Aucun versement/.test(rendre([], {})), rendre([], {}));
+    // Une ligne sans date ne doit pas être jetée ni datée au 1er janvier 1970.
+    const sansDate = rendre([{ va: "X", amount: 5, ts: 0 }], {});
+    verifie("Historique : une ligne sans date reste visible, dans « date inconnue »",
+      sansDate.includes("date inconnue") && sansDate.includes("pay-h-row"), sansDate);
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
