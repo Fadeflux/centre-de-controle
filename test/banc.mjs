@@ -2881,4 +2881,25 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   }
 }
 
+// ================= TÂCHES : un panneau REPLIÉ n'est pas un panneau REGARDÉ
+// (25/09) `/api/hub/tasks` lit la base à chaque appel et tourne toutes les 8 s quand
+// le tableau est à l'écran. Un panneau replié reste « visible » pour le navigateur
+// (son titre s'affiche) : sans ce test, 450 lectures par heure pour un contenu caché.
+{
+  const i0 = src.indexOf("function tkRegarde(){");
+  const i1 = i0 >= 0 ? src.indexOf("function ", i0 + 10) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Tâches : la sonde de visibilité est trouvée", corps.length > 0, "tkRegarde introuvable");
+  if (corps) {
+    const faire = (el) => new Function("$", "window", corps + String.fromCharCode(10) + "return tkRegarde;")(() => el, { innerHeight: 800 })();
+    const panneau = (opts) => ({ offsetParent: opts.masque ? null : {}, classList: { contains: (c) => (opts.classes || []).includes(c) },
+      getBoundingClientRect: () => ({ top: opts.top == null ? 100 : opts.top, bottom: opts.bottom == null ? 400 : opts.bottom }) });
+    verifie("Tâches : panneau ouvert et à l'écran -> on interroge", faire(panneau({})) === true, "pas de sonde");
+    verifie("Tâches : panneau REPLIÉ -> on n'interroge plus (450 lectures/h économisées)",
+      faire(panneau({ classes: ["pb-replie"] })) === false, "le panneau replié interroge encore");
+    verifie("Tâches : panneau masqué -> on n'interroge pas", faire(panneau({ masque: true })) === false, "panneau masqué interrogé");
+    verifie("Tâches : panneau hors de l'écran -> on n'interroge pas", faire(panneau({ top: 2000, bottom: 2400 })) === false, "hors écran interrogé");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

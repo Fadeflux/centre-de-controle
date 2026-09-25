@@ -7683,7 +7683,13 @@ async function syncTasks(){
 function tkRegarde(){
   try{
     const el=$("#tasks"); if(!el) return false;
-    if(el.offsetParent===null) return false;          // panneau masqué ou replié
+    if(el.offsetParent===null) return false;          // panneau masqué
+    // ⚠️ (25/09) Depuis le repli panneau par panneau, le panneau REPLIÉ reste
+    // « visible » au sens du navigateur (son titre est affiché, seul son contenu
+    // est caché) : sans ce test, le tableau des tâches continuait à interroger la
+    // base toutes les 8 s pour un contenu que personne ne voit — 450 lectures à
+    // l'heure. Replié = pas regardé.
+    if(el.classList.contains("pb-replie")) return false;
     const r=el.getBoundingClientRect();
     return r.bottom>0 && r.top<(window.innerHeight||0);
   }catch(e){ return true; }                           // dans le doute, on sonde
