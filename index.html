@@ -1133,6 +1133,7 @@
   .pay-h-d{color:var(--muted);margin-left:auto;font-size:12px}
   .pay-h-a{font-weight:600;min-width:60px;text-align:right}
   /* Historique des versements : un bloc par jour de paie (25/09) */
+  .pcumul-last{color:var(--muted);font-size:11.5px}
   .pay-h-sum{color:var(--muted);font-size:12px;margin:6px 0 10px}
   .pay-h-grp{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--surface-2)}
   .pay-h-grp>summary{display:flex;gap:10px;align-items:center;cursor:pointer;list-style:none;padding:8px 10px;font-size:13px;font-weight:600}
@@ -5954,6 +5955,13 @@ function renderPaieCumul(){
     const nouveaux=Number(v.nouveaux)||0, montant=Number(v.aPayer)||0;
     const _dBase=(Number(v.baseTs)>0)?new Date(Number(v.baseTs)).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
     const baseTxt=`<span class="pcumul-base" data-pcbase="${nom}" title="Cumul de ${nom} à ta dernière paie${_dBase?" ("+_dBase+")":""} — clique pour corriger">base ${fmtInt(v.base)}</span>`;
+    // 💵 (25/09) Le cerveau envoyait déjà `lastAmount` (le montant du DERNIER versement
+    // à ce VA) et l'écran le jetait. C'est le garde-fou gratuit avant un virement : voir
+    // qu'on s'apprête à envoyer trois fois la dernière fois. Jamais de 0 inventé : si le
+    // journal ne le donne pas, on n'écrit rien.
+    const derniereTxt=(v.lastAmount!=null && isFinite(Number(v.lastAmount)))
+      ? ` <span class="pcumul-last" title="Ce que tu lui as versé la dernière fois${_dBase?", le "+_dBase:""}">· la dernière fois ${pcMoney(Number(v.lastAmount))}</span>`
+      : "";
     // ⚠️ Une prime posée depuis Discord n'apparaît PAS dans le montant ci-contre :
     // ce sont deux registres séparés (of_bonuses côté Discord, hub_pay_history ici).
     // Elle était donc structurellement oubliée au moment du virement. On l'affiche,
@@ -5977,7 +5985,7 @@ function renderPaieCumul(){
         +`<button class="pv-pay-btn" data-pcpay="${nom}" data-amt="${montant}" data-n="${nouveaux}"${pcPerime?' disabled title="Chiffres pas à jour — le montant réel peut être différent. Clique 🔄 avant de payer."':''}>${pcPerime?"⚠️ Chiffres à rafraîchir":"Payer "+pcMoney(montant)}</button></div>`
       : `<span class="pv-note">à jour ✓</span>`;
     return `<div class="pv-row pcumul-row ${nouveaux>0?"":"pv-done"}">${nameCell}`
-      +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}</span>`
+      +`<span class="pv-subs">${fmtInt(v.cumul)} · ${baseTxt}${derniereTxt}</span>`
       +`<span class="pv-pay">+${fmtInt(nouveaux)} → ${pcMoney(montant)}</span>${primeBadge}${actions}</div>`;
   }).join("");
   // 👔🧭 Rappel : les rôles se règlent par les boutons 👔 (manager) / 🧭 (team
@@ -12087,8 +12095,19 @@ function renderCash(){
     ? `<div class="cash-line warn"><span>⚠️ Quinzaine passée pas soldée</span><b>${cur(retard)}</b></div>`
       +`<div class="cash-sub">${(d.restantsPrev||[]).slice(0,6).map(o=>`${escapeHtml(o.va)} ${cur(o.pay)}`).join(" · ")}</div>`
     : "");
+  // 👥 (25/09) Le cerveau envoie aussi `vasEnCours` (VA par VA, du plus gros au plus
+  // petit) : jusqu'ici l'écran n'affichait que le TOTAL. Avant la paie, savoir si le
+  // virement est porté par un seul VA change ce qu'on en fait. Replié : zéro pixel tant
+  // qu'on ne l'ouvre pas, et on n'invente rien si la liste n'est pas là.
+  const _enC=(Array.isArray(d.vasEnCours)?d.vasEnCours:[]).filter(o=>o&&o.va);
+  const enCoursDetail=_enC.length
+    ? `<details class="ent-plus"><summary>Voir qui compose ces ${cur(d.duEnCours)}</summary><div class="liste-max">`
+      +_enC.map(o=>`<div class="cash-line"><span>${escapeHtml(o.va)}${Number(o.subs)>0?` <span style="opacity:.6">· ${fmtInt(o.subs)} subs</span>`:""}</span><b>${cur(o.pay)}</b></div>`).join("")
+      +`</div></details>`
+    : "";
   const enCoursHtml=`<div class="cash-line"><span>Quinzaine en cours (${escapeHtml(d.curLabel||"")})</span><b>${cur(d.duEnCours)}</b></div>`
-    +`<div class="cash-sub">à ce jour (jour ${d.joursEcoules}/${d.joursTotal}) · projeté fin de quinzaine ≈ <b>${cur(d.projete)}</b></div>`;
+    +`<div class="cash-sub">à ce jour (jour ${d.joursEcoules}/${d.joursTotal}) · projeté fin de quinzaine ≈ <b>${cur(d.projete)}</b></div>`
+    +enCoursDetail;
   let tresoHtml;
   if(d.tresoIndispo){ tresoHtml=`<div class="cash-line muted"><span>Argent sur OnlyFans</span><b>—</b></div><div class="cash-sub">trésorerie illisible pour l'instant</div>`; }
   else{
@@ -14482,6 +14501,15 @@ function renderEntComptes(){
       // au total pour que ce soit décidable d'un coup d'œil.
       +`${(d.vuesSansPont!=null && d.vuesSansPont>0)?` — <b>${fmtInt(d.vuesSansPont)}</b> vues sur ${fmtInt(d.jours||14)} j${(d.vuesRelies)?` (<b>${Math.round(d.vuesSansPont/((d.vuesRelies||0)+d.vuesSansPont)*100)} %</b> de tes vues)`:""} dont les clics ne sont attribués à personne`:""}`
       +`. Le pont se remplit tout seul à chaque lien créé via le bot Discord. Pour relier un vieux compte : recrée simplement son lien via le bot.</div>`
+    // 🔁 (25/09) L'AUTRE MOITIÉ DE LA FUITE, calculée et envoyée depuis toujours, jamais
+    // dite : des LIENS qui reçoivent des visites sans aucun compte Instagram en face.
+    // Ici on ne peut pas savoir qui poste pour eux — c'est un pont à créer, pas un
+    // compte à changer. Deux problèmes différents, deux phrases différentes.
+    +((Number(d.nbLiensSansPont)>0)
+      ? `<div class="sv-note">🔁 <b>${fmtInt(d.nbLiensSansPont)}</b> lien${d.nbLiensSansPont>1?"s":""} reçoi${d.nbLiensSansPont>1?"vent":"t"} des visites <b>sans compte Instagram en face</b> : leurs clics ne sont rattachés à aucun compte. `
+        +`${(Array.isArray(d.liensSansPont)&&d.liensSansPont.length)?`Les plus gros : ${d.liensSansPont.slice(0,5).map(l=>`<b>${escapeHtml(l.nom||l.slug||"?")}</b> (${fmtInt(l.visites)} visites)`).join(" · ")}. `:""}`
+        +`Recrée ces liens via le bot Discord pour les rattacher.</div>`
+      : "")
     +(sansPont?`<div class="sv-head" style="margin-top:10px">Plus gros comptes pas encore reliés</div><div>${sansPont}</div>`:"")
     +`${d.gmsOk===false?`<div class="sv-note" style="color:#facc15">⚠️ GetMySocial n'a pas répondu : visites et clics peuvent être incomplets.</div>`:""}`;
   try{ fixPairs(); }catch(e){}

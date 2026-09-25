@@ -3139,4 +3139,40 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     orphelins.every((id) => pan.includes('["' + id + '"')), orphelins.filter((id) => !pan.includes('["' + id + '"')).join());
 }
 
+// ================= TROIS CHIFFRES QUE LE CERVEAU ENVOYAIT ET QUE L'ÉCRAN JETAIT (25/09)
+{
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // 1. « la dernière fois : X $ » à côté du bouton Payer — le garde-fou gratuit
+  //    avant un virement (voir qu'on s'apprête à envoyer 3× le versement précédent).
+  verifie("Ajouts : le montant du dernier versement est affiché sur la ligne du VA",
+    /lastAmount!=null && isFinite\(Number\(v\.lastAmount\)\)/.test(src) && /la dernière fois \$\{pcMoney/.test(src),
+    "lastAmount encore jeté");
+  verifie("Ajouts : … et rien n'est écrit quand le journal ne le donne pas (jamais un 0 inventé)",
+    /lastAmount!=null[\s\S]{0,400}: "";/.test(src), "un 0 pourrait s'afficher");
+
+  // 2. Qui compose la quinzaine en cours (replié, VA par VA).
+  {
+    const i0 = src.indexOf("const _enC=(Array.isArray(d.vasEnCours)");
+    const i1 = i0 >= 0 ? src.indexOf("+enCoursDetail;", i0) : -1;
+    const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1 + 15) : "";
+    verifie("Ajouts : le détail de la quinzaine en cours existe", corps.length > 0, "absent");
+    if (corps) {
+      const rendre = (d) => new Function("d", "cur", "escapeHtml", "fmtInt",
+        corps + "\nreturn enCoursHtml;")(d, (v) => Math.round(Number(v) || 0) + " $", esc, (n) => String(n));
+      const plein = rendre({ curLabel: "2026-09-B", duEnCours: 300, projete: 600, joursEcoules: 5, joursTotal: 15,
+        vasEnCours: [{ va: "Welzy", pay: 200, subs: 40 }, { va: "Yohan", pay: 100, subs: 20 }] });
+      verifie("Ajouts : il liste les VA du plus gros au plus petit, replié",
+        /<details class="ent-plus"><summary>Voir qui compose ces 300 \$<\/summary>/.test(plein)
+        && plein.indexOf("Welzy") < plein.indexOf("Yohan") && !/<details[^>]* open/.test(plein), plein.slice(0, 220));
+      const vide = rendre({ curLabel: "x", duEnCours: 0, projete: 0, joursEcoules: 1, joursTotal: 15 });
+      verifie("Ajouts : serveur muet sur le détail -> aucun repli vide", !/<details/.test(vide), vide);
+    }
+  }
+
+  // 3. Le miroir de la fuite d'attribution : des LIENS sans compte en face.
+  verifie("Ajouts : les liens qui reçoivent des visites sans compte sont enfin dits",
+    /nbLiensSansPont\)>0/.test(src) && /sans compte Instagram en face/.test(src), "moitié toujours muette");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
