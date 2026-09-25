@@ -2837,4 +2837,48 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   }
 }
 
+// ================= « PANNEAU NON LU » ≠ « PANNEAU VIDE »
+// (25/09) 41 chargeurs font `if(!r.ok) return;` : quand le cerveau tousse, le panneau
+// reste vide et RIEN ne le dit — on croit que la donnée n'existe pas. La file de
+// lectures note maintenant les échecs et le haut de page les compte.
+{
+  const i0 = src.indexOf("window.noterLecture = function(url, ok, code){");
+  const i1 = i0 >= 0 ? src.indexOf(String.fromCharCode(10) + "})();", i0) : -1;
+  const noter = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  const i2 = src.indexOf("function texteLecturesKo(map, maintenant){");
+  const i3 = i2 >= 0 ? src.indexOf("function renderLecturesKo(){", i2) : -1;
+  const texte = (i2 >= 0 && i3 > i2) ? src.slice(i2, i3) : "";
+  verifie("Lectures KO : le registre et son texte existent", !!(noter && texte), `noter:${noter.length} texte:${texte.length}`);
+  verifie("Lectures KO : la file note CHAQUE lecture, réussie, ratée ou sans réponse",
+    /noterLecture\(s, !!\(r && r\.ok\), r && r\.status\)/.test(src) && /noterLecture\(s, false, 0\)/.test(src), "la file ne note pas");
+  if (noter && texte) {
+    const w = { LECTURES_KO: {} };
+    const fab = new Function("window", noter + texte + "\nreturn { noter: window.noterLecture, texte: texteLecturesKo };");
+    const api = fab(w);
+    const T = 1758800000000;
+    api.noter("https://x/api/hub/onlymonster", false, 502);
+    api.noter("https://x/api/hub/va-cac?days=14", false, 0);
+    api.noter("https://x/api/hub/cash", true, 200);
+    let r = api.texte(w.LECTURES_KO, T);
+    verifie("Lectures KO : deux lectures ratées comptées, la réussie non", r && r.n === 2 && r.noms.join() === "onlymonster,va-cac", JSON.stringify(r));
+    verifie("Lectures KO : le détail dit quoi et pourquoi (code ou pas de réponse)",
+      /onlymonster \(erreur 502\)/.test(r.detail) && /va-cac \(pas de réponse\)/.test(r.detail), r.detail);
+    api.noter("https://x/api/hub/onlymonster", true, 200);
+    r = api.texte(w.LECTURES_KO, T);
+    verifie("Lectures KO : une lecture qui repasse efface son alerte", r && r.n === 1 && r.noms[0] === "va-cac", JSON.stringify(r));
+    // Mode associé : « refusé pour ce compte » n'est pas une panne, il a déjà son écran.
+    api.noter("https://x/api/hub/payments", false, 403);
+    api.noter("https://x/api/hub/subs", false, 401);
+    r = api.texte(w.LECTURES_KO, T);
+    verifie("Lectures KO : un refus de rôle (403) ou un jeton (401) n'est pas compté comme une panne", r.n === 1, JSON.stringify(r));
+    // Une panne d'il y a une heure n'apprend plus rien : on ne l'affiche plus.
+    r = api.texte({ "vieux": { ts: T - 60 * 60000, code: 500 } }, T);
+    verifie("Lectures KO : une panne vieille de plus de 15 min disparaît", r === null, JSON.stringify(r));
+    verifie("Lectures KO : tout va bien -> aucune pastille", api.texte({}, T) === null, "pastille affichée pour rien");
+    // Ce qui n'est pas le cerveau ne rentre pas dans le compte.
+    api.noter("https://api.github.com/truc", false, 500);
+    verifie("Lectures KO : une lecture qui n'est pas le cerveau n'est pas comptée", api.texte(w.LECTURES_KO, T).n === 1, JSON.stringify(w.LECTURES_KO));
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

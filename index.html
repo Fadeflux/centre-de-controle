@@ -2228,6 +2228,7 @@
         <div class="sub" id="sub">Chargement…</div>
         <!-- 🚦 Fiabilité des chiffres d'un coup d'œil (à jour / partiel / indispo). -->
         <div id="dataHealth" class="dh" title="Fiabilité des chiffres d'argent en ce moment"></div>
+        <div id="lecturesKo" class="dh" style="display:none"></div>
       </div>
     </div>
 
@@ -3090,8 +3091,31 @@ const REFRESH_MS = 60000;
           }).catch(function(){});
         }
       }catch(e){}
+      try{ window.noterLecture(s, !!(r && r.ok), r && r.status); }catch(e){}
       return r;
+    }, function(err){
+      // Pas de réponse du tout (réseau coupé, lecture annulée au bout de son délai) :
+      // c'est le cas le plus silencieux de tous, il compte double ici.
+      try{ window.noterLecture(s, false, 0); }catch(e){}
+      throw err;
     });
+  };
+  // 📡 (25/09) « JE N'AI PAS PU LIRE » N'EST PAS « IL N'Y A RIEN ». 41 chargeurs
+  // font `if(!r.ok) return;` : quand le cerveau tousse, le panneau reste vide et
+  // RIEN ne le dit — on croit que la donnée n'existe pas (même famille que les
+  // listes coupées en silence). La file voit passer toutes les lectures : on note
+  // ici celles qui échouent, et le haut de page affiche combien de panneaux n'ont
+  // pas pu être lus, avec leur nom au survol.
+  window.LECTURES_KO = {};
+  window.noterLecture = function(url, ok, code){
+    try{
+      var s=String(url||""), i=s.indexOf("/api/hub/"); if(i<0) return;
+      var nom=s.slice(i+9).split("?")[0].split("#")[0]; if(!nom) return;
+      // 403 = « refusé pour ce compte » (mode associé) et 401 = jeton : ce ne sont
+      // pas des pannes, ils ont déjà leur propre traitement à l'écran.
+      if(ok || code===403 || code===401){ delete window.LECTURES_KO[nom]; return; }
+      window.LECTURES_KO[nom]={ ts:Date.now(), code:code||0 };
+    }catch(e){}
   };
 })();
 // ⚡ AJOUTÉ le 2026-08-23 — ne rien demander au cerveau quand l'onglet n'est
@@ -8316,6 +8340,28 @@ function ltvBrutTxt(v,cur){ return HIDE ? "•••" : (Number(v)||0).toFixed(2
 // 🚦 Badge fiabilité GLOBAL (en-tête) : d'un coup d'œil, puis-je décider sur les
 // chiffres d'argent ? 🟢 à jour · 🟡 partiel (un compte muet → minimums) · 🔴 argent
 // indisponible. Masqué en mode démo/déconnecté (rien à certifier).
+// Texte de la pastille « lectures en échec ». Fonction PURE (le banc la rejoue) :
+// on ne garde que les échecs des 15 dernières minutes — au-delà, soit la lecture a
+// été refaite avec succès (et elle a disparu du registre), soit la page est restée
+// ouverte sans rien demander, et une vieille panne n'apprend plus rien.
+function texteLecturesKo(map, maintenant){
+  var noms=Object.keys(map||{}).filter(function(n){ return (maintenant-((map[n]||{}).ts||0)) < 15*60000; });
+  if(!noms.length) return null;
+  noms.sort();
+  return { n:noms.length, noms:noms,
+    detail:noms.map(function(n){ var c=(map[n]||{}).code; return "· "+n+(c?" (erreur "+c+")":" (pas de réponse)"); }).join(String.fromCharCode(10)) };
+}
+function renderLecturesKo(){
+  var SL=String.fromCharCode(10);
+  var el=document.getElementById("lecturesKo"); if(!el) return;
+  var r=texteLecturesKo(window.LECTURES_KO||{}, Date.now());
+  if(!r){ el.style.display="none"; el.textContent=""; return; }
+  el.style.display="";
+  el.className="dh on dh-amber";
+  el.textContent="⚠️ "+r.n+" panneau"+(r.n>1?"x":"")+" non lu"+(r.n>1?"s":"");
+  el.title="Ces lectures du cerveau ont échoué — les panneaux concernés sont VIDES, pas à zéro :"+SL+r.detail+SL+SL+"Nouvel essai automatique au prochain rafraîchissement.";
+}
+setInterval(function(){ try{ renderLecturesKo(); }catch(e){} }, 20000);
 function renderDataHealth(){
   const el=document.getElementById("dataHealth"); if(!el) return;
   const d=OM_DATA;
@@ -8341,6 +8387,7 @@ function renderDataHealth(){
   }
   el.className="dh on "+cls;
   el.textContent=txt;
+  try{ renderLecturesKo(); }catch(e){}
 }
 /* ── 📅 « QUI A DÉPENSÉ » UN AUTRE JOUR (demande du 18/09) ─────────────────────
    « Hier j'ai pas pu regarder et je sais pas grâce à qui j'ai fait de l'argent —
