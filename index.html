@@ -9231,6 +9231,12 @@ function _frMoney(v,cur){ return HIDE?"•••":Math.round(Number(v)||0).toLoc
 // fans (jusqu'à 126 lignes) déroulaient la moitié du centre de contrôle à chaque
 // ouverture. Elles sont REPLIÉES par défaut — mais rien n'est caché : le repli dit
 // combien de fans et combien d'argent il y a dedans, et la liste est à un clic.
+// « Voir les 40 plus gros (sur 126) » : le serveur borne ces listes pour ne pas
+// alourdir la page. Sans le total, l'écran laissait croire qu'il montrait tout.
+function frTitre(plein, mot, montres, total){
+  const n=Number(montres)||0, T=Number(total);
+  return (isFinite(T) && T>n) ? `Voir les ${fmtInt(n)} plus gros ${mot} (sur ${fmtInt(T)})` : plein;
+}
 function frRepli(titre, rows, apercu){
   if(!rows) return "";
   return `<details class="fr-fold"><summary>${escapeHtml(titre)}<span class="fr-fold-n">${apercu||""}</span></summary>${rows}</details>`;
@@ -9242,7 +9248,7 @@ function renderVips(){
   panel.style.display="block"; const cur=(d.currency)||"$";
   const totalV=vips.reduce((a,v)=>a+(Number(v.total)||0),0);
   body.innerHTML=`<div class="fr-intro">Tes plus gros dépenseurs <b>encore actifs</b> — tes baleines. Choie-les (message perso, contenu exclu) pour qu'ils restent.</div>`
-    +frRepli(`Voir tes ${fmtInt(vips.length)} baleine${vips.length>1?"s":""}`, vips.map(v=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(v.fan)}${v.model?` <span class="fr-meta">· ${escapeHtml(v.model)}</span>`:""}</span>${v.va?`<span class="fr-va">👤 ${escapeHtml(v.va)}</span>`:""}<span class="fr-total">${_frMoney(v.total,cur)}</span>${v.days!=null?`<span class="fr-days">${v.days<=1?"actif":"il y a "+v.days+" j"}</span>`:""}</div>`).join(""), `${_frMoney(totalV,cur)} dépensés en tout`);
+    +frRepli(frTitre(`Voir tes ${fmtInt(vips.length)} baleine${vips.length>1?"s":""}`, "baleines", vips.length, d.vipsCount), vips.map(v=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(v.fan)}${v.model?` <span class="fr-meta">· ${escapeHtml(v.model)}</span>`:""}</span>${v.va?`<span class="fr-va">👤 ${escapeHtml(v.va)}</span>`:""}<span class="fr-total">${_frMoney(v.total,cur)}</span>${v.days!=null?`<span class="fr-days">${v.days<=1?"actif":"il y a "+v.days+" j"}</span>`:""}</div>`).join(""), `${_frMoney(totalV,cur)} dépensés en tout`);
   if(typeof fixPairs==="function") fixPairs();
 }
 function renderChurn(){
@@ -9252,7 +9258,7 @@ function renderChurn(){
   panel.style.display="block"; const cur=(d.currency)||"$";
   const totalC=ch.reduce((a,c)=>a+(Number(c.total)||0),0);
   body.innerHTML=`<div class="fr-intro">Gros fans dont l'abonnement vient d'expirer. Tente de les récupérer vite (👤 = le VA qui les avait amenés).</div>`
-    +frRepli(`Voir les ${fmtInt(ch.length)} fans qui viennent de partir`, ch.map(c=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(c.fan)}${c.model?` <span class="fr-meta">· ${escapeHtml(c.model)}</span>`:""}</span>${c.va?`<span class="fr-va">👤 ${escapeHtml(c.va)}</span>`:""}<span class="fr-total">${_frMoney(c.total,cur)}</span><span class="fr-days" style="color:#f87171">parti il y a ${c.partiIlYa} j 💔</span></div>`).join(""), `${_frMoney(totalC,cur)} perdus`);
+    +frRepli(frTitre(`Voir les ${fmtInt(ch.length)} fans qui viennent de partir`, "fans partis", ch.length, d.churnedCount), ch.map(c=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(c.fan)}${c.model?` <span class="fr-meta">· ${escapeHtml(c.model)}</span>`:""}</span>${c.va?`<span class="fr-va">👤 ${escapeHtml(c.va)}</span>`:""}<span class="fr-total">${_frMoney(c.total,cur)}</span><span class="fr-days" style="color:#f87171">parti il y a ${c.partiIlYa} j 💔</span></div>`).join(""), `${_frMoney(totalC,cur)} perdus`);
   if(typeof fixPairs==="function") fixPairs();
 }
 function renderFanRadar(){
@@ -9271,7 +9277,7 @@ function renderFanRadar(){
   </div>`).join("");
   const totalF=d.fans.reduce((a,f)=>a+(Number(f.total)||0),0);
   $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené). 📋 = message prêt à coller.</div>`
-    +frRepli(`Voir les ${fmtInt(d.fans.length)} fans à relancer`, rows, `${HIDE?"•••":Math.round(totalF).toLocaleString("fr-FR")+" "+cur} déjà dépensés par eux`);
+    +frRepli(frTitre(`Voir les ${fmtInt(d.fans.length)} fans à relancer`, "fans à relancer", d.fans.length, d.count), rows, `${HIDE?"•••":Math.round(totalF).toLocaleString("fr-FR")+" "+cur} déjà dépensés par eux`);
   if(typeof fixPairs==="function") fixPairs();
 }
 // 📋 Message de relance PRÊT À COLLER, écrit côté MODÈLE, en ANGLAIS (les fans

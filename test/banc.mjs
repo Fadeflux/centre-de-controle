@@ -2573,7 +2573,7 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     for (let i = 0; i < 126; i++) fans.push(fan(i, { days: 30 }));
     for (let i = 0; i < 22; i++) vips.push(fan(i));
     for (let i = 0; i < 18; i++) churned.push(fan(i));
-    const s = lancer({ fans, vips, churned, count: 126, sleepDays: 14, currency: "$" });
+    const s = lancer({ fans, vips, churned, count: 126, vipsCount: 22, churnedCount: 18, sleepDays: 14, currency: "$" });
     const rad = s["#fanradarBody"] || "", vip = s["#vipsBody"] || "", chu = s["#churnBody"] || "";
     verifie("Fans endormis : replié à la première ouverture (pas d'attribut « open »)",
       rad.includes('<details class="fr-fold">') && !/<details class="fr-fold" open/.test(rad), "panneau ouvert en grand");
@@ -2589,6 +2589,11 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
       && (chu.match(/class="fr-row"/g) || []).length === 18, (chu.match(/class="fr-row"/g) || []).length + " lignes");
     verifie("Fans : le bouton « message prêt à coller » est toujours sur chaque ligne",
       (rad.match(/data-frmsg=/g) || []).length === 126, "boutons perdus");
+    // Le serveur borne : 40 fans envoyes sur 126 endormis. L'ecran doit le DIRE.
+    const borne = lancer({ fans: fans.slice(0, 40), vips: vips.slice(0, 5), churned, count: 126, vipsCount: 22, churnedCount: 18, sleepDays: 14, currency: "$" });
+    verifie("Fans : quand le serveur borne la liste, le repli dit « les 40 plus gros (sur 126) »",
+      /Voir les 40 plus gros fans à relancer \(sur 126\)/.test(borne["#fanradarBody"] || "")
+      && /Voir les 5 plus gros baleines \(sur 22\)/.test(borne["#vipsBody"] || ""), (borne["#fanradarBody"] || "").slice(0, 200));
     const mode = lancer({ fans: fans.slice(0, 2), vips: vips.slice(0, 2), churned: [], count: 2, sleepDays: 14, currency: "$" });
     verifie("Fans : panneau « fans partis » vide -> il disparaît, pas un repli vide", !(mode["#churnBody"] || "").includes("fr-fold"), "repli vide affiché");
   }
