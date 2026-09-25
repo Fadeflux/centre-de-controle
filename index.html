@@ -5793,10 +5793,19 @@ function versementsParJourHtml(lignes, opts) {
   }
   const l = (lignes || []).filter(h => h && (h.va || h.amount != null));
   if (!l.length) return `<div class="tk-empty">${escapeHtml(opts.vide || "Aucun versement enregistré ici encore.")}</div>`;
+  // ⚠️ Le jour est celui du MÉTIER (Africa/Porto-Novo), pas celui du navigateur :
+  // un versement fait à 00 h 30 à Paris appartient encore à la veille côté métier.
+  // Sans ça, le virement « du 15 » pouvait s'afficher au 16 — sur l'écran qui sert
+  // justement à retrouver un virement à une date précise. Même règle que jourServeur().
+  const jourFr = (dt) => {
+    try{ return new Intl.DateTimeFormat("fr-FR",{ timeZone:(typeof TZ_METIER!=="undefined"?TZ_METIER:undefined),
+      year:"numeric", month:"2-digit", day:"2-digit" }).format(dt); }
+    catch(e){ return dt.toLocaleDateString("fr-FR"); }
+  };
   const jours = new Map();
   l.forEach(h => {
     const dt = new Date(h.ts || 0), ok = !isNaN(dt.getTime()) && (Number(h.ts) || 0) > 0;
-    const cle = ok ? dt.toLocaleDateString("fr-FR") : "date inconnue";
+    const cle = ok ? jourFr(dt) : "date inconnue";
     const g = jours.get(cle) || { cle, ts: ok ? dt.getTime() : 0, l: [] };
     if (ok) g.ts = Math.max(g.ts, dt.getTime());
     g.l.push(h);
@@ -7557,9 +7566,17 @@ document.addEventListener("click",e=>{
   toggleCatCollapsed(Number(h.getAttribute("data-cat-idx")));
 });
 // Panneaux (avec un id) d'une section, dans l'ordre de la page.
+// ⚠️ Seulement les panneaux que l'opérateur VOIT : ceux qu'il a décochés dans
+// ⚙️ → 🧩 (classe user-hidden) ou qui n'ont pas de données ne doivent ni compter
+// dans « tout est replié », ni encombrer la mémoire des replis. Sinon le bouton
+// s'affiche sur une section où un seul panneau est visible, et son libellé ment.
 function panneauxDeSection(idx){
   const b=document.getElementById("catBody"+idx); if(!b) return [];
-  return [...b.querySelectorAll(".panel-box[id]")];
+  return [...b.querySelectorAll(".panel-box[id]")].filter(p=>{
+    if(p.classList.contains("user-hidden")) return false;
+    if(p.classList.contains("pb-replie")) return true;          // replié = visible, juste fermé
+    try{ return getComputedStyle(p).display!=="none"; }catch(e){ return true; }
+  });
 }
 function toggleSectionPanneaux(idx){
   const pans=panneauxDeSection(idx); if(!pans.length) return;

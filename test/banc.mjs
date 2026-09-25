@@ -2469,8 +2469,8 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
     "une liste est encore tronquée");
   if (corps) {
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const fab = new Function("escapeHtml", "fmtInt", "pcMoney", corps + "\nreturn versementsParJourHtml;");
-    const rendre = fab(esc, (n) => String(Math.round(Number(n) || 0)), (v) => Math.round(Number(v) || 0) + " $");
+    const fab = new Function("escapeHtml", "fmtInt", "pcMoney", "TZ_METIER", corps + "\nreturn versementsParJourHtml;");
+    const rendre = fab(esc, (n) => String(Math.round(Number(n) || 0)), (v) => Math.round(Number(v) || 0) + " $", "Africa/Porto-Novo");
     // 4 jours de paie (dont le 15 juillet), 26 versements : AUCUN ne doit disparaître.
     const jourDe = (iso) => new Date(iso + "T12:00:00Z").getTime();
     const lignes = [];
@@ -2494,6 +2494,19 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
     const dedans = blocs[3].split('class="pay-h-va"').slice(1).map((x) => Number((x.match(/pay-h-a">(\d+)/) || [0, 0])[1]));
     verifie("Historique : dans un jour, les plus gros montants en premier",
       dedans.length === 8 && dedans.every((v, i) => i === 0 || dedans[i - 1] >= v), dedans.join());
+    // 🕐 Le jour est celui du MÉTIER, pas celui du navigateur. Preuve : on place la
+    // machine à New York et on verse à 00 h 30 (heure du Bénin) le 16 juillet — la
+    // date locale dit « 15 », l'écran doit dire « 16 » (c'est le jour de paie).
+    {
+      const avant = process.env.TZ;
+      process.env.TZ = "America/New_York";
+      const ts = new Date("2026-07-16T00:30:00Z").getTime();
+      const local = new Date(ts).toLocaleDateString("fr-FR");
+      const h2 = rendre([{ va: "Yohan", amount: 142, ts }], {});
+      process.env.TZ = avant;
+      verifie("Historique : le jour affiche est celui du METIER (Benin), pas celui du navigateur",
+        h2.includes(">16/07/2026<") && local === "15/07/2026", "local=" + local + " ; " + h2.slice(0, 200));
+    }
     // Honnêteté : journal illisible ≠ « aucun versement » (le piège du faux zéro)
     verifie("Historique : journal illisible (serveur muet) -> on le DIT, pas « aucun versement »",
       /illisible/.test(rendre(null, { subs: true })) && !/Aucun versement/.test(rendre(null, { subs: true })), rendre(null, {}));
@@ -2693,7 +2706,8 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const faux = (ids, boutons) => {
       const mem = {};
-      const pans = ids.map((id) => { const p = { id, classes: {} , style:{}}; p.classList = { toggle: (c, on) => { p.classes[c] = !!on; } }; return p; });
+      const pans = ids.map((id) => { const p = { id, classes: {}, style: {} };
+        p.classList = { toggle: (c, on) => { p.classes[c] = !!on; }, contains: (c) => !!p.classes[c] }; return p; });
       const btns = (boutons || []).map((b) => ({ idx: b.idx, style: {}, textContent: "", getAttribute: () => String(b.idx) }));
       const doc = {
         getElementById: (id) => {
@@ -2730,6 +2744,16 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     let w1 = faux(["cash"], [{ idx: 3 }]); w1.pans[0].sec = "3";
     monter(w1, TOUT).majBoutonsSection();
     verifie("Section : pas de bouton « replier » pour une section à un seul panneau", w1.btns[0].style.display === "none", w1.btns[0].style.display);
+    // Panneaux décochés dans ⚙️ → 🧩 : ils ne comptent pas et n'encombrent pas la mémoire
+    let wh = faux(["pie", "cac", "om"], [{ idx: 4 }]);
+    wh.pans.forEach((p) => p.sec = "4");
+    wh.pans[0].classes["user-hidden"] = true; wh.pans[1].classes["user-hidden"] = true;
+    const apiH = monter(wh, TOUT);
+    apiH.majBoutonsSection();
+    verifie("Section : un seul panneau VISIBLE (les autres décochés) -> pas de bouton", wh.btns[0].style.display === "none", wh.btns[0].style.display);
+    apiH.toggleSectionPanneaux(4);
+    verifie("Section : replier n'enregistre que les panneaux visibles",
+      wh.mem["ccn_panel_replie"] === '["om"]', wh.mem["ccn_panel_replie"]);
 
     // --- repli de départ (première ouverture sur un appareil)
     let w2 = faux(["ocrelance", "tgva", "om"], []);
