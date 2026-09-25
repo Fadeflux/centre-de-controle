@@ -2543,4 +2543,9 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   }
 }
 
+// Meme famille, en preventif : aucun tableau de VA ne coupe plus a 20 sans le dire
+// (classement OnlyMonster, CAC par VA, charge par VA). L'equipe peut depasser 20.
+verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
+  !/vas\.slice\(0,\s*20\)/.test(src), "un tableau de VA est encore tronque");
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

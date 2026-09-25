@@ -8538,7 +8538,10 @@ function renderOM(){
       : tri==="marge"?(((a.marge==null)-(b.marge==null))||((Number(b.marge)||0)-(Number(a.marge)||0)))
       : (b.subs-a.subs));
   }
-  const vaRows=vas.slice(0,20).map((v,i)=>{
+  // ⚠️ (25/09) Coupé aux 20 premiers VA sans le dire (même famille que les 92
+  // comptes cachés de l'entonnoir) : à 21 VA, les derniers disparaissaient du tableau
+  // sans un mot. L'équipe tient en une page : on les montre tous.
+  const vaRows=vas.map((v,i)=>{
     // `ko` neutralise TOUS les jugements d'argent : sans ça, chaque VA sortait
     // « LTV 0,00 » en rouge, « −91 $ » de marge et « ROI −1,0× » — un tableau où
     // toute l'équipe paraît déficitaire alors qu'on n'a rien lu.
@@ -11848,7 +11851,10 @@ function renderCac(){
   if(!d||!vas.length){ panel.style.display="none"; return; }
   panel.style.display="block";
   const cur=v=>HIDE?"•••":(Math.round((Number(v)||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" $";
-  const rows=vas.slice(0,20).map(v=>{
+  // ⚠️ (25/09) Coupé aux 20 premiers VA sans le dire (même famille que les 92
+  // comptes cachés de l'entonnoir) : à 21 VA, les derniers disparaissaient du tableau
+  // sans un mot. L'équipe tient en une page : on les montre tous.
+  const rows=vas.map(v=>{
     const co1=v.coutSub!=null?cur(v.coutSub):"—", val=v.ltv!=null?cur(v.ltv):"—", marge=v.margeSub;
     const cls=marge==null?"":(marge>=0?"pos":"neg");
     const badge=marge==null?`<span class="cac-badge unk">valeur inconnue</span>`
@@ -12639,7 +12645,10 @@ function renderCharge(){
   if(typeof renderOnboarding==="function") renderOnboarding();   // #10 : va-charge alimente le côté IG
   if(typeof renderBurnout==="function") renderBurnout();
   if(typeof renderCoaching==="function") renderCoaching();
-  const rows=vas.slice(0,20).map(v=>{
+  // ⚠️ (25/09) Coupé aux 20 premiers VA sans le dire (même famille que les 92
+  // comptes cachés de l'entonnoir) : à 21 VA, les derniers disparaissaient du tableau
+  // sans un mot. L'équipe tient en une page : on les montre tous.
+  const rows=vas.map(v=>{
     const p=v.posts7||0;
     let badge=(p>=med*1.5 && p>=6)?`<span class="ch-badge fond">⚡ à fond</span>`:(p<=Math.max(1,med*0.5))?`<span class="ch-badge marge">🌱 de la marge</span>`:"";
     if(sat.indexOf(v)>=0) badge=`<span class="ch-badge sat">🔴 saturé</span>`;
