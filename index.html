@@ -14295,7 +14295,12 @@ function renderEntComptes(){
   const sansPont=tousSP.slice(0,6).map(spCase).join("")
     +(tousSP.length>6?`<details class="ent-plus"><summary>Voir ${fmtInt(tousSP.length-6)} de plus${(d.nbComptesSansPont||0)>tousSP.length?` (sur ${fmtInt(d.nbComptesSansPont)})`:""}</summary><div>${tousSP.slice(6).map(spCase).join("")}</div></details>`:"");
   $("#entcomptesBody").innerHTML=(rows||`<div class="sv-note">Aucun compte relié pour l'instant.</div>`)
-    +`<div class="sv-note">🔗 <b>${fmtInt(d.nbRelies)}</b> compte${(d.nbRelies||0)>1?"s":""} relié${(d.nbRelies||0)>1?"s":""} · <b>${fmtInt(d.nbComptesSansPont)}</b> compte${(d.nbComptesSansPont||0)>1?"s":""} avec des vues mais <b>sans lien relié</b> — le pont se remplit tout seul à chaque lien créé via le bot Discord. Pour relier un vieux compte : recrée simplement son lien via le bot.</div>`
+    +`<div class="sv-note">🔗 <b>${fmtInt(d.nbRelies)}</b> compte${(d.nbRelies||0)>1?"s":""} relié${(d.nbRelies||0)>1?"s":""}${d.vuesRelies!=null?` (<b>${fmtInt(d.vuesRelies)}</b> vues sur ${fmtInt(d.jours||14)} j)`:""} · <b>${fmtInt(d.nbComptesSansPont)}</b> compte${(d.nbComptesSansPont||0)>1?"s":""} avec des vues mais <b>sans lien relié</b>`
+      // ⚠️ Le NOMBRE de comptes sans pont ne dit pas ce qu'on perd : ce qui compte,
+      // c'est le trafic que personne ne peut attribuer. On l'écrit, et on le rapporte
+      // au total pour que ce soit décidable d'un coup d'œil.
+      +`${(d.vuesSansPont!=null && d.vuesSansPont>0)?` — <b>${fmtInt(d.vuesSansPont)}</b> vues sur ${fmtInt(d.jours||14)} j${(d.vuesRelies)?` (<b>${Math.round(d.vuesSansPont/((d.vuesRelies||0)+d.vuesSansPont)*100)} %</b> de tes vues)`:""} dont les clics ne sont attribués à personne`:""}`
+      +`. Le pont se remplit tout seul à chaque lien créé via le bot Discord. Pour relier un vieux compte : recrée simplement son lien via le bot.</div>`
     +(sansPont?`<div class="sv-head" style="margin-top:10px">Plus gros comptes pas encore reliés</div><div>${sansPont}</div>`:"")
     +`${d.gmsOk===false?`<div class="sv-note" style="color:#facc15">⚠️ GetMySocial n'a pas répondu : visites et clics peuvent être incomplets.</div>`:""}`;
   try{ fixPairs(); }catch(e){}

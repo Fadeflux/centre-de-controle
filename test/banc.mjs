@@ -2566,6 +2566,19 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
         /Sur <b>32<\/b> comptes reliés : <b>20<\/b> avec un taux de clic mesurable[\s\S]*<b>12<\/b> sans aucune visite, <b>12<\/b> dont les vues ne sont pas suivies/.test(hm), (hm.match(/📊[\s\S]{0,220}/) || [""])[0]);
       verifie("Entonnoir comptes : les 32 sont toujours là", (hm.match(/class="sv-row"/g) || []).length === 32, (hm.match(/class="sv-row"/g) || []).length + "");
     }
+    // 🚨 Ce qui compte n'est pas le NOMBRE de comptes sans lien relié, mais le trafic
+    // qu'ils représentent : 81 comptes peuvent peser 3 vues comme 300 000.
+    {
+      const h3 = rendre({ comptes, comptesSansPont: sp, nbRelies: 107, nbComptesSansPont: 81,
+        jours: 14, vuesRelies: 300000, vuesSansPont: 100000 });
+      verifie("Entonnoir comptes : le trafic NON attribué est chiffré (vues + part du total)",
+        /81<\/b> comptes? avec des vues mais <b>sans lien relié<\/b> — <b>100000<\/b> vues sur 14 j \(<b>25 %<\/b> de tes vues\)/.test(h3), (h3.match(/sans lien relié[\s\S]{0,160}/) || [""])[0]);
+      const h4 = rendre({ comptes, comptesSansPont: [], nbRelies: 107, nbComptesSansPont: 0, jours: 14, vuesRelies: 300000, vuesSansPont: 0 });
+      verifie("Entonnoir comptes : rien à rattraper -> aucune phrase inventée", !/dont les clics ne sont attribués/.test(h4), "phrase en trop");
+      const h5 = rendre({ comptes, comptesSansPont: sp, nbRelies: 107, nbComptesSansPont: 81 });
+      verifie("Entonnoir comptes : vieux serveur (pas de vues envoyées) -> on n'invente pas de chiffre",
+        !/vues sur 14 j/.test(h5) && /81<\/b> comptes? avec des vues/.test(h5), (h5.match(/sans lien relié[\s\S]{0,120}/) || [""])[0]);
+    }
     const petit = rendre({ comptes: comptes.slice(0, 9), comptesSansPont: sp.slice(0, 3), nbRelies: 9, nbComptesSansPont: 3 });
     verifie("Entonnoir comptes : peu de comptes -> aucun repli inutile", !petit.includes("<details"), "repli affiché pour rien");
   }
