@@ -2599,4 +2599,83 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   }
 }
 
+// ================= PANNEAUX REPLIABLES UN PAR UN (demande d'André, 25/09)
+// Le centre fait 21 000 px de haut. Taper le TITRE d'un panneau le replie, et
+// l'appareil s'en souvient. Pièges gardés ici : ne PAS replier quand on clique un
+// bouton ou une pastille de l'en-tête, et DÉPLIER avant tout saut de navigation
+// (sinon le clic « aller au panneau » semble mort — le piège déjà connu des
+// catégories repliées).
+{
+  const i0 = src.indexOf("function panReplieSet(){");
+  const i1 = i0 >= 0 ? src.indexOf("function catCollapsedSet()", i0) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Repli panneau : le code est trouvé", corps.length > 0, "panReplieSet introuvable");
+  if (corps) {
+    const noeud = (o) => {
+      const n = Object.assign({ tagName: "DIV", sels: [], attrs: {}, parent: null, classes: [] }, o);
+      n.attributes = Object.keys(n.attrs).map((name) => ({ name }));
+      n.classList = { contains: (c) => n.classes.includes(c),
+        toggle: (c, on) => { n[c] = !!on; } };
+      n.closest = (sel) => { for (let x = n; x; x = x.parent) if ((x.sels || []).includes(sel)) return x; return null; };
+      Object.defineProperty(n, "parentElement", { get: () => n.parent });
+      return n;
+    };
+    const faire = () => {
+      const mem = {};
+      const pan = (id) => { const p = noeud({ id, sels: [".panel-box[id]"] }); return p; };
+      const panneaux = [pan("om"), pan("tgva"), pan("cal")];
+      let clic = null;
+      const document_ = { addEventListener: (t, f) => { if (t === "click") clic = f; },
+        querySelectorAll: () => panneaux };
+      const ls = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+      const fab = new Function("document", "localStorage",
+        corps + "\nreturn { applyPanReplie, togglePanReplie, deplierPanneau, panReplieSet };");
+      const api = fab(document_, ls);
+      return { api, panneaux, mem, clic: (cible) => clic({ target: cible }) };
+    };
+
+    // 1) taper le titre replie, et c'est retenu
+    let w = faire();
+    const tete = (p, opts) => noeud(Object.assign({ sels: [".pb-head"], parent: p }, opts || {}));
+    const tOm = tete(w.panneaux[0]);
+    w.clic(noeud({ tagName: "SPAN", parent: tOm }));
+    verifie("Repli : taper le titre replie le panneau", w.panneaux[0]["pb-replie"] === true, "pas replié");
+    verifie("Repli : l'appareil s'en souvient", (w.mem["ccn_panel_replie"] || "").includes('"om"'), w.mem["ccn_panel_replie"]);
+    w.clic(noeud({ tagName: "SPAN", parent: tOm }));
+    verifie("Repli : re-taper le titre le rouvre", w.panneaux[0]["pb-replie"] === false && !(w.mem["ccn_panel_replie"] || "").includes('"om"'), "resté replié");
+
+    // 2) les commandes de l'en-tête restent des commandes
+    w = faire();
+    const t2 = tete(w.panneaux[1]);
+    w.clic(noeud({ tagName: "BUTTON", parent: t2 }));
+    verifie("Repli : cliquer un BOUTON de l'en-tête ne replie pas le panneau", !w.panneaux[1]["pb-replie"], "replié par un bouton");
+    w.clic(noeud({ tagName: "SPAN", attrs: { "data-omper": "j7" }, parent: t2 }));
+    verifie("Repli : cliquer une pastille (data-…) ne replie pas non plus", !w.panneaux[1]["pb-replie"], "replié par une pastille");
+    w.clic(noeud({ tagName: "SPAN", parent: noeud({ tagName: "BUTTON", parent: t2 }) }));
+    verifie("Repli : … même en tapant le texte À L'INTÉRIEUR d'un bouton", !w.panneaux[1]["pb-replie"], "replié depuis un bouton");
+
+    // 3) le calendrier garde son propre repli
+    w = faire();
+    w.clic(noeud({ tagName: "SPAN", parent: tete(w.panneaux[2], { classes: ["cal-head-toggle"] }) }));
+    verifie("Repli : le calendrier garde son propre repli (pas de double)", !w.panneaux[2]["pb-replie"], "double repli sur le calendrier");
+
+    // 4) naviguer vers un panneau replié le déplie (sinon le clic semble mort)
+    w = faire();
+    w.clic(noeud({ tagName: "SPAN", parent: tete(w.panneaux[1]) }));
+    const ligne = noeud({ parent: w.panneaux[1] });
+    verifie("Repli : sauter vers un panneau replié le déplie d'abord",
+      w.api.deplierPanneau(ligne) === true && !w.panneaux[1]["pb-replie"], "saut vers un panneau resté fermé");
+    verifie("Repli : sauter vers un panneau déjà ouvert ne change rien", w.api.deplierPanneau(ligne) === false, "faux dépliage");
+
+    // 5) au chargement suivant, l'état est repris
+    w = faire();
+    w.mem["ccn_panel_replie"] = '["tgva","om"]';
+    w.api.applyPanReplie();
+    verifie("Repli : à la réouverture du centre, les panneaux repliés le restent",
+      w.panneaux[0]["pb-replie"] && w.panneaux[1]["pb-replie"] && !w.panneaux[2]["pb-replie"], "état perdu");
+    w.mem["ccn_panel_replie"] = "{cassé";
+    verifie("Repli : mémoire abîmée -> tout s'ouvre, rien ne plante", w.api.panReplieSet().size === 0, "plantage");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

@@ -903,6 +903,15 @@
 
   .panel-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;margin:18px 0 0}
   .pb-head{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  /* 🧰 (25/09) Chaque panneau se replie tout seul : tape son titre. L'état est
+     retenu par appareil (ccn_panel_replie) — le centre fait 21 000 px de haut,
+     tout le monde n'a pas besoin des mêmes panneaux tous les jours. */
+  .panel-box>.pb-head{cursor:pointer;user-select:none}
+  .panel-box>.pb-head::after{content:"▾";order:99;margin-left:6px;color:var(--faint);font-size:11px;font-weight:400}
+  .panel-box.pb-replie>.pb-head::after{content:"▸"}
+  .panel-box.pb-replie>.pb-head{margin-bottom:0}
+  .panel-box.pb-replie>*:not(.pb-head){display:none !important}
+  #cal>.pb-head::after{content:""}
   .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
   .pc-cahier{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;padding:1px 6px;white-space:nowrap}
 .pc-parti{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fca5a5;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);border-radius:6px;padding:1px 6px;white-space:nowrap}
@@ -7419,6 +7428,45 @@ function refreshSecHeads(){ appliqueCategories(); }
 // on ne touche JAMAIS le display de chaque panneau individuel, qui reste sa
 // propre vérité — replier/déplier ne fait qu'ajouter/retirer un display:none
 // sur le PARENT, les enfants retrouvent exactement leur état d'avant).
+// 🧰 (25/09) UN PANNEAU SE REPLIE TOUT SEUL — demande d'André : le centre fait
+// 21 000 px de haut, et personne n'a besoin des mêmes panneaux chaque jour. Taper
+// le TITRE d'un panneau le replie (le titre reste, pour le rouvrir d'un geste).
+// Retenu par appareil. ⚠️ On ne touche PAS au display du panneau : c'est sa propre
+// vérité (les rendus l'allument/l'éteignent selon les données). Le repli n'ajoute
+// qu'une classe qui cache les ENFANTS — un panneau replié puis rempli par le
+// serveur reste replié, et rien n'est perdu.
+function panReplieSet(){ try{ return new Set(JSON.parse(localStorage.getItem("ccn_panel_replie")||"[]")); }catch(e){ return new Set(); } }
+function panReplieEcrire(s){ try{ localStorage.setItem("ccn_panel_replie",JSON.stringify([...s])); }catch(e){} }
+function applyPanReplie(){
+  const s=panReplieSet();
+  document.querySelectorAll(".panel-box[id]").forEach(p=>p.classList.toggle("pb-replie", s.has(p.id)));
+}
+function togglePanReplie(id){ const s=panReplieSet(); s.has(id)?s.delete(id):s.add(id); panReplieEcrire(s); applyPanReplie(); }
+// ⚠️ MÊME PIÈGE QUE LES CATÉGORIES : sauter vers un panneau replié ne bougerait
+// pas d'un pixel (le titre est visible, le contenu non) et le clic semblerait
+// mort. Toute navigation le déplie d'abord.
+function deplierPanneau(el){
+  // La cible d'un saut n'est pas toujours le panneau lui-même (une ligne, un
+  // titre) : on remonte au panneau qui la contient.
+  const p=(el&&el.closest)?(el.closest(".panel-box[id]")||el):el;
+  if(!p||!p.id) return false;
+  const s=panReplieSet(); if(!s.has(p.id)) return false;
+  s.delete(p.id); panReplieEcrire(s); applyPanReplie(); return true;
+}
+document.addEventListener("click",e=>{
+  const h=e.target.closest(".pb-head"); if(!h) return;
+  if(h.classList.contains("cal-head-toggle")) return;         // le calendrier a déjà son propre repli
+  // Un en-tête contient souvent des boutons et des pastilles cliquables
+  // (rafraîchir, filtres, onglets) : on ne replie que si le clic tombe sur le
+  // TEXTE. Tout ce qui porte un data-… est piloté par un autre gestionnaire.
+  for(let n=e.target; n&&n!==h; n=n.parentElement){
+    const tag=n.tagName;
+    if(tag==="BUTTON"||tag==="A"||tag==="INPUT"||tag==="SELECT"||tag==="TEXTAREA"||tag==="LABEL"||tag==="SUMMARY") return;
+    if(n.attributes && [...n.attributes].some(a=>a.name.indexOf("data-")===0)) return;
+  }
+  const p=h.closest(".panel-box[id]"); if(!p) return;
+  togglePanReplie(p.id);
+});
 function catCollapsedSet(){ try{ return new Set(JSON.parse(localStorage.getItem("ccn_cat_collapsed")||"[]")); }catch(e){ return new Set(); } }
 function applyCatCollapsed(){ appliqueCategories(); }
 function toggleCatCollapsed(idx){
@@ -7467,7 +7515,7 @@ function toutVoir(){
 }
 function scrollToPanel(el){
   const leger=accueilLegerActif(); if(leger) toutVoir();
-  const deplie = expandCatOf(el) || leger;
+  const deplie = expandCatOf(el) || deplierPanneau(el) || leger;
   const go = ()=>el.scrollIntoView({behavior:"smooth",block:"start"});
   deplie ? setTimeout(go,50) : go();
 }
@@ -12693,7 +12741,8 @@ function jumpPanel(id){
   // Sort de l'accueil léger puis déplie la catégorie si besoin (sinon le clic
   // viserait un panneau masqué et semblerait mort).
   const leger=(typeof accueilLegerActif==="function")&&accueilLegerActif(); if(leger) toutVoir();
-  const deplie = ((typeof expandCatOf==="function") ? expandCatOf(el) : false) || leger;
+  const deplie = ((typeof expandCatOf==="function") ? expandCatOf(el) : false)
+    || ((typeof deplierPanneau==="function") ? deplierPanneau(el) : false) || leger;
   // Toujours invisible après dépliage = panneau masqué par l'opérateur (⚙️ 🧩)
   // ou vide. On le DIT au lieu de laisser croire à un bouton cassé.
   if(!deplie && el.getClientRects().length===0){
@@ -16365,6 +16414,7 @@ try{ appliquerRangements(); }catch(e){ console.error("rangements:",e); }
 applyOrder();
 refreshSecHeads();
 applyCatCollapsed();
+try{ applyPanReplie(); }catch(e){}
 try{ initCatSpy(); }catch(e){}
 
 // ⚠️ ON ATTEND DE SAVOIR SI LE JETON EST BON. `load()` est lancée plus haut mais
