@@ -14275,8 +14275,21 @@ function renderEntComptes(){
       +`<span class="sv-part ${cls}" title="Part des visiteurs de sa page bio qui cliquent jusqu'à OnlyFans">${pctFr(c.tauxClic)}</span></div>`;
   };
   const tousC=(d.comptes||[]);
+  // 📊 (25/09) 107 comptes, mais seulement 40 avec un taux mesurable et 39 sans la
+  // moindre visite : la liste seule ressemblait à 68 lignes de « — ». On dit d'abord
+  // ce que la liste contient, et on renvoie les comptes SANS AUCUNE VISITE à la fin
+  // (ils n'envoient personne : ce n'est pas un mauvais taux, c'est un compte mort ou
+  // un lien jamais utilisé — deux problèmes différents).
+  const aVisite=(c)=>Number(c.visites)>0;
+  const nMesurables=tousC.filter(c=>c.tauxClic!=null).length;
+  const nSansVisite=tousC.filter(c=>!aVisite(c)).length;
+  const nSansVues=tousC.filter(c=>c.vues==null).length;
+  const reste=tousC.slice(15), resteActifs=reste.filter(aVisite), resteMorts=reste.filter(c=>!aVisite(c));
   const rows=tousC.slice(0,15).map(ligneCompte).join("")
-    +(tousC.length>15?`<details class="ent-plus"><summary>Voir les ${fmtInt(tousC.length-15)} autres comptes reliés</summary>${tousC.slice(15).map(ligneCompte).join("")}</details>`:"");
+    +(reste.length?`<details class="ent-plus"><summary>Voir les ${fmtInt(reste.length)} autres comptes reliés</summary><div class="liste-max">${resteActifs.map(ligneCompte).join("")}`
+      +(resteMorts.length?`<div class="sv-head" style="margin-top:10px">Aucune visite enregistrée — ${fmtInt(resteMorts.length)} compte${resteMorts.length>1?"s":""}</div>${resteMorts.map(ligneCompte).join("")}`:"")
+      +`</div></details>`:"")
+    +(tousC.length?`<div class="sv-note">📊 Sur <b>${fmtInt(tousC.length)}</b> comptes reliés : <b>${fmtInt(nMesurables)}</b> avec un taux de clic mesurable (≥ 20 visites), <b>${fmtInt(nSansVisite)}</b> sans aucune visite, <b>${fmtInt(nSansVues)}</b> dont les vues ne sont pas suivies.</div>`:"");
   const tousSP=(d.comptesSansPont||[]);
   const spCase=(c)=>`<span class="om-spend-c" style="cursor:default">@${escapeHtml(c.insta)} <i>· ${fmtInt(c.vues)} vues</i></span>`;
   const sansPont=tousSP.slice(0,6).map(spCase).join("")

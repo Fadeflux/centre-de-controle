@@ -2551,6 +2551,21 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
       h.includes("@cpt106") && h.includes("vues pas encore mesurées"), "compte sans vues perdu");
     verifie("Entonnoir comptes : les comptes pas encore reliés aussi (6 + le reste, avec le total)",
       (h.match(/@sp\d+/g) || []).length === 20 && /Voir 14 de plus \(sur 34\)/.test(h), "sans-pont tronqué");
+    // 📊 Un compte SANS AUCUNE VISITE n'a pas « un mauvais taux » : il n'envoie
+    // personne. Il part à la fin, sous son propre intertitre, et le panneau dit
+    // en une ligne ce que la liste contient (sinon : 68 lignes de « — »).
+    {
+      const mix = [];
+      for (let i = 0; i < 20; i++) mix.push({ insta: "vivant" + i, va: "VA", vues: 100 - i, visites: 30, clics: 20, tauxClic: 66 });
+      for (let i = 0; i < 12; i++) mix.push({ insta: "mort" + i, va: "VA", vues: null, visites: 0, clics: 0, tauxClic: null });
+      const hm = rendre({ comptes: mix, comptesSansPont: [], nbRelies: 32, nbComptesSansPont: 0 });
+      const repli = hm.slice(hm.indexOf("<details"));
+      verifie("Entonnoir comptes : les comptes sans aucune visite passent en dernier, sous leur intertitre",
+        /Aucune visite enregistrée — 12 comptes/.test(repli) && repli.indexOf("@vivant19") < repli.indexOf("Aucune visite") && repli.indexOf("Aucune visite") < repli.indexOf("@mort0"), repli.slice(0, 200));
+      verifie("Entonnoir comptes : une ligne dit ce que contient la liste (mesurables / sans visite / sans vues)",
+        /Sur <b>32<\/b> comptes reliés : <b>20<\/b> avec un taux de clic mesurable[\s\S]*<b>12<\/b> sans aucune visite, <b>12<\/b> dont les vues ne sont pas suivies/.test(hm), (hm.match(/📊[\s\S]{0,220}/) || [""])[0]);
+      verifie("Entonnoir comptes : les 32 sont toujours là", (hm.match(/class="sv-row"/g) || []).length === 32, (hm.match(/class="sv-row"/g) || []).length + "");
+    }
     const petit = rendre({ comptes: comptes.slice(0, 9), comptesSansPont: sp.slice(0, 3), nbRelies: 9, nbComptesSansPont: 3 });
     verifie("Entonnoir comptes : peu de comptes -> aucun repli inutile", !petit.includes("<details"), "repli affiché pour rien");
   }
