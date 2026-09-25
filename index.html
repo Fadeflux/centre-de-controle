@@ -1556,6 +1556,13 @@
   /* Radar fans endormis */
   .fr-c{font-size:11px;color:var(--faint);font-weight:600;margin-left:auto}
   .fr-intro{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45}
+  .fr-fold{margin-top:2px}
+  .fr-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);font-size:13px;font-weight:600}
+  .fr-fold>summary::-webkit-details-marker{display:none}
+  .fr-fold>summary::before{content:"▸";color:var(--muted);font-weight:400}
+  .fr-fold[open]>summary::before{content:"▾"}
+  .fr-fold>summary .fr-fold-n{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+  .fr-fold[open]>summary{margin-bottom:6px}
   .fr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid var(--line);font-size:14px}
   .fr-row:last-child{border-bottom:0}
   .fr-fan{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -9220,13 +9227,22 @@ let FAN_RADAR=null;
 async function loadFanRadar(retry){ if(!TOKEN) return; try{ const r=await fetch(HUB_BASE+"/api/hub/fan-radar",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); FAN_RADAR=j.data||null; renderFanRadar(); renderVips(); renderChurn(); if(typeof renderActions==="function") renderActions(); if(!FAN_RADAR && (retry||0)<2) setTimeout(()=>loadFanRadar((retry||0)+1),9000); } }catch(e){} }
 // 💎 #3 baleines (gros fans ENCORE actifs) + 💔 #4 gros fans partis — même source FAN_RADAR.
 function _frMoney(v,cur){ return HIDE?"•••":Math.round(Number(v)||0).toLocaleString("fr-FR")+" "+(cur||"$"); }
+// 📏 (25/09) André : « le mets pas en ouvert, ça sert à rien ». Ces trois listes de
+// fans (jusqu'à 126 lignes) déroulaient la moitié du centre de contrôle à chaque
+// ouverture. Elles sont REPLIÉES par défaut — mais rien n'est caché : le repli dit
+// combien de fans et combien d'argent il y a dedans, et la liste est à un clic.
+function frRepli(titre, rows, apercu){
+  if(!rows) return "";
+  return `<details class="fr-fold"><summary>${escapeHtml(titre)}<span class="fr-fold-n">${apercu||""}</span></summary>${rows}</details>`;
+}
 function renderVips(){
   const panel=$("#vips"), body=$("#vipsBody"); if(!panel||!body) return;
   const d=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null, vips=(d&&Array.isArray(d.vips))?d.vips:[];
   if(!TOKEN||!vips.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
   panel.style.display="block"; const cur=(d.currency)||"$";
+  const totalV=vips.reduce((a,v)=>a+(Number(v.total)||0),0);
   body.innerHTML=`<div class="fr-intro">Tes plus gros dépenseurs <b>encore actifs</b> — tes baleines. Choie-les (message perso, contenu exclu) pour qu'ils restent.</div>`
-    +vips.slice(0,15).map(v=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(v.fan)}${v.model?` <span class="fr-meta">· ${escapeHtml(v.model)}</span>`:""}</span>${v.va?`<span class="fr-va">👤 ${escapeHtml(v.va)}</span>`:""}<span class="fr-total">${_frMoney(v.total,cur)}</span>${v.days!=null?`<span class="fr-days">${v.days<=1?"actif":"il y a "+v.days+" j"}</span>`:""}</div>`).join("");
+    +frRepli(`Voir tes ${fmtInt(vips.length)} baleine${vips.length>1?"s":""}`, vips.map(v=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(v.fan)}${v.model?` <span class="fr-meta">· ${escapeHtml(v.model)}</span>`:""}</span>${v.va?`<span class="fr-va">👤 ${escapeHtml(v.va)}</span>`:""}<span class="fr-total">${_frMoney(v.total,cur)}</span>${v.days!=null?`<span class="fr-days">${v.days<=1?"actif":"il y a "+v.days+" j"}</span>`:""}</div>`).join(""), `${_frMoney(totalV,cur)} dépensés en tout`);
   if(typeof fixPairs==="function") fixPairs();
 }
 function renderChurn(){
@@ -9234,8 +9250,9 @@ function renderChurn(){
   const d=(typeof FAN_RADAR!=="undefined")?FAN_RADAR:null, ch=(d&&Array.isArray(d.churned))?d.churned:[];
   if(!TOKEN||!ch.length){ panel.style.display="none"; if(typeof fixPairs==="function") fixPairs(); return; }
   panel.style.display="block"; const cur=(d.currency)||"$";
+  const totalC=ch.reduce((a,c)=>a+(Number(c.total)||0),0);
   body.innerHTML=`<div class="fr-intro">Gros fans dont l'abonnement vient d'expirer. Tente de les récupérer vite (👤 = le VA qui les avait amenés).</div>`
-    +ch.slice(0,15).map(c=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(c.fan)}${c.model?` <span class="fr-meta">· ${escapeHtml(c.model)}</span>`:""}</span>${c.va?`<span class="fr-va">👤 ${escapeHtml(c.va)}</span>`:""}<span class="fr-total">${_frMoney(c.total,cur)}</span><span class="fr-days" style="color:#f87171">parti il y a ${c.partiIlYa} j 💔</span></div>`).join("");
+    +frRepli(`Voir les ${fmtInt(ch.length)} fans qui viennent de partir`, ch.map(c=>`<div class="fr-row"><span class="fr-fan">${escapeHtml(c.fan)}${c.model?` <span class="fr-meta">· ${escapeHtml(c.model)}</span>`:""}</span>${c.va?`<span class="fr-va">👤 ${escapeHtml(c.va)}</span>`:""}<span class="fr-total">${_frMoney(c.total,cur)}</span><span class="fr-days" style="color:#f87171">parti il y a ${c.partiIlYa} j 💔</span></div>`).join(""), `${_frMoney(totalC,cur)} perdus`);
   if(typeof fixPairs==="function") fixPairs();
 }
 function renderFanRadar(){
@@ -9252,7 +9269,9 @@ function renderFanRadar(){
     <span class="fr-days">${f.days} j 💤</span>
     <button class="fr-msg" data-frmsg="${escapeHtml(f.id)}" data-frdays="${Number(f.days)||0}" title="Copier un message de relance prêt à coller (côté modèle, en anglais)">📋</button>
   </div>`).join("");
-  $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené). 📋 = message prêt à coller.</div>${rows}`;
+  const totalF=d.fans.reduce((a,f)=>a+(Number(f.total)||0),0);
+  $("#fanradarBody").innerHTML=`<div class="fr-intro">Gros dépenseurs qui n'ont plus rien acheté depuis ≥ ${d.sleepDays} jours. À faire relancer par la chatteuse (👤 = le VA qui l'a amené). 📋 = message prêt à coller.</div>`
+    +frRepli(`Voir les ${fmtInt(d.fans.length)} fans à relancer`, rows, `${HIDE?"•••":Math.round(totalF).toLocaleString("fr-FR")+" "+cur} déjà dépensés par eux`);
   if(typeof fixPairs==="function") fixPairs();
 }
 // 📋 Message de relance PRÊT À COLLER, écrit côté MODÈLE, en ANGLAIS (les fans

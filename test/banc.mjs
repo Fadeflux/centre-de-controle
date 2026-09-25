@@ -2548,4 +2548,50 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
 verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   !/vas\.slice\(0,\s*20\)/.test(src), "un tableau de VA est encore tronque");
 
+// ================= LISTES DE FANS REPLIÉES : le centre ne déroule plus 126 lignes
+// André (25/09) : « le mets pas en ouvert, ça sert à rien ». Les trois panneaux de fans
+// (endormis 126 lignes, baleines, fans partis) s'ouvraient en grand à chaque chargement.
+// Repliés — mais le repli DIT combien il y a dedans, et plus rien n'est coupé à 15.
+{
+  const i0 = src.indexOf("function _frMoney(");
+  const i1 = i0 >= 0 ? src.indexOf("\nfunction frMessagePour(", i0) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Fans : les trois panneaux sont trouvés", corps.length > 0 && corps.includes("function renderFanRadar(){") && corps.includes("function renderVips(){"), "panneaux introuvables");
+  if (corps) {
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const sorties = {};
+    const faux = (id) => ({ style: {}, set innerHTML(v) { sorties[id] = v; }, set textContent(v) { sorties[id + ":txt"] = v; } });
+    const fan = (i, o) => Object.assign({ id: "f" + i, fan: "Fan #" + i, model: "Layla", va: "Welzy", total: 100 + i, days: 3, partiIlYa: 5 }, o || {});
+    const lancer = (d) => {
+      for (const k of Object.keys(sorties)) delete sorties[k];
+      const fab = new Function("$", "FAN_RADAR", "TOKEN", "HIDE", "escapeHtml", "fmtInt", "fixPairs",
+        corps + "\nrenderVips(); renderChurn(); renderFanRadar();");
+      fab(faux, d, "jeton", false, esc, (n) => String(Math.round(Number(n) || 0)), () => {});
+      return sorties;
+    };
+    const fans = [], vips = [], churned = [];
+    for (let i = 0; i < 126; i++) fans.push(fan(i, { days: 30 }));
+    for (let i = 0; i < 22; i++) vips.push(fan(i));
+    for (let i = 0; i < 18; i++) churned.push(fan(i));
+    const s = lancer({ fans, vips, churned, count: 126, sleepDays: 14, currency: "$" });
+    const rad = s["#fanradarBody"] || "", vip = s["#vipsBody"] || "", chu = s["#churnBody"] || "";
+    verifie("Fans endormis : replié à la première ouverture (pas d'attribut « open »)",
+      rad.includes('<details class="fr-fold">') && !/<details class="fr-fold" open/.test(rad), "panneau ouvert en grand");
+    verifie("Fans endormis : le repli dit combien de fans et combien d'argent",
+      /Voir les 126 fans à relancer/.test(rad) && /\d[\d\s ]*\$ déjà dépensés par eux/.test(rad), rad.slice(0, 300));
+    verifie("Fans endormis : les 126 lignes sont dedans (rien n'est jeté)",
+      (rad.match(/class="fr-row"/g) || []).length === 126, (rad.match(/class="fr-row"/g) || []).length + " lignes");
+    verifie("Baleines : repliées, les 22 dedans (avant : coupées à 15 en silence)",
+      vip.includes('<details class="fr-fold">') && /Voir tes 22 baleines/.test(vip)
+      && (vip.match(/class="fr-row"/g) || []).length === 22, (vip.match(/class="fr-row"/g) || []).length + " lignes");
+    verifie("Fans partis : repliés, les 18 dedans (avant : coupés à 15)",
+      chu.includes('<details class="fr-fold">') && /Voir les 18 fans qui viennent de partir/.test(chu)
+      && (chu.match(/class="fr-row"/g) || []).length === 18, (chu.match(/class="fr-row"/g) || []).length + " lignes");
+    verifie("Fans : le bouton « message prêt à coller » est toujours sur chaque ligne",
+      (rad.match(/data-frmsg=/g) || []).length === 126, "boutons perdus");
+    const mode = lancer({ fans: fans.slice(0, 2), vips: vips.slice(0, 2), churned: [], count: 2, sleepDays: 14, currency: "$" });
+    verifie("Fans : panneau « fans partis » vide -> il disparaît, pas un repli vide", !(mode["#churnBody"] || "").includes("fr-fold"), "repli vide affiché");
+  }
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
