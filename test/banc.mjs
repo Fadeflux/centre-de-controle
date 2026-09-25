@@ -2738,6 +2738,7 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
         p.classList = { toggle: (c, on) => { p.classes[c] = !!on; }, contains: (c) => !!p.classes[c] }; return p; });
       const btns = (boutons || []).map((b) => ({ idx: b.idx, style: {}, textContent: "", getAttribute: () => String(b.idx) }));
       const doc = {
+        documentElement: { style: { setProperty: () => {} } },
         getElementById: (id) => {
           if (id.indexOf("catBody") === 0) { const n = id.slice(7); return { querySelectorAll: () => pans.filter((p) => p.sec === n) }; }
           return pans.find((p) => p.id === id) || null;
@@ -2802,7 +2803,7 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     // --- barre collante de l'essentiel
     let w4 = faux(["om"], []); w4.actions = [1, 2, 3];
     const bar = { classes: {}, innerHTML: "", style: {} };
-    bar.classList = { toggle: (c, on) => { bar.classes[c] = !!on; }, remove: (c) => { bar.classes[c] = false; } };
+    bar.classList = { toggle: (c, on) => { bar.classes[c] = !!on; }, remove: (c) => { bar.classes[c] = false; }, contains: (c) => !!bar.classes[c] };
     w4.doc.getElementById = (id) => (id === "miniEss" ? bar : (id === "tabbar" || id === "secnav" ? { offsetHeight: 40 } : null));
     w4.doc.body = { classList: { contains: () => false } };
     monter(w4, TOUT).renderMiniEss();
@@ -2995,6 +2996,49 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     verifie("Argent : elles partent de la projection de FIN de mois, pas du cumul à ce jour",
       lignes.length === 2 && lignes.every((l) => /projNetMois\(\)/.test(l) && !/caNetMois\(\)\+/.test(l)), lignes.join(" | "));
   }
+}
+
+// ================= SAUTER VERS UN PANNEAU REPLIÉ DANS UNE SECTION REPLIÉE (25/09)
+// `a() || b()` court-circuite : dès que la section était dépliée, le panneau, lui,
+// restait fermé. La page défilait jusqu'à un TITRE NU, sans un mot. C'est le chemin
+// de « 💸 Payer » dans la file d'actions, de la recherche et du lien ?go=.
+{
+  const i0 = src.indexOf("function scrollToPanel(el){");
+  const i1 = i0 >= 0 ? src.indexOf("\ndocument.addEventListener", i0) : -1;
+  const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+  verifie("Saut : scrollToPanel est trouvée", corps.length > 0, "introuvable");
+  if (corps) {
+    const essai = (catRepliee, panRepliee) => {
+      const appels = { cat: 0, pan: 0, scroll: 0 };
+      const el = { id: "paie", scrollIntoView: () => { appels.scroll++; } };
+      const f = new Function("accueilLegerActif", "toutVoir", "expandCatOf", "deplierPanneau", "setTimeout",
+        corps + "\nreturn scrollToPanel;")(
+        () => false, () => {},
+        () => { appels.cat++; return catRepliee; },
+        () => { appels.pan++; return panRepliee; },
+        (fn) => fn());
+      f(el);
+      return appels;
+    };
+    const a = essai(true, true);
+    verifie("Saut : section repliée ET panneau replié -> les DEUX sont dépliés",
+      a.cat === 1 && a.pan === 1 && a.scroll === 1, JSON.stringify(a));
+    const b = essai(false, true);
+    verifie("Saut : panneau replié seul -> il est déplié", b.pan === 1 && b.scroll === 1, JSON.stringify(b));
+    const c = essai(true, false);
+    verifie("Saut : section repliée seule -> elle est dépliée", c.cat === 1 && c.scroll === 1, JSON.stringify(c));
+  }
+  // Le libellé des boutons de section doit être recalculé quand la page redessine,
+  // pas seulement au démarrage (au démarrage, tous les panneaux sont encore vides).
+  const iA = src.indexOf("function appliqueCategories(){");
+  const corpsA = iA >= 0 ? src.slice(iA, iA + 900) : "";
+  verifie("Saut : les boutons « replier » sont remis à jour à chaque redessin",
+    /majBoutonsSection\(\)/.test(corpsA), "appelé seulement au démarrage");
+  // Un panneau replié ET sans données ne compte plus comme visible.
+  const iP = src.indexOf("function panneauxDeSection(idx){");
+  const corpsP = iP >= 0 ? src.slice(iP, src.indexOf("}", src.indexOf("return [...b.querySelectorAll", iP)) + 1) : "";
+  verifie("Saut : « replié = visible » a bien été retiré (il mentait sur un panneau vide)",
+    corpsP.length > 0 && !/contains\("pb-replie"\)\s*\)\s*return true/.test(corpsP), corpsP.slice(0, 200));
 }
 
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

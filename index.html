@@ -300,11 +300,16 @@
     border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
   .sec-chip:hover{color:var(--text);border-color:var(--acc-line);background:var(--acc-bg)}
   /* les panneaux s'arrêtent SOUS les barres collantes quand on saute vers eux */
-  .panel-box[id],.costs,.tgrev,.todo,.journal,.antileak,#sections,#om{scroll-margin-top:64px}
+  /* ⚠️ (25/09) 64 px était la hauteur de la pile collante AVANT la barre de
+     l'essentiel. Avec elle, la pile descend à ~90 px : le haut du panneau visé
+     passait DERRIÈRE la barre, et un doigt posé là tapait la barre — qui renvoie
+     tout en haut. `--stickH` est mesuré par `placerMiniEss()`, donc ça reste juste
+     quel que soit l'état (onglets ouverts, barre affichée ou non). */
+  .panel-box[id],.costs,.tgrev,.todo,.journal,.antileak,#sections,#om{scroll-margin-top:calc(var(--stickH,64px) + 10px)}
   /* deux barres empilées = il faut s'arrêter plus bas, sinon le saut atterrit
      derrière elles et on croit que le clic n'a rien fait */
   body.has-tabs .panel-box[id],body.has-tabs .costs,body.has-tabs .tgrev,body.has-tabs .todo,
-  body.has-tabs .journal,body.has-tabs .antileak,body.has-tabs #sections,body.has-tabs #om{scroll-margin-top:118px}
+  body.has-tabs .journal,body.has-tabs .antileak,body.has-tabs #sections,body.has-tabs #om{scroll-margin-top:calc(var(--stickH,118px) + 10px)}
   /* 📅 CA brut par jour */
   .cj-wrap{display:flex;align-items:flex-end;gap:3px;height:132px;margin-top:10px}
   .cj-bar{flex:1;min-width:0;background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));
@@ -934,7 +939,11 @@
   .liste-max{max-height:min(440px,60vh);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
   .liste-max::-webkit-scrollbar{width:8px}
   .liste-max::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-  @media (max-width:640px){ .liste-max{max-height:70vh} }
+  /* 📱 (25/09) 70 vh, c'était les trois quarts de l'écran : arrivé au bout de la
+     liste, `overscroll-behavior:contain` empêchait la page de reprendre le
+     défilement — André glissait, plus rien ne bougeait. Plus courte, et on rend
+     la main à la page en bout de liste. */
+  @media (max-width:640px){ .liste-max{max-height:45vh;overscroll-behavior-y:auto} }
   #cal>.pb-head::after{content:""}
   .pb-sub{font-size:12px;line-height:1.5;color:var(--muted);margin:-6px 0 12px}
   .pc-cahier{display:inline-flex;align-items:center;margin-left:7px;font-size:10.5px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;padding:1px 6px;white-space:nowrap}
@@ -1794,6 +1803,9 @@
   .sec-head .t{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .sec-fold{background:none;border:0;color:var(--faint);font:inherit;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px}
   .sec-fold:hover{background:var(--surface-2);color:var(--text)}
+  /* 📱 21 px de haut à côté d'un en-tête cliquable : un doigt qui manque de 5 px
+     repliait la CATÉGORIE entière. */
+  @media (max-width:640px){ .sec-fold{min-height:38px;padding:9px 10px;font-size:12px} }
   .sec-head.pin .t{color:var(--gold)}
   .sec-head .rule{flex:1;height:1px;background:var(--line)}
   /* Catégories physiques repliables — [data-cat-idx] cible SEULEMENT mes 8
@@ -2330,6 +2342,9 @@
     <div id="omBody"></div>
   </div>
     <div class="panel-box" id="notejour" style="display:none">
+      <!-- ⚠️ (25/09) Seul panneau sans `.pb-head` : une fois la section repliée, il
+           devenait une boîte grise VIDE, sans titre à taper pour la rouvrir. -->
+      <div class="pb-head">📋 Note du jour</div>
       <div id="notejourBody"></div>
     </div>
     <div class="panel-box" id="cash" style="display:none">
@@ -7466,6 +7481,12 @@ function fixPairs(){
 // Les deux noms sont conservés (ils sont appelés à plein d'endroits) mais
 // pointent désormais sur la même logique, donc elles ne peuvent plus diverger.
 function appliqueCategories(){
+  // ⚠️ (25/09) Les boutons « replier » d'une section étaient calculés UNE fois au
+  // démarrage, quand tous les panneaux sont encore vides et masqués : le libellé
+  // mentait (« rouvrir » alors que tout était ouvert) et le bouton restait caché sur
+  // des sections qui, deux secondes plus tard, portaient dix panneaux. On les remet à
+  // jour ici, c'est-à-dire à chaque fois que la page redessine ses sections.
+  try{ majBoutonsSection(); }catch(e){}
   const replies=catCollapsedSet();
   SECNAV_CATS.forEach((_,idx)=>{
     const h=document.getElementById("catHead"+idx), b=document.getElementById("catBody"+idx);
@@ -7576,7 +7597,12 @@ function toutVoir(){
 }
 function scrollToPanel(el){
   const leger=accueilLegerActif(); if(leger) toutVoir();
-  const deplie = expandCatOf(el) || deplierPanneau(el) || leger;
+  // ⚠️ (25/09) `a() || b()` COURT-CIRCUITE : quand la section venait d'être dépliée,
+  // `deplierPanneau` n'était jamais appelé et le panneau restait fermé. André cliquait
+  // « Payer » dans la file d'actions, la page défilait jusqu'à un TITRE NU, rien
+  // dessous, aucun message. On appelle les deux, puis on combine.
+  const _cat = expandCatOf(el), _pan = deplierPanneau(el);
+  const deplie = _cat || _pan || leger;
   const go = ()=>el.scrollIntoView({behavior:"smooth",block:"start"});
   deplie ? setTimeout(go,50) : go();
 }
@@ -7598,7 +7624,12 @@ function panneauxDeSection(idx){
   const b=document.getElementById("catBody"+idx); if(!b) return [];
   return [...b.querySelectorAll(".panel-box[id]")].filter(p=>{
     if(p.classList.contains("user-hidden")) return false;
-    if(p.classList.contains("pb-replie")) return true;          // replié = visible, juste fermé
+    // ⚠️ (25/09) Il y avait ici un « replié = visible » qui rendait `true` sans
+    // regarder le display : un panneau à la fois REPLIÉ et SANS DONNÉES (le semis de
+    // départ replie 5 panneaux, qu'ils aient des données ou non) comptait alors comme
+    // visible. Le bouton affichait « rouvrir », le clic ne changeait RIEN à l'écran, et
+    // le libellé rebasculait — deux fois de suite, ça se lit comme un bouton cassé.
+    // Le repli ne touche jamais au display du panneau : ce test suffit seul.
     try{ return getComputedStyle(p).display!=="none"; }catch(e){ return true; }
   });
 }
@@ -12899,8 +12930,10 @@ function jumpPanel(id){
   // Sort de l'accueil léger puis déplie la catégorie si besoin (sinon le clic
   // viserait un panneau masqué et semblerait mort).
   const leger=(typeof accueilLegerActif==="function")&&accueilLegerActif(); if(leger) toutVoir();
-  const deplie = ((typeof expandCatOf==="function") ? expandCatOf(el) : false)
-    || ((typeof deplierPanneau==="function") ? deplierPanneau(el) : false) || leger;
+  // Même piège du court-circuit que dans scrollToPanel : on appelle les deux.
+  const _cat2 = (typeof expandCatOf==="function") ? expandCatOf(el) : false;
+  const _pan2 = (typeof deplierPanneau==="function") ? deplierPanneau(el) : false;
+  const deplie = _cat2 || _pan2 || leger;
   // Toujours invisible après dépliage = panneau masqué par l'opérateur (⚙️ 🧩)
   // ou vide. On le DIT au lieu de laisser croire à un bouton cassé.
   if(!deplie && el.getClientRects().length===0){
@@ -13060,6 +13093,10 @@ function placerMiniEss(){
   const hT=(document.body.classList.contains("has-tabs")&&tb&&tb.offsetHeight)||0;
   const hS=(sn&&sn.offsetHeight)||0;
   bar.style.top="calc(env(safe-area-inset-top,0px) + "+(hT+hS)+"px)";
+  // Hauteur RÉELLE de la pile collante, pour que les sauts ne posent pas le haut
+  // d'un panneau derrière elle (cf. `scroll-margin-top` plus haut).
+  const hB=(bar.classList.contains("on")?(bar.offsetHeight||0):0);
+  try{ document.documentElement.style.setProperty("--stickH",(hT+hS+hB)+"px"); }catch(e){}
 }
 function renderMiniEss(){
   const bar=document.getElementById("miniEss"); if(!bar) return;
