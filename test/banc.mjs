@@ -3041,4 +3041,99 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     corpsP.length > 0 && !/contains\("pb-replie"\)\s*\)\s*return true/.test(corpsP), corpsP.slice(0, 200));
 }
 
+// ================= QUAND ÇA RATE, L'ÉCRAN DOIT LE DIRE (25/09)
+// Revue d'honnêteté : tout ce qui, en cas de panne ou de saisie refusée, laissait
+// André devant un chiffre, un bouton ou une liste qui ne disait rien.
+{
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // --- La tuile n°1 de l'accueil quand Telegram est muet
+  {
+    const i0 = src.indexOf("function essTuilesCatalogue(){");
+    const i1 = i0 >= 0 ? src.indexOf("const ESS_TUILES_DEFAUT", i0) : -1;
+    const corps = (i0 >= 0 && i1 > i0) ? src.slice(i0, i1) : "";
+    verifie("Honnêteté : le catalogue des tuiles est trouvé", corps.length > 0, "introuvable");
+    if (corps) {
+      const tuiles = (tgSur) => new Function("OM_DATA", "revKo", "netRate", "HIDE", "tgMonthTotal", "CASH_DATA",
+        "LAST", "ONLYCHAT_DATA", "moneyPrecis", "tgMoney", "tgIncertain", "fmtInt",
+        corps + "\nreturn essTuilesCatalogue();")(
+        { totals: { netMonth: 10000, subsDay: 15 }, currency: "$" }, () => false, () => 0.8, false,
+        () => (tgSur ? 1000 : 0), { apresPaie: 500 }, {}, (tgSur ? { totalRevenue: 1000 } : null),
+        (v) => Math.round(v) + " $", (v) => v + " $", () => !tgSur, (n) => String(n))
+        .reduce((o, x) => (o[x.k] = x, o), {});
+      const sur = tuiles(true), muet = tuiles(false);
+      verifie("Honnêteté : Telegram lu -> la tuile « Net du mois » est nette et marquée à jour",
+        sur.netmois.ok === true && !/au moins/.test(sur.netmois.v), JSON.stringify(sur.netmois));
+      verifie("Honnêteté : Telegram MUET -> la tuile dit « au moins » et porte son ⏳",
+        muet.netmois.ok === false && /^au moins /.test(muet.netmois.v), JSON.stringify(muet.netmois));
+      verifie("Honnêteté : arriéré non lu -> « au plus » sur le reste après la paie",
+        (new Function("OM_DATA", "revKo", "netRate", "HIDE", "tgMonthTotal", "CASH_DATA", "LAST", "ONLYCHAT_DATA",
+          "moneyPrecis", "tgMoney", "tgIncertain", "fmtInt", corps + "\nreturn essTuilesCatalogue();")(
+          { totals: { netMonth: 10000 }, currency: "$" }, () => false, () => 0.8, false, () => 1000,
+          { apresPaie: 500, retardIndispo: true }, {}, { totalRevenue: 1000 },
+          (v) => Math.round(v) + " $", (v) => v + " $", () => false, (n) => String(n))
+          .find((x) => x.k === "apres") || {}).v === "au plus ~500 $", "");
+    }
+  }
+
+  // --- Les messages ne se recouvrent plus, et ne parlent plus anglais
+  {
+    const i0 = src.indexOf("function toast(title, body){");
+    const iFin = i0 >= 0 ? src.indexOf("t.onclick=kill; }", i0) : -1;
+    const corps = (i0 >= 0 && iFin > i0) ? src.slice(i0, iFin + 17) : "";
+    verifie("Honnêteté : toast() est trouvée", corps.length > 0, "introuvable");
+    if (corps) {
+      const vivants = [];
+      const doc = {
+        createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, set innerHTML(v) { this._h = v; }, remove() {} }),
+        body: { appendChild: (x) => vivants.push(x) },
+        querySelectorAll: () => vivants,
+      };
+      const f = new Function("document", "escapeHtml", "requestAnimationFrame", "setTimeout",
+        corps + "\nreturn toast;")(doc, esc, () => {}, () => {});
+      f("un", "premier"); f("deux", "second"); f("trois", "");
+      verifie("Honnêteté : trois messages à la suite ne s'écrasent plus (ils s'empilent)",
+        vivants.length === 3 && vivants[1].style.bottom && vivants[2].style.bottom
+        && vivants[1].style.bottom !== vivants[2].style.bottom, JSON.stringify(vivants.map((x) => x.style.bottom)));
+    }
+    const i2 = src.indexOf("function envoiServeur(chemin, corps, libelle){");
+    const i3 = i2 >= 0 ? src.indexOf("\n// ", i2) : -1;
+    const env = (i2 >= 0 && i3 > i2) ? src.slice(i2, i3) : "";
+    if (env) {
+      const dits = [];
+      const f = new Function("fetch", "HUB_BASE", "TOKEN", "toast",
+        env + "\nreturn envoiServeur;")(
+        () => Promise.reject(new Error("Failed to fetch")), "http://x", "jeton",
+        (a, b) => dits.push(a + " | " + b));
+      await f("/api/hub/x", {}, "Objectif");
+      verifie("Honnêteté : une panne réseau ne montre plus « Failed to fetch » à l'écran",
+        dits.length === 1 && !/Failed to fetch/.test(dits[0]) && /pas de réseau|n'a pas répondu/.test(dits[0]), dits.join());
+    }
+  }
+}
+
+// La suite (branchements) est vérifiée sur le texte de la page : ce sont des
+// endroits où il n'y a qu'une ligne à poser, et où l'oublier ne se voit pas.
+{
+  verifie("Honnêteté : la facture Railway passe par la règle des montants (« 27,50 » refusé, pas ignoré)",
+    /lireMontant\(\(\(\$\("#rwBill"\)\|\|\{\}\)\.value\)\|\|""/.test(src), "parseFloat encore en place");
+  verifie("Honnêteté : la facture Railway est relue en boucle (une panne au démarrage ne l'éteint plus)",
+    /"loadProxy","loadCrons","loadRailway"/.test(src), "loadRailway hors des boucles");
+  verifie("Honnêteté : le partage entre associés dit quand une sortie n'a pas pu être lue",
+    /_sortiesNote/.test(src) && src.indexOf("_sortiesNote}") < src.indexOf("_caisseNote}"), "note absente");
+  verifie("Honnêteté : « 🔄 Actualiser » dit quand le serveur n'a pas répondu",
+    /Actualisation impossible/.test(src), "échec encore muet");
+  verifie("Honnêteté : un bouton d'en-tête ouvre son panneau avant d'agir",
+    /function ouvrirPanneauDe\(el\)/.test(src) && (src.match(/ouvrirPanneauDe\(/g) || []).length >= 3, "helper absent");
+  verifie("Honnêteté : le texte de paie copié porte le « + ? » quand une paie manque",
+    /const _inc = vas\.filter\(v=>v && v\.pay==null\)/.test(src) && /non calculée/.test(src), "total nu");
+  const orphelins = ["crons", "relancer", "vaarchives", "echeances"];
+  const iS = src.indexOf("const SECNAV_CATS=["), iF = src.indexOf("const SECNAV_CATS_DEFAUT");
+  const nav = src.slice(iS, iF), pan = src.slice(src.indexOf("const PANNEAUX=["), src.indexOf("const PANNEAUX=[") + 3000);
+  verifie("Honnêteté : les 4 panneaux orphelins sont enfin dans la navigation",
+    orphelins.every((id) => nav.includes('["' + id + '"')), orphelins.filter((id) => !nav.includes('["' + id + '"')).join());
+  verifie("Honnêteté : … et dans le sélecteur 🧩 (on peut les masquer et les ranger)",
+    orphelins.every((id) => pan.includes('["' + id + '"')), orphelins.filter((id) => !pan.includes('["' + id + '"')).join());
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);

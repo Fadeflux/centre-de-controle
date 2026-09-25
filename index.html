@@ -92,7 +92,7 @@
      même colonne à TOUTES les largeurs ; le bloc grand écran ne fait plus que
      la positionner. */
   #sidebar{display:flex;flex-direction:column;gap:16px}
-  #sidebar > .panel-box, #sidebar > .tkbox{margin:0!important}
+  #sidebar > .panel-box{margin:0!important}
   @media (min-width:1180px){
     /* Largeur FLUIDE : 1340px fixes laissaient d'énormes bandes vides sur les
        grands écrans (« trop de vide sur les côtés »). On suit l'écran, plafonné
@@ -4517,7 +4517,7 @@ function envoiServeur(chemin, corps, libelle){
       const maintenant=Date.now();
       if(typeof toast==="function" && (!dejaDit[libelle] || maintenant-dejaDit[libelle]>60000)){
         dejaDit[libelle]=maintenant;
-        toast("⚠️ "+libelle+" : NON enregistré sur le serveur","Gardé sur cet appareil seulement ("+((e&&e.message)||"réseau")+"). Tes autres écrans ne le verront pas — réessaie plus tard.");
+        toast("⚠️ "+libelle+" : NON enregistré sur le serveur","Gardé sur cet appareil seulement ("+((typeof navigator!=="undefined" && navigator.onLine===false) ? "pas de réseau" : (/^HTTP /.test(String((e&&e.message)||"")) ? ("le cerveau a répondu "+String(e.message).slice(5)) : "le serveur n'a pas répondu"))+"). Tes autres écrans ne le verront pas — réessaie plus tard.");
       }
       return false;
     });
@@ -4537,15 +4537,20 @@ async function saveOnlyChatGoal(g){
   ONLYCHAT_GOAL=Math.max(0,Math.round(Number(g)||0));
   localStorage.setItem("ccn_onlychat_goal",String(ONLYCHAT_GOAL));
   renderOnlyChat();
-  if(TOKEN){ await envoiServeur("/api/hub/onlychat-goal",{goal:ONLYCHAT_GOAL},"Objectif Telegram"); }
+  if(TOKEN){ return await envoiServeur("/api/hub/onlychat-goal",{goal:ONLYCHAT_GOAL},"Objectif Telegram"); }
+  return true;
 }
 { const b=$("#ocGoalEdit"); if(b) b.onclick=()=>{
     const cur=ONLYCHAT_GOAL>0?String(ONLYCHAT_GOAL):"";
     const v=prompt("Ton objectif de revenu Telegram pour le mois, en $ ?\n\nLaisse VIDE pour retirer l'objectif.",cur);
     if(v===null) return;
     const s=String(v).replace(/[^0-9]/g,"");
-    saveOnlyChatGoal(s===""?0:parseInt(s,10));
-    if(typeof toast==="function") toast("🎯 Objectif Telegram", s===""?"Objectif retiré.":"Objectif fixé.");
+    // ⚠️ (25/09) Le vert s'affichait AVANT la réponse du serveur : on lisait
+    // « Objectif fixé » puis, une seconde plus tard, « NON enregistré ».
+    saveOnlyChatGoal(s===""?0:parseInt(s,10)).then(function(ok){
+      if(ok===false) return;                       // envoiServeur a déjà dit l'échec
+      if(typeof toast==="function") toast("🎯 Objectif Telegram", s===""?"Objectif retiré.":"Objectif fixé.");
+    });
   };
 }
 
@@ -4800,8 +4805,17 @@ document.addEventListener("click",e=>{
 });
 { const b=$("#ocrRefresh"); if(b) b.onclick=async()=>{
   if(!TOKEN) return;
+  try{ ouvrirPanneauDe(b); }catch(e){}       // sinon la liste se rafraîchit derrière un panneau fermé
   b.disabled=true; b.textContent="⏳";
-  try{ await fetch(HUB_BASE+"/api/hub/onlychat-relance/refresh",{method:"POST",headers:{"x-hub-token":TOKEN}}); }catch(e){}
+  // ⚠️ Le `catch` était VIDE : que le serveur accepte, refuse ou soit injoignable,
+  // l'écran était le même (⏳ 15 s, puis le bouton revient). On croyait la liste à jour.
+  let _ok=true;
+  try{ const _r=await fetch(HUB_BASE+"/api/hub/onlychat-relance/refresh",{method:"POST",headers:{"x-hub-token":TOKEN}}); _ok=!!(_r&&_r.ok); }catch(e){ _ok=false; }
+  if(!_ok){
+    b.disabled=false; b.textContent="🔄 Actualiser";
+    if(typeof toast==="function") toast("⚠️ Actualisation impossible","Le serveur n'a pas répondu — la liste affichée date d'avant.");
+    return;
+  }
   setTimeout(async()=>{ await loadOcRelance(); b.disabled=false; b.textContent="🔄 Actualiser"; }, 15000);
 }; }
 
@@ -5532,7 +5546,6 @@ function renderPaie(data){
     // 1 000 $ de réel — un facteur QUINZE sur une ligne de trésorerie. Même
     // mécanique le 1er entre 00 h et 01 h. `jourServeur()` existe pour ça et
     // `curPeriod()` l'utilise déjà pour le cahier de paie.
-    const jS=(typeof jourServeur==="function")?jourServeur():"";
     const d=(typeof jourDuMoisServeur==="function")?jourDuMoisServeur():new Date().getDate();
     const dansA=(d<=15), joursEcoules=dansA?d:(d-15);
     const finMois=(typeof joursDuMoisServeur==="function")?joursDuMoisServeur():new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
@@ -5587,7 +5600,12 @@ $("#paieBody").addEventListener("click",e=>{
 $("#paieCopy").onclick = ()=>{
   const vas = ((LAST["stats-tracker"]||{}).vas)||[]; if(!vas.length) return;
   // Texte destiné à être COLLÉ (à un VA, dans un message) → jamais masqué.
-  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${v.pay==null?"— (paie inconnue)":moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}`;
+  // ⚠️ (25/09) Le TOTAL était un nombre nu, alors que l'écran affiche « X $ + ? »
+  // quand une paie n'a pas pu être calculée, avec une note jaune qui dit « ce n'est pas
+  // zéro, c'est un trou ». Collé dans un message à un VA, ce total se lisait comme le
+  // montant complet.
+  const _inc = vas.filter(v=>v && v.pay==null).length;
+  const txt = "💰 Paie de la quinzaine\n" + vas.map(v=>`${v.va} : ${v.subs} subs → ${v.pay==null?"— (paie inconnue)":moneyClair(v.pay)}`).join("\n") + `\nTOTAL : ${moneyClair(vas.reduce((a,v)=>a+(Number(v.pay)||0),0))}${_inc?` + ? (${_inc} paie${_inc>1?"s":""} non calculée${_inc>1?"s":""})`:""}`;
   (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{ $("#paieCopy").textContent="✓ Copié"; setTimeout(()=>$("#paieCopy").textContent="📋 Copier",1500); }).catch(()=>{});
 };
 // 📤 Export compta : l'HISTORIQUE des paiements versés (PAYMENTS, la même
@@ -7534,6 +7552,15 @@ function deplierPanneau(el){
   if(!p||!p.id) return false;
   const s=panReplieSet(); if(!s.has(p.id)) return false;
   s.delete(p.id); panReplieEcrire(s); applyPanReplie(); return true;
+}
+// ⚠️ (25/09) Un bouton posé DANS le titre reste cliquable quand le panneau est
+// replié (le repli ne cache que le corps) : « 🔄 Actualiser » tournait 15 s et écrivait
+// dans une liste invisible, la dictée du bloc-notes remplissait un champ caché — André
+// croyait avoir perdu son texte. Tout bouton d'en-tête ouvre donc son panneau d'abord.
+// `ocrelance` fait partie des panneaux repliés à la première ouverture : ça arrive sur
+// tout téléphone neuf.
+function ouvrirPanneauDe(el){
+  try{ const p=el&&el.closest?el.closest(".panel-box[id]"):null; if(p) deplierPanneau(p); }catch(e){}
 }
 document.addEventListener("click",e=>{
   const h=e.target.closest(".pb-head"); if(!h) return;
@@ -10131,7 +10158,6 @@ function saveTaxRate(v, silencieux){
 // annonce alors un « reste » trop élevé, sans rien signaler. Même verrou de
 // lecture que les autres listes (RULES / COSTS / REMINDERS / TODOS / RÔLES).
 let SPLIT_LOADED=false, SPLIT_DIRTY=false;
-function splitMoisCle(){ return ((typeof jourServeur==="function")?jourServeur():new Date().toISOString()).slice(0,7); }
 function splitRetraitsLocaux(){
   // Les retraits vivaient en une clé localStorage PAR MOIS : on les rassemble.
   const out={};
@@ -10270,7 +10296,17 @@ function renderSplit(){
         <div style="margin-top:4px;opacity:.75">Ce chiffre ne compte QUE la trésorerie OnlyFans moins la paie à venir : ni ton argent Telegram, ni tes abonnements à payer. À recouper avant de conclure.</div></div>`;
     return "";
   })();
+  // ⚠️ (25/09) Le compte de résultat DIT quand les primes ou la facture Railway n'ont
+  // pas pu être lues ; ce panneau-ci, qui décide de ce que chacun retire, comptait ces
+  // sorties comme ZÉRO sans un mot — donc un profit trop haut, partagé en deux.
+  const _sorties=[];
+  if((typeof primesVerseesCeMois==="function") && primesVerseesCeMois()===null) _sorties.push("les primes et parts versées");
+  if((typeof coutRailwayMois==="function") && coutRailwayMois()===null) _sorties.push("la facture Railway");
+  const _sortiesNote=_sorties.length
+    ? `<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ <b>${_sorties.join(" et ")}</b> n'${_sorties.length>1?"ont":"a"} pas pu être lu${_sorties.length>1?"es":"e"} : ${_sorties.length>1?"elles ne sont pas déduites":"elle n'est pas déduite"} du profit ci-dessous, qui est donc <b>trop haut</b>. Attends la prochaine lecture avant de retirer.</div>`
+    : "";
   $("#splitBody").innerHTML=`
+    ${_sortiesNote}
     ${_caisseNote}
     ${(typeof tgBandeau==="function")?tgBandeau():""}
     ${(typeof OM_DATA!=="undefined"&&OM_DATA&&OM_DATA.revenusPartiels)?`<div class="sv-note" style="border-left:3px solid #facc15;margin-bottom:8px">⚠️ Chiffres <b>incomplets</b> (une source ne répond pas) : le profit réparti ci-dessous est un <b>minimum</b>.</div>`:""}
@@ -11365,7 +11401,6 @@ async function loadBrief(force){
     // 🎯 On envoie AUSSI le CA net du mois (+ Telegram) et la prévision nette, pour
     // que la « cible du jour » du coach soit sur la MÊME échelle que l'objectif net.
     // Sinon le serveur comparait l'objectif net à un cumul BRUT → cible fausse.
-    const _fgN=(OM_DATA&&OM_DATA.forecast&&OM_DATA.forecast.net&&OM_DATA.forecast.net.method==="smart")?OM_DATA.forecast.net:null;
     const curNet=(typeof caNetMois==="function")?Math.round(caNetMois()):null;
     // ⚠️ Consommateur OUBLIÉ de l'unification des projections : celui-ci
     // reconstruisait la formule à la main avec le Telegram DÉJÀ ENCAISSÉ, pendant
@@ -11886,7 +11921,17 @@ function renderRailway(){
   try{ fixPairs(); }catch(e){}   // la visibilite du panneau vient de changer
   const b=$("#rwBillSave");
   if(b) b.onclick=async()=>{
-    const val=parseFloat(($("#rwBill")||{}).value); if(!(val>=0)) return;
+    // ⚠️ (25/09) SEULE SAISIE D'ARGENT DE LA PAGE QUI NE PASSAIT PAS PAR `lireMontant`.
+    // Taper « 27,50 » au clavier français dans un `input[type=number]` donne une valeur
+    // VIDE : `parseFloat` rendait NaN et on sortait SANS UN MOT — le bouton semblait mort,
+    // et le compte de résultat continuait d'annoncer « facture non saisie, ton profit est
+    // trop haut ». Pire, « 1.500 » passait pour 1,50 $ : l'avertissement disparaissait et
+    // le profit (donc le partage entre associés) restait faux de ~1 498 $.
+    const _rvB=(typeof lireMontant==="function")
+      ? lireMontant((($("#rwBill")||{}).value)||"",{min:0,max:1000000,signeAutorise:false})
+      : {ok:true, valeur:parseFloat((($("#rwBill")||{}).value))};
+    if(!_rvB.ok){ if(typeof toast==="function") toast("⚠️ Facture NON enregistrée",String(_rvB.erreur||"Montant illisible.").replace(/\*\*/g,"")); return; }
+    const val=Number(_rvB.valeur); if(!(val>=0)) return;
     b.disabled=true; b.textContent="⏳";
     try{
       // ⚠️ `fetch` NE REJETTE PAS sur 401 / 403 / 500 : la réponse arrive, elle
@@ -13064,7 +13109,12 @@ function essTuilesCatalogue(){
   return [
     // moneyPrecis (2 décimales) : la somme OF (arrondi × 0,78) + Telegram (exact)
     // doit rester lisible telle quelle, pas ré-arrondie une 2e fois.
-    {k:"netmois", src:"om", ok:dispo.om, l:"Net du mois (est.)", v:(ko||!om||tot.netMonth==null)?"—":moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$")},
+    // ⚠️ (25/09) Telegram muet -> `tgM` vaut 0 et la tuile affichait un total AMPUTÉ
+    // sous le badge vert « à jour ». C'est la tuile n°1 par défaut. On la marque (⏳) et
+    // on écrit « au moins », comme le bandeau rouge des panneaux plus bas.
+    {k:"netmois", src:"om", ok:dispo.om && !((typeof tgIncertain==="function")&&tgIncertain()),
+     l:"Net du mois (est.)",
+     v:(ko||!om||tot.netMonth==null)?"—":(((typeof tgIncertain==="function")&&tgIncertain()?"au moins ":"")+moneyPrecis((Number(tot.netMonth)||0)*NET+tgM,(om&&om.currency)||"$"))},
     {k:"subsauj", src:"om", ok:dispo.om, l:"Subs aujourd'hui",   v:(tot.subsDay!=null)?String(tot.subsDay):"—"},
     // ⚠️ Arriéré non lu : `apresPaie` est un MAXIMUM (l'arriéré y compte pour zéro).
     // On l'écrit « au plus », et la tuile porte son ⏳ : un chiffre trop haut sous un
@@ -14447,6 +14497,18 @@ async function loadSanteComptes(){
     SANTEC_DATA=(await r.json()).data||null; renderSanteComptes(); try{renderNoteJour();}catch(e){}
   }catch(e){}
 }
+// ⚠️ (25/09) Ces listes annonçaient leur vrai nombre dans le titre puis n'en
+// montraient que 12 (ou 10) : les lignes suivantes étaient DÉFINITIVEMENT hors de
+// portée — alors qu'elles portent le bouton « Sortir des stats », qui retire les reels
+// d'un compte des chiffres d'un VA, donc de sa paie. Un compte suspect en 11e position
+// ne pouvait jamais être traité. Même remède que l'entonnoir : N en tête, le reste à un
+// clic, et on dit combien il y en a.
+function _replierAu(liste, n, quoi, ligne){
+  const l=Array.isArray(liste)?liste:[];
+  const tete=l.slice(0,n).map(ligne).join("");
+  if(l.length<=n) return tete;
+  return tete+`<details class="ent-plus"><summary>Voir les ${fmtInt(l.length-n)} autres ${escapeHtml(quoi)}</summary><div class="liste-max">${l.slice(n).map(ligne).join("")}</div></details>`;
+}
 function renderSanteComptes(){
   const p=$("#santecomptes"); if(!p) return;
   const d=SANTEC_DATA;
@@ -14458,14 +14520,14 @@ function renderSanteComptes(){
   let html="";
   if(ete&&ete.length){
     html+=`<div class="sv-head">📉 Comptes en train de s'éteindre — ${ete.length}</div>`
-      +ete.slice(0,12).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
+      +_replierAu(ete,12,"comptes en train de s'éteindre",(x)=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
         +`<span class="sv-cell"><b>${fmtInt(x.avant)}</b> → <b>${fmtInt(x.maintenant)}</b> vues/post <span style="opacity:.6">(${x.postsRecents} posts récents)</span></span>`
-        +`<span class="sv-part bad">${String(x.pct).replace(".",",")} %</span></div>`).join("")
+        +`<span class="sv-part bad">${String(x.pct).replace(".",",")} %</span></div>`)
       +`<div class="sv-note">Chaque compte est comparé <b>à lui-même</b> : ses 5 derniers jours contre ses 15 jours d'avant. Sous 30 % de son propre niveau, chaque post dessus est probablement du travail perdu — à reposer ou remplacer. Tu reçois aussi un message privé Discord chaque matin s'il y a du nouveau.</div>`;
   }
   if(sus&&sus.length){
     html+=`<div class="sv-head" style="margin-top:${ete&&ete.length?"12px":"0"}">🕵️ Comptes qui ne ressemblent pas à des comptes de VA — ${sus.length}</div>`
-      +sus.slice(0,10).map(x=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
+      +_replierAu(sus,10,"comptes à vérifier",(x)=>`<div class="sv-row"><span class="sv-name">@${escapeHtml(x.username)} <span style="opacity:.55">· ${escapeHtml(x.va||"?")}</span></span>`
         +`<span class="sv-cell"><b>${fmtInt(x.followers)}</b> followers · ${x.posts30?`<b>${x.posts30}</b> posts / ${fmtInt(x.vues30)} vues sur 30 j`:"aucun post sur 30 j"}`
         // Bouton d'écriture : jamais en vue associé (le serveur refuse de toute façon).
         +`${_assocSc?"":` <button class="mn-act-btn" data-exclure="${escapeHtml(x.username)}" style="padding:2px 8px;font-size:11px;margin-left:6px" title="Ce compte n'appartient pas au VA : ses reels trouvés par le robot ne comptent plus pour lui, et il n'est plus suivi">Sortir des stats</button>`}</span>`
@@ -14669,10 +14731,15 @@ function renderTgVa(){
     blocMem=`<div class="sv-head" style="margin-top:12px">🔎 Tes payeurs et le canal</div>`
       +`<div class="sv-row"><span class="sv-name">Dans le canal</span><span class="sv-cell"><b>${fmtInt(mem.dedans)}</b> payeur${mem.dedans>1?"s":""}</span><span class="sv-part good">${money(mem.sommeDedans)}</span></div>`
       +`<div class="sv-row"><span class="sv-name">Hors du canal</span><span class="sv-cell"><b>${fmtInt(mem.dehors)}</b> payeur${mem.dehors>1?"s":""} (partis, ou jamais entrés)</span><span class="sv-part mid">${money(mem.sommeDehors)}</span></div>`;
-    const aCh=(mem.aChercher||[]).filter(x=>x.depense>0).sort((a,b)=>b.depense-a.depense).slice(0,15);
+    // ⚠️ (25/09) Coupée à 15 sans dire combien il y en a, alors que c'est la liste
+    // qu'on PARCOURT pour attribuer de l'argent à un VA.
+    const aChTous=(mem.aChercher||[]).filter(x=>x.depense>0).sort((a,b)=>b.depense-a.depense);
+    const aCh=aChTous.slice(0,15);
     if(aCh.length){
-      blocMem+=`<div class="sv-note">👉 Ces payeurs sont <b>dans le canal</b> — cherche leur nom dans tes liens d'invitation Telegram pour savoir quel VA les a amenés :</div>`
-        +aCh.map(x=>`<div class="sv-row"><span class="sv-name">${escapeHtml(x.nom||"?")}${x.user?` <span style="opacity:.55">@${escapeHtml(x.user)}</span>`:""}</span><span class="sv-cell">${escapeHtml(x.modele||"")}</span><span class="sv-part good">${money(x.depense)}</span></div>`).join("");
+      const _ligneP=(x)=>`<div class="sv-row"><span class="sv-name">${escapeHtml(x.nom||"?")}${x.user?` <span style="opacity:.55">@${escapeHtml(x.user)}</span>`:""}</span><span class="sv-cell">${escapeHtml(x.modele||"")}</span><span class="sv-part good">${money(x.depense)}</span></div>`;
+      blocMem+=`<div class="sv-note">👉 <b>${fmtInt(aChTous.length)}</b> payeur${aChTous.length>1?"s":""} <b>dans le canal</b> — cherche leur nom dans tes liens d'invitation Telegram pour savoir quel VA les a amenés :</div>`
+        +aCh.map(_ligneP).join("")
+        +(aChTous.length>15?`<details class="ent-plus"><summary>Voir les ${fmtInt(aChTous.length-15)} autres</summary><div class="liste-max">${aChTous.slice(15).map(_ligneP).join("")}</div></details>`:"");
     }
   }
   $("#tgvaBody").innerHTML=(rows||`<div class="sv-note">Des entrées, mais aucun lien nommé pour l'instant.</div>`)
@@ -15123,7 +15190,11 @@ document.addEventListener("click",()=>{ const a=audioCtx(); if(a&&a.state==="sus
 function playChime(){ const ac=audioCtx(); if(!ac) return; if(ac.state==="suspended") ac.resume();
   [[659.25,0],[783.99,0.15],[1046.5,0.3]].forEach(([f,t])=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const s=ac.currentTime+t; g.gain.setValueAtTime(0,s); g.gain.linearRampToValueAtTime(0.5,s+0.02); g.gain.exponentialRampToValueAtTime(0.001,s+0.45); o.start(s); o.stop(s+0.5); });
 }
-function toast(title, body){ const t=document.createElement("div"); t.className="cc-toast"; t.innerHTML=`<b>${escapeHtml(title)}</b>${body?`<div>${escapeHtml(body)}</div>`:""}`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; setTimeout(kill,8000); t.onclick=kill; }
+// ⚠️ (25/09) Tous les messages s'affichaient AU MÊME PIXEL (bas de l'écran, 8 s
+// chacun) : un « ✅ » qui tombe après un « ⚠️ NON enregistré » le recouvrait
+// entièrement. On les empile.
+function toast(title, body){ const t=document.createElement("div"); t.className="cc-toast";
+  try{ const n=document.querySelectorAll(".cc-toast").length; if(n) t.style.bottom=(24+n*74)+"px"; }catch(e){} t.innerHTML=`<b>${escapeHtml(title)}</b>${body?`<div>${escapeHtml(body)}</div>`:""}`; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add("show")); const kill=()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),400); }; setTimeout(kill,8000); t.onclick=kill; }
 // ⚠️ LE SEUL ÉCRASEMENT QUI SE PRODUIT SANS AUCUN GESTE HUMAIN.
 // `saveReminders` renvoie la LISTE ENTIÈRE, et `tickClock` — qui tourne toutes
 // les 5 secondes — l'appelle dès qu'un rappel sonne (il note `firedDate`).
@@ -15329,7 +15400,7 @@ renderCal();
   // 🎤 Note vocale : dicte et ça s'ajoute au bloc-notes (avec la date).
   const npm=$("#npMic"); const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(npm){ if(!SR){ npm.style.display="none"; } else { let nrec=null, nlisten=false;
-    npm.onclick=()=>{ try{ primeVoices(); }catch(e){}
+    npm.onclick=()=>{ try{ primeVoices(); }catch(e){} try{ ouvrirPanneauDe(npm); }catch(e){}   // le texte dicté irait dans un champ caché
       if(nlisten){ try{ nrec.stop(); }catch(e){} return; }
       nrec=new SR(); nrec.lang="fr-FR"; nrec.interimResults=false; nrec.continuous=true; nrec.maxAlternatives=1;
       nrec.onstart=()=>{ nlisten=true; npm.classList.add("on"); npm.textContent="🔴"; };
@@ -16263,14 +16334,19 @@ const SECNAV_CATS=[
   ["💰 Argent & rentabilité",[["om","💰 Argent"],["cash","💵 Cash à venir"],["cajours","📅 CA/jour"],["quinz","⚖️ Quinzaines"],["tres","🏦 Banque"],["renta","📊 Renta"],["pie","🥧 Répartition"],["cac","🎯 Coût/abo"],["coutopp","💡 Opportunité"],["costs","🧾 Dépenses"],["objmois","🎯 Objectif"],["moisrecord","🥇 Record"],["subval","💳 Valeur abonné"],["history","📈 Mon année"],["split","🤝 Partage"],["coherence","🧮 Cohérence des chiffres"],["santecomptes","🧹 Santé des comptes"],["tgva","📲 Qui amène Telegram"],["heurespay","🕐 Heures de paiement"],["notejour","📋 Note du jour"],["iahumain","🤖 IA ou humain"],["rw","🚂 Coût Railway"]]],
   ["💬 Telegram (OnlyChat)",[["onlychat","💬 Telegram auto"],["onlychatcoach","🎓 Coaching Telegram"],["ocrelance","💸 Argent qui dort"],["tgrev","📲 Revenus Telegram"]]],
   ["💎 Fans",[["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"]]],
-  ["👥 Équipe (VA)",[["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
+  ["👥 Équipe (VA)",[["vaarchives","👥 Arrivées & archives"],["modeles","🎭 Modèles"],["vamodel","🎯 VA×modèle"],["compare","🆚 Comparer"],["versus","⚔️ Versus"],["decroche","📉 Décrochage"],["opportunites","🚀 Ça décolle"],["charge","💪 Charge"],["paie","💸 Paie"],["paiecumul","💸 Paie cumul"],["classement","🏆 Classement"],["meteo","🌤️ Météo"],["busfactor","🏖️ Absence"],["changements","📓 Changements"],["onboarding","🆕 Onboarding"],["burnout","😮‍💨 Fatigue"],["coaching","🎓 Conseils VA"],["ghosts","👻 VA fantômes"]]],
   ["📊 Analyse & tendances",[["insights","🔍 Patterns cachés"],["anomalies","📊 Anomalies"],["conv","🎯 Conversion"],["rachat","⏱️ Quand ils rachètent"],["entcomptes","🔬 Entonnoir par compte"],["sources","🔗 Sources"],["concentration","⚠️ Concentration"],["cohortes","📊 Cohortes"],["vatraj","📈 Trajectoires"],["varisque","🚪 Départs ?"],["sim","🧪 Simulateur"],["sim3","🔮 Simulateur 3 mois"],["realloc","🔀 Réorganiser"],["hours","⏰ Heures des abonnés"],["saison","📅 Saisonnalité"]]],
-  ["🧭 À faire & décisions",[["recos","🧭 À faire"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
+  ["🧭 À faire & décisions",[["recos","🧭 À faire"],["echeances","⏳ Ce qui va expirer"],["decisions","📓 Décisions"],["todo","✅ Tâches"],["journal","📔 Journal"]]],
   // ⚠️ tip/notepad/duo/ask VIVENT dans cette catégorie sur la page mais n'étaient
   // pas listés ici : injoignables depuis « Tout voir » et la recherche, et
   // l'en-tête de la catégorie disparaissait quand seuls eux étaient visibles.
   ["🏆 Motivation & suivi perso",[["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["streak","🔥 Ta série"],["tip","💡 Conseil du jour"],["notepad","📝 Bloc-notes"],["duo","🤝 Qui fait quoi"],["ask","🤖 Demande à tes chiffres"]]],
-  ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"]]],
+  // ⚠️ (25/09) crons/relancer/vaarchives/echeances s'affichaient bien, mais
+  // n'étaient dans AUCUN registre : introuvables par la recherche et par « Tout voir »,
+  // impossibles à masquer ou à ranger — exactement le défaut déjà corrigé une fois pour
+  // tip/notepad/duo/ask. Et ce sont justement ceux qu'on cherche en urgence (quel
+  // automatisme est mort, quel envoi Discord est à relancer).
+  ["🛠 Système",[["sections","🛠 Outils"],["proxy","🛰️ Proxies"],["incidents","🗂️ Incidents"],["rules","🔔 Alertes"],["antileak","🛡️ Anti-leak"],["shortcuts","⭐ Mes raccourcis"],["crons","⏱️ Automatismes"],["relancer","📤 Envois à relancer"]]],
 ];
 // 📁 « RANGER DANS… » : André choisit lui-même la catégorie de chaque panneau
 // (menu 📁 dans ⚙️ → 🧩). Une seule vérité : SECNAV_CATS est REPATCHÉE puis le
@@ -16458,7 +16534,7 @@ $("#secnav").addEventListener("click",e=>{
 refreshSecnav();
 
 /* ---------- 🧩 choisir les panneaux affichés ---------- */
-const PANNEAUX=[["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
+const PANNEAUX=[["crons","⏱️ Automatismes (chien de garde)"],["relancer","📤 Envois Discord à relancer"],["vaarchives","👥 Équipe — arrivées et archives"],["echeances","⏳ Ce qui va expirer"],["insights","🔍 Patterns cachés (IA)"],["modeles","🎭 Modèles en un coup d'œil"],["cash","💵 Cash à venir"],["cajours","📅 CA par jour"],["quinz","⚖️ Quinzaine vs précédente"],["tres","🏦 Argent sur OnlyFans"],["renta","💰 Rentabilité du mois"],["cac","🎯 Coût d'un abonné par VA"],["coutopp","💡 Ce que tu laisses sur la table"],["vamodel","🎯 Meilleure combinaison VA × modèle"],["compare","🆚 Comparaison sur mesure"],["decroche","📉 VA en décrochage"],["opportunites","🚀 VA qui décollent"],["burnout","😮‍💨 Fatigue / burnout des VA"],["coaching","🎓 Conseils à donner aux VA"],["anomalies","📊 Anomalies détectées"],["charge","💪 Charge & saturation de l'équipe"],["saison","📅 Saisonnalité"],["sim3","🔮 Simulateur 3 mois"],["streak","🔥 Ta série"],["sources","🔗 Qualité des sources"],
   ["badges","🏅 Badges"],["achievements","🏆 Accomplissements"],["rw","🚂 Coût Railway"],["proxy","🛰️ État des proxies"],["incidents","🗂️ Historique des incidents"],["rules","🔔 Mes alertes perso"],["busfactor","🏖️ Dépendance à toi"],["decisions","📓 Journal de mes décisions"],["conv","🎯 Conversion"],["subval","💳 Valeur d'un abonné"],
   ["hours","⏰ Heures des abonnés"],["sim","🧪 Simulateur"],["realloc","🔀 Réorganiser l'équipe"],["pie","🥧 Répartition"],["history","📈 Historique 6 mois"],
   ["split","🤝 Partage du profit"],["versus","⚔️ Versus"],["fanradar","💤 Fans endormis"],["vips","💎 Tes baleines"],["churn","💔 Fans partis"],["onboarding","🆕 Onboarding VA"],["ghosts","👻 VA fantômes"],
@@ -16843,8 +16919,13 @@ setInterval(function(){ if(!pageCachee()) boucleRafraichissement(); }, REFRESH_M
 function boucleLente(){
   if(AUTH_KO) return;
   if(pageCachee() || $("#gate").classList.contains("show")) return;
+  // ⚠️ (25/09) `loadRailway` n'était dans AUCUNE boucle : une lecture ratée au
+  // démarrage (redéploiement du cerveau) laissait `RW_DATA` à null jusqu'au prochain
+  // rechargement de page — et alors le panneau 🚂 se cache, le compte de résultat
+  // n'affiche même plus son avertissement « facture non saisie, profit trop haut », le
+  // partage entre associés déduit 0, et le relevé du jour n'est jamais figé.
   [ "loadTresorerie","loadCoherence","loadSanteComptes","loadCac",
-    "loadDecroche","loadConversion","loadHours","loadProxy","loadCrons" ].forEach(function(n){
+    "loadDecroche","loadConversion","loadHours","loadProxy","loadCrons","loadRailway" ].forEach(function(n){
     try{ if(typeof window[n]==="function") window[n](); }catch(e){}
   });
   // loadIncidents prend un paramètre : sans `true`, c'est une simple lecture du
