@@ -2706,10 +2706,11 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
       const ls = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
       return { pans, btns, mem, doc, ls };
     };
-    const monter = (w, morceaux) => new Function("document", "localStorage", "toast", "escapeHtml", "TOKEN", "LAST_ACTIONS", "essTuilesChoisies", "essTuilesCatalogue",
-      morceaux + "\nreturn { applyPanReplie, togglePanReplie, panReplieSet, toggleSectionPanneaux, majBoutonsSection, semerReplisDepart, renderMiniEss, panneauxDeSection };")(
+    const monter = (w, morceaux) => new Function("document", "localStorage", "toast", "escapeHtml", "TOKEN", "LAST_ACTIONS", "essTuilesChoisies", "essTuilesCatalogue", "getComputedStyle", "window",
+      morceaux + "\nreturn { applyPanReplie, togglePanReplie, panReplieSet, toggleSectionPanneaux, majBoutonsSection, semerReplisDepart, renderMiniEss, majMiniEss, panneauxDeSection };")(
       w.doc, w.ls, (a, b) => w.msg = a + " | " + b, esc, w.TOKEN === undefined ? "jeton" : w.TOKEN, w.actions || [], () => ["netmois", "apres"],
-      () => [{ k: "netmois", l: "Net du mois (est.)", v: "7 545 $" }, { k: "apres", l: "Ce qu'il te resterait après la paie (estimé)", v: "~1 200 $" }, { k: "tg", l: "Telegram ce mois", v: "1 003 $" }]);
+      () => [{ k: "netmois", l: "Net du mois (est.)", v: "7 545 $" }, { k: "apres", l: "Ce qu'il te resterait après la paie (estimé)", v: "~1 200 $" }, { k: "tg", l: "Telegram ce mois", v: "1 003 $" }],
+      () => ({ display: w.essCache ? "none" : "block" }), { addEventListener: () => {} });
 
     // --- « replier » d'une section entière
     let w = faux(["om", "onlychat", "tgva"], [{ idx: 2 }]);
@@ -2760,6 +2761,27 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
     w5.doc.getElementById = () => bar; bar.innerHTML = "";
     monter(w5, TOUT).renderMiniEss();
     verifie("Barre : pas connecté -> aucune barre", bar.innerHTML === "" && bar.classes["on"] === false, JSON.stringify(bar.classes));
+    // Montrer/cacher : seulement quand le bloc du haut est PASSÉ au-dessus de l'écran.
+    // (Écrit avec un écouteur de défilement : dans un onglet en arrière-plan, un
+    // IntersectionObserver ne rappelle pas — mesuré, la barre ne s'allumait jamais.)
+    let w6 = faux(["om"], []); w6.actions = [1];
+    const bar6 = { classes: {}, innerHTML: "", style: {} };
+    bar6.classList = { toggle: (c, on) => { bar6.classes[c] = !!on; }, remove: (c) => { bar6.classes[c] = false; }, contains: (c) => !!bar6.classes[c] };
+    let hautVisible = true;
+    const essFaux = { getBoundingClientRect: () => ({ bottom: hautVisible ? 300 : -120 }) };
+    w6.doc.getElementById = (id) => (id === "miniEss" ? bar6 : (id === "essentiel" ? essFaux : { offsetHeight: 40 }));
+    w6.doc.body = { classList: { contains: () => false } };
+    const api6 = monter(w6, TOUT);
+    api6.renderMiniEss();
+    verifie("Barre : en haut de page, elle reste cachée (elle répéterait le bloc juste au-dessus)", !bar6.classes["on"], JSON.stringify(bar6.classes));
+    hautVisible = false; api6.majMiniEss();
+    verifie("Barre : une fois le bloc du haut dépassé, elle apparaît", bar6.classes["on"] === true, JSON.stringify(bar6.classes));
+    hautVisible = true; api6.majMiniEss();
+    verifie("Barre : de retour en haut, elle disparaît", bar6.classes["on"] === false, JSON.stringify(bar6.classes));
+    hautVisible = false; bar6.innerHTML = ""; api6.majMiniEss();
+    verifie("Barre : rien à afficher -> pas de bandeau vide", bar6.classes["on"] === false, "bandeau vide");
+    w6.essCache = true; bar6.innerHTML = "x"; api6.majMiniEss();
+    verifie("Barre : accueil léger (bloc du haut masqué) -> pas de barre non plus", bar6.classes["on"] === false, "barre sans bloc");
   }
 }
 

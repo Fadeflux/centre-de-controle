@@ -12960,18 +12960,29 @@ function renderMiniEss(){
   bar.innerHTML=tuiles.map(x=>`<span class="me-fig"><span class="me-l">${escapeHtml(MINI_ESS_L[x.k]||x.l)}</span><span class="me-v">${escapeHtml(String(x.v))}</span></span>`).join("")
     +(nb?`<span class="me-act">🎯 ${nb} à faire</span>`:"");
   placerMiniEss();
+  try{ majMiniEss(); }catch(e){}
 }
-function brancherMiniEss(){
+// Montrer/cacher : la barre n'apparaît que lorsque le bloc du haut est PASSÉ
+// au-dessus de l'écran. ⚠️ Écrit avec un écouteur de défilement et non un
+// IntersectionObserver : dans un onglet en arrière-plan, le navigateur diffère
+// les callbacks de l'observateur (mesuré — la barre ne s'allumait jamais dans
+// un onglet non affiché), alors qu'ici l'état est recalculé au moment voulu.
+function majMiniEss(){
   const bar=document.getElementById("miniEss"), ess=document.getElementById("essentiel");
   if(!bar) return;
+  const vide = !bar.innerHTML;
+  const cache = !ess || getComputedStyle(ess).display==="none";
+  const passe = !cache && ess.getBoundingClientRect().bottom < 4;
+  bar.classList.toggle("on", !!(passe && !vide));
+}
+function brancherMiniEss(){
+  const bar=document.getElementById("miniEss"); if(!bar) return;
   bar.addEventListener("click",()=>{ const e=document.getElementById("essentiel"); if(e) e.scrollIntoView({behavior:"smooth",block:"start"}); });
-  window.addEventListener("resize",placerMiniEss);
-  // Sans IntersectionObserver (vieux navigateur) : on la laisse simplement cachée
-  // plutôt que collée en permanence au-dessus du bloc qu'elle répète.
-  if(!("IntersectionObserver" in window) || !ess) return;
-  new IntersectionObserver(es=>{
-    es.forEach(x=>{ bar.classList.toggle("on", !x.isIntersecting && x.boundingClientRect.top<0 && bar.innerHTML!==""); });
-  },{threshold:0}).observe(ess);
+  let enAttente=false;
+  const surDefilement=()=>{ if(enAttente) return; enAttente=true; requestAnimationFrame(()=>{ enAttente=false; majMiniEss(); }); };
+  window.addEventListener("scroll",surDefilement,{passive:true});
+  window.addEventListener("resize",()=>{ placerMiniEss(); surDefilement(); });
+  majMiniEss();
 }
 // 📏 PREMIÈRE OUVERTURE SUR UN APPAREIL : les plus longs panneaux secondaires
 // arrivent repliés (sinon 21 000 px à faire défiler avant d'avoir tout vu).
