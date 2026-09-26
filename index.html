@@ -3648,7 +3648,11 @@ function demoFallback(msg){
   setBanner(msg);
 }
 function showReauth(){ openGate("🔑 Ta session a expiré — reconnecte-toi."); }
-let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null;
+// 🕒 DERNIERE_LECTURE_OK : l'heure de la dernière lecture RÉUSSIE du cerveau.
+// Sans elle, l'en-tête gardait « mis à jour à l'instant » pendant toute la première
+// panne — 7 s avant la nouvelle tentative, puis tant que les échecs n'étaient pas
+// au nombre de deux — au-dessus de chiffres venus du cache.
+let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null, DERNIERE_LECTURE_OK=0;
 /* ── La ferme iPhone dans les cartes ──────────────────────────────────────
    Elle tourne sur le PC (localhost:8770), pas sur Railway : le cerveau ne peut
    pas aller la sonder, c'est ELLE qui pousse son état toutes les 5 min. On le
@@ -3824,6 +3828,7 @@ async function load(){
     await Promise.all([fermeDansLesCartes(tools), oneupDansLesCartes(tools)]);
     render(tools);
     try{ localStorage.setItem("ccn_lastdata", JSON.stringify(tools)); }catch(_){}
+    DERNIERE_LECTURE_OK = Date.now();
     $("#sub").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) + " · mis à jour à l'instant";
     $("#footnote").textContent = new Date().toLocaleString("fr-FR");
     setBanner("");
@@ -3833,6 +3838,17 @@ async function load(){
     let cached=null; try{ cached = TOKEN ? JSON.parse(localStorage.getItem("ccn_lastdata")||"null") : null; }catch(_){}
     if(cached){
       IS_LIVE=true; try{ render(cached); }catch(_){}
+      // ⚠️ (26/09) L'EN-TÊTE DISAIT « MIS À JOUR À L'INSTANT » PENDANT LA PANNE.
+      // L'anti-blip ci-dessous ne doit porter que sur le BANDEAU bruyant : l'heure
+      // des chiffres, elle, doit être vraie dès le premier échec — sinon on regarde
+      // le cache en croyant regarder du direct. Même défaut que le badge de
+      // fraîcheur, déjà corrigé deux fois dans ce fichier.
+      try{
+        const _ts=(typeof DERNIERE_LECTURE_OK!=="undefined"&&DERNIERE_LECTURE_OK)||0;
+        const _quand=_ts?new Date(_ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):null;
+        $("#sub").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})
+          + (_quand?(" · chiffres de "+_quand+" (pas à jour)"):" · chiffres en mémoire (pas à jour)");
+      }catch(_){}
       // Un blip isolé passe inaperçu ; on n'alerte qu'après 2 échecs d'affilée.
       if(OFFLINE_FAILS>=2){ $("#sub").textContent="Reconnexion…"; setBanner("📶 Reconnexion en cours… tes chiffres restent affichés."); }
       // Retente vite tant que c'est coupé (sans empiler les timers).

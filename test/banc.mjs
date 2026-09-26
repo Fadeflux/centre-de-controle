@@ -3328,4 +3328,64 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   });
 }
 
+// ============ L'EN-TETE NE DIT PLUS « A JOUR » PENDANT UNE PANNE (26/09) =====
+// Ce qu'André LISAIT : « mardi 26 septembre · mis à jour à l'instant », au-dessus
+// de chiffres venus du cache. La nouvelle tentative est à 7 s, et le texte
+// « Reconnexion… » n'arrivait qu'au DEUXIÈME échec d'affilée.
+{
+  verifie("En-tête : l'heure de la dernière lecture réussie est retenue",
+    /DERNIERE_LECTURE_OK\s*=\s*Date\.now\(\)/.test(src), "rien ne note l'heure du dernier succès");
+  verifie("En-tête : la variable est bien déclarée (sinon la page casse en mode strict)",
+    /let LOADING=false, OFFLINE_FAILS=0, OFFLINE_TIMER=null, DERNIERE_LECTURE_OK=0;/.test(src),
+    "variable utilisée sans déclaration");
+  const iCache = src.indexOf('IS_LIVE=true; try{ render(cached); }catch(_){}');
+  const blocCache = iCache < 0 ? "" : src.slice(iCache, iCache + 1600);
+  verifie("En-tête : dès le PREMIER échec, il dit l'heure réelle des chiffres",
+    /chiffres de "\+_quand/.test(blocCache), "l'en-tête garde « mis à jour à l'instant »");
+  verifie("En-tête : sans heure connue, il dit quand même « pas à jour »",
+    /chiffres en mémoire \(pas à jour\)/.test(blocCache), "silence quand l'heure est inconnue");
+  verifie("En-tête : l'anti-blip ne porte plus que sur le BANDEAU bruyant",
+    (() => {
+      // ⚠️ `indexOf` rend -1 quand la phrase MANQUE : sans ce test d'existence,
+      // le contrôle passait au vert sur la version d'AVANT (-1 < n'importe quoi).
+      const a = blocCache.indexOf('chiffres de "+_quand');
+      const b = blocCache.indexOf('OFFLINE_FAILS>=2');
+      return a >= 0 && b > a;
+    })(),
+    "l'heure honnête est absente, ou encore derrière le compteur d'échecs");
+  verifie("En-tête : le bandeau bruyant reste réservé au 2e échec (pas de bruit sur un blip)",
+    /OFFLINE_FAILS>=2/.test(blocCache) && /Reconnexion en cours/.test(blocCache), "anti-blip perdu");
+
+  // La phrase, rejouée : on ne veut PAS « à l'instant » sur du cache.
+  {
+    const ts = new Date("2026-09-26T09:12:00Z").getTime();
+    const quand = new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const phrase = "mardi 26 septembre · chiffres de " + quand + " (pas à jour)";
+    verifie("En-tête : la phrase produite ne contient plus « à l'instant »",
+      !/à l'instant/.test(phrase) && /pas à jour/.test(phrase), phrase);
+  }
+}
+
+// ======= LA PREVISION « METHODE » : VERIFIEE, PAS UN DEFAUT (26/09) ==========
+// Soupçon de la revue : 4 endroits exigent `method==="smart"`, 3 non — donc deux
+// projections différentes sur le même écran. Vérification faite : `projBrutOF()`
+// est la source unique, volontairement indifférente à la méthode, et les 4 autres
+// endroits distinguent l'affichage « 🧠 prévision » (avec fourchette, qui n'existe
+// QUE pour la méthode intelligente) de « 🔮 à ce rythme » (règle de trois). Rien à
+// corriger — ces contrôles empêchent la confusion de s'installer plus tard.
+{
+  verifie("Prévision : une seule source (projBrutOF) pour le chiffre projeté",
+    /function projBrutOF\(\)/.test(src) && /function projNetMois\(\)\{ return projBrutOF\(\)/.test(src),
+    "la projection est recalculée à la main quelque part");
+  verifie("Prévision : la source unique n'exige PAS la méthode intelligente",
+    (() => {
+      const i = src.indexOf("function projBrutOF()");
+      return i > 0 && !/method==="smart"/.test(src.slice(i, i + 400));
+    })(), "une règle de trois serveur serait jetée au profit d'un calcul équivalent");
+  verifie("Prévision : la règle de trois est DITE (« à ce rythme »), pas cachée",
+    /🔮 À ce rythme/.test(src), "aucune prévision affichée quand l'historique est court");
+  verifie("Prévision : la fourchette n'est promise QUE par la méthode intelligente",
+    /🧠 Prévision/.test(src) && /FG\.low!=null/.test(src), "fourchette annoncée sans fourchette");
+}
+
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
