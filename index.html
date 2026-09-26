@@ -223,6 +223,7 @@
   .mini-ess .me-fig{display:flex;gap:6px;align-items:baseline;white-space:nowrap}
   .mini-ess .me-l{color:var(--muted);font-size:11px}
   .mini-ess .me-v{font-weight:700;font-size:13px}
+  .mini-ess .me-ko .me-v{color:#facc15}
   .mini-ess .me-act{margin-left:auto;white-space:nowrap;font-size:11.5px;color:#f87171;font-weight:600}
   @media (max-width:640px){ .mini-ess{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--bg) 96%,transparent);gap:12px} }
   @media print{ .mini-ess{display:none !important} }
@@ -4429,7 +4430,8 @@ async function openBriefHistory(){
     const zone=ov.querySelector("#briefHistBody"); if(!zone) return;
     if(!hist.length){ zone.innerHTML=`<div class="tg-empty">Pas encore de briefing enregistré.</div>`; return; }
     hist.sort((a,b)=>(b.ts||0)-(a.ts||0));
-    zone.innerHTML=hist.slice(0,30).map(h=>{
+    const _resteB=Math.max(0, hist.length-30);
+    zone.innerHTML=(_resteB?`<div class="sv-note">Les <b>30</b> plus récents sur <b>${hist.length}</b>.</div>`:"")+hist.slice(0,30).map(h=>{
       const d=h.date?new Date(h.date+"T12:00:00Z").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}):"?";
       const ic=(h.mode==="evening"||h.mode==="soir")?"🌙":"☀️";
       return `<div class="bh-item"><div class="bh-d">${ic} ${escapeHtml(d)}</div><div class="bh-t">${escapeHtml(h.text)}</div>${h.action?`<div class="bh-a">🎯 ${escapeHtml(h.action)}</div>`:""}</div>`;
@@ -4564,12 +4566,14 @@ async function saveOnlyChatGoal(g){
 function renderOcSales(d){
   const sales=Array.isArray(d.recentSales)?d.recentSales:[];
   if(!sales.length) return "";
+  const _resteV=Math.max(0, sales.length-8);
   const rows=sales.slice(0,8).map(s=>{
     const dt=new Date(s.date);
     const when=isNaN(dt.getTime())?"":dt.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+" "+dt.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
     return `<div class="oc-sale-row"><span class="oc-sale-who">${escapeHtml(s.fanUsername||"?")}</span><span class="oc-sale-model">${escapeHtml(s.creator||"")}</span><span class="oc-sale-amt">${tgMoney(s.amount)}</span><span class="oc-sale-when">${when}</span></div>`;
   }).join("");
-  return `<div class="oc-chart-cap">🛒 Dernières ventes</div><div class="oc-sales">${rows}</div>`;
+  // (26/09) « Dernieres ventes » : on dit sur combien on montre 8.
+  return `<div class="oc-chart-cap">🛒 Dernières ventes${_resteV?` <span class="sv-note" style="font-weight:400">(8 sur ${sales.length})</span>`:""}</div><div class="oc-sales">${rows}</div>`;
 }
 
 // 📈 Historique hebdo (unlockRatio/LTV) — pour voir si le script de vente
@@ -4939,7 +4943,10 @@ function renderTgrev(){
   const srcKeys=Object.keys(perM).sort((a,b)=>perM[b]-perM[a]);
   const srcLine = srcKeys.length>1 ? `<div class="tg-src">Ce mois par modèle : ${srcKeys.map(m=>`${escapeHtml(m)} <b>${tgMoney(perM[m])}</b>`).join(" · ")}</div>` : "";
   if(!TGREV.length){ list.innerHTML=`<div class="tg-empty">Aucune saisie manuelle — normal si tout passe par OnlyChat.</div>`; return; }
-  list.innerHTML=srcLine+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${tgMoney(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
+  // ⚠️ (26/09) Au-delà de 60 saisies, les suivantes étaient INATTEIGNABLES : on ne
+  // pouvait même plus en supprimer une fausse, et rien ne disait qu'il en restait.
+  const _resteTg=Math.max(0, TGREV.length-60);
+  list.innerHTML=srcLine+(_resteTg?`<div class="tg-empty">Les <b>60</b> plus récentes sur <b>${TGREV.length}</b> — les autres ne sont pas affichées ici (les totaux, eux, les comptent toutes).</div>`:"")+TGREV.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60).map(x=>`<div class="tg-row"><span class="tg-d">${new Date(x.ts||0).toLocaleDateString("fr-FR")}</span><span class="tg-n">${x.model?`<span class="tg-mtag">${escapeHtml(x.model)}</span> `:""}${escapeHtml(x.note||"—")}${Number(x.subs)>0?` · ${Number(x.subs)} pers.`:""}</span><span class="tg-a">${tgMoney(Number(x.amount)||0)}</span><button class="tg-del" data-tgdel="${escapeHtml(x.id)}" aria-label="Supprimer">✕</button></div>`).join("");
 }
 // ⚠️ Une saisie manuelle (utile quand OnlyChat est tombé) change l'argent du
 // mois : il faut rafraîchir AUSSI la tuile « Net du mois », « Mon année » et
@@ -4999,9 +5006,24 @@ function saveLeakwatch(){ localStorage.setItem("ccn_leakwatch", JSON.stringify(L
   if(!TOKEN) return;
   if(!LW_LOADED){ LW_DIRTY=true; if(typeof toast==="function") toast("⏳ Surveillance en attente","Le serveur n'a pas encore répondu : l'envoyer maintenant effacerait les autres modèles surveillés. Ça partira tout seul dès qu'il répond.");
     return; }
+  // ⚠️ (26/09) SEUL ENREGISTREMENT DU FICHIER SANS MESSAGE D'ECHEC. Les douze autres
+  // disent « ⚠️ … NON enregistré » quand le serveur refuse ; celui-ci se taisait, et
+  // « 🛡️ Surveillance activée » restait à l'écran. Un refus durable laissait donc
+  // croire qu'un modèle est surveillé alors qu'il ne l'est pas — sur le radar
+  // anti-fuite, c'est-à-dire là où ça coûte le plus cher.
   fetch(HUB_BASE+"/api/hub/leak-watch",{method:"POST",headers:{"content-type":"application/json","x-hub-token":TOKEN},body:JSON.stringify({watch:LEAKWATCH})})
-    .then(r=>{ LW_DIRTY = !r.ok; })
-    .catch(()=>{ LW_DIRTY=true; });
+    .then(r=>{
+      LW_DIRTY = !r.ok;
+      if(!r.ok && typeof toast==="function"){
+        toast("⚠️ Surveillance NON enregistrée",
+          "Le serveur a refusé ("+r.status+") : ce modèle n'est PAS surveillé. Je réessaie au prochain changement — ne compte pas dessus d'ici là.");
+      }
+    })
+    .catch(()=>{
+      LW_DIRTY=true;
+      if(typeof toast==="function") toast("⚠️ Surveillance NON enregistrée",
+        "Le serveur n'a pas répondu : ce modèle n'est PAS surveillé pour l'instant.");
+    });
 }
 async function loadLeakwatch(){
   if(TOKEN){
@@ -5018,7 +5040,21 @@ async function loadLeakwatch(){
   } else { LW_LOADED=true; }   // démo : rien à écraser
   renderWatch();
 }
-async function loadLeaks(){ if(!TOKEN){ LEAKS=[]; renderLeaks(); return; } try{ const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}}); if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; } }catch(e){} renderLeaks(); if(typeof renderActions==="function") renderActions(); }
+// ⚠️ (26/09) « ✅ RIEN » S'AFFICHAIT QUAND LA LECTURE AVAIT ECHOUE. L'erreur etait
+// avalee et `LEAKS` restait vide : l'ecran annoncait « Rien pour l'instant » et
+// « Aucune fuite detectee ce mois-ci », en vert, sur le panneau d'une agence dont le
+// contenu fuite. « Rien » et « je ne sais pas » ne menent pas a la meme decision.
+let LEAKS_KO=false;
+async function loadLeaks(){
+  if(!TOKEN){ LEAKS=[]; LEAKS_KO=false; renderLeaks(); return; }
+  try{
+    const r=await fetch(HUB_BASE+"/api/hub/leaks",{headers:{"x-hub-token":TOKEN}});
+    if(r.ok){ const j=await r.json(); LEAKS=Array.isArray(j.leaks)?j.leaks:[]; LEAKS_KO=false; }
+    else { LEAKS_KO=true; }
+  }catch(e){ LEAKS_KO=true; }
+  // (la file de lectures note deja cet appel : voir window.noterLecture)
+  renderLeaks(); if(typeof renderActions==="function") renderActions();
+}
 function renderWatch(){
   const list=$("#alList"); if(!list) return;
   if(!LEAKWATCH.length){ list.innerHTML=`<div class="al-empty">Aucun modèle surveillé. Ajoute-en un ci-dessus 👆</div>`; return; }
@@ -5026,14 +5062,19 @@ function renderWatch(){
 }
 function renderLeakRoi(){
   const el=$("#alRoi"); if(!el) return;
-  if(!TOKEN || !LEAKS.length){ el.innerHTML=""; return; }
+  if(!TOKEN || (!LEAKS.length && !(typeof LEAKS_KO!=="undefined"&&LEAKS_KO))){ el.innerHTML=""; return; }
   const now=new Date(), moisDeb=new Date(now.getFullYear(),now.getMonth(),1).getTime();
   const ceMois=LEAKS.filter(l=>Number(l.ts)>=moisDeb);
   const detectees=ceMois.length;
   const reposts=ceMois.filter(l=>l.status==="repost"||l.source==="repost").length;
   const dmca=ceMois.filter(l=>l.status==="sent"||Number(l.dmcaTs)>=moisDeb).length;
   const retirees=ceMois.filter(l=>l.status==="removed").length;
-  if(!detectees){ el.innerHTML=`<span class="al-roi-item">✅ Aucune fuite détectée ce mois-ci</span>`; return; }
+  if(!detectees){
+    el.innerHTML=(typeof LEAKS_KO!=="undefined"&&LEAKS_KO)
+      ? `<span class="al-roi-item">⚠️ Radar non lu — ce n'est pas « aucune fuite »</span>`
+      : `<span class="al-roi-item">✅ Aucune fuite détectée ce mois-ci</span>`;
+    return;
+  }
   const mois=now.toLocaleDateString("fr-FR",{month:"long"});
   el.innerHTML=`<span class="al-roi-lbl">📊 En ${escapeHtml(mois)} :</span>`
     +`<span class="al-roi-item">🚨 ${detectees} détectée${detectees>1?"s":""}</span>`
@@ -5045,8 +5086,14 @@ function renderLeaks(){
   const box=$("#alLeaks"), cnt=$("#alLeakCount"); if(!box) return;
   renderLeakRoi();
   const active=LEAKS.filter(l=>l.status!=="ignored"&&l.status!=="removed");
-  if(cnt) cnt.textContent = LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "";
+  if(cnt) cnt.textContent = (typeof LEAKS_KO!=="undefined"&&LEAKS_KO) ? "non lu"
+    : (LEAKS.length ? `${active.length} à traiter · ${LEAKS.length} au total` : "");
   if(!TOKEN){ box.innerHTML=`<div class="al-empty">🔒 Connecte-toi pour activer la surveillance.</div>`; return; }
+  if(typeof LEAKS_KO!=="undefined" && LEAKS_KO){
+    // Lecture ratée : on le DIT au lieu d'un ✅ vert rassurant.
+    box.innerHTML=`<div class="al-empty" style="border-left:3px solid #facc15;padding-left:10px">⚠️ <b>Je n'ai pas pu lire le radar</b> — ce n'est <b>pas</b> « aucune fuite ».<br>Réessaie dans un instant ; si ça dure, le cerveau ne répond pas.</div>`;
+    return;
+  }
   if(!LEAKS.length){ box.innerHTML=`<div class="al-empty">✅ Rien pour l'instant — les fuites détectées apparaîtront ici avec tous les détails.</div>`; return; }
   const stLabel={new:"🔴 nouvelle",sent:"🟡 DMCA envoyé",removed:"🟢 retirée",ignored:"⚪ ignorée",repost:"♻️ repost"};
   box.innerHTML=LEAKS.slice(0,50).map(l=>{
@@ -6372,7 +6419,14 @@ function jfHtml(){
 function renderClassement(){
   const box=$("#classement"); if(!box) return;
   const d=(typeof OM_DATA!=="undefined")?OM_DATA:null;
-  const vas=(d&&Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid&&Number(v.monthSubs)>0);
+  // ⚠️ (26/09) « absent » et « zéro » ne sont pas la même chose, et la MOYENNE ne
+  // doit pas se calculer sur les seuls VA qui ont produit.
+  const _tous=(d&&Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid);
+  const _pasLu=x=>x===null||x===undefined||x==="";
+  const _mesures=_tous.filter(v=>!_pasLu(v.monthSubs));          // 0 compris
+  const _zeros=_mesures.filter(v=>Number(v.monthSubs)===0);
+  const _nonMesures=_tous.filter(v=>_pasLu(v.monthSubs));
+  const vas=_mesures.filter(v=>Number(v.monthSubs)>0);
   if(vas.length<2){ box.style.display="none"; return; }
   box.style.display="block";
   const sorted=vas.slice().sort((a,b)=>Number(b.monthSubs)-Number(a.monthSubs));
@@ -6391,9 +6445,19 @@ function renderClassement(){
       +`<span class="cl-pct" title="Fait mieux que ${pct}% de l'équipe ce mois">devant ${pct}%</span>`
       +`</div>`;
   }).join("");
-  const moy=Math.round(sorted.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)/n);
+  // ⚠️ (26/09) LA MOYENNE EXCLUAIT LES VA A 0. Mesuré : 60, 40, 20, 0, 0 affichait
+  // « 40 subs » au lieu de 24 (+67 %). Elle se calcule maintenant sur tous les VA
+  // MESURÉS — un VA à 0 fait partie de l'équipe, c'est même lui qu'il faut relancer.
+  const _nMoy=_mesures.length;
+  const moy=_nMoy?Math.round(_mesures.reduce((a,v)=>a+(Number(v.monthSubs)||0),0)/_nMoy):0;
+  const _zerosTxt=_zeros.length
+    ? ` · ⚠️ <b>${_zeros.length}</b> VA à <b>0</b> ce mois (${_zeros.slice(0,6).map(v=>escapeHtml(v.va)).join(", ")}${_zeros.length>6?` +${_zeros.length-6}`:""}) — ils ne sont pas dans le classement`
+    : "";
+  const _nonLusTxt=_nonMesures.length
+    ? ` · ⏳ <b>${_nonMesures.length}</b> pas encore mesuré(s) (${_nonMesures.slice(0,4).map(v=>escapeHtml(v.va)).join(", ")}${_nonMesures.length>4?` +${_nonMesures.length-4}`:""}) : ce n'est <b>pas</b> zéro`
+    : "";
   $("#classementBody").innerHTML = rows
-    + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois · « devant X% » = part de l'équipe que ce VA dépasse.</div>`
+    + `<div class="pcumul-tip">Moyenne de l'équipe : <b>${fmtInt(moy)} subs</b> ce mois (sur <b>${_nMoy}</b> VA mesurés) · « devant X% » = part de l'équipe que ce VA dépasse.${_zerosTxt}${_nonLusTxt}</div>`
     + horsEquipeLigne();
 }
 
@@ -6537,8 +6601,22 @@ document.addEventListener("click",e=>{
 });
 
 /* ---------- ⚠️ #3 risque de concentration (front, depuis OM_DATA) ---------- */
-function ccBlock(title, arr, hint){
-  if(!arr || arr.length<2) return "";
+function ccBlock(title, arr, hint, illisibles){
+  // ⚠️ (26/09) CE BLOC MENTAIT QUAND UNE SOURCE ETAIT ILLISIBLE. Une valeur absente
+  // (net/rev = null) devenait 0 puis disparaissait de la liste : le total retrecissait
+  // et les parts des autres gonflaient — au point de faire passer le verdict de
+  // « Concentre » a « Tres concentre » et de nommer le mauvais premier. Le frere
+  // `renderPie` dit deja « ce total est un MINIMUM » : meme regle ici.
+  const _ill = Array.isArray(illisibles) ? illisibles.filter(Boolean) : [];
+  const _noteIll = _ill.length
+    ? `<div class="cc-hint" style="border-left:3px solid #facc15;padding-left:8px">⚠️ <b>${_ill.map(escapeHtml).join(", ")}</b> n'a pas pu être lu : les pourcentages ci-dessous sont calculés <b>sans</b>, ils sont donc <b>trop hauts</b>, et le premier du classement peut être faux.</div>`
+    : "";
+  if(!arr || arr.length<2){
+    // Avant : le bloc disparaissait en silence (2 sources dont une illisible).
+    return _ill.length
+      ? `<div class="cc-block"><div class="cc-title">${title}</div>${_noteIll}</div>`
+      : "";
+  }
   const tot=arr.reduce((a,x)=>a+x.val,0)||1;
   const top1=arr[0], top1pct=Math.round(top1.val/tot*100);
   const top3pct=Math.round(arr.slice(0,3).reduce((a,x)=>a+x.val,0)/tot*100);
@@ -6548,6 +6626,7 @@ function ccBlock(title, arr, hint){
   const niv = top1pct>=50?["🔴","Très concentré"]:top1pct>=35?["🟠","Concentré"]:["🟢","Bien réparti"];
   const bars=arr.slice(0,6).map(x=>{ const p=Math.round(x.val/tot*100); return `<div class="cc-row"><span class="cc-va">${escapeHtml(x.va)}</span><span class="cc-bar"><span style="width:${p}%"></span></span><span class="cc-pct">${p}%</span></div>`; }).join("");
   return `<div class="cc-block"><div class="cc-title">${title} <span class="cc-lvl">${niv[0]} ${niv[1]}</span></div>`
+    +_noteIll
     +`<div class="cc-kpi">Si <b>${escapeHtml(top1.va)}</b> part, tu perds <b>${top1pct}%</b>. Top 3 = ${top3pct}%. Diversification <b>${divScore}/100</b>.</div>`
     +bars+`<div class="cc-hint">${hint}</div></div>`;
 }
@@ -6557,14 +6636,20 @@ function renderConcentration(){
   const vas=(d&&Array.isArray(d.vas)?d.vas:[]).filter(v=>v&&!v.unpaid);
   if(vas.length<2){ box.style.display="none"; return; }
   box.style.display="block";
+  // ⚠️ (26/09) On sépare « à zéro » (mesuré) de « pas mesuré » (null) : la 2e sorte
+  // ne doit pas disparaître en silence, elle fausse tous les pourcentages.
+  const _pasLu = (x)=> x===null || x===undefined || x==="";
   const bySubs=vas.map(v=>({va:v.va, val:Number(v.monthSubs)||0})).filter(v=>v.val>0).sort((a,b)=>b.val-a.val);
+  const illSubs=vas.filter(v=>_pasLu(v.monthSubs)).map(v=>v.va);
   const rok=(typeof revKo!=="function")||!revKo();
   const byRev=rok? vas.map(v=>({va:v.va, val:Number(v.rev)||0})).filter(v=>v.val>0).sort((a,b)=>b.val-a.val) : [];
+  const illRev=rok? vas.filter(v=>_pasLu(v.rev)).map(v=>v.va) : [];
   const models=(d&&d.models)||{};
   const byModel=rok? Object.keys(models).map(m=>({va:m, val:Number(models[m].net)||0})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val) : [];
-  const html = ccBlock("👥 Par VA (abonnés du mois)", bySubs, "Plus c'est réparti, moins un départ te fait mal.")
-    + (rok? ccBlock("💰 Par VA (revenu généré)", byRev, "Qui pèse vraiment dans ton chiffre, pas juste en volume.") : "")
-    + (rok? ccBlock("🎭 Par modèle (revenu du mois)", byModel, "Un modèle qui pèse trop = risque si son contenu s'essouffle.") : "");
+  const illModel=rok? Object.keys(models).filter(m=>models[m] && _pasLu(models[m].net)) : [];
+  const html = ccBlock("👥 Par VA (abonnés du mois)", bySubs, "Plus c'est réparti, moins un départ te fait mal.", illSubs)
+    + (rok? ccBlock("💰 Par VA (revenu généré)", byRev, "Qui pèse vraiment dans ton chiffre, pas juste en volume.", illRev) : "")
+    + (rok? ccBlock("🎭 Par modèle (revenu du mois)", byModel, "Un modèle qui pèse trop = risque si son contenu s'essouffle.", illModel) : "");
   // 🎲 AJOUTÉ le 2026-08-24 — troisième forme de dépendance, dans le MÊME panneau
   // plutôt qu'un panneau de plus au nom voisin : celle envers tes gros CLIENTS.
   // Les deux blocs au-dessus disent « si un VA ou un modèle s'arrête » ; celui-ci
@@ -6761,7 +6846,9 @@ function renderObjMois(){
       const h=(typeof OBJ_HIST!=="undefined"&&Array.isArray(OBJ_HIST))?OBJ_HIST:[];
       if(!h.length) return "";
       const mois=ym=>{ const p=String(ym||"").split("-"); return (["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"][(+p[1])-1]||"?")+" "+String(p[0]||"").slice(2); };
-      const rows=h.slice(0,12).map(x=>{ const okM=x.pct!=null&&x.pct>=100; return `<div class="pay-h-row"><span>${mois(x.ym)}</span><span class="pay-h-d">objectif ${money((Number(x.goal)||0)*netR)}</span><span class="pay-h-n">fait ${money((Number(x.net)||0)*netR)}</span><span class="pay-h-a">${x.pct!=null?(okM?"✅ ":"")+x.pct+" %":"—"}</span></div>`; }).join("");
+      const _resteH=Math.max(0, h.length-12);
+      const rows=h.slice(0,12).map(x=>{ const okM=x.pct!=null&&x.pct>=100; return `<div class="pay-h-row"><span>${mois(x.ym)}</span><span class="pay-h-d">objectif ${money((Number(x.goal)||0)*netR)}</span><span class="pay-h-n">fait ${money((Number(x.net)||0)*netR)}</span><span class="pay-h-a">${x.pct!=null?(okM?"✅ ":"")+x.pct+" %":"—"}</span></div>`; }).join("")
+        +(_resteH?`<div class="sv-note">Les <b>12</b> derniers mois sur <b>${h.length}</b> enregistrés.</div>`:"");
       return `<details class="pay-hist"><summary>📜 Mes mois passés (objectif vs réalisé)</summary><div class="pay-h-list">${rows}</div></details>`;
     })()}`;
 }
@@ -6969,7 +7056,9 @@ function renderCohortes(){
   } else if(d.soloDrivers && d.soloDrivers.perSrc && d.soloDrivers.perSrc.length){
     // Pas encore 2 mois à comparer : on explique qui tire la moyenne vers le haut/bas.
     const sd=d.soloDrivers;
-    const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${String(p.share).replace(".",",")} %</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("");
+    const _resteSrc=Math.max(0, sd.perSrc.length-6);
+    const rows=sd.perSrc.slice(0,6).map(p=>`<div>${escapeHtml(p.src)} : <b>${String(p.share).replace(".",",")} %</b> des fans, ${money(p.avg)} chacun → tire la moyenne de <b>${p.pull>=0?"+":""}${money(p.pull)}</b></div>`).join("")
+      +(_resteSrc?`<div class="sv-note">… et ${_resteSrc} autre(s) source(s), non détaillée(s) ici.</div>`:"");
     why=`<div class="co-why"><div class="co-why-h">🔍 Pourquoi la dépense moyenne (net) est de ${money(sd.avg)}</div>`
       +(d.why?`<div class="co-ai">${escapeHtml(d.why)}</div>`:"")
       +`<div class="co-facts">${rows}<div>Médiane ${money(sd.median)} · plus gros fan ${String(sd.whale).replace(".",",")} %${sd.whale>=50?" ⚠️ un gros fan tire la moyenne":""}</div></div>`
@@ -6988,6 +7077,7 @@ function renderCohortes(){
     // étaient faussement marqués « à coacher ⚠️ ».
     const teamAvg=(COHORTES&&COHORTES.qualityMoyenne!=null)?Number(COHORTES.qualityMoyenne):(totF>0?real.reduce((a,q)=>a+(Number(q.avg)||0)*(Number(q.fans)||0),0)/totF:0);
     qual=`<div class="co-qual"><div class="co-why-h">💎 Qualité des fans par VA (dépense 30 j, <b>net</b>)</div>`
+      +((d.quality.length>8)?`<div class="sv-note">Les <b>8</b> premiers sur <b>${d.quality.length}</b> — la source elle-même est déjà un top.</div>`:"")
       +d.quality.slice(0,8).map(q=>{
         const low=teamAvg>0&&(Number(q.fans)||0)>=15&&(Number(q.avg)||0)<teamAvg*0.5&&q.va!=="(inconnu)";
         return `<div class="cc-row"><span class="cc-va">${escapeHtml(q.va)}${low?' <span class="cc-low" title="Fans à faible dépense — à coacher sur le ciblage">⚠️</span>':''}</span><span class="cc-bar"><span style="width:${Math.round((Number(q.avg)||0)/max*100)}%"></span></span><span class="cc-pct">${money(q.avg)}</span></div>`;
@@ -12995,17 +13085,47 @@ function renderCharge(){
 function jumpPanel(id){
   const el=document.getElementById(id); if(!el) return;
   try{ _userScrolled=true; }catch(e){}
+  // ⚠️ (26/09) CINQ ALERTES SUR QUATORZE MENAIENT A UN CLIC MORT. Le centre démarre
+  // en « mode essentiel » : 26 panneaux sont masqués sans que l'opérateur ait rien
+  // décoché — dont `decroche`, `opportunites`, `churn`, `ghosts` et `anomalies`, vers
+  // lesquels la file « à faire » envoie justement. La bulle l'accusait en plus à tort
+  // (« tu l'as décoché »), trois de ces panneaux n'ont aucun autre chemin (ils sont
+  // aussi retirés de la barre de navigation), et si la section était repliée AUCUNE
+  // bulle n'apparaissait : clic parfaitement mort.
+  // S'il clique sur l'alerte, c'est qu'il veut voir ce panneau : on le réaffiche, on
+  // retient le choix, et on le DIT.
+  let _reaffiche=false;
+  if(el.classList.contains("user-hidden")){
+    el.classList.remove("user-hidden");
+    _reaffiche=true;
+    try{
+      const brut=localStorage.getItem("ccn_hidden_panels");
+      const base=(brut==null && typeof ESSENTIEL_MASQUES!=="undefined")
+        ? ESSENTIEL_MASQUES.slice()
+        : (JSON.parse(brut||"[]")||[]);
+      localStorage.setItem("ccn_hidden_panels",
+        JSON.stringify((Array.isArray(base)?base:[]).filter(x=>x!==id)));
+    }catch(e){}
+    // `marquerChoix` : à partir d'ici c'est SON réglage qui fait loi (même règle
+    // que le sélecteur ⚙️ → 🧩). `peindre` reconstruit la barre de sections, d'où
+    // les panneaux masqués sont retirés — sans ça, le panneau réapparaît mais reste
+    // absent de la navigation.
+    try{ if(typeof marquerChoix==="function") marquerChoix(); }catch(e){}
+    try{ if(typeof peindre==="function") peindre(); }catch(e){}
+  }
   // Sort de l'accueil léger puis déplie la catégorie si besoin (sinon le clic
   // viserait un panneau masqué et semblerait mort).
   const leger=(typeof accueilLegerActif==="function")&&accueilLegerActif(); if(leger) toutVoir();
   // Même piège du court-circuit que dans scrollToPanel : on appelle les deux.
   const _cat2 = (typeof expandCatOf==="function") ? expandCatOf(el) : false;
   const _pan2 = (typeof deplierPanneau==="function") ? deplierPanneau(el) : false;
-  const deplie = _cat2 || _pan2 || leger;
-  // Toujours invisible après dépliage = panneau masqué par l'opérateur (⚙️ 🧩)
-  // ou vide. On le DIT au lieu de laisser croire à un bouton cassé.
+  const deplie = _cat2 || _pan2 || leger || _reaffiche;
+  if(_reaffiche && typeof toast==="function"){
+    toast("👀 Panneau réaffiché","Il était masqué par le mode essentiel du départ. Il reste visible ; tu peux le remasquer dans ⚙️ → 🧩.");
+  }
+  // Toujours invisible après tout ça = le panneau n'a rien à montrer.
   if(!deplie && el.getClientRects().length===0){
-    if(typeof toast==="function") toast("👀 Panneau masqué","Il n'a pas de données pour l'instant, ou tu l'as décoché dans ⚙️ → 🧩.");
+    if(typeof toast==="function") toast("👀 Panneau vide","Il n'a pas de données pour l'instant — rien à voir de ce côté.");
     return;
   }
   const go=()=>el.scrollIntoView({behavior:"smooth",block:"start"});
@@ -13178,7 +13298,16 @@ function renderMiniEss(){
   try{ const choix=essTuilesChoisies(); tuiles=essTuilesCatalogue().filter(x=>choix.includes(x.k)); }catch(e){ return; }
   if(!tuiles.length){ bar.classList.remove("on"); return; }
   const nb=(typeof LAST_ACTIONS!=="undefined"&&Array.isArray(LAST_ACTIONS))?LAST_ACTIONS.length:0;
-  bar.innerHTML=tuiles.map(x=>`<span class="me-fig"><span class="me-l">${escapeHtml(MINI_ESS_L[x.k]||x.l)}</span><span class="me-v">${escapeHtml(String(x.v))}</span></span>`).join("")
+  // ⚠️ (26/09) LE DRAPEAU « pas mesuré » ETAIT JETE ICI. La tuile d'accueil affiche
+  // un sablier jaune quand la source n'a pas répondu ; cette barre n'affichait que le
+  // libellé et la valeur. Or « Telegram ce mois » peut rendre un CHIFFRE (d'anciennes
+  // saisies) tout en n'étant pas mesuré : sur la barre qu'on lit toute la journée en
+  // défilant, il passait pour une mesure propre.
+  bar.innerHTML=tuiles.map(x=>{
+    const pasMesure = (x && x.ok === false);
+    const titre = pasMesure ? ` title="Cette source n'a pas répondu — ce chiffre n'est pas mesuré."` : "";
+    return `<span class="me-fig${pasMesure?" me-ko":""}"${titre}><span class="me-l">${escapeHtml(MINI_ESS_L[x.k]||x.l)}</span><span class="me-v">${pasMesure?"⏳ ":""}${escapeHtml(String(x.v))}</span></span>`;
+  }).join("")
     +(nb?`<span class="me-act">🎯 ${nb} à faire</span>`:"");
   placerMiniEss();
   try{ majMiniEss(); }catch(e){}
@@ -13496,8 +13625,29 @@ function renderEcheances(){
   if(!TOKEN){ box.style.display="none"; return; }
   box.style.display="block";
   const badge=$("#echBadge");
-  const alerte=ECHEANCES.filter(e=>e&&e.etat&&e.etat!=="ok").length;
-  if(badge){ badge.textContent=alerte?(alerte+" à surveiller"):""; badge.style.display=alerte?"":"none"; }
+  // ⚠️ (26/09) LA PASTILLE IGNORAIT LES TROIS ECHEANCES MESUREES. Elle ne comptait
+  // que les dates tapées à la main — or on n'en tape aucune, donc elle était toujours
+  // vide. Et quand le panneau est replié, la pastille est la SEULE chose qui reste
+  // visible : cookie GetMySocial dépassé + panneau replié = « rien à surveiller ».
+  const alerteMain=ECHEANCES.filter(e=>e&&e.etat&&e.etat!=="ok").length;
+  let alerteMes=0, nonMesure=0;
+  try{
+    (echeancesMesurees()||[]).forEach(l=>{
+      if(!l) return;
+      if(!l.j){ nonMesure++; return; }               // « je ne sais pas » ≠ « tout va bien »
+      // Seuil identique au bloc mesuré juste en dessous : ≤ 7 jours = à surveiller.
+      if(!l.j.mini && Number(l.j.n)<=7) alerteMes++;
+    });
+  }catch(e){}
+  const alerte=alerteMain+alerteMes;
+  if(badge){
+    badge.textContent = alerte ? (alerte+" à surveiller")
+      : (nonMesure ? (nonMesure+" non mesuré"+(nonMesure>1?"s":"")) : "");
+    badge.style.display = (alerte||nonMesure) ? "" : "none";
+    badge.title = alerte
+      ? "Dont "+alerteMes+" mesuré(s) tout seul (cookie, proxy, solde) et "+alerteMain+" saisi(s) à la main."
+      : (nonMesure ? "Aucune mesure reçue pour "+nonMesure+" ligne(s) : ce n'est pas « tout va bien »." : "");
+  }
   if(!ECHEANCES.length){
     // ⚠️ CE RETOUR ANTICIPÉ SAUTAIT LE BLOC MESURÉ — c'est-à-dire précisément
     // dans le cas réel (aucune date tapée à la main, parce qu'on ne les tape

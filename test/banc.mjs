@@ -24,7 +24,12 @@
 // Banc d'essai : on rejoue la COURSE reelle, on ne relit pas le code.
 import fs from "fs";
 const FICH = process.argv[2] || new URL("../index.html", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,"$1");
-const src = fs.readFileSync(FICH,"utf8");
+// ⚠️ (26/09) FINS DE LIGNE NORMALISEES A LA LECTURE. index.html est en CRLF sur
+// cette machine ; toute ancre ecrite avec « \n » devient introuvable, et le bloc
+// qu'elle garde est saute EN SILENCE. Sept controles de la file de lectures ne
+// tournaient plus, masques par un unique KO.
+const lire = (f) => fs.readFileSync(f, "utf8").replace(/\r\n/g, "\n");
+const src = lire(FICH);
 function morceau(debut, fin){
   const i = src.indexOf(debut); if(i<0) throw new Error("introuvable: "+debut);
   const j = src.indexOf(fin, i);  if(j<0) throw new Error("fin introuvable: "+fin);
@@ -61,6 +66,32 @@ function neuf(reponseGet, delaiMs){
 let ko=0;
 function verifie(nom, cond, detail){ if(cond){ console.log("  OK  "+nom); } else { ko++; console.log("  KO  "+nom+" -> "+detail); } }
 const V=verifie;
+
+// ---- 0) LA PAGE SE CHARGE-T-ELLE ? (a poser AVANT tout le reste) ----
+// ⚠️ (26/09) Une apostrophe mal echappee rend la page ENTIEREMENT morte : aucun
+// panneau, aucun chiffre. Le banc s'en apercevait — mais en PLANTANT au milieu d'un
+// autre controle, 2700 lignes plus loin, sous une trace Node illisible. On pose donc
+// la question en premier, et en francais. `new Function` ANALYSE sans executer.
+{
+  const scripts = [];
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(src))) scripts.push(m[1]);
+  V("La page : au moins un script a analyser", scripts.length > 0, scripts.length);
+  let souci = "";
+  scripts.forEach((code, i) => {
+    if (souci) return;
+    try { new Function(code); }
+    catch (e) { souci = "script #" + (i + 1) + " : " + e.message; }
+  });
+  V("La page se charge (aucune erreur de syntaxe — sinon TOUT l'ecran est vide)",
+    !souci, souci);
+  if (souci) {
+    console.log("");
+    console.log("1 ECHEC(S) — la page ne se chargerait pas du tout, on s'arrete ici.");
+    process.exit(1);
+  }
+}
 
 // ---- 1) LA COURSE : lecture en vol, on paie pendant, la reponse est perimee ----
 {
@@ -1381,7 +1412,7 @@ const V=verifie;
   // LE CONTROLE QUI COMPTE : au demarrage, `loadAll()` ne doit plus partir
   // AVANT de savoir si le jeton est bon. C'est ce depart immediat qui franchissait
   // le compteur d'echecs.
-  const src2 = fs.readFileSync(FICH, "utf8");
+  const src2 = lire(FICH);
   V("au demarrage, loadAll attend la premiere lecture",
     /PREMIER_LOAD[\s\S]{0,400}loadAll\(\)/.test(src2),
     "loadAll() repart sans attendre : la rafale revient");
@@ -1399,7 +1430,7 @@ const V=verifie;
 // Je les ai passes a la main et ils ont trouve de vrais defauts. Mais un audit
 // manuel ne vaut que pour le jour ou on le passe.
 {
-  const src3 = fs.readFileSync(FICH, "utf8");
+  const src3 = lire(FICH);
 
   // ── (a) UN MESSAGE ADRESSE A UN ELEMENT QUI N'EXISTE PAS ──────────────────
   // `flashMsg(id, msg)` fait `if (!el) return;` : il sort EN SILENCE quand sa
@@ -1580,7 +1611,7 @@ const V=verifie;
 // de VA vient d'un nom de lien, et ce sont les VA qui creent leurs liens.
 // Ce banc ferme la porte avant qu'on l'ouvre.
 {
-  const src4 = fs.readFileSync(FICH, "utf8");
+  const src4 = lire(FICH);
   const ligneActions = src4.split("\n").find(l => l.includes('class="act-quick"'));
   V("le rendu des actions est bien la", !!ligneActions);
   if (ligneActions) {
@@ -1919,7 +1950,7 @@ console.log("\n== Cloisonnement : aucun nom ni identifiant d'une autre agence da
   for (const f of ["index.html", "README.md", "manifest.json", "sw.js", "test/banc.mjs"]) {
     const u = new URL(f, racine);
     if (!fs.existsSync(u)) continue;
-    fs.readFileSync(u, "utf8").split("\n").forEach((l, n) => { if (interdits(l).length) trouves.push(f + ":" + (n + 1)); });
+    lire(u).split("\n").forEach((l, n) => { if (interdits(l).length) trouves.push(f + ":" + (n + 1)); });
   }
   V("aucun nom ni identifiant d'une autre agence", trouves.length === 0, trouves.join(", "));
 }
@@ -3196,6 +3227,105 @@ verifie("VA : plus aucun tableau de VA coupe aux 20 premiers en silence",
   verifie("Cadres : chaque outil ouvert en interne est autorisé (aucun cadre blanc)",
     bloc.length > 0 && manquants.length === 0, manquants.join(", "));
   verifie("Cadres : la liste reste FERMÉE (pas de joker https:)", !/frame-src[^;]*\*|frame-src[^;]*https:(\s|;|$)/.test(csp), frame);
+}
+
+// ================= REVUE EN AGENTS DU 26/09 ==================================
+// Chaque controle dit ce que l'operateur LISAIT avant, et ce qu'il en concluait.
+{
+  // --- 1) RISQUE DE CONCENTRATION : un modele illisible faisait passer le voyant
+  // en ROUGE et disparaissait de l'ecran. Mesure : Nova 3000, Iris 2000, Luna 4000
+  // illisible -> « Tres concentre · si Nova part tu perds 60 % », et Luna nulle part.
+  // La verite : « Concentre · Luna, 44 % ».
+  const iCC = src.indexOf("function ccBlock(");
+  const blocCC = iCC < 0 ? "" : src.slice(iCC, src.indexOf("function renderConcentration(", iCC));
+  verifie("Concentration : le bloc accepte la liste de ce qui n'a pas pu etre lu",
+    /function ccBlock\(title, arr, hint, illisibles\)/.test(blocCC), "signature inchangee");
+  verifie("Concentration : il le DIT (pourcentages trop hauts, premier peut-etre faux)",
+    /trop hauts/.test(blocCC) && /premier du classement peut être faux/.test(blocCC), "aucune note");
+  verifie("Concentration : 2 sources dont une illisible ne fait plus disparaitre le bloc",
+    /_ill\.length[\s\S]{0,200}cc-block/.test(blocCC), "retour vide silencieux");
+  const iRC = src.indexOf("function renderConcentration(");
+  const blocRC = iRC < 0 ? "" : src.slice(iRC, iRC + 2600);
+  verifie("Concentration : les trois listes passent leurs illisibles",
+    /illSubs/.test(blocRC) && /illRev/.test(blocRC) && /illModel/.test(blocRC), "une liste oubliee");
+
+  // --- 2) CLASSEMENT : « Moyenne de l'equipe » excluait les VA a 0.
+  // Mesure : 60, 40, 20, 0, 0 + un non mesure -> 40 annonce au lieu de 24 (+67 %).
+  const iCL = src.indexOf("function renderClassement(");
+  const blocCL = iCL < 0 ? "" : src.slice(iCL, iCL + 3200);
+  verifie("Classement : la moyenne se calcule sur tous les VA MESURES",
+    /_mesures\.reduce/.test(blocCL) && /_mesures\.length/.test(blocCL), "moyenne toujours sur les >0");
+  verifie("Classement : elle dit sur combien de VA elle porte",
+    /VA mesurés/.test(blocCL), "aucun denominateur affiche");
+  verifie("Classement : les VA a 0 sont nommes (ce sont eux qu'on relance)",
+    /VA à <b>0<\/b> ce mois/.test(blocCL), "les VA a 0 restent invisibles");
+  verifie("Classement : « pas encore mesure » n'est pas confondu avec zero",
+    /pas encore mesuré/.test(blocCL) && /n'est <b>pas<\/b> zéro/.test(blocCL), "absent = 0");
+  // La moyenne, rejouee sur le cas mesure par l'agent.
+  {
+    const vas = [{ va: "A", monthSubs: 60 }, { va: "B", monthSubs: 40 }, { va: "C", monthSubs: 20 },
+                 { va: "D", monthSubs: 0 }, { va: "E", monthSubs: 0 }, { va: "F", monthSubs: null }];
+    const pasLu = (x) => x === null || x === undefined || x === "";
+    const mes = vas.filter(v => !pasLu(v.monthSubs));
+    const moy = Math.round(mes.reduce((a, v) => a + (Number(v.monthSubs) || 0), 0) / mes.length);
+    verifie("Classement : la moyenne du cas mesure tombe sur 24 (et non 40)", moy === 24, moy);
+  }
+
+  // --- 3) ANTI-LEAK : « Rien pour l'instant » s'affichait quand la lecture ratait.
+  const iAL = src.indexOf("async function loadLeaks(");
+  const blocAL = iAL < 0 ? "" : src.slice(iAL, iAL + 1200);
+  verifie("Anti-leak : une lecture ratee est retenue", /LEAKS_KO=true/.test(blocAL), "erreur avalee");
+  verifie("Anti-leak : l'ecran dit « je n'ai pas pu lire » au lieu d'un ✅ vert",
+    /Je n'ai pas pu lire le radar/.test(src), "message rassurant toujours la");
+  verifie("Anti-leak : le bilan du mois ne dit plus « aucune fuite » sans avoir lu",
+    /Radar non lu/.test(src), "bilan toujours vert");
+  verifie("Anti-leak : le compteur du titre le dit aussi", /\? "non lu"/.test(src), "compteur vide");
+
+  // --- 4) « Surveillance activee » annonce avant la reponse du serveur.
+  verifie("Radar : un refus d'enregistrement est DIT (12 autres le font deja)",
+    /Surveillance NON enregistrée/.test(src), "seul enregistrement muet du fichier");
+
+  // --- 5) CLICS MORTS : 5 alertes sur 14 menaient a un panneau masque par defaut.
+  const iJP = src.indexOf("function jumpPanel(");
+  const blocJP = iJP < 0 ? "" : src.slice(iJP, iJP + 2200);
+  verifie("File d'actions : un panneau masque par le mode de depart se REAFFICHE",
+    /classList\.remove\("user-hidden"\)/.test(blocJP), "clic toujours mort");
+  verifie("File d'actions : le choix est retenu", /ccn_hidden_panels/.test(blocJP), "remasque au rechargement");
+  // (le commentaire CITE l'ancien message pour expliquer ce qu'on a retire : on ne
+  // regarde que ce qui est AFFICHE, c'est-a-dire les appels a toast())
+  const _toasts = (blocJP.match(/toast\([^;]*\)/g) || []).join(" ");
+  verifie("File d'actions : on ne l'accuse plus d'avoir decoche le panneau",
+    !/tu l'as décoché/.test(_toasts), "message accusateur toujours affiche");
+  verifie("File d'actions : la barre de navigation est refaite",
+    /peindre\(\)/.test(blocJP), "panneau visible mais absent de la nav");
+
+  // --- 6) PASTILLE « ce qui va expirer » : elle ignorait les 3 mesurees.
+  const iEC = src.indexOf("const alerteMain=ECHEANCES.filter");
+  const blocEC = iEC < 0 ? "" : src.slice(iEC, iEC + 1400);
+  verifie("Echeances : la pastille compte aussi les echeances MESUREES",
+    /echeancesMesurees\(\)/.test(blocEC), "seules les dates tapees a la main comptent");
+  verifie("Echeances : « non mesure » apparait aussi (ce n'est pas « tout va bien »)",
+    /non mesuré/.test(blocEC), "silence quand rien n'est mesure");
+
+  // --- 7) BARRE COLLANTE : le marqueur « pas mesure » etait jete.
+  const iME = src.indexOf("function renderMiniEss(");
+  const blocME = iME < 0 ? "" : src.slice(iME, iME + 1600);
+  verifie("Barre collante : le drapeau « pas mesure » suit la tuile",
+    /x\.ok === false/.test(blocME), "drapeau jete");
+  verifie("Barre collante : et il se VOIT", /me-ko/.test(src), "aucun marqueur visible");
+
+  // --- 8) SEPT LISTES COUPEES EN SILENCE.
+  const listes = [
+    ["qualite des fans par VA", /Les <b>8<\/b> premiers sur/],
+    ["sources de la moyenne", /autre\(s\) source\(s\), non détaillée\(s\)/],
+    ["saisies Telegram", /Les <b>60<\/b> plus récentes sur/],
+    ["objectif du mois", /Les <b>12<\/b> derniers mois sur/],
+    ["historique des briefings", /Les <b>30<\/b> plus récents sur/],
+    ["dernieres ventes", /\(8 sur \$\{sales\.length\}\)/],
+  ];
+  listes.forEach(([nom, re]) => {
+    verifie("Listes : « " + nom + " » dit ce qu'elle coupe", re.test(src), "coupe toujours muette");
+  });
 }
 
 console.log(ko? "\n"+ko+" ECHEC(S)" : "\nTOUT PASSE"); process.exit(ko?1:0);
